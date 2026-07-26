@@ -1,0 +1,470 @@
+// src/errors/error.types.ts
+
+// ========================
+// API Response Types
+// ========================
+export interface ApiErrorResponse {
+  timestamp: string;
+  status: number;
+  error: string;
+  message: string;
+  path: string;
+  errorCode: string;
+  fieldErrors?: FieldError[] | null;
+}
+
+export interface FieldError {
+  field: string;
+  message: string;
+}
+
+/** @deprecated Use ApiErrorResponse */
+export type ErrorResponse = ApiErrorResponse;
+
+export interface ErrorConfig {
+  showNotification?: boolean;
+  notificationType?: 'error' | 'warning' | 'info';
+  customMessage?: string;
+  logToConsole?: boolean;
+}
+
+// ========================
+// Error Category & Severity
+// ========================
+export enum ErrorCategory {
+  NOT_FOUND = 'not_found',
+  VALIDATION = 'validation',
+  PERMISSION = 'permission',
+  SERVER = 'server',
+  BUSINESS = 'business',
+  UPLOAD = 'upload',
+  DATABASE = 'database',
+  STORAGE = 'storage',
+}
+
+export enum ErrorSeverity {
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical',
+}
+
+// ========================
+// AppError (uso interno)
+// ========================
+export interface AppError {
+  code: string;
+  message: string;
+  userMessage: string;
+  status: number;
+  timestamp: Date;
+  path: string;
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  fieldErrors?: FieldError[];
+}
+
+// ========================
+// ErrorCode Enums
+// ========================
+
+export enum GenericErrorCode {
+  INTERNAL_SERVER_ERROR  = 'ERR_001',
+  VALIDATION_ERROR       = 'ERR_002',
+  RESOURCE_NOT_FOUND     = 'ERR_003',
+  UNAUTHORIZED           = 'ERR_004',
+  FORBIDDEN              = 'ERR_005',
+  BAD_REQUEST            = 'ERR_006',
+  CONFLICT               = 'ERR_007',
+  METHOD_NOT_ALLOWED     = 'ERR_008',
+  UNSUPPORTED_MEDIA_TYPE = 'ERR_009',
+  REQUEST_TIMEOUT        = 'ERR_010',
+  RATE_LIMIT_EXCEEDED    = 'ERR_011',
+  SERVICE_UNAVAILABLE    = 'ERR_012',
+}
+
+export enum AssetErrorCode {
+  ASSET_NOT_FOUND                       = 'ASSET_001',
+  ASSET_ALREADY_EXISTS                  = 'ASSET_002',
+  ASSET_CREATE_ERROR                    = 'ASSET_003',
+  ASSET_UPDATE_ERROR                    = 'ASSET_004',
+  ASSET_DELETE_ERROR                    = 'ASSET_005',
+  ASSET_NOT_DELETED                     = 'ASSET_006',
+  ASSET_INVALID_NAME                    = 'ASSET_010',
+  ASSET_INVALID_PRICE                   = 'ASSET_011',
+  ASSET_INVALID_AREA                    = 'ASSET_012',
+  ASSET_INVALID_STATUS                  = 'ASSET_013',
+  ASSET_INVALID_BUSINESS_NATURE         = 'ASSET_014',
+  ASSET_INVALID_COORDINATES             = 'ASSET_015',
+  ASSET_INVALID_YEAR                    = 'ASSET_016',
+  ASSET_AGENCY_NOT_FOUND                = 'ASSET_020',
+  ASSET_INVALID_AGENCY                  = 'ASSET_021',
+  ASSET_TYPE_NOT_FOUND                  = 'ASSET_025',
+  ASSET_SUBTYPE_NOT_FOUND               = 'ASSET_026',
+  ASSET_INVALID_TYPE_SUBTYPE_COMBINATION = 'ASSET_027',
+  ASSET_ENTERPRISE_NOT_FOUND            = 'ASSET_030',
+  ASSET_BUILDING_NOT_FOUND              = 'ASSET_031',
+  ASSET_BUILDING_ENTERPRISE_MISMATCH    = 'ASSET_032',
+  ASSET_ALREADY_HAS_BUILDING            = 'ASSET_033',
+  ASSET_BUILDING_REQUIRED               = 'ASSET_034',
+  ASSET_DEVELOPMENT_NOT_FOUND           = 'ASSET_035',
+  ASSET_LOCATION_NOT_FOUND              = 'ASSET_040',
+  ASSET_LOCATION_CREATE_ERROR           = 'ASSET_041',
+  ASSET_LOCATION_INVALID                = 'ASSET_042',
+  ASSET_MULTIPLE_PRIMARY_LOCATIONS      = 'ASSET_043',
+  ASSET_CONTACT_NOT_FOUND               = 'ASSET_045',
+  ASSET_CONTACT_CREATE_ERROR            = 'ASSET_046',
+  ASSET_CONTACT_ALREADY_LINKED          = 'ASSET_047',
+  ASSET_DESCRIPTION_CREATE_ERROR        = 'ASSET_050',
+  ASSET_DESCRIPTION_UPDATE_ERROR        = 'ASSET_051',
+  ASSET_DESCRIPTION_NOT_FOUND           = 'ASSET_052',
+  ASSET_TAG_NOT_FOUND                   = 'ASSET_055',
+  ASSET_TAG_CREATE_ERROR                = 'ASSET_056',
+  ASSET_TAG_ALREADY_LINKED              = 'ASSET_057',
+  ASSET_TAG_LIMIT_EXCEEDED              = 'ASSET_058',
+  TAG_INVALID                           = 'ASSET_059',
+  ASSET_DIVISION_CREATE_ERROR           = 'ASSET_060',
+  ASSET_DIVISION_UPDATE_ERROR           = 'ASSET_061',
+  ASSET_DIVISION_DELETE_ERROR           = 'ASSET_062',
+  ASSET_TYPOLOGY_NOT_FOUND              = 'ASSET_063',
+  DIVISION_NOT_FOUND                    = 'ASSET_064',
+  DIVISION_EMPTY_LIST                   = 'ASSET_065',
+  ASSET_SETTINGS_CREATE_ERROR           = 'ASSET_066',
+  ASSET_SETTINGS_UPDATE_ERROR           = 'ASSET_067',
+  ASSET_SETTINGS_NOT_FOUND              = 'ASSET_068',
+  ASSET_INACTIVE                        = 'ASSET_070',
+  ASSET_ARCHIVED                        = 'ASSET_071',
+  ASSET_CANNOT_CHANGE_STATUS            = 'ASSET_072',
+  ASSET_STATUS_TRANSITION_INVALID       = 'ASSET_073',
+  ASSET_TYPE_INACTIVE                   = 'ASSET_074',
+  TYPOLOGY_DUPLICATE_SLUG               = 'ASSET_075',
+  ASSET_DUPLICATE_REFERENCE             = 'ASSET_080',
+  ASSET_HAS_DEPENDENCIES                = 'ASSET_081',
+  ASSET_CANNOT_DELETE_WITH_AGENTS       = 'ASSET_082',
+  ASSET_CANNOT_DELETE_WITH_MEDIA        = 'ASSET_083',
+}
+
+export enum AgentErrorCode {
+  AGENT_NOT_FOUND            = 'AGENT_001',
+  AGENT_PROFILE_NOT_FOUND    = 'AGENT_002',
+  AGENT_ALREADY_ASSIGNED     = 'AGENT_003',
+  AGENT_NOT_ASSIGNED_TO_ASSET= 'AGENT_004',
+  AGENT_INVALID_ROLE         = 'AGENT_005',
+  AGENT_INVALID_COMMISSION   = 'AGENT_006',
+  AGENT_CREATE_ERROR         = 'AGENT_007',
+  AGENT_DELETE_ERROR         = 'AGENT_008',
+  AGENT_LIMIT_EXCEEDED       = 'AGENT_009',
+}
+
+export enum ContactErrorCode {
+  CONTACT_NOT_FOUND       = 'CONTACT_001',
+  CONTACT_EMPTY_LIST      = 'CONTACT_002',
+  CONTACT_ROLE_INVALID    = 'CONTACT_003',
+  CONTACT_ALREADY_PRIMARY = 'CONTACT_004',
+}
+
+export enum MediaErrorCode {
+  MEDIA_UPLOAD_ERROR             = 'MEDIA_010',
+  MEDIA_UPLOAD_FAILED            = 'MEDIA_011',
+  MEDIA_INVALID_TYPE             = 'MEDIA_012',
+  MEDIA_SIZE_EXCEEDED            = 'MEDIA_013',
+  MEDIA_EMPTY                    = 'MEDIA_014',
+  MEDIA_CORRUPTED                = 'MEDIA_015',
+  MEDIA_BANNER_UPLOAD_ERROR      = 'MEDIA_020',
+  MEDIA_BANNER_INVALID_TYPE      = 'MEDIA_021',
+  MEDIA_BANNER_SIZE_EXCEEDED     = 'MEDIA_022',
+  MEDIA_BANNER_NOT_FOUND         = 'MEDIA_023',
+  MEDIA_BANNER_DELETE_ERROR      = 'MEDIA_024',
+  MEDIA_GALLERY_UPLOAD_ERROR     = 'MEDIA_030',
+  MEDIA_GALLERY_INVALID_TYPE     = 'MEDIA_031',
+  MEDIA_GALLERY_SIZE_EXCEEDED    = 'MEDIA_032',
+  MEDIA_GALLERY_LIMIT_EXCEEDED   = 'MEDIA_033',
+  MEDIA_GALLERY_NOT_FOUND        = 'MEDIA_034',
+  MEDIA_GALLERY_DELETE_ERROR     = 'MEDIA_035',
+  MEDIA_GALLERY_METADATA_MISMATCH= 'MEDIA_036',
+  MEDIA_NOT_FOUND                = 'MEDIA_040',
+  MEDIA_DELETE_ERROR             = 'MEDIA_041',
+  MEDIA_UPDATE_ERROR             = 'MEDIA_042',
+  MEDIA_DOWNLOAD_ERROR           = 'MEDIA_043',
+  MEDIA_REORDER_ERROR            = 'MEDIA_044',
+  MEDIA_ASSET_NOT_FOUND          = 'MEDIA_045',
+  MEDIA_INVALID_ENTITY_TYPE      = 'MEDIA_046',
+  MEDIA_FETCH_ERROR              = 'MEDIA_047',
+  MEDIA_DUPLICATE_IDS            = 'MEDIA_048',
+  MEDIA_NOT_IN_ASSET             = 'MEDIA_049',
+  MEDIA_DUPLICATE_SORT_ORDERS    = 'MEDIA_050',
+  MEDIA_INVALID_SORT_ORDER       = 'MEDIA_051',
+}
+
+export enum DocumentErrorCode {
+  DOCUMENT_NOT_FOUND        = 'DOC_001',
+  DOCUMENT_CREATE_ERROR     = 'DOC_002',
+  DOCUMENT_UPDATE_ERROR     = 'DOC_003',
+  DOCUMENT_DELETE_ERROR     = 'DOC_004',
+  DOCUMENT_UPLOAD_ERROR     = 'DOC_005',
+  DOCUMENT_DOWNLOAD_ERROR   = 'DOC_006',
+  DOCUMENT_INVALID_TYPE     = 'DOC_007',
+  DOCUMENT_SIZE_EXCEEDED    = 'DOC_008',
+  DOCUMENT_ASSET_NOT_FOUND  = 'DOC_009',
+  DOCUMENT_EMPTY            = 'DOC_010',
+  DOCUMENT_CORRUPTED        = 'DOC_011',
+  DOCUMENT_PROCESSING_ERROR = 'DOC_012',
+}
+
+export enum LicenseErrorCode {
+  LICENSE_NOT_FOUND         = 'LICENSE_001',
+  LICENSE_CREATE_ERROR      = 'LICENSE_002',
+  LICENSE_UPDATE_ERROR      = 'LICENSE_003',
+  LICENSE_DELETE_ERROR      = 'LICENSE_004',
+  LICENSE_UPLOAD_ERROR      = 'LICENSE_005',
+  LICENSE_ASSET_NOT_FOUND   = 'LICENSE_006',
+  LICENSE_INVALID_CLASS     = 'LICENSE_007',
+  LICENSE_INVALID_DATE      = 'LICENSE_008',
+  LICENSE_EXPIRED           = 'LICENSE_009',
+  LICENSE_DUPLICATE_NUMBER  = 'LICENSE_010',
+  LICENSE_INVALID_NUMBER    = 'LICENSE_011',
+  LICENSE_FILE_REQUIRED     = 'LICENSE_012',
+  LICENSE_PROCESSING_ERROR  = 'LICENSE_013',
+}
+
+export enum CharacteristicErrorCode {
+  CHARACTERISTIC_NOT_FOUND       = 'CHAR_001',
+  CHARACTERISTIC_CREATE_ERROR    = 'CHAR_002',
+  CHARACTERISTIC_UPDATE_ERROR    = 'CHAR_003',
+  CHARACTERISTIC_DELETE_ERROR    = 'CHAR_004',
+  CHARACTERISTIC_INVALID_TYPE    = 'CHAR_005',
+  CHARACTERISTIC_INVALID_VALUE   = 'CHAR_006',
+  CHARACTERISTIC_DUPLICATE       = 'CHAR_007',
+  CHARACTERISTIC_ASSET_NOT_FOUND = 'CHAR_008',
+  CHARACTERISTIC_DELETE_ALL_ERROR= 'CHAR_009',
+}
+
+export enum FileErrorCode {
+  FILE_UPLOAD_ERROR       = 'FILE_001',
+  FILE_SIZE_EXCEEDED      = 'FILE_002',
+  FILE_TYPE_NOT_ALLOWED   = 'FILE_003',
+  FILE_NOT_FOUND          = 'FILE_004',
+  FILE_DELETE_ERROR       = 'FILE_005',
+  FILE_DOWNLOAD_ERROR     = 'FILE_006',
+  FILE_CORRUPTED          = 'FILE_007',
+  FILE_EMPTY              = 'FILE_008',
+  FILE_NAME_INVALID       = 'FILE_009',
+  FILE_STORAGE_ERROR      = 'FILE_010',
+  FILE_COMPRESSION_ERROR  = 'FILE_011',
+  FILE_EXTRACTION_ERROR   = 'FILE_012',
+  FILE_MIME_TYPE_INVALID  = 'FILE_013',
+  FILE_EXTENSION_INVALID  = 'FILE_014',
+  FILE_READ_ERROR         = 'FILE_015',
+  IMAGE_INVALID_FORMAT    = 'FILE_020',
+  IMAGE_SIZE_EXCEEDED     = 'FILE_021',
+  IMAGE_DIMENSIONS_INVALID= 'FILE_022',
+  IMAGE_PROCESSING_ERROR  = 'FILE_023',
+  VIDEO_INVALID_FORMAT    = 'FILE_030',
+  VIDEO_SIZE_EXCEEDED     = 'FILE_031',
+  VIDEO_DURATION_EXCEEDED = 'FILE_032',
+  VIDEO_PROCESSING_ERROR  = 'FILE_033',
+  PDF_INVALID_FORMAT      = 'FILE_040',
+  PDF_SIZE_EXCEEDED       = 'FILE_041',
+  PDF_CORRUPTED           = 'FILE_042',
+  PDF_PROCESSING_ERROR    = 'FILE_043',
+}
+
+export enum UploadRequestErrorCode {
+  UPLOAD_REQUEST_NOT_FOUND            = 'UPLOAD_001',
+  UPLOAD_REQUEST_INVALID_STATUS       = 'UPLOAD_002',
+  UPLOAD_REQUEST_ENERGY_DATA_MISSING  = 'UPLOAD_003',
+}
+
+export enum StorageErrorCode {
+  STORAGE_CONNECTION_ERROR   = 'STORAGE_001',
+  STORAGE_UPLOAD_ERROR       = 'STORAGE_002',
+  STORAGE_DELETE_ERROR       = 'STORAGE_003',
+  STORAGE_DOWNLOAD_ERROR     = 'STORAGE_004',
+  STORAGE_BUCKET_NOT_FOUND   = 'STORAGE_005',
+  STORAGE_FILE_NOT_FOUND     = 'STORAGE_006',
+  STORAGE_QUOTA_EXCEEDED     = 'STORAGE_007',
+  STORAGE_PERMISSION_DENIED  = 'STORAGE_008',
+  STORAGE_SIGNED_URL_ERROR   = 'STORAGE_009',
+  STORAGE_INVALID_PATH       = 'STORAGE_010',
+  STORAGE_UPLOAD_TIMEOUT     = 'STORAGE_011',
+  STORAGE_DOWNLOAD_TIMEOUT   = 'STORAGE_012',
+  STORAGE_BUCKET_CREATE_ERROR= 'STORAGE_013',
+  STORAGE_MOVE_ERROR         = 'STORAGE_014',
+  STORAGE_COPY_ERROR         = 'STORAGE_015',
+}
+
+export enum EnterpriseErrorCode {
+  ENTERPRISE_NOT_FOUND      = 'ENT_001',
+  ENTERPRISE_ALREADY_EXISTS = 'ENT_002',
+  ENTERPRISE_CREATE_ERROR   = 'ENT_003',
+  ENTERPRISE_UPDATE_ERROR   = 'ENT_004',
+  ENTERPRISE_DELETE_ERROR   = 'ENT_005',
+  ENTERPRISE_INVALID_NAME   = 'ENT_010',
+  ENTERPRISE_INVALID_NIF    = 'ENT_011',
+  ENTERPRISE_INVALID_EMAIL  = 'ENT_012',
+  ENTERPRISE_INVALID_PHONE  = 'ENT_013',
+  ENTERPRISE_HAS_PROPERTIES = 'ENT_020',
+  ENTERPRISE_HAS_BUILDINGS  = 'ENT_021',
+  ENTERPRISE_HAS_USERS      = 'ENT_022',
+  ENTERPRISE_DUPLICATE_NIF  = 'ENT_030',
+  ENTERPRISE_INACTIVE       = 'ENT_031',
+}
+
+export enum BuildingErrorCode {
+  BUILDING_NOT_FOUND              = 'BUILD_001',
+  BUILDING_ALREADY_EXISTS         = 'BUILD_002',
+  BUILDING_CREATE_ERROR           = 'BUILD_003',
+  BUILDING_UPDATE_ERROR           = 'BUILD_004',
+  BUILDING_DELETE_ERROR           = 'BUILD_005',
+  BUILDING_INVALID_NAME           = 'BUILD_010',
+  BUILDING_INVALID_ADDRESS        = 'BUILD_011',
+  BUILDING_INVALID_FLOORS         = 'BUILD_012',
+  BUILDING_INVALID_YEAR           = 'BUILD_013',
+  BUILDING_HAS_PROPERTIES         = 'BUILD_020',
+  BUILDING_ENTERPRISE_NOT_FOUND   = 'BUILD_021',
+  BUILDING_LOCATION_NOT_FOUND     = 'BUILD_022',
+  BUILDING_DUPLICATE_REFERENCE    = 'BUILD_030',
+  BUILDING_CAPACITY_EXCEEDED      = 'BUILD_031',
+  BUILDING_ID_REQUIRED            = 'BUILD_032',
+  BUILDING_NOT_ASSOCIATED         = 'BUILD_033',
+}
+
+export enum LocationErrorCode {
+  DISTRICT_NOT_FOUND       = 'LOC_001',
+  DISTRICT_ALREADY_EXISTS  = 'LOC_002',
+  DISTRICT_CREATE_ERROR    = 'LOC_003',
+  DISTRICT_DELETE_ERROR    = 'LOC_004',
+  DISTRICT_HAS_COUNTIES    = 'LOC_005',
+  COUNTY_NOT_FOUND         = 'LOC_010',
+  COUNTY_ALREADY_EXISTS    = 'LOC_011',
+  COUNTY_CREATE_ERROR      = 'LOC_012',
+  COUNTY_DELETE_ERROR      = 'LOC_013',
+  COUNTY_HAS_PARISHES      = 'LOC_014',
+  COUNTY_DISTRICT_NOT_FOUND= 'LOC_015',
+  PARISH_NOT_FOUND         = 'LOC_020',
+  PARISH_ALREADY_EXISTS    = 'LOC_021',
+  PARISH_CREATE_ERROR      = 'LOC_022',
+  PARISH_DELETE_ERROR      = 'LOC_023',
+  PARISH_HAS_PROPERTIES    = 'LOC_024',
+  PARISH_COUNTY_NOT_FOUND  = 'LOC_025',
+  LOCATION_INVALID_NAME    = 'LOC_030',
+  LOCATION_INVALID_CODE    = 'LOC_031',
+  LOCATION_HIERARCHY_ERROR = 'LOC_032',
+  LOCATION_NOT_FOUND       = 'LOC_034',
+  LOCATION_LINK_BROKEN     = 'LOC_035',
+  LOCATION_PRIMARY_REQUIRED= 'LOC_036',
+}
+
+export enum UserErrorCode {
+  USER_NOT_FOUND                = 'USER_001',
+  USER_ALREADY_EXISTS           = 'USER_002',
+  USER_CREATE_ERROR             = 'USER_003',
+  USER_UPDATE_ERROR             = 'USER_004',
+  USER_DELETE_ERROR             = 'USER_005',
+  USER_INVALID_CREDENTIALS      = 'USER_010',
+  USER_NOT_AUTHENTICATED        = 'USER_011',
+  USER_TOKEN_EXPIRED            = 'USER_012',
+  USER_TOKEN_INVALID            = 'USER_013',
+  USER_SESSION_EXPIRED          = 'USER_014',
+  USER_PROFILE_NOT_FOUND        = 'USER_015',
+  USER_INSUFFICIENT_PERMISSIONS = 'USER_020',
+  USER_ROLE_NOT_FOUND           = 'USER_021',
+  USER_CANNOT_ACCESS_RESOURCE   = 'USER_022',
+  USER_CANNOT_MODIFY_RESOURCE   = 'USER_023',
+  PROFILE_NOT_DELETED           = 'USER_024',
+  USER_INVALID_EMAIL            = 'USER_030',
+  USER_INVALID_PASSWORD         = 'USER_031',
+  USER_INVALID_NAME             = 'USER_032',
+  USER_INVALID_PHONE            = 'USER_033',
+  USER_DUPLICATE_EMAIL          = 'USER_034',
+  USER_INACTIVE                 = 'USER_040',
+  USER_BLOCKED                  = 'USER_041',
+  USER_DELETED                  = 'USER_042',
+  USER_PENDING_VERIFICATION     = 'USER_043',
+  USER_ENTERPRISE_NOT_FOUND     = 'USER_050',
+  USER_HAS_DEPENDENCIES         = 'USER_051',
+}
+
+export enum DatabaseErrorCode {
+  DATABASE_ERROR               = 'DB_001',
+  DATABASE_CONNECTION_ERROR    = 'DB_002',
+  DATABASE_CONSTRAINT_VIOLATION= 'DB_003',
+  DATABASE_DUPLICATE_KEY       = 'DB_004',
+  DATABASE_FOREIGN_KEY_VIOLATION='DB_005',
+  DATABASE_TRANSACTION_ERROR   = 'DB_006',
+  DATABASE_DEADLOCK            = 'DB_007',
+  DATABASE_TIMEOUT             = 'DB_008',
+  DATABASE_MIGRATION_ERROR     = 'DB_009',
+}
+
+export enum SearchErrorCode {
+  SEARCH_INVALID_QUERY   = 'SEARCH_001',
+  SEARCH_INVALID_FILTER  = 'SEARCH_002',
+  SEARCH_INVALID_SORT    = 'SEARCH_003',
+  SEARCH_NO_RESULTS      = 'SEARCH_004',
+  SEARCH_TOO_MANY_RESULTS= 'SEARCH_005',
+}
+
+export enum PaginationErrorCode {
+  PAGINATION_INVALID_PAGE = 'PAGE_001',
+  PAGINATION_INVALID_SIZE = 'PAGE_002',
+  PAGINATION_OUT_OF_BOUNDS= 'PAGE_003',
+}
+
+export enum ConstructionStageErrorCode {
+  STAGE_NOT_FOUND        = 'STAGE_001',
+  STAGE_CREATE_ERROR     = 'STAGE_002',
+  STAGE_UPDATE_ERROR     = 'STAGE_003',
+  STAGE_DELETE_ERROR     = 'STAGE_004',
+  STAGE_INVALID_NAME     = 'STAGE_005',
+  STAGE_ENTERPRISE_NOT_FOUND = 'STAGE_006',
+}
+
+export enum ConstructionSubStageErrorCode {
+  SUBSTAGE_NOT_FOUND     = 'SUBSTAGE_001',
+  SUBSTAGE_CREATE_ERROR  = 'SUBSTAGE_002',
+  SUBSTAGE_UPDATE_ERROR  = 'SUBSTAGE_003',
+  SUBSTAGE_DELETE_ERROR  = 'SUBSTAGE_004',
+  SUBSTAGE_INVALID_NAME  = 'SUBSTAGE_005',
+  SUBSTAGE_STAGE_NOT_FOUND = 'SUBSTAGE_006',
+}
+
+export enum ConstructionExpenseErrorCode {
+  EXPENSE_NOT_FOUND        = 'EXPENSE_001',
+  EXPENSE_CREATE_ERROR     = 'EXPENSE_002',
+  EXPENSE_UPDATE_ERROR     = 'EXPENSE_003',
+  EXPENSE_DELETE_ERROR     = 'EXPENSE_004',
+  EXPENSE_INVALID_NAME     = 'EXPENSE_005',
+  EXPENSE_INVALID_PRICE    = 'EXPENSE_006',
+  EXPENSE_SUBSTAGE_NOT_FOUND = 'EXPENSE_007',
+  EXPENSE_INVOICE_UPLOAD_ERROR = 'EXPENSE_008',
+}
+
+export enum TaskErrorCode {
+  TASK_NOT_FOUND          = 'TASK_001',
+  TASK_ASSIGNEE_NOT_FOUND = 'TASK_002',
+}
+
+export type BackendErrorCode =
+  | GenericErrorCode
+  | AssetErrorCode
+  | AgentErrorCode
+  | ContactErrorCode
+  | MediaErrorCode
+  | DocumentErrorCode
+  | LicenseErrorCode
+  | CharacteristicErrorCode
+  | FileErrorCode
+  | UploadRequestErrorCode
+  | StorageErrorCode
+  | EnterpriseErrorCode
+  | BuildingErrorCode
+  | LocationErrorCode
+  | UserErrorCode
+  | DatabaseErrorCode
+  | SearchErrorCode
+  | PaginationErrorCode
+  | ConstructionStageErrorCode
+  | ConstructionSubStageErrorCode
+  | ConstructionExpenseErrorCode
+  | TaskErrorCode;

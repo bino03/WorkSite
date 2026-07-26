@@ -1,0 +1,125 @@
+/* ═══════════════════════════════════════════════════════════════
+   HOMMANE — Design Tokens (Anthropic-inspired warm palette)
+   Aplica-se a tudo fora do AppLayout (páginas, cards, tabelas…)
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+
+  /* ── Backgrounds ─────────────────────────────────────────────
+     Usar do mais claro para o mais escuro como camadas           */
+  --color-bg-page:        #f5f4ed;   /* Parchment  — fundo geral da página     */
+  --color-bg-card:        #faf9f5;   /* Ivory      — cards, painéis, drawers   */
+  --color-bg-hover:       #f0eee6;   /* Border Cream ligeiramente mais escuro  */
+  --color-bg-sand:        #e8e6dc;   /* Warm Sand  — inputs, tags, badges      */
+  --color-bg-dark:        #30302e;   /* Dark Warm  — secções escuras, nav      */
+  --color-bg-dark-hover:  #3d3d3a;   /* Dark hover — hover em superfícies dark */
+
+  /* ── Texto ───────────────────────────────────────────────────  */
+  --color-text-primary:   #141413;   /* Near Black — título, texto principal   */
+  --color-text-secondary: #4d4c48;   /* Charcoal   — texto secundário forte    */
+  --color-text-muted:     #5e5d59;   /* Olive Gray — texto de suporte          */
+  --color-text-faint:     #87867f;   /* Stone Gray — placeholders, metadata    */
+  --color-text-on-dark:   #faf9f5;   /* Ivory      — texto em fundos escuros   */
+  --color-text-silver:    #b0aea5;   /* Warm Silver— texto suave em dark       */
+
+  /* ── Marca / Accent ─────────────────────────────────────────  */
+  --color-brand:          #c96442;   /* Terracotta — CTA principal, links      */
+  --color-brand-hover:    #b5573a;   /* Terracotta escuro — hover do CTA       */
+  --color-brand-light:    #d97757;   /* Coral      — accent secundário         */
+
+  /* ── Bordas ─────────────────────────────────────────────────  */
+  --color-border-subtle:  #f0eee6;   /* Border Cream — borda mínima (cards)    */
+  --color-border:         #e8e6dc;   /* Border Warm  — borda standard          */
+  --color-border-strong:  #d1cfc5;   /* Ring Warm    — borda/anel interativo   */
+  --color-border-dark:    #30302e;   /* Border Dark  — borda em fundos escuros */
+
+  /* ── Sombras ─────────────────────────────────────────────────
+     Evitar drop-shadows pesadas; preferir ring shadows           */
+  --shadow-whisper: rgba(0,0,0,0.05) 0px 4px 24px;   /* elevação suave (cards)  */
+  --shadow-ring:    0px 0px 0px 1px var(--color-border-strong); /* anel interativo */
+  --shadow-card:    rgba(0,0,0,0.06) 0px 2px 12px;   /* card padrão             */
+
+  /* ── Semânticas ──────────────────────────────────────────────  */
+  --color-error:   #b53333;   /* Crimson — erros, eliminar           */
+  --color-success: #3a7d44;   /* Verde quente — estados positivos    */
+  --color-warning: #a0622b;   /* Âmbar quente — avisos               */
+  --color-focus:   #3898ec;   /* Azul focus   — único azul na paleta */
+
+  /* ── Border-radius ───────────────────────────────────────────  */
+  --radius-sm:   6px;    /* pequenos elementos inline             */
+  --radius-md:   8px;    /* botões standard, cards pequenos       */
+  --radius-lg:   12px;   /* inputs, botões primários              */
+  --radius-xl:   16px;   /* featured cards, media players         */
+  --radius-2xl:  24px;   /* tags grandes, containers destacados   */
+  --radius-3xl:  32px;   /* hero containers, media grandes        */
+
+  /* ── Tipografia ─────────────────────────────────────────────
+     Serif → títulos/headings   |   Sans → UI/body               */
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-sans:  system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-mono:  "Courier New", Courier, monospace;
+
+  --text-display:  2rem;      /* 32px — títulos de página           */
+  --text-heading:  1.6rem;    /* 25.6px — títulos de secção         */
+  --text-subhead:  1.3rem;    /* 20.8px — sub-títulos               */
+  --text-body-lg:  1.06rem;   /* 17px — corpo grande                */
+  --text-body:     1rem;      /* 16px — corpo standard              */
+  --text-sm:       0.94rem;   /* 15px — texto compacto              */
+  --text-caption:  0.875rem;  /* 14px — captions, labels            */
+  --text-label:    0.75rem;   /* 12px — badges, rótulos pequenos    */
+
+  --leading-tight:   1.2;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.6;
+}
+
+/* ── Utilitários prontos a usar ──────────────────────────────── */
+
+/* Superfícies */
+.surface-page  { background-color: var(--color-bg-page);  }
+.surface-card  { background-color: var(--color-bg-card);
+                 border: 1px solid var(--color-border-subtle);
+                 box-shadow: var(--shadow-whisper);
+                 border-radius: var(--radius-md); }
+
+/* Botões */
+.btn-brand {
+  background-color: var(--color-brand);
+  color: var(--color-text-on-dark);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.btn-brand:hover { background-color: var(--color-brand-hover); }
+
+.btn-sand {
+  background-color: var(--color-bg-sand);
+  color: var(--color-text-secondary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  box-shadow: var(--shadow-ring);
+  transition: background-color 0.15s;
+}
+.btn-sand:hover { background-color: #dddbd0; }
+
+/* Texto */
+.text-primary   { color: var(--color-text-primary);   }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted     { color: var(--color-text-muted);     }
+.text-faint     { color: var(--color-text-faint);     }
+.text-brand     { color: var(--color-brand);          }
+.text-error     { color: var(--color-error);          }
+
+/* Títulos com serif */
+.heading-serif {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: var(--leading-tight);
+}

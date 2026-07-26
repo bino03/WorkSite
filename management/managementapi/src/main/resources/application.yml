@@ -1,0 +1,91 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  application:
+    name: managementApi
+
+  datasource:
+    # garante que o DB_URL tem estes parâmetros:
+    # ?sslmode=require&preferQueryMode=simple&prepareThreshold=0
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 0
+      idle-timeout: 30000          # 30s
+      connection-timeout: 30000    # 30s
+      max-lifetime: 600000         # 10min (menor que timeouts do pooler)
+      keepalive-time: 300000       # 5min (mantém conexões vivas)
+      leak-detection-threshold: 2000
+
+  jpa:
+    hibernate:
+      ddl-auto: none               # confiar só no Flyway
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: pm
+        jdbc.time_zone: UTC
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    default-schema: pm
+    schemas: [pm, settings]
+    create-schemas: true
+    clean-disabled: true
+
+  sql:
+    init:
+      mode: never
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+      file-size-threshold: 2MB
+
+server:
+  port: 8080
+  tomcat:
+    max-http-form-post-size: 25MB
+    max-swallow-size: -1
+
+logging:
+  level:
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    com.zaxxer.hikari.HikariConfig: DEBUG
+    org.springframework.boot.context.config: DEBUG
+    com.management.managementapi: DEBUG
+  file:
+    name: logs/app.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 3
+
+supabase:
+  url: ${SUPABASE_URL}
+  serviceRoleKey: ${SUPABASE_SERVICE_ROLE_KEY}
+  anon-key: ${SUPABASE_ANON_KEY}
+  auth-url: ${supabase.url}/auth/v1
+  jwt:
+    secret: ${SUPABASE_JWT_SECRET}
+
+# Cookies (JWT tokens em cookies HttpOnly)
+app:
+  security:
+    cookie:
+      # HTTPS em produção, HTTP em desenvolvimento
+      secure: ${COOKIE_SECURE:false}
+      # Domain dos cookies (localhost em dev, seu-app.com em prod)
+      domain: ${COOKIE_DOMAIN:localhost}

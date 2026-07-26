@@ -1,0 +1,11 @@
+{
+  "workspace:copy-path": [
+    {
+      "modifiers": [
+        "Alt",
+        "Shift"
+      ],
+      "key": "C"
+    }
+  ]
+}

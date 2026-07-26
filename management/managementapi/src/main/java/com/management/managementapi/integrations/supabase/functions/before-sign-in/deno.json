@@ -1,0 +1,8 @@
+{
+  "tasks": {
+    "serve": "deno run -A --watch index.ts"
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.unstable", "dom"]
+  }
+}

@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+/* ════════════════════════════════════════════════════════
+   Anthropic / Claude Design System — CSS Variables
+   ════════════════════════════════════════════════════════ */
+:root {
+  /* Brand */
+  --terracotta:      #c96442;
+  --coral:           #d97757;
+  --terracotta-hover:#b5573a;
+
+  /* Backgrounds */
+  --parchment:       #f5f4ed;
+  --ivory:           #faf9f5;
+  --warm-sand:       #e8e6dc;
+
+  /* Text */
+  --near-black:      #141413;
+  --charcoal-warm:   #4d4c48;
+  --olive-gray:      #5e5d59;
+  --stone-gray:      #87867f;
+  --dark-warm:       #3d3d3a;
+  --warm-silver:     #b0aea5;
+
+  /* Surfaces (dark) */
+  --dark-surface:    #30302e;
+  --deep-dark:       #141413;
+
+  /* Borders */
+  --border-cream:    #f0eee6;
+  --border-warm:     #e8e6dc;
+  --border-dark:     #30302e;
+
+  /* Rings / Shadows */
+  --ring-warm:       #d1cfc5;
+  --ring-subtle:     #dedc01;
+  --ring-deep:       #c2c0b6;
+
+  /* Semantic */
+  --error:           #b53333;
+  --focus-blue:      #3898ec;
+
+  /* Legacy aliases (for Ant Design compatibility) */
+  --brand-primary:   #c96442;
+  --brand-primary-hover: #b5573a;
+  --surface:         #faf9f5;
+  --surface-2:       #f5f4ed;
+  --text-strong:     #141413;
+  --text-muted:      #5e5d59;
+  --border:          #e8e6dc;
+}
+
+/* ── Typography ──────────────────────────────────────────── */
+@font-face {
+  font-family: "Anthropic Serif";
+  src: local("Georgia");
+  /* Swap for actual Anthropic Serif when available */
+}
+
+body {
+  background-color: var(--parchment);
+  color: var(--near-black);
+  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* ── Layout ──────────────────────────────────────────────── */
+.container-page { @apply container mx-auto px-6; }
+
+/* ── Cards ───────────────────────────────────────────────── */
+.card {
+  @apply rounded-2xl border;
+  border-color: var(--border-cream);
+  background-color: var(--ivory);
+  box-shadow: rgba(0,0,0,0.05) 0px 4px 24px;
+}
+
+/* ── Utility ─────────────────────────────────────────────── */
+.muted { color: var(--olive-gray); }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 font-medium transition-all duration-200;
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+/* Primary — Terracotta Brand */
+.btn-primary {
+  background-color: var(--terracotta);
+  color: var(--ivory);
+  border: none;
+  box-shadow: var(--terracotta) 0px 0px 0px 0px, var(--terracotta) 0px 0px 0px 1px;
+}
+.btn-primary:hover {
+  background-color: var(--terracotta-hover);
+}
+
+/* Secondary — Warm Sand */
+.btn-secondary {
+  background-color: var(--warm-sand);
+  color: var(--charcoal-warm);
+  border: none;
+  box-shadow: var(--warm-sand) 0px 0px 0px 0px, var(--ring-warm) 0px 0px 0px 1px;
+}
+.btn-secondary:hover {
+  background-color: #dddbd0;
+}
+
+/* Outline */
+.btn-outline {
+  background: var(--ivory);
+  color: var(--near-black);
+  border: 1px solid var(--border-warm);
+}
+.btn-outline:hover {
+  background: var(--warm-sand);
+}
+
+/* ── Ant Design overrides ────────────────────────────────── */
+.ant-table-cell {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+
+.employees-table .ant-table-cell {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+/* Warm Ant Table */
+.ant-table {
+  background: var(--ivory) !important;
+}
+.ant-table-thead > tr > th {
+  background: var(--warm-sand) !important;
+  color: var(--charcoal-warm) !important;
+  border-bottom: 1px solid var(--border-warm) !important;
+  font-weight: 500 !important;
+}
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--border-cream) !important;
+  color: var(--near-black) !important;
+}
+.ant-table-tbody > tr:hover > td {
+  background: #f2f1ea !important;
+}
+
+/* Warm pagination */
+.ant-pagination-item-active {
+  border-color: var(--terracotta) !important;
+}
+.ant-pagination-item-active a {
+  color: var(--terracotta) !important;
+}
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes agentRipple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
