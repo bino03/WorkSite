@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "revoked_token", schema = "pm")
+@Table(name = "revoked_token", schema = "worksite")
 public class RevokedToken {
 
   @Id

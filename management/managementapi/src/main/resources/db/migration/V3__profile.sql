@@ -1,11 +1,11 @@
 -- =============================================================
 -- V3__profile.sql
--- pm.profile — utilizador interno (admin/funcionário), ligado a auth.users
+-- worksite.profile — utilizador interno (admin/funcionário), ligado a auth.users
 -- =============================================================
 
-SET search_path TO pm, public;
+SET search_path TO worksite, public;
 
-CREATE TABLE pm.profile (
+CREATE TABLE worksite.profile (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_user_id    UUID UNIQUE,
   name            TEXT NOT NULL,
@@ -14,8 +14,8 @@ CREATE TABLE pm.profile (
   last_token_reset_at TIMESTAMPTZ,
   photo_bucket    TEXT DEFAULT 'private',
   photo_key       TEXT,
-  account_status  pm.account_status_enum NOT NULL DEFAULT 'unlocked',
-  role            pm.role_enum NOT NULL DEFAULT 'EMPLOYEE',
+  account_status  worksite.account_status_enum NOT NULL DEFAULT 'unlocked',
+  role            worksite.role_enum NOT NULL DEFAULT 'EMPLOYEE',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

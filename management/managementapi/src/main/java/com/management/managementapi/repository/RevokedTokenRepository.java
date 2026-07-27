@@ -13,7 +13,7 @@ public interface RevokedTokenRepository extends JpaRepository<RevokedToken, Long
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Transactional
   @Query(value = """
-      delete from pm.revoked_token
+      delete from worksite.revoked_token
       where (expires_at is not null and expires_at < now())
          or (expires_at is null and revoked_at < now() - (?1 || ' seconds')::interval)
       """, nativeQuery = true)

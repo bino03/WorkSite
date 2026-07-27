@@ -71,7 +71,7 @@ public class EmployeeServiceImpl implements EmployeeService {
               p.created_at,
               p.updated_at,
               u.email
-            from pm.profile p
+            from worksite.profile p
             left join auth.users u on u.id = p.auth_user_id
             """;
     }
@@ -92,11 +92,11 @@ public class EmployeeServiceImpl implements EmployeeService {
             params.addValue("q", q);
         }
         if (role != null && !role.isBlank()) {
-            sql.append(" and p.role = cast(:role as pm.role_enum) ");
+            sql.append(" and p.role = cast(:role as worksite.role_enum) ");
             params.addValue("role", role);
         }
         if (status != null && !status.isBlank()) {
-            sql.append(" and p.account_status = cast(:status as pm.account_status_enum) ");
+            sql.append(" and p.account_status = cast(:status as worksite.account_status_enum) ");
             params.addValue("status", status);
         }
     }
@@ -151,7 +151,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     public List<EmployeeAssignableDTO> listAssignable() {
         String sql = """
             select p.id, p.name, u.email, p.role::text as role
-            from pm.profile p
+            from worksite.profile p
             left join auth.users u on u.id = p.auth_user_id
             where p.account_status != 'deleted'
             order by p.name asc
@@ -172,7 +172,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         // 1) buscar auth_user_id e email atual (para decidir se é preciso alterar o email)
         var row = jdbc.queryForObject("""
             select p.auth_user_id, u.email
-              from pm.profile p
+              from worksite.profile p
               left join auth.users u on u.id = p.auth_user_id
              where p.id = :id
         """,
@@ -204,10 +204,10 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .addValue("role", dto.role());
 
         int updated = jdbc.update("""
-            update pm.profile set
+            update worksite.profile set
               name = :name,
               phone_number = :phone,
-              role = cast(:role as pm.role_enum),
+              role = cast(:role as worksite.role_enum),
               updated_at = now()
             where id = :id
         """, params);
@@ -224,8 +224,8 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .addValue("role", dto.role());
 
         int updated = jdbc.update("""
-            update pm.profile set
-              role = cast(:role as pm.role_enum)
+            update worksite.profile set
+              role = cast(:role as worksite.role_enum)
             where id = :id
             """, params);
 
@@ -244,7 +244,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .addValue("avatar", dto.avatarUrl());
 
         int updated = jdbc.update("""
-            update pm.profile set
+            update worksite.profile set
               photo_url = :avatar
             where id = :id
             """, params);
@@ -279,7 +279,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Transactional(readOnly = true)
     public List<EmployeeResponseDTO> getDeletedProfiles() {
         String sql = baseSelect() +
-                " where p.account_status = cast('deleted' as pm.account_status_enum)" +
+                " where p.account_status = cast('deleted' as worksite.account_status_enum)" +
                 " order by p.updated_at desc";
 
         return jdbc.queryForList(sql, new MapSqlParameterSource())
@@ -291,11 +291,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EmployeeResponseDTO restoreProfile(UUID id) {
         int updated = jdbc.update("""
-                update pm.profile
-                   set account_status = cast('unlocked' as pm.account_status_enum),
+                update worksite.profile
+                   set account_status = cast('unlocked' as worksite.account_status_enum),
                        updated_at     = now()
                  where id             = :id
-                   and account_status = cast('deleted' as pm.account_status_enum)
+                   and account_status = cast('deleted' as worksite.account_status_enum)
                 """,
                 new MapSqlParameterSource("id", id));
 
@@ -310,11 +310,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EmployeeResponseDTO blockProfile(UUID id) {
         int updated = jdbc.update("""
-                update pm.profile
-                   set account_status = cast('blocked' as pm.account_status_enum),
+                update worksite.profile
+                   set account_status = cast('blocked' as worksite.account_status_enum),
                        updated_at     = now()
                  where id             = :id
-                   and account_status = cast('unlocked' as pm.account_status_enum)
+                   and account_status = cast('unlocked' as worksite.account_status_enum)
                 """,
                 new MapSqlParameterSource("id", id));
 
@@ -329,11 +329,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EmployeeResponseDTO unblockProfile(UUID id) {
         int updated = jdbc.update("""
-                update pm.profile
-                   set account_status = cast('unlocked' as pm.account_status_enum),
+                update worksite.profile
+                   set account_status = cast('unlocked' as worksite.account_status_enum),
                        updated_at     = now()
                  where id             = :id
-                   and account_status = cast('blocked' as pm.account_status_enum)
+                   and account_status = cast('blocked' as worksite.account_status_enum)
                 """,
                 new MapSqlParameterSource("id", id));
 
@@ -348,11 +348,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public void deleteProfile(UUID id) {
         int updated = jdbc.update("""
-                update pm.profile
-                   set account_status = cast('deleted' as pm.account_status_enum),
+                update worksite.profile
+                   set account_status = cast('deleted' as worksite.account_status_enum),
                        updated_at     = now()
                  where id             = :id
-                   and account_status != cast('deleted' as pm.account_status_enum)
+                   and account_status != cast('deleted' as worksite.account_status_enum)
                 """,
                 new MapSqlParameterSource("id", id));
 

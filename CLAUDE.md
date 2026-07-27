@@ -96,12 +96,13 @@ npm run dev
 
 This project started as a scoped copy of the [Property-Management](https://github.com/bino03/Property-Management) monorepo, keeping only:
 
-- **Auth/accounts**: Supabase JWT auth, `pm.profile` (staff/users, roles `ADMIN`/`EMPLOYEE`), admin invite flow.
+- **Auth/accounts**: Supabase JWT auth, `worksite.profile` (staff/users, roles `ADMIN`/`EMPLOYEE`), admin invite flow.
 - **Enterprises** (renamed conceptually to "projects" — the `enterprises` table/package names were kept as-is to minimize risk).
 - **Construction management**: `construction_stage` → `construction_sub_stage` → `construction_expense`, including invoice upload.
-- **Employees**: CRUD over `pm.profile` (no separate entity).
+- **Employees**: CRUD over `worksite.profile` (no separate entity).
+- **Tasks**: standalone tasks assignable to one or more `worksite.profile` users, isolated in their own `tasks` schema (no link to any asset/property — that concept doesn't exist here).
 
-Deliberately **not** carried over: property listings (`property_asset`, `buildings`, agency/characteristics/contacts/licenses), leads, banners, payments, the public portal, notifications/SSE, and tasks — none of these were part of the original ask; they're candidates for future features, not gaps.
+Deliberately **not** carried over: property listings (`property_asset`, `buildings`, agency/characteristics/contacts/licenses), leads, banners, payments, the public portal, notifications/SSE — none of these were part of the original ask; they're candidates for future features, not gaps.
 
 ---
 

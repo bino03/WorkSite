@@ -45,7 +45,7 @@ src/
 ├── index.css / colors.css    # Tailwind + variáveis CSS globais
 │
 ├── layouts/
-│   └── AppLayout.tsx         # Layout principal (nav: Home, Projetos, Equipa)
+│   └── AppLayout.tsx         # Layout principal (nav: Home, Projetos, Tarefas, Equipa)
 │
 ├── pages/
 │   ├── Login.tsx / LoginLoadingPage.tsx / ForgotPassword.tsx / NotFoundPage.tsx
@@ -55,6 +55,7 @@ src/
 │   └── backoffice/
 │       ├── BackofficeHome.tsx
 │       ├── EmployeesList.tsx
+│       ├── TasksPage.tsx
 │       ├── employee/EmployeeProfilePage.tsx
 │       └── enterprise/
 │           ├── ConstructionStagesPage.tsx
@@ -63,6 +64,7 @@ src/
 │
 ├── components/               # Organizados por domínio
 │   ├── enterprise/           # create/ (secções + schema Zod), edit/ (cards), Create/View drawers
+│   ├── tasks/                # TasksList, TaskFormDrawer, TaskDetailDrawer
 │   ├── construction/         # Stage/SubStage/Expense upsert drawers + InvoicePreviewModal
 │   ├── employees/            # CreateEmployeeDrawer, EmployeeContextMenu
 │   ├── profile/              # MyProfileModal, ProfileView, ProfileDrawer, seeprofile/EmployeeMiniCard
@@ -120,6 +122,7 @@ This is a scoped copy of Property-Management's Backoffice — no property listin
   /backoffice/empreendimentos/:enterpriseId/construction     → ConstructionStagesPage
   /backoffice/empreendimentos/:enterpriseId/construction/:stageId              → ConstructionSubStagesPage
   /backoffice/empreendimentos/:enterpriseId/construction/:stageId/:subStageId  → ConstructionExpensesPage
+  /backoffice/tasks                                          → TasksPage
 ```
 
 `PrivateRoute` (`src/PrivateRoute.tsx`) verifica o `user` do `AuthContext` — sem sessão redireciona para `/login`.

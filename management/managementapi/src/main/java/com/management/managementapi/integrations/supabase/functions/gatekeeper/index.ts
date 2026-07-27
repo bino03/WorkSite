@@ -1,5 +1,5 @@
 // functions/before-sign-in/index.ts
-// Bloqueia o login se a conta estiver "locked" no teu pm.profile
+// Bloqueia o login se a conta estiver "locked" no teu worksite.profile
 // Docs: este endpoint recebe um POST do Auth com info do utilizador que tenta login.
 
 import { serve } from "https://deno.land/std@0.177.0/http/mod.ts";

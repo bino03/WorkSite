@@ -1,5 +1,6 @@
 package com.management.managementapi.security;
 
+import com.management.managementapi.model.enums.ProfileRole;
 import com.management.managementapi.repository.ProfileRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -73,5 +74,15 @@ public class AuthContext {
 
     // Último fallback: email
     return Optional.ofNullable(jwt.getClaimAsString("email"));
+  }
+
+  /**
+   * Verifica se o utilizador autenticado tem role ADMIN, consultando o profile na BD.
+   */
+  public boolean isCurrentUserAdmin() {
+    return currentProfileId()
+        .flatMap(profileRepository::findById)
+        .map(p -> p.getRole() == ProfileRole.ADMIN)
+        .orElse(false);
   }
 }

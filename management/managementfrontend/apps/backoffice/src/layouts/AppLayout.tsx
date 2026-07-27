@@ -4,7 +4,7 @@ import MyProfileModal from "@/components/profile/MyProfileModal";
 import { useState, useRef, useEffect } from "react";
 import api from "@/api";
 import { Avatar, Modal } from "antd";
-import { UserOutlined, ExclamationCircleOutlined, GlobalOutlined, BuildOutlined, TeamOutlined } from "@ant-design/icons";
+import { UserOutlined, ExclamationCircleOutlined, GlobalOutlined, BuildOutlined, TeamOutlined, CheckSquareOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { Switch } from "antd";
 import { useAuthContext } from "@/context/AuthContext";
@@ -107,6 +107,10 @@ export default function AppLayout() {
 
             <NavLink to={`${getBasePath()}/empreendimentos`} className={linkClass}>
               <BuildOutlined className="mr-2" />{t('nav.enterprises')}
+            </NavLink>
+
+            <NavLink to={`${getBasePath()}/tasks`} className={linkClass}>
+              <CheckSquareOutlined className="mr-2" />{userRole === "EMPLOYEE" ? "Minhas Tarefas" : "Tarefas"}
             </NavLink>
 
             {userRole === "ADMIN" && (

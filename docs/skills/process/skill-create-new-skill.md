@@ -135,7 +135,7 @@ Flyway needs migrations named `V{number}__{description}.sql`.
 Create `src/main/resources/db/migration/V20__add_users_table.sql`:
 
 \`\`\`sql
-CREATE TABLE pm.users (
+CREATE TABLE worksite.users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) NOT NULL UNIQUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

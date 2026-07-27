@@ -1,11 +1,11 @@
 -- =============================================================
 -- V4__enterprises.sql
--- pm.enterprises — projeto (empreendimento)
+-- worksite.enterprises — projeto (empreendimento)
 -- =============================================================
 
-SET search_path TO pm, public;
+SET search_path TO worksite, public;
 
-CREATE TABLE pm.enterprises (
+CREATE TABLE worksite.enterprises (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                VARCHAR(255) NOT NULL,
   internal_reference  VARCHAR(100),

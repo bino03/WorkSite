@@ -27,15 +27,15 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        default_schema: pm
+        default_schema: worksite
         jdbc.time_zone: UTC
     open-in-view: false
 
   flyway:
     enabled: true
     locations: classpath:db/migration
-    default-schema: pm
-    schemas: [pm, settings]
+    default-schema: worksite
+    schemas: [worksite, settings, tasks]
     create-schemas: true
     clean-disabled: true
 

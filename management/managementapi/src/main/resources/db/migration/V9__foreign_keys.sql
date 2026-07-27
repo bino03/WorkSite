@@ -9,7 +9,7 @@ DO $$ BEGIN
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'auth' AND table_name = 'users'
   ) THEN
-    ALTER TABLE pm.profile
+    ALTER TABLE worksite.profile
       ADD CONSTRAINT fk_profile_authuser
       FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
   END IF;

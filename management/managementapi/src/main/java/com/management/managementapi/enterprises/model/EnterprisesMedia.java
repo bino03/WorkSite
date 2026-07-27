@@ -29,7 +29,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "enterprises_media", schema = "pm")
+@Table(name = "enterprises_media", schema = "worksite")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -90,7 +90,7 @@ public class EnterprisesMedia {
     private String checksumSha256;
 
     @Convert(converter = VisibilityConverter.class)
-    @Column(name = "visibility", nullable = false, columnDefinition = "pm.visibility_enum")
+    @Column(name = "visibility", nullable = false, columnDefinition = "worksite.visibility_enum")
     @Builder.Default
     private Visibility visibility = Visibility.PRIVATE;
 

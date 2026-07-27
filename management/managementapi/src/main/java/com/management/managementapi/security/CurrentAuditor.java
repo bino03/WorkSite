@@ -54,7 +54,7 @@ public class CurrentAuditor implements AuditorAware<UUID> {
     try {
       UUID authUserId = UUID.fromString(jwt.getSubject()); // "sub"
       UUID pid = jdbc.query(
-          "select id from pm.profile where auth_user_id = ? limit 1",
+          "select id from worksite.profile where auth_user_id = ? limit 1",
           ps -> ps.setObject(1, authUserId),
           rs -> rs.next() ? rs.getObject(1, java.util.UUID.class) : null
       );

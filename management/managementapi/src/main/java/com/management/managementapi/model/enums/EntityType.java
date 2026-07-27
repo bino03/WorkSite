@@ -5,7 +5,8 @@ public enum EntityType {
     USER("user"),
     CONSTRUCTION_STAGE("construction_stage"),
     CONSTRUCTION_SUB_STAGE("construction_sub_stage"),
-    CONSTRUCTION_EXPENSE("construction_expense");
+    CONSTRUCTION_EXPENSE("construction_expense"),
+    TASK("task");
 
     private final String dbValue;
 

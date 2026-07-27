@@ -35,7 +35,7 @@ Copy this block, fill it out, save it before coding:
 [ ] No - independent
 
 ### 5. Relations to other tables?
-(List FKs: "FK to pm.profile, FK to pm.property_asset")
+(List FKs: "FK to worksite.profile, FK to worksite.property_asset")
 
 ### 6. Required fields?
 (field: TYPE, NOT NULL, default value)
@@ -43,7 +43,7 @@ Example:
 - name: TEXT, NOT NULL
 - value: NUMERIC(12,2)
 - state: TEXT, NOT NULL, default 'draft'
-- asset_id: UUID, FK → pm.property_asset
+- asset_id: UUID, FK → worksite.property_asset
 
 ### 7. Need soft-delete (deleted_at)?
 [ ] Yes (important data that shouldn't disappear)
@@ -67,10 +67,10 @@ Create file: `src/main/resources/db/migration/V{number}__description_of_table.sq
 ### Template
 
 ```sql
-set search_path to pm, public;
+set search_path to worksite, public;
 
 -- Main table
-create table if not exists pm.my_table (
+create table if not exists worksite.my_table (
     id          uuid        not null default gen_random_uuid() primary key,
     created_at  timestamptz not null default now(),
     updated_at  timestamptz not null default now(),
@@ -81,19 +81,19 @@ create table if not exists pm.my_table (
     state       text        not null default 'draft',
     
     -- Foreign keys
-    asset_id    uuid        not null references pm.property_asset(id) on delete cascade,
-    owner_id    uuid        references pm.profile(id) on delete set null
+    asset_id    uuid        not null references worksite.property_asset(id) on delete cascade,
+    owner_id    uuid        references worksite.profile(id) on delete set null
 );
 
 -- Trigger for updated_at (uses existing function)
 create trigger tg_my_table_updated_at
-    before update on pm.my_table
-    for each row execute procedure pm.tg_set_updated_at();
+    before update on worksite.my_table
+    for each row execute procedure worksite.tg_set_updated_at();
 
 -- Indexes (add ones relevant to your queries)
-create index if not exists idx_my_table_asset_id on pm.my_table(asset_id);
-create index if not exists idx_my_table_owner_id on pm.my_table(owner_id);
-create index if not exists idx_my_table_state on pm.my_table(state);
+create index if not exists idx_my_table_asset_id on worksite.my_table(asset_id);
+create index if not exists idx_my_table_owner_id on worksite.my_table(owner_id);
+create index if not exists idx_my_table_state on worksite.my_table(state);
 ```
 
 ### If you need soft-delete
@@ -104,17 +104,17 @@ deleted_at  timestamptz null,
 
 -- Index for "only active" queries
 create index if not exists idx_my_table_active
-    on pm.my_table(id) where deleted_at is null;
+    on worksite.my_table(id) where deleted_at is null;
 ```
 
 ### If you need RLS
 
 ```sql
 -- Enable RLS
-alter table pm.my_table enable row level security;
+alter table worksite.my_table enable row level security;
 
 -- Policy example: users see only their own records
-create policy my_table_user_read on pm.my_table
+create policy my_table_user_read on worksite.my_table
     for select using (owner_id = auth.uid());
 ```
 
@@ -145,7 +145,7 @@ Location: `src/main/java/com/management/managementapi/model/MyTable.java`
 
 ```java
 @Entity
-@Table(name = "my_table", schema = "pm")
+@Table(name = "my_table", schema = "worksite")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -266,18 +266,18 @@ public class MyTableService {
 ### Self-referential (parent-child)
 
 ```sql
-create table pm.node (
+create table worksite.node (
     id        uuid primary key,
-    parent_id uuid references pm.node(id) on delete cascade
+    parent_id uuid references worksite.node(id) on delete cascade
 );
 ```
 
 ### Many-to-many
 
 ```sql
-create table pm.my_table_tags (
-    my_table_id uuid not null references pm.my_table(id) on delete cascade,
-    tag_id      uuid not null references pm.tag(id) on delete cascade,
+create table worksite.my_table_tags (
+    my_table_id uuid not null references worksite.my_table(id) on delete cascade,
+    tag_id      uuid not null references worksite.tag(id) on delete cascade,
     primary key (my_table_id, tag_id)
 );
 ```
@@ -285,11 +285,11 @@ create table pm.my_table_tags (
 ### Versioning/History
 
 ```sql
-create table pm.my_table_history (
+create table worksite.my_table_history (
     id           serial primary key,
-    my_table_id  uuid not null references pm.my_table(id),
+    my_table_id  uuid not null references worksite.my_table(id),
     changed_at   timestamptz default now(),
-    changed_by   uuid references pm.profile(id),
+    changed_by   uuid references worksite.profile(id),
     change_type  text, -- 'CREATE', 'UPDATE', 'DELETE'
     old_value    jsonb,
     new_value    jsonb

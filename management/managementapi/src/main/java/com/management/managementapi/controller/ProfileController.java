@@ -79,7 +79,7 @@ public class ProfileController {
                 COALESCE(u.email, '') as email,
                 p.role,
                 p.phone_number
-            FROM pm.profile p
+            FROM worksite.profile p
             LEFT JOIN auth.users u ON p.auth_user_id = u.id
             WHERE p.auth_user_id != ? OR p.auth_user_id IS NULL
             ORDER BY p.name ASC

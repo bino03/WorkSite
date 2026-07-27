@@ -59,4 +59,11 @@ public class ResourceNotFoundException extends BusinessException {
             "Despesa com ID " + expenseId + " não encontrada"
         );
     }
+
+    public static ResourceNotFoundException task(String taskId) {
+        return new ResourceNotFoundException(
+            ErrorCode.TASK_NOT_FOUND,
+            "Tarefa com ID " + taskId + " não encontrada"
+        );
+    }
 }

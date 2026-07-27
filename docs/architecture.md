@@ -32,7 +32,7 @@ Ao contrário do Property-Management, **não existe portal público** — esta �
 ┌──────────▼──────────────────┐
 │  PostgreSQL                     │
 │  (via Flyway)                    │
-│  schemas: pm, settings            │
+│  schemas: worksite, settings, tasks      │
 │  + Supabase Auth (JWT) + Storage    │
 └─────────────────────────────────────┘
 ```
@@ -46,7 +46,7 @@ O backend é a única fonte de verdade e o único componente com acesso direto �
 - Mapeamento DTO ↔ entidade via **MapStruct 1.6.0**.
 - Autenticação: **Spring OAuth2 Resource Server** a validar JWTs emitidos pelo **Supabase** (HS256, chave partilhada). Ver [[security.md]].
 - Não usa um SDK oficial do Supabase — a integração é feita por chamadas REST próprias via **OkHttp**.
-- API organizada em: auth/perfil (`/auth/**`, `/profile/**`), funcionários (`/employees/**`), projetos (`/enterprises/**`, `/enterprise-relations/**`), gestão de construção (`/construction-stages/**`, `/construction-sub-stages/**`, `/construction-expenses/**`), localizações (`/locations/**`), atividade (`/activities/**`). Todas as rotas requerem JWT válido (e em muitos casos role `ADMIN`/`EMPLOYEE`), exceto `/auth/login|refresh|logout|accept-invite`.
+- API organizada em: auth/perfil (`/auth/**`, `/profile/**`), funcionários (`/employees/**`), projetos (`/enterprises/**`, `/enterprise-relations/**`), gestão de construção (`/construction-stages/**`, `/construction-sub-stages/**`, `/construction-expenses/**`), tarefas (`/tasks/**`), localizações (`/locations/**`), atividade (`/activities/**`). Todas as rotas requerem JWT válido (e em muitos casos role `ADMIN`/`EMPLOYEE`), exceto `/auth/login|refresh|logout|accept-invite`.
 
 ## Backoffice — `management/managementfrontend/apps/backoffice`
 

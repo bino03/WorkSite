@@ -1,11 +1,11 @@
 -- =============================================================
 -- V5__location.sql
--- pm.location — localização standalone (reutilizada por enterprises)
+-- worksite.location — localização standalone (reutilizada por enterprises)
 -- =============================================================
 
-SET search_path TO pm, public;
+SET search_path TO worksite, public;
 
-CREATE TABLE pm.location (
+CREATE TABLE worksite.location (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   address_line1   TEXT,
   address_line2   TEXT,

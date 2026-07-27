@@ -19,7 +19,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "activity_log",
-    schema = "pm",
+    schema = "worksite",
     indexes = {
         @Index(name = "idx_activity_log_user_id",      columnList = "user_id"),
         @Index(name = "idx_activity_log_created_at",   columnList = "created_at DESC"),
@@ -36,11 +36,11 @@ public class ActivityLog extends BaseEntity {
     private String userName;
 
     @Convert(converter = ActivityTypeConverter.class)
-    @Column(name = "activity_type", nullable = false, columnDefinition = "pm.activity_type")
+    @Column(name = "activity_type", nullable = false, columnDefinition = "worksite.activity_type")
     private ActivityType activityType;
 
     @Convert(converter = EntityTypeConverter.class)
-    @Column(name = "entity_type", columnDefinition = "pm.entity_type")
+    @Column(name = "entity_type", columnDefinition = "worksite.entity_type")
     private EntityType entityType;
 
     @Column(name = "entity_id")

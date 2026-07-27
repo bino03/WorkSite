@@ -46,8 +46,8 @@ This is a scoped copy of [Property-Management](https://github.com/bino03/Propert
 
 ### Database
 
-- Schemas: `pm` (main), `settings` (config/invites), `auth` (Supabase-managed — never touch)
-- Migrations: `src/main/resources/db/migration/` — Flyway V1–V13, `ddl-auto: none`
+- Schemas: `worksite` (main), `settings` (config/invites), `tasks` (standalone task management), `auth` (Supabase-managed — never touch)
+- Migrations: `src/main/resources/db/migration/` — Flyway V1–V14, `ddl-auto: none`
 - When adding a new table: create a new `V{next}__description.sql` in `db/migration/` — never alter the DB directly via Supabase. See [[../../docs/skills/backend/skill-add-database-table]]
 - Base entity: UUID PK + `createdAt`/`updatedAt` (JPA auditing enabled)
 

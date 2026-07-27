@@ -7,7 +7,7 @@ import java.sql.Timestamp;
 import java.util.UUID;
 
 @Entity
-@Table(name = "location", schema = "pm")
+@Table(name = "location", schema = "worksite")
 public class Location {
 
   @Id

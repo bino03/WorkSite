@@ -8,12 +8,12 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 2. O token é devolvido em cookies HttpOnly (`access_token`, `refresh_token`).
 3. Em todos os pedidos protegidos, o `CookieJwtFilter` promove o cookie para header `Authorization: Bearer {token}` antes do filtro OAuth2 correr.
 4. O backend valida o token **localmente**, sem chamar o Supabase — usa `NimbusJwtDecoder` com algoritmo **HS256** e a chave partilhada (`SupabaseProperties` → `jwt.secret`).
-5. `GET /auth/me` devolve o perfil (`role`, nome, foto) a partir da tabela `pm.profile`.
+5. `GET /auth/me` devolve o perfil (`role`, nome, foto) a partir da tabela `worksite.profile`.
 
 ## Autorização (roles)
 
 - Todo o token válido recebe a authority `ROLE_AUTHENTICATED`.
-- Roles adicionais (`ROLE_ADMIN`, `ROLE_EMPLOYEE`) são derivadas de três fontes, por ordem: claim `role` no topo do JWT, `app_metadata.role`, e como fallback uma consulta a `pm.profile.role`.
+- Roles adicionais (`ROLE_ADMIN`, `ROLE_EMPLOYEE`) são derivadas de três fontes, por ordem: claim `role` no topo do JWT, `app_metadata.role`, e como fallback uma consulta a `worksite.profile.role`.
 - O tipo `role_enum` na base de dados só define `ADMIN` e `EMPLOYEE`.
 - Autorização fina feita maioritariamente por `@PreAuthorize` em cada controller/método (`hasRole('ADMIN')`, `hasAnyRole('ADMIN','EMPLOYEE')`, `isAuthenticated()`).
 
@@ -30,7 +30,7 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 
 ## Filtros de segurança (ordem relevante)
 
-- **`TokenRevocationFilter`** — corre antes da autenticação Bearer; verifica se o `jti` do token está na tabela `pm.revoked_token`.
+- **`TokenRevocationFilter`** — corre antes da autenticação Bearer; verifica se o `jti` do token está na tabela `worksite.revoked_token`.
 - **`CookieJwtFilter`** — lê o cookie `access_token` e injeta-o como header `Authorization` se ainda não existir.
 - **Filtro Bearer JWT (OAuth2 Resource Server)** — valida assinatura/expiração e constrói as authorities.
 - **`AccountLockFilter`** — corre depois da autenticação; bloqueia pedidos de contas com `account_status` de bloqueada/eliminada.
@@ -48,6 +48,6 @@ Configurado via `CorsConfigurationSource` em `SecurityConfig.java` — ajustar a
 ## Relacionado
 
 - [[architecture.md]] — Visão geral do sistema
-- [[database.md]] — `pm.profile`, `pm.revoked_token`
+- [[database.md]] — `worksite.profile`, `worksite.revoked_token`
 - [[../management/managementapi/CLAUDE.md]] — Guia do backend
 - [[../management/managementfrontend/apps/backoffice/CLAUDE.md]] — Fluxo de autenticação no Backoffice

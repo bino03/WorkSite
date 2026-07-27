@@ -18,6 +18,7 @@ import EnterprisesList from "./pages/enterprises/EnterprisesList";
 import ConstructionStagesPage from "./pages/backoffice/enterprise/ConstructionStagesPage";
 import ConstructionSubStagesPage from "./pages/backoffice/enterprise/ConstructionSubStagesPage";
 import ConstructionExpensesPage from "./pages/backoffice/enterprise/ConstructionExpensesPage";
+import TasksPage from "./pages/backoffice/TasksPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import "antd/dist/reset.css";
 import "./index.css";
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="empreendimentos/:enterpriseId/construction" element={<ConstructionStagesPage />} />
               <Route path="empreendimentos/:enterpriseId/construction/:stageId" element={<ConstructionSubStagesPage />} />
               <Route path="empreendimentos/:enterpriseId/construction/:stageId/:subStageId" element={<ConstructionExpensesPage />} />
+              <Route path="tasks" element={<TasksPage />} />
             </Route>
 
             {/* 404 */}

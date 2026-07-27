@@ -11,7 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "construction_sub_stage", schema = "pm")
+@Table(name = "construction_sub_stage", schema = "worksite")
 @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 public class ConstructionSubStage extends BaseEntity {
 

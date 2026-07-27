@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "enterprises_location", schema = "pm")
+@Table(name = "enterprises_location", schema = "worksite")
 @Getter
 @Setter
 @NoArgsConstructor
