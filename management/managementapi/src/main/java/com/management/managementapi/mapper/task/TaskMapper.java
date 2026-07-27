@@ -5,7 +5,9 @@ import java.util.List;
 import org.mapstruct.Mapper;
 
 import com.management.managementapi.dto.task.response.TaskAssigneeDTO;
+import com.management.managementapi.dto.task.response.TaskEnterpriseSummaryDTO;
 import com.management.managementapi.dto.task.response.TaskResponseDTO;
+import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.mapper.GlobalMapperConfig;
 import com.management.managementapi.model.Profile;
 import com.management.managementapi.model.Task;
@@ -18,6 +20,10 @@ public interface TaskMapper {
 
     default TaskAssigneeDTO map(Profile profile) {
         return profile == null ? null : new TaskAssigneeDTO(profile.getId(), profile.getName());
+    }
+
+    default TaskEnterpriseSummaryDTO map(Enterprise enterprise) {
+        return enterprise == null ? null : new TaskEnterpriseSummaryDTO(enterprise.getId(), enterprise.getName());
     }
 
     default List<TaskAssigneeDTO> mapAssignees(List<TaskAssignee> assignees) {

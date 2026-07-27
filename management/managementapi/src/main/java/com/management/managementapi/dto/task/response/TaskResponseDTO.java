@@ -14,6 +14,7 @@ public record TaskResponseDTO(
     String description,
     OffsetDateTime dueDate,
     TaskStatus status,
+    TaskEnterpriseSummaryDTO enterprise,
     TaskAssigneeDTO createdBy,
     List<TaskAssigneeDTO> assignees,
     OffsetDateTime createdAt,

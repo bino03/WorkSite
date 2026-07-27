@@ -12,6 +12,7 @@ export const taskService = {
     const params = new URLSearchParams();
     if (filters.q) params.set("q", filters.q);
     if (filters.status) params.set("status", filters.status);
+    if (filters.enterpriseId) params.set("enterpriseId", filters.enterpriseId);
     if (filters.assigneeId) params.set("assigneeId", filters.assigneeId);
     params.set("page", String(filters.page));
     params.set("size", String(filters.size));

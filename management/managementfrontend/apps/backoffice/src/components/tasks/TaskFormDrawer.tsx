@@ -6,12 +6,15 @@ import { notificationService } from '@/services/general/notificationService';
 import { ErrorHandler } from '@/errors/errorHandler';
 import { listAssignableUsers } from '@/services/profileService';
 import type { AssignableEmployee } from '@/services/profileService';
+import { searchEnterprises } from '@/services/enterpriseService';
+import type { EnterpriseOption } from '@/services/enterpriseService';
 import type { TaskResponse } from '@/types/task';
 
 interface TaskFormValues {
   name: string;
   description?: string;
   dueDate: dayjs.Dayjs;
+  enterpriseId?: string;
   assigneeIds: string[];
 }
 
@@ -26,6 +29,8 @@ export const TaskFormDrawer: FC<Props> = ({ open, task, onClose, onSaved }) => {
   const [form] = Form.useForm<TaskFormValues>();
   const [saving, setSaving] = useState(false);
   const [assignableUsers, setAssignableUsers] = useState<AssignableEmployee[]>([]);
+  const [enterpriseOptions, setEnterpriseOptions] = useState<EnterpriseOption[]>([]);
+  const [enterpriseSearchLoading, setEnterpriseSearchLoading] = useState(false);
   const isEdit = !!task;
 
   useEffect(() => {
@@ -37,12 +42,27 @@ export const TaskFormDrawer: FC<Props> = ({ open, task, onClose, onSaved }) => {
         name: task.name,
         description: task.description ?? undefined,
         dueDate: dayjs(task.dueDate),
+        enterpriseId: task.enterprise?.id,
         assigneeIds: task.assignees.map((a) => a.id),
       });
+      setEnterpriseOptions(task.enterprise ? [task.enterprise] : []);
     } else {
       form.resetFields();
+      setEnterpriseOptions([]);
     }
   }, [open, task, form]);
+
+  const handleEnterpriseSearch = async (q: string) => {
+    setEnterpriseSearchLoading(true);
+    try {
+      const results = await searchEnterprises(q);
+      setEnterpriseOptions(results);
+    } catch {
+      // silencioso — pesquisa de conveniência, não bloqueia o formulário
+    } finally {
+      setEnterpriseSearchLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
@@ -51,6 +71,7 @@ export const TaskFormDrawer: FC<Props> = ({ open, task, onClose, onSaved }) => {
       name: values.name,
       description: values.description,
       dueDate: values.dueDate.toISOString(),
+      enterpriseId: values.enterpriseId,
       assigneeIds: values.assigneeIds,
     };
 
@@ -111,6 +132,18 @@ export const TaskFormDrawer: FC<Props> = ({ open, task, onClose, onSaved }) => {
           rules={[{ required: true, message: 'O prazo é obrigatório' }]}
         >
           <DatePicker showTime format="DD/MM/YYYY HH:mm" style={{ width: '100%' }} />
+        </Form.Item>
+
+        <Form.Item name="enterpriseId" label="Projeto (opcional)">
+          <Select
+            allowClear
+            showSearch
+            placeholder="Ligar a um projeto"
+            filterOption={false}
+            loading={enterpriseSearchLoading}
+            onSearch={handleEnterpriseSearch}
+            options={enterpriseOptions.map((e) => ({ value: e.id, label: e.name }))}
+          />
         </Form.Item>
 
         <Form.Item

@@ -126,3 +126,16 @@ export const updateEnterpriseDatesAreas = async (enterpriseId: string, data: {
 export async function deleteEnterprise(id: string): Promise<void> {
   await api.delete(`/enterprises/${id}`);
 }
+
+export interface EnterpriseOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Pesquisa leve de projetos (id + nome) — usada em pickers, ex. ligar uma tarefa a um projeto
+ */
+export async function searchEnterprises(q: string, size = 10): Promise<EnterpriseOption[]> {
+  const { data } = await api.get(`/enterprises`, { params: { q, page: 0, size } });
+  return (data?.content ?? []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name }));
+}

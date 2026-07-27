@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.dto.task.request.TaskUpsertDTO;
 import com.management.managementapi.dto.task.response.TaskResponseDTO;
+import com.management.managementapi.enterprises.model.Enterprise;
+import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.exeption.ForbiddenException;
 import com.management.managementapi.exeption.ResourceNotFoundException;
 import com.management.managementapi.mapper.task.TaskMapper;
@@ -30,13 +32,14 @@ public class TaskService {
 
     private final TaskRepository repository;
     private final ProfileRepository profileRepository;
+    private final EnterpriseRepository enterpriseRepository;
     private final TaskMapper mapper;
 
     @Transactional(readOnly = true)
-    public Page<TaskResponseDTO> list(String q, TaskStatus status, UUID assigneeId,
+    public Page<TaskResponseDTO> list(String q, TaskStatus status, UUID enterpriseId, UUID assigneeId,
                                        UUID requesterId, boolean isAdmin, Pageable pageable) {
         UUID effectiveAssigneeId = isAdmin ? assigneeId : requesterId;
-        return repository.search(status, effectiveAssigneeId, q, pageable).map(mapper::toResponse);
+        return repository.search(status, enterpriseId, effectiveAssigneeId, q, pageable).map(mapper::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -48,8 +51,8 @@ public class TaskService {
     /**
      * Devolve o DTO já mapeado dentro da transação — necessário porque
      * `spring.jpa.open-in-view` está desligado e associações lazy (createdBy,
-     * assignees) deixam de ter sessão Hibernate disponível assim que o método
-     * transacional termina.
+     * enterprise, assignees) deixam de ter sessão Hibernate disponível assim
+     * que o método transacional termina.
      */
     @Transactional(readOnly = true)
     public TaskResponseDTO getResponseById(UUID id, UUID requesterId, boolean isAdmin) {
@@ -67,6 +70,7 @@ public class TaskService {
         task.setDescription(dto.description());
         task.setDueDate(dto.dueDate());
         task.setCreatedBy(creator);
+        task.setEnterprise(resolveEnterprise(dto.enterpriseId()));
         task.replaceAssignees(resolveAssignees(dto.assigneeIds()));
 
         return mapper.toResponse(repository.save(task));
@@ -84,6 +88,7 @@ public class TaskService {
         task.setName(dto.name());
         task.setDescription(dto.description());
         task.setDueDate(dto.dueDate());
+        task.setEnterprise(resolveEnterprise(dto.enterpriseId()));
         task.replaceAssignees(resolveAssignees(dto.assigneeIds()));
 
         return mapper.toResponse(repository.save(task));
@@ -114,6 +119,14 @@ public class TaskService {
         if (!isAssignee) {
             throw new ForbiddenException(ErrorCode.ACCESS_DENIED);
         }
+    }
+
+    private Enterprise resolveEnterprise(UUID enterpriseId) {
+        if (enterpriseId == null) {
+            return null;
+        }
+        return enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> ResourceNotFoundException.enterprise(enterpriseId.toString()));
     }
 
     private List<Profile> resolveAssignees(Set<UUID> assigneeIds) {

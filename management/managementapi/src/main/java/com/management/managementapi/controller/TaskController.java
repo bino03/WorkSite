@@ -50,10 +50,11 @@ public class TaskController {
     public Page<TaskResponseDTO> list(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) TaskStatus status,
+            @RequestParam(required = false) UUID enterpriseId,
             @RequestParam(required = false) UUID assigneeId,
             @PageableDefault(size = 20, sort = "dueDate") Pageable pageable) {
         UUID requesterId = currentProfileId();
-        return taskService.list(q, status, assigneeId, requesterId, authContext.isCurrentUserAdmin(), pageable);
+        return taskService.list(q, status, enterpriseId, assigneeId, requesterId, authContext.isCurrentUserAdmin(), pageable);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")

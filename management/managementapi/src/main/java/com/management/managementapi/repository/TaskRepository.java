@@ -17,6 +17,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
         select t
         from Task t
         where (:status is null or t.status = :status)
+          and (:enterpriseId is null or t.enterprise.id = :enterpriseId)
           and (:assigneeId is null or exists (
                 select 1 from TaskAssignee ta
                 where ta.task = t and ta.profile.id = :assigneeId))
@@ -24,6 +25,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
     """)
     Page<Task> search(
         @Param("status") TaskStatus status,
+        @Param("enterpriseId") UUID enterpriseId,
         @Param("assigneeId") UUID assigneeId,
         @Param("q") String q,
         Pageable pageable

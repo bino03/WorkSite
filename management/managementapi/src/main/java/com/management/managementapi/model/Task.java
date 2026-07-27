@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.model.enums.TaskStatus;
 
 import jakarta.persistence.CascadeType;
@@ -46,6 +47,10 @@ public class Task extends BaseEntity {
     private TaskStatus status = TaskStatus.PENDING;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "enterprise_id")
+    private Enterprise enterprise;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private Profile createdBy;
 
@@ -64,6 +69,9 @@ public class Task extends BaseEntity {
 
     public TaskStatus getStatus() { return status; }
     public void setStatus(TaskStatus status) { this.status = status; }
+
+    public Enterprise getEnterprise() { return enterprise; }
+    public void setEnterprise(Enterprise enterprise) { this.enterprise = enterprise; }
 
     public Profile getCreatedBy() { return createdBy; }
     public void setCreatedBy(Profile createdBy) { this.createdBy = createdBy; }

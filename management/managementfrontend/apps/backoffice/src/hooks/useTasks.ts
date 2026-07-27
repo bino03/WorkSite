@@ -15,6 +15,7 @@ export const useTasks = () => {
   const [filters, setFilters] = useState<TaskListFilters>({
     q: '',
     status: null,
+    enterpriseId: null,
     assigneeId: null,
     page: 0,
     size: DEFAULT_PAGE_SIZE,

@@ -5,12 +5,18 @@ export interface TaskAssigneeSummary {
   name: string;
 }
 
+export interface TaskEnterpriseSummary {
+  id: string;
+  name: string;
+}
+
 export interface TaskResponse {
   id: string;
   name: string;
   description: string | null;
   dueDate: string;
   status: TaskStatus;
+  enterprise: TaskEnterpriseSummary | null;
   createdBy: TaskAssigneeSummary | null;
   assignees: TaskAssigneeSummary[];
   createdAt: string;
@@ -21,6 +27,7 @@ export interface TaskUpsertRequest {
   name: string;
   description?: string;
   dueDate: string;
+  enterpriseId?: string;
   assigneeIds: string[];
 }
 
@@ -31,6 +38,7 @@ export interface TaskStatusUpdateRequest {
 export interface TaskListFilters {
   q?: string;
   status?: TaskStatus | null;
+  enterpriseId?: string | null;
   assigneeId?: string | null;
   page: number;
   size: number;

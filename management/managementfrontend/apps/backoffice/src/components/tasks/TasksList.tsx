@@ -65,28 +65,34 @@ export const TasksList: FC<TasksListProps> = ({
       title: 'Nome',
       dataIndex: 'name',
       key: 'name',
-      width: '25%',
+      width: '20%',
     },
     {
       title: 'Prazo',
       dataIndex: 'dueDate',
       key: 'dueDate',
-      width: '15%',
+      width: '13%',
       render: (dueDate: string) => formatDate(dueDate),
     },
     {
       title: 'Estado',
       dataIndex: 'status',
       key: 'status',
-      width: '15%',
+      width: '13%',
       render: (status: TaskStatus) => (
         <Tag color={statusColorMap[status]}>{statusLabelMap[status]}</Tag>
       ),
     },
     {
+      title: 'Projeto',
+      key: 'enterprise',
+      width: '14%',
+      render: (_: unknown, record: TaskResponse) => record.enterprise?.name ?? '—',
+    },
+    {
       title: 'Atribuídos',
       key: 'assignees',
-      width: '25%',
+      width: '20%',
       render: (_: unknown, record: TaskResponse) => (
         <Avatar.Group max={{ count: 4 }}>
           {record.assignees.map((a) => {

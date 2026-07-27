@@ -13,5 +13,6 @@ public record TaskUpsertDTO(
     @NotBlank @Size(max = 200) String name,
     @Size(max = 2000) String description,
     @NotNull OffsetDateTime dueDate,
+    UUID enterpriseId,
     @NotEmpty Set<UUID> assigneeIds
 ) {}

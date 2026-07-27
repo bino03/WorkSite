@@ -47,6 +47,7 @@ export const TaskDetailDrawer: FC<Props> = ({ task, open, onClose, onStatusUpdat
               <Descriptions.Item label="Nome">{task.name}</Descriptions.Item>
               <Descriptions.Item label="Descrição">{task.description || '—'}</Descriptions.Item>
               <Descriptions.Item label="Prazo">{formatDate(task.dueDate)}</Descriptions.Item>
+              <Descriptions.Item label="Projeto">{task.enterprise?.name ?? '—'}</Descriptions.Item>
               <Descriptions.Item label="Criado por">{task.createdBy?.name ?? '—'}</Descriptions.Item>
               <Descriptions.Item label="Atribuídos">
                 {task.assignees.length
