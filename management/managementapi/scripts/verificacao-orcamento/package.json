@@ -1,0 +1,14 @@
+{
+  "name": "verificacao-orcamento",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Confronta o Excel do orçamento de obra com a árvore gravada na base de dados",
+  "scripts": {
+    "projetos": "node ler-arvore.js",
+    "exportar": "node ler-arvore.js",
+    "verificar": "node verificar-importacao.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

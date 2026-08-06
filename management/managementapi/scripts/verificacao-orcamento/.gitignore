@@ -1,0 +1,5 @@
+# Exports da árvore — artefactos de trabalho, gerados a cada verificação
+arvore.json
+*.json
+!package.json
+package-lock.json
