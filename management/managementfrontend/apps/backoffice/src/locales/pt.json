@@ -2909,15 +2909,15 @@
       "suggestion4": "Benefícios e vantagens"
     },
     "enterpriseEdit": {
-    "idNotFound": "ID do empreendimento não encontrado",
-    "updateError": "Erro ao atualizar empreendimento",
-    "updateSuccess": "Empreendimento atualizado com sucesso!"
-  },
-  "buildingEdit": {
-    "areasTeamUpdateError": "Falha ao atualizar as áreas e equipa.",
-    "updateSuccess": "Áreas e equipa atualizadas com sucesso!"
-  },
-  "enterprise": {
+      "idNotFound": "ID do empreendimento não encontrado",
+      "updateError": "Erro ao atualizar empreendimento",
+      "updateSuccess": "Empreendimento atualizado com sucesso!"
+    },
+    "buildingEdit": {
+      "areasTeamUpdateError": "Falha ao atualizar as áreas e equipa.",
+      "updateSuccess": "Áreas e equipa atualizadas com sucesso!"
+    },
+    "enterprise": {
       "title": "Empreendimentos",
       "subtitle": "Associação do empreendimento",
       "associatedTo": "Associado a {{name}}",
@@ -3117,24 +3117,12 @@
     },
     "location": {
       "title": "Localização",
-      "subtitle": "Localização do imóvel",
-      "enterpriseSubtitle": "Localização do empreendimento",
+      "subtitle": "Localização do empreendimento",
       "emptyTitle": "Sem localização definida",
       "emptySubtitle": "Esta propriedade ainda não tem uma localização associada",
-      "closeMap": "Fechar Mapa",
-      "openMap": "Ver no Mapa",
-      "mapLoadError": "Erro ao carregar mapa",
-      "mapLoading": "A carregar mapa...",
-      "municipality": "Município",
       "locatedIn": "Localizado em {{city}}",
-      "city": "Cidade",
-      "postalCode": "Código Postal",
-      "country": "País",
-      "parish": "Freguesia",
-      "gpsCoords": "Coordenadas GPS",
-      "latitude": "Latitude",
-      "longitude": "Longitude",
-      "notes": "Observações"
+      "closeMap": "Fechar Mapa",
+      "openMap": "Ver no Mapa"
     },
     "priceAndTags": {
       "title": "Preço e Etiquetas",
@@ -3158,15 +3146,6 @@
       "tagsSubtitle": "Categorização e organização da propriedade",
       "tagsTip": "As etiquetas ajudam a categorizar e filtrar propriedades de forma mais eficiente",
       "tip": "Dica:"
-    },
-    "location": {
-      "title": "Localização",
-      "subtitle": "Localização do empreendimento",
-      "emptyTitle": "Sem localização definida",
-      "emptySubtitle": "Esta propriedade ainda não tem uma localização associada",
-      "locatedIn": "Localizado em {{city}}",
-      "closeMap": "Fechar Mapa",
-      "openMap": "Ver no Mapa"
     },
     "settings": {
       "title": "Definições",
@@ -3469,85 +3448,8 @@
     "apiKeyError": "Chave da API do Google Maps não configurada",
     "loadError": "Erro ao carregar o Google Maps. Verifica a tua conexão e a API Key."
   },
-  "construction": {
-    "manageConstruction": "Gerir Construção"
-  },
-  "constructionStages": {
-    "title": "Etapas de Construção",
-    "subtitle": "Empreendimento: {{enterprise}}",
-    "createTitle": "Nova Etapa",
-    "editTitle": "Editar Etapa",
-    "addStage": "Adicionar Etapa",
-    "viewSubStages": "Ver sub-etapas",
-    "created": "Etapa criada com sucesso!",
-    "updated": "Etapa atualizada com sucesso!",
-    "deleted": "Etapa eliminada com sucesso!",
-    "deleteConfirmTitle": "Eliminar esta etapa?",
-    "noStages": "Sem etapas para mostrar",
-    "columns": {
-      "name": "Nome",
-      "description": "Descrição"
-    },
-    "fields": {
-      "name": "Nome",
-      "namePlaceholder": "Ex.: Fundações",
-      "description": "Descrição",
-      "descriptionPlaceholder": "Descrição opcional"
-    },
-    "formErrors": {
-      "nameRequired": "O nome é obrigatório."
-    }
-  },
-  "constructionSubStages": {
-    "title": "Sub-Etapas",
-    "subtitle": "Etapa: {{stage}}",
-    "createTitle": "Nova Sub-Etapa",
-    "editTitle": "Editar Sub-Etapa",
-    "addSubStage": "Adicionar Sub-Etapa",
-    "viewExpenses": "Ver despesas",
-    "created": "Sub-etapa criada com sucesso!",
-    "updated": "Sub-etapa atualizada com sucesso!",
-    "deleted": "Sub-etapa eliminada com sucesso!",
-    "deleteConfirmTitle": "Eliminar esta sub-etapa?",
-    "noSubStages": "Sem sub-etapas para mostrar",
-    "columns": {
-      "name": "Nome",
-      "description": "Descrição",
-      "total": "Total"
-    },
-    "fields": {
-      "name": "Nome",
-      "namePlaceholder": "Ex.: Escavação",
-      "description": "Descrição",
-      "descriptionPlaceholder": "Descrição opcional"
-    },
-    "formErrors": {
-      "nameRequired": "O nome é obrigatório."
-    }
-  },
   "constructionExpenses": {
-    "title": "Despesas",
-    "subtitle": "Sub-Etapa: {{subStage}}",
-    "createTitle": "Nova Despesa",
-    "editTitle": "Editar Despesa",
-    "addExpense": "Adicionar Despesa",
-    "viewInvoice": "Ver fatura",
-    "created": "Despesa criada com sucesso!",
-    "updated": "Despesa atualizada com sucesso!",
-    "deleted": "Despesa eliminada com sucesso!",
-    "deleteConfirmTitle": "Eliminar esta despesa?",
-    "noExpenses": "Sem despesas para mostrar",
-    "totalSpent": "Total gasto",
-    "columns": {
-      "name": "Nome",
-      "price": "Preço",
-      "invoice": "Fatura"
-    },
     "fields": {
-      "name": "Nome",
-      "namePlaceholder": "Ex.: Fatura do fornecedor de cimento",
-      "price": "Preço",
-      "pricePlaceholder": "Ex.: 1500",
       "invoice": "Fatura",
       "invoiceDragHint": "Clique ou arraste um ficheiro para esta área",
       "invoiceFormats": "PDF, JPEG ou PNG, até 25 MB",
@@ -3558,9 +3460,6 @@
       "keepCurrentDocument": "Manter documento atual"
     },
     "formErrors": {
-      "nameRequired": "O nome é obrigatório.",
-      "priceRequired": "O preço é obrigatório.",
-      "pricePositive": "O preço deve ser positivo.",
       "invoiceInvalidType": "Tipo de ficheiro inválido. Aceites: PDF, JPEG, PNG.",
       "invoiceTooLarge": "O ficheiro excede o tamanho máximo de 25 MB."
     }

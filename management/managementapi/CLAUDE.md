@@ -47,7 +47,7 @@ This is a scoped copy of [Property-Management](https://github.com/bino03/Propert
 ### Database
 
 - Schemas: `worksite` (main), `settings` (config/invites), `tasks` (standalone task management), `auth` (Supabase-managed — never touch)
-- Migrations: `src/main/resources/db/migration/` — Flyway V1–V14, `ddl-auto: none`
+- Migrations: `src/main/resources/db/migration/` — Flyway V1–V15, `ddl-auto: none`
 - When adding a new table: create a new `V{next}__description.sql` in `db/migration/` — never alter the DB directly via Supabase. See [[../../docs/skills/backend/skill-add-database-table]]
 - Base entity: UUID PK + `createdAt`/`updatedAt` (JPA auditing enabled)
 
@@ -90,6 +90,24 @@ Annotation processor order in `pom.xml` is intentional: **Lombok must run before
 ### File uploads
 
 Max 25 MB (configured in `application.yml`). Construction expense invoices go through `SupabaseStorageService` (bucket `"documents"`) — see [[../../docs/skills/backend/skill-add-file-upload]].
+
+### Ficheiros lidos, não só guardados
+
+Duas dependências existem só para **ler** ficheiros que os clientes enviam:
+
+- **Apache POI** (`poi-ooxml`) — `BudgetExcelImportService` importa o orçamento da obra a
+  partir do `.xlsx` do empreiteiro, reconstruindo a árvore de rubricas.
+- **ZXing + PDFBox** — `AtInvoiceQrService` lê o QR code da AT nas faturas (PDFBox rasteriza
+  a página quando o documento é PDF, ZXing descodifica). Preferido a OCR por ser
+  determinístico e correr offline; nada sai do servidor. Sem QR legível devolve vazio e o
+  preenchimento segue manual — nunca é erro.
+
+### Compressão HTTP
+
+Ligada em `application.yml` (`server.compression`). Está desligada por omissão no Spring Boot,
+e as respostas desta API repetem os mesmos nomes de campo centenas de vezes — a árvore de
+orçamento traz ~198 nós com ~25 chaves cada. Não afeta as faturas: são PDF/imagem, já
+comprimidas, e servidas directamente pelo Supabase via signed URL.
 
 ### CORS
 

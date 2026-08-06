@@ -44,7 +44,8 @@ Unlike Property-Management, there is **no public portal** — this is an interna
 ```
 Worksite/
 ├── .obsidian/               ← Obsidian config
-├── .claude/skills/          ← Invocable skills (carried over from Property-Management)
+├── .claude/skills/          ← 11 invocable skills (thin pointers to docs/skills/)
+├── .githooks/pre-commit     ← Aviso não-bloqueante de docs por atualizar (ver docs/vault-sync-hooks.md)
 │
 ├── management/
 │   ├── managementapi/       ← Spring Boot backend
@@ -53,13 +54,31 @@ Worksite/
 │
 ├── docs/                    ← Centralized documentation
 │   ├── README.md
-│   ├── architecture.md / database.md / security.md
-│   └── skills/              ← Mirrors .claude/skills content + design references
+│   ├── architecture.md / database.md / security.md / api.md
+│   ├── vault-sync-hooks.md
+│   └── skills/              ← Fonte de verdade das skills + referências
+│       ├── SKILLS-INDEX.md / SKILLS-QUICK-REFERENCE.md
+│       ├── backend/ (4) · frontend/ (4) · process/ (3)
+│       └── references/      ← code-best-practices, frontend-visual-consistency + design/ (8 sub-files)
+│
+├── references/              ← Links externos (useful-links.md)
 │
 ├── notes/                   ← Personal notes (NOT versioned — git ignored)
+│   ├── ToDo.md              ← Backlog acionável (o que /implement-todo consome)
+│   ├── ideas.md / bugs.md / refactoring.md / learning.md / whatIveDone.md
+│   ├── roadmap/             ← backlog.md + plans/ (planos datados) + plans/archive/
+│   └── design-briefs/       ← Gerados por /frontend-structure-brief
 │
 └── CLAUDE.md                ← This file
 ```
+
+## 🔁 Fluxo de trabalho do backlog
+
+```
+notes/ideas.md → notes/ToDo.md → /implement-todo → notes/roadmap/plans/ → notes/whatIveDone.md
+```
+
+`/implement-todo` abre com um menu (retomar plano / implementar / só planear / ver estado), pergunta âmbito e orçamento, investiga o código em paralelo por tema, esclarece dúvidas em bloco, grava um plano com checkpoints e implementa **uma tarefa de cada vez**, invocando as outras skills. Ver [[docs/skills/process/skill-implement-todo.md]].
 
 ---
 
@@ -87,8 +106,11 @@ npm run dev
 - **Architecture** → [[docs/architecture.md]]
 - **Database** → [[docs/database.md]]
 - **Security** → [[docs/security.md]]
+- **API** → [[docs/api.md]]
+- **Skills index** → [[docs/skills/SKILLS-INDEX.md]]
 - **Backend guide** → [[management/managementapi/CLAUDE.md]]
 - **Frontend guide** → [[management/managementfrontend/CLAUDE.md]]
+- **Notes / backlog** → [[notes/README.md]]
 
 ---
 
@@ -98,7 +120,7 @@ This project started as a scoped copy of the [Property-Management](https://githu
 
 - **Auth/accounts**: Supabase JWT auth, `worksite.profile` (staff/users, roles `ADMIN`/`EMPLOYEE`), admin invite flow.
 - **Enterprises** (renamed conceptually to "projects" — the `enterprises` table/package names were kept as-is to minimize risk).
-- **Construction management**: `construction_stage` → `construction_sub_stage` → `construction_expense`, including invoice upload.
+- **Construction management**: originally `construction_stage` → `construction_sub_stage` → `construction_expense`. Replaced in `V15` by a single self-referencing tree, `construction_budget_item` → `construction_expense`, so a work budget of arbitrary depth maps 1:1 onto the Excel the company receives — including an `.xlsx` importer. Invoice upload kept as-is.
 - **Employees**: CRUD over `worksite.profile` (no separate entity).
 - **Tasks**: standalone tasks assignable to one or more `worksite.profile` users, isolated in their own `tasks` schema (no link to any asset/property — that concept doesn't exist here).
 

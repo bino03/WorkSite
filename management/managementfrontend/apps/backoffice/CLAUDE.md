@@ -56,27 +56,23 @@ src/
 │       ├── BackofficeHome.tsx
 │       ├── EmployeesList.tsx
 │       ├── TasksPage.tsx
-│       ├── employee/EmployeeProfilePage.tsx
-│       └── enterprise/
-│           ├── ConstructionStagesPage.tsx
-│           ├── ConstructionSubStagesPage.tsx
-│           └── ConstructionExpensesPage.tsx
+│       └── employee/EmployeeProfilePage.tsx
 │
 ├── components/               # Organizados por domínio
 │   ├── enterprise/           # create/ (secções + schema Zod), edit/ (cards), Create/View drawers
 │   ├── tasks/                # TasksList, TaskFormDrawer, TaskDetailDrawer
-│   ├── construction/         # Stage/SubStage/Expense upsert drawers + InvoicePreviewModal
+│   ├── construction/         # InvoicePreviewModal + regras da fatura (ver nota abaixo)
 │   ├── employees/            # CreateEmployeeDrawer, EmployeeContextMenu
 │   ├── profile/              # MyProfileModal, ProfileView, ProfileDrawer, seeprofile/EmployeeMiniCard
 │   ├── invites/               # InvitesDrawer
 │   ├── location/             # MapLocationPickerDrawer
 │   ├── image/                # AuthenticatedImage
 │   ├── upload/                # MediaUploadsSection
-│   └── common/                # Label, ErrorBoundary, ErrorDisplay, CountryDistrictSelect
+│   └── common/                # ListActions (coluna de ações das listas), Label, ErrorBoundary, ErrorDisplay, CountryDistrictSelect, BlueprintCard
 │
 ├── services/                 # Chamadas à API por domínio
 │   ├── authService.ts / profileService.ts / adminService.ts
-│   ├── enterpriseService.ts / constructionService.ts / locationService.ts
+│   ├── enterpriseService.ts / locationService.ts
 │   └── general/notificationService.tsx
 │
 ├── hooks/
@@ -89,11 +85,10 @@ src/
 │   └── errorHandler.ts       # ErrorHandler.handle() centralizado
 │
 ├── types/
-│   ├── profile.ts
-│   └── construction.ts
+│   └── profile.ts
 │
 ├── config/
-│   ├── entityColors.ts       # Paleta `D` partilhada por listas/tabelas
+│   ├── entityColors.ts       # `IND` — espelho em JS das vars `--ind-*` (só para casos que precisam do hex, ex. `stroke` de SVG)
 │   └── pagination.ts         # DEFAULT_PAGE_SIZE=10, PAGE_SIZE_OPTIONS
 │
 └── utils/
@@ -119,13 +114,20 @@ This is a scoped copy of Property-Management's Backoffice — no property listin
   /backoffice/funcionarios                                  → EmployeesList
   /backoffice/funcionarios/:id                               → EmployeeProfilePage
   /backoffice/empreendimentos                                → EnterprisesList
-  /backoffice/empreendimentos/:enterpriseId/construction     → ConstructionStagesPage
-  /backoffice/empreendimentos/:enterpriseId/construction/:stageId              → ConstructionSubStagesPage
-  /backoffice/empreendimentos/:enterpriseId/construction/:stageId/:subStageId  → ConstructionExpensesPage
   /backoffice/tasks                                          → TasksPage
 ```
 
 `PrivateRoute` (`src/PrivateRoute.tsx`) verifica o `user` do `AuthContext` — sem sessão redireciona para `/login`.
+
+> ⚠️ **Orçamento de obra — frontend por construir.** O backend passou (migração `V15`) da
+> hierarquia de dois níveis etapa → sub-etapa para uma **árvore** de rubricas
+> (`/construction-budget/**`, ver [[../../../../docs/api.md]]). As três páginas encadeadas, os
+> respetivos drawers, o `constructionService.ts` e o `types/construction.ts` foram removidos
+> por terem ficado a apontar para endpoints que já não existem. Sobreviveram intactos, para
+> reaproveitar: `components/construction/InvoicePreviewModal.tsx` e o `validateInvoiceFile`
+> em `constructionFormSchemas.ts` — as regras da fatura não mudaram (PDF/JPEG/PNG, 25 MB,
+> signed URL). O link "Gerir fases de construção" foi retirado do rodapé do
+> `EnterpriseViewDrawer` e volta a entrar com a nova página.
 
 ---
 
@@ -156,10 +158,10 @@ Comportamento automático:
 ## Padrões de componentes
 
 ### Drawers
-Operações de criar/editar/ver usam `<Drawer>` do Ant Design em vez de páginas separadas (ex: `CreateEnterpriseDrawer`, `EnterpriseViewDrawer`, `ConstructionStageUpsertDrawer`).
+Operações de criar/editar/ver usam `<Drawer>` do Ant Design em vez de páginas separadas (ex: `CreateEnterpriseDrawer`, `EnterpriseViewDrawer`, `TaskFormDrawer`).
 
 ### Formulários
-- React Hook Form + Zod schemas (`enterpriseFormSchema.ts`, `constructionFormSchemas.ts`)
+- React Hook Form + Zod schemas (`enterpriseFormSchema.ts`)
 - Formulário de criação de projeto dividido em secções (`BasicInfoSection`, `EnterpriseLocationSection`, `EnterpriseMediaSection`, `FinancialSection`, `TimelineMetricsSection`)
 
 ### Paginação com Spring
@@ -191,4 +193,10 @@ Ver [[../../../../docs/skills/frontend/skill-frontend-error-handling]].
 
 ## Design tokens
 
-`theme.ts` centraliza a paleta Ant Design; `config/entityColors.ts` (constante `D`) tem as cores hex reutilizadas por listas/tabelas. Antes de hardcodar uma cor nova, ver [[../../../../docs/skills/references/frontend-visual-consistency.md]].
+Sistema visual **Industry** (steel-blue "blueprint"): as variáveis `--ind-*` em `index.css` são a fonte de verdade, `theme.ts` espelha-as para os componentes Ant Design. `config/entityColors.ts` exporta só `IND`, para o caso pontual que precisa mesmo do hex em JS.
+
+Antes de hardcodar uma cor nova, ver [[../../../../docs/skills/references/frontend-visual-consistency.md]].
+
+### Listas — coluna de ações
+
+Usa sempre `components/common/ListActions.tsx` (`ListActions` + `ListActionPrimary`/`ListActionSecondary`/`ListActionDanger`) em vez de estilizar botões por ficheiro. Confirmação de ações destrutivas via `useConfirm()` (`context/ConfirmDialogContext`), não `Popconfirm`. Ver [[../../../../docs/skills/references/design/backoffice-tables-and-lists.md]].

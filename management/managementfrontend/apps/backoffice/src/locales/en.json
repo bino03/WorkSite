@@ -1468,8 +1468,7 @@
       "fileSizeExceeded": "Image {{name}} exceeds the maximum size of 10MB.",
       "addedLocally_one": "{{count}} photo added locally. Click \"Save Changes\" to confirm.",
       "addedLocally_other": "{{count}} photos added locally. Click \"Save Changes\" to confirm.",
-      "removedLocally": "Photo removed locally. Click \"Save Changes\" to confirm.",
-      "photoNotFound": "Photo not found."
+      "removedLocally": "Photo removed locally. Click \"Save Changes\" to confirm."
     },
     "finance": {
       "constructionTypes": {
@@ -2879,15 +2878,15 @@
       "suggestion4": "Benefits and advantages"
     },
     "enterpriseEdit": {
-    "idNotFound": "Enterprise ID not found",
-    "updateError": "Error updating enterprise",
-    "updateSuccess": "Enterprise updated successfully!"
-  },
-  "buildingEdit": {
-    "areasTeamUpdateError": "Failed to update areas and team.",
-    "updateSuccess": "Areas and team updated successfully!"
-  },
-  "enterprise": {
+      "idNotFound": "Enterprise ID not found",
+      "updateError": "Error updating enterprise",
+      "updateSuccess": "Enterprise updated successfully!"
+    },
+    "buildingEdit": {
+      "areasTeamUpdateError": "Failed to update areas and team.",
+      "updateSuccess": "Areas and team updated successfully!"
+    },
+    "enterprise": {
       "title": "Enterprises",
       "subtitle": "Enterprise association",
       "associatedTo": "Associated with {{name}}",
@@ -3087,24 +3086,12 @@
     },
     "location": {
       "title": "Location",
-      "subtitle": "Property location",
-      "enterpriseSubtitle": "Enterprise location",
+      "subtitle": "Enterprise location",
       "emptyTitle": "No location defined",
-      "emptySubtitle": "This property has no associated location yet",
-      "closeMap": "Close Map",
-      "openMap": "View on Map",
-      "mapLoadError": "Error loading map",
-      "mapLoading": "Loading map...",
-      "municipality": "Municipality",
+      "emptySubtitle": "This property does not yet have an associated location",
       "locatedIn": "Located in {{city}}",
-      "city": "City",
-      "postalCode": "Postal Code",
-      "country": "Country",
-      "parish": "Parish",
-      "gpsCoords": "GPS Coordinates",
-      "latitude": "Latitude",
-      "longitude": "Longitude",
-      "notes": "Notes"
+      "closeMap": "Close Map",
+      "openMap": "View on Map"
     },
     "priceAndTags": {
       "title": "Price & Tags",
@@ -3128,15 +3115,6 @@
       "tagsSubtitle": "Property categorization and organization",
       "tagsTip": "Tags help to categorize and filter properties more efficiently",
       "tip": "Tip:"
-    },
-    "location": {
-      "title": "Location",
-      "subtitle": "Enterprise location",
-      "emptyTitle": "No location defined",
-      "emptySubtitle": "This property does not yet have an associated location",
-      "locatedIn": "Located in {{city}}",
-      "closeMap": "Close Map",
-      "openMap": "View on Map"
     },
     "settings": {
       "title": "Settings",
@@ -3439,85 +3417,8 @@
     "apiKeyError": "Google Maps API key not configured",
     "loadError": "Error loading Google Maps. Check your connection and API Key."
   },
-  "construction": {
-    "manageConstruction": "Manage Construction"
-  },
-  "constructionStages": {
-    "title": "Construction Stages",
-    "subtitle": "Enterprise: {{enterprise}}",
-    "createTitle": "New Stage",
-    "editTitle": "Edit Stage",
-    "addStage": "Add Stage",
-    "viewSubStages": "View sub-stages",
-    "created": "Stage created successfully!",
-    "updated": "Stage updated successfully!",
-    "deleted": "Stage deleted successfully!",
-    "deleteConfirmTitle": "Delete this stage?",
-    "noStages": "No stages to display",
-    "columns": {
-      "name": "Name",
-      "description": "Description"
-    },
-    "fields": {
-      "name": "Name",
-      "namePlaceholder": "E.g.: Foundation",
-      "description": "Description",
-      "descriptionPlaceholder": "Optional description"
-    },
-    "formErrors": {
-      "nameRequired": "Name is required."
-    }
-  },
-  "constructionSubStages": {
-    "title": "Sub-Stages",
-    "subtitle": "Stage: {{stage}}",
-    "createTitle": "New Sub-Stage",
-    "editTitle": "Edit Sub-Stage",
-    "addSubStage": "Add Sub-Stage",
-    "viewExpenses": "View expenses",
-    "created": "Sub-stage created successfully!",
-    "updated": "Sub-stage updated successfully!",
-    "deleted": "Sub-stage deleted successfully!",
-    "deleteConfirmTitle": "Delete this sub-stage?",
-    "noSubStages": "No sub-stages to display",
-    "columns": {
-      "name": "Name",
-      "description": "Description",
-      "total": "Total"
-    },
-    "fields": {
-      "name": "Name",
-      "namePlaceholder": "E.g.: Excavation",
-      "description": "Description",
-      "descriptionPlaceholder": "Optional description"
-    },
-    "formErrors": {
-      "nameRequired": "Name is required."
-    }
-  },
   "constructionExpenses": {
-    "title": "Expenses",
-    "subtitle": "Sub-Stage: {{subStage}}",
-    "createTitle": "New Expense",
-    "editTitle": "Edit Expense",
-    "addExpense": "Add Expense",
-    "viewInvoice": "View invoice",
-    "created": "Expense created successfully!",
-    "updated": "Expense updated successfully!",
-    "deleted": "Expense deleted successfully!",
-    "deleteConfirmTitle": "Delete this expense?",
-    "noExpenses": "No expenses to display",
-    "totalSpent": "Total spent",
-    "columns": {
-      "name": "Name",
-      "price": "Price",
-      "invoice": "Invoice"
-    },
     "fields": {
-      "name": "Name",
-      "namePlaceholder": "E.g.: Cement supplier invoice",
-      "price": "Price",
-      "pricePlaceholder": "E.g.: 1500",
       "invoice": "Invoice",
       "invoiceDragHint": "Click or drag a file to this area",
       "invoiceFormats": "PDF, JPEG or PNG, up to 25 MB",
@@ -3528,9 +3429,6 @@
       "keepCurrentDocument": "Keep current document"
     },
     "formErrors": {
-      "nameRequired": "Name is required.",
-      "priceRequired": "Price is required.",
-      "pricePositive": "Price must be positive.",
       "invoiceInvalidType": "Invalid file type. Accepted: PDF, JPEG, PNG.",
       "invoiceTooLarge": "File exceeds the maximum size of 25 MB."
     }

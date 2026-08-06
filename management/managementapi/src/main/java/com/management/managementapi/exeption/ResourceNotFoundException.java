@@ -39,17 +39,10 @@ public class ResourceNotFoundException extends BusinessException {
         );
     }
 
-    public static ResourceNotFoundException constructionStage(String stageId) {
+    public static ResourceNotFoundException budgetItem(String itemId) {
         return new ResourceNotFoundException(
-            ErrorCode.STAGE_NOT_FOUND,
-            "Etapa com ID " + stageId + " não encontrada"
-        );
-    }
-
-    public static ResourceNotFoundException constructionSubStage(String subStageId) {
-        return new ResourceNotFoundException(
-            ErrorCode.SUBSTAGE_NOT_FOUND,
-            "Sub-etapa com ID " + subStageId + " não encontrada"
+            ErrorCode.BUDGET_ITEM_NOT_FOUND,
+            "Rubrica com ID " + itemId + " não encontrada"
         );
     }
 

@@ -3,10 +3,14 @@ package com.management.managementapi.model.enums;
 public enum EntityType {
     ENTERPRISE("enterprise"),
     USER("user"),
-    CONSTRUCTION_STAGE("construction_stage"),
-    CONSTRUCTION_SUB_STAGE("construction_sub_stage"),
+    BUDGET_ITEM("budget_item"),
     CONSTRUCTION_EXPENSE("construction_expense"),
-    TASK("task");
+    TASK("task"),
+
+    // Mantidos só para leitura do histórico: o activity_log ainda tem linhas
+    // destes tipos, das etapas/sub-etapas que a V15 substituiu pela árvore.
+    CONSTRUCTION_STAGE("construction_stage"),
+    CONSTRUCTION_SUB_STAGE("construction_sub_stage");
 
     private final String dbValue;
 

@@ -23,120 +23,34 @@ public enum ErrorCode {
     RATE_LIMIT_EXCEEDED("ERR_011", "Limite de pedidos excedido"),
     SERVICE_UNAVAILABLE("ERR_012", "Serviço temporariamente indisponível"),
 
-    // ========================================================================
-    // ASSETS/PROPRIEDADES (ASSET_xxx)
-    // ========================================================================
-
     // CRUD básico
-    ASSET_NOT_FOUND("ASSET_001", "Asset não encontrado"),
-    ASSET_ALREADY_EXISTS("ASSET_002", "Asset já existe"),
-    ASSET_CREATE_ERROR("ASSET_003", "Erro ao criar asset"),
-    ASSET_UPDATE_ERROR("ASSET_004", "Erro ao atualizar asset"),
-    ASSET_DELETE_ERROR("ASSET_005", "Erro ao eliminar asset"),
-    ASSET_NOT_DELETED("ASSET_006", "Asset não está no estado eliminado"),
 
     // Validação de dados básicos
-    ASSET_INVALID_NAME("ASSET_010", "Nome do asset inválido"),
-    ASSET_INVALID_PRICE("ASSET_011", "Preço do asset inválido"),
-    ASSET_INVALID_AREA("ASSET_012", "Área do asset inválida"),
-    ASSET_INVALID_STATUS("ASSET_013", "Estado do asset inválido"),
-    ASSET_INVALID_BUSINESS_NATURE("ASSET_014", "Natureza do negócio inválida"),
-    ASSET_INVALID_COORDINATES("ASSET_015", "Coordenadas do asset inválidas"),
-    ASSET_INVALID_YEAR("ASSET_016", "Ano de construção inválido"),
 
     // Relações/Associações - Agency
-    ASSET_AGENCY_NOT_FOUND("ASSET_020", "Agência não encontrada"),
-    ASSET_INVALID_AGENCY("ASSET_021", "Agência inválida"),
 
     // Relações/Associações - Type/Subtype
-    ASSET_TYPE_NOT_FOUND("ASSET_025", "Tipo de asset não encontrado"),
-    ASSET_SUBTYPE_NOT_FOUND("ASSET_026", "Subtipo de asset não encontrado"),
-    ASSET_INVALID_TYPE_SUBTYPE_COMBINATION("ASSET_027", "Combinação de tipo e subtipo inválida"),
 
     // Relações/Associações - Enterprise/Building
     ASSET_ENTERPRISE_NOT_FOUND("ASSET_030", "Empresa não encontrada"),
-    ASSET_BUILDING_NOT_FOUND("ASSET_031", "Edifício não encontrado"),
-    ASSET_BUILDING_ENTERPRISE_MISMATCH("ASSET_032", "Edifício não pertence à empresa especificada"),
-    ASSET_ALREADY_HAS_BUILDING("ASSET_033", "Asset já está associado a um edifício"),
-    ASSET_BUILDING_REQUIRED("ASSET_034", "Edifício é obrigatório para este tipo de asset"),
 
     // Relações/Associações - Development
-    ASSET_DEVELOPMENT_NOT_FOUND("ASSET_035", "Empreendimento não encontrado"),
 
     // Relações/Associações - Location
-    ASSET_LOCATION_NOT_FOUND("ASSET_040", "Localização não encontrada"),
-    ASSET_LOCATION_CREATE_ERROR("ASSET_041", "Erro ao criar localização"),
-    ASSET_LOCATION_INVALID("ASSET_042", "Dados de localização inválidos"),
-    ASSET_MULTIPLE_PRIMARY_LOCATIONS("ASSET_043", "Asset não pode ter múltiplas localizações primárias"),
 
     // Relações/Associações - Contact
-    ASSET_CONTACT_NOT_FOUND("ASSET_045", "Contacto não encontrado"),
-    ASSET_CONTACT_CREATE_ERROR("ASSET_046", "Erro ao criar contacto"),
-    ASSET_CONTACT_ALREADY_LINKED("ASSET_047", "Contacto já está associado ao asset"),
 
     // Description
-    ASSET_DESCRIPTION_CREATE_ERROR("ASSET_050", "Erro ao criar descrição"),
-    ASSET_DESCRIPTION_UPDATE_ERROR("ASSET_051", "Erro ao atualizar descrição"),
-    ASSET_DESCRIPTION_NOT_FOUND("ASSET_052", "Descrição não encontrada"),
 
     // Tags
-    ASSET_TAG_NOT_FOUND("ASSET_055", "Tag não encontrada"),
-    ASSET_TAG_CREATE_ERROR("ASSET_056", "Erro ao criar tag"),
-    ASSET_TAG_ALREADY_LINKED("ASSET_057", "Tag já está associada ao asset"),
-    ASSET_TAG_LIMIT_EXCEEDED("ASSET_058", "Limite de tags excedido"),
-    TAG_INVALID("ASSET_059", "Tag inválida: precisa de label ou ID"),
 
     // Divisions (tipologias/divisões)
-    ASSET_DIVISION_CREATE_ERROR("ASSET_060", "Erro ao criar divisão"),
-    ASSET_DIVISION_UPDATE_ERROR("ASSET_061", "Erro ao atualizar divisão"),
-    ASSET_DIVISION_DELETE_ERROR("ASSET_062", "Erro ao eliminar divisão"),
-    ASSET_TYPOLOGY_NOT_FOUND("ASSET_063", "Tipologia não encontrada"),
-    DIVISION_NOT_FOUND("ASSET_064", "Divisão não encontrada"),
-    DIVISION_EMPTY_LIST("ASSET_065", "Lista de divisões vazia"),
 
     // Settings
-    ASSET_SETTINGS_CREATE_ERROR("ASSET_066", "Erro ao criar definições do asset"),
-    ASSET_SETTINGS_UPDATE_ERROR("ASSET_067", "Erro ao atualizar definições do asset"),
-    ASSET_SETTINGS_NOT_FOUND("ASSET_068", "Definições do asset não encontradas"),
 
     // Estado/Status
-    ASSET_INACTIVE("ASSET_070", "Asset está inativo"),
-    ASSET_ARCHIVED("ASSET_071", "Asset está arquivado"),
-    ASSET_CANNOT_CHANGE_STATUS("ASSET_072", "Não é possível alterar o estado do asset"),
-    ASSET_STATUS_TRANSITION_INVALID("ASSET_073", "Transição de estado inválida"),
-    ASSET_TYPE_INACTIVE("ASSET_074", "Tipo de asset está inativo"),
-    TYPOLOGY_DUPLICATE_SLUG("ASSET_075", "Já existe uma tipologia com este slug para este tipo de imóvel"),
 
     // Operações específicas
-    ASSET_DUPLICATE_REFERENCE("ASSET_080", "Referência interna duplicada"),
-    ASSET_HAS_DEPENDENCIES("ASSET_081", "Asset tem dependências associadas"),
-    ASSET_CANNOT_DELETE_WITH_AGENTS("ASSET_082", "Não é possível eliminar asset com angariadores associados"),
-    ASSET_CANNOT_DELETE_WITH_MEDIA("ASSET_083", "Não é possível eliminar asset com media associada"),
-
-    // ========================================================================
-    // PROPERTY AGENTS (AGENT_xxx)
-    // ========================================================================
-    AGENT_NOT_FOUND("AGENT_001", "Angariador não encontrado"),
-    AGENT_PROFILE_NOT_FOUND("AGENT_002", "Perfil do angariador não encontrado"),
-    AGENT_ALREADY_ASSIGNED("AGENT_003", "Angariador já está associado a este asset"),
-    AGENT_NOT_ASSIGNED_TO_ASSET("AGENT_004", "Angariador não está associado a este asset"),
-    AGENT_INVALID_ROLE("AGENT_005", "Role do angariador inválido"),
-    AGENT_INVALID_COMMISSION("AGENT_006", "Percentagem de comissão inválida"),
-    AGENT_CREATE_ERROR("AGENT_007", "Erro ao associar angariador"),
-    AGENT_DELETE_ERROR("AGENT_008", "Erro ao remover angariador"),
-    AGENT_LIMIT_EXCEEDED("AGENT_009", "Limite de angariadores excedido"),
-
-    // ========================================================================
-    // CONTACTOS (CONTACT_xxx)
-    // ========================================================================
-    CONTACT_NOT_FOUND("CONTACT_001", "Contacto não encontrado"),
-    CONTACT_EMPTY_LIST("CONTACT_002", "Lista de contactos vazia"),
-    CONTACT_ROLE_INVALID("CONTACT_003", "Role de contacto inválida"),
-    CONTACT_ALREADY_PRIMARY("CONTACT_004", "Já existe um contacto primário"),
-
-    // ========================================================================
-    // MEDIA (Assets) (MEDIA_xxx)
-    // ========================================================================
 
     // Upload geral
     MEDIA_UPLOAD_ERROR("MEDIA_010", "Erro ao fazer upload de media"),
@@ -191,9 +105,6 @@ public enum ErrorCode {
     DOCUMENT_EMPTY("DOC_010", "Documento vazio"),
     DOCUMENT_CORRUPTED("DOC_011", "Documento corrompido"),
     DOCUMENT_PROCESSING_ERROR("DOC_012", "Erro ao processar documento"),
-    PROPERTY_DOCUMENT_NOT_FOUND("DOC_013", "Documento de propriedade não encontrado"),
-    PROPERTY_DOCUMENT_TYPE_ALREADY_EXISTS("DOC_014", "Já existe um documento deste tipo para esta propriedade"),
-    PROPERTY_DOCUMENT_TYPE_INVALID("DOC_015", "Tipo de documento inválido"),
 
     // ========================================================================
     // LICENÇAS/CERTIFICADOS ENERGÉTICOS (LICENSE_xxx)
@@ -211,19 +122,6 @@ public enum ErrorCode {
     LICENSE_INVALID_NUMBER("LICENSE_011", "Número de licença inválido"),
     LICENSE_FILE_REQUIRED("LICENSE_012", "Ficheiro de licença é obrigatório"),
     LICENSE_PROCESSING_ERROR("LICENSE_013", "Erro ao processar licença"),
-
-    // ========================================================================
-    // CARACTERÍSTICAS (CHAR_xxx)
-    // ========================================================================
-    CHARACTERISTIC_NOT_FOUND("CHAR_001", "Característica não encontrada"),
-    CHARACTERISTIC_CREATE_ERROR("CHAR_002", "Erro ao criar característica"),
-    CHARACTERISTIC_UPDATE_ERROR("CHAR_003", "Erro ao atualizar característica"),
-    CHARACTERISTIC_DELETE_ERROR("CHAR_004", "Erro ao eliminar característica"),
-    CHARACTERISTIC_INVALID_TYPE("CHAR_005", "Tipo de característica inválido"),
-    CHARACTERISTIC_INVALID_VALUE("CHAR_006", "Valor da característica inválido"),
-    CHARACTERISTIC_DUPLICATE("CHAR_007", "Característica duplicada"),
-    CHARACTERISTIC_ASSET_NOT_FOUND("CHAR_008", "Asset da característica não encontrado"),
-    CHARACTERISTIC_DELETE_ALL_ERROR("CHAR_009", "Erro ao eliminar todas as características"),
 
     // ========================================================================
     // FICHEIROS/UPLOAD (FILE_xxx)
@@ -265,10 +163,6 @@ public enum ErrorCode {
     VIDEO_PROCESSING_ERROR("FILE_033", "Erro ao processar vídeo"),
 
     // PDFs
-    PDF_INVALID_FORMAT("FILE_040", "Formato de PDF inválido"),
-    PDF_SIZE_EXCEEDED("FILE_041", "Tamanho do PDF excedido"),
-    PDF_CORRUPTED("FILE_042", "PDF corrompido"),
-    PDF_PROCESSING_ERROR("FILE_043", "Erro ao processar PDF"),
 
     // ========================================================================
     // STORAGE (SUPABASE) (STORAGE_xxx)
@@ -308,44 +202,28 @@ public enum ErrorCode {
     ENTERPRISE_INACTIVE("ENT_031", "Empresa está inativa"),
 
     // ========================================================================
-    // EDIFÍCIOS (BUILD_xxx)
+    // ORÇAMENTO DE CONSTRUÇÃO (BUDGET_xxx)
     // ========================================================================
-    BUILDING_NOT_FOUND("BUILD_001", "Edifício não encontrado"),
-    BUILDING_ALREADY_EXISTS("BUILD_002", "Edifício já existe"),
-    BUILDING_CREATE_ERROR("BUILD_003", "Erro ao criar edifício"),
-    BUILDING_UPDATE_ERROR("BUILD_004", "Erro ao atualizar edifício"),
-    BUILDING_DELETE_ERROR("BUILD_005", "Erro ao eliminar edifício"),
-    BUILDING_INVALID_NAME("BUILD_010", "Nome do edifício inválido"),
-    BUILDING_INVALID_ADDRESS("BUILD_011", "Morada do edifício inválida"),
-    BUILDING_INVALID_FLOORS("BUILD_012", "Número de pisos inválido"),
-    BUILDING_INVALID_YEAR("BUILD_013", "Ano de construção inválido"),
-    BUILDING_HAS_PROPERTIES("BUILD_020", "Edifício tem propriedades associadas"),
-    BUILDING_ENTERPRISE_NOT_FOUND("BUILD_021", "Empresa do edifício não encontrada"),
-    BUILDING_LOCATION_NOT_FOUND("BUILD_022", "Localização do edifício não encontrada"),
-    BUILDING_DUPLICATE_REFERENCE("BUILD_030", "Referência do edifício duplicada"),
-    BUILDING_CAPACITY_EXCEEDED("BUILD_031", "Capacidade do edifício excedida"),
-    BUILDING_ID_REQUIRED("BUILD_032", "ID do edifício é obrigatório"),
-    BUILDING_NOT_ASSOCIATED("BUILD_033", "Propriedade não tem edifício associado"),
+    BUDGET_ITEM_NOT_FOUND("BUDGET_001", "Rubrica do orçamento não encontrada"),
+    BUDGET_CREATE_ERROR("BUDGET_002", "Erro ao criar rubrica"),
+    BUDGET_UPDATE_ERROR("BUDGET_003", "Erro ao atualizar rubrica"),
+    BUDGET_DELETE_ERROR("BUDGET_004", "Erro ao eliminar rubrica"),
+    BUDGET_INVALID_NAME("BUDGET_005", "Descrição da rubrica inválida"),
+    BUDGET_ENTERPRISE_NOT_FOUND("BUDGET_006", "Projeto do orçamento não encontrado"),
+    BUDGET_PARENT_NOT_FOUND("BUDGET_007", "Rubrica-mãe não encontrada"),
+    BUDGET_PARENT_OTHER_ENTERPRISE("BUDGET_008", "A rubrica-mãe pertence a outro projeto"),
+    BUDGET_CYCLE("BUDGET_009", "Uma rubrica não pode ficar dentro de si própria"),
+    BUDGET_DUPLICATE_CODE("BUDGET_010", "Já existe uma rubrica com este índice neste projeto"),
+    BUDGET_INVALID_DATES("BUDGET_011", "A data de fim não pode ser anterior à data de início"),
+    BUDGET_ITEM_OTHER_ENTERPRISE("BUDGET_012", "Uma rubrica não pode mudar de projeto"),
 
-    // ========================================================================
-    // ETAPAS DE CONSTRUÇÃO (STAGE_xxx)
-    // ========================================================================
-    STAGE_NOT_FOUND("STAGE_001", "Etapa não encontrada"),
-    STAGE_CREATE_ERROR("STAGE_002", "Erro ao criar etapa"),
-    STAGE_UPDATE_ERROR("STAGE_003", "Erro ao atualizar etapa"),
-    STAGE_DELETE_ERROR("STAGE_004", "Erro ao eliminar etapa"),
-    STAGE_INVALID_NAME("STAGE_005", "Nome da etapa inválido"),
-    STAGE_ENTERPRISE_NOT_FOUND("STAGE_006", "Empresa da etapa não encontrada"),
-
-    // ========================================================================
-    // SUB-ETAPAS DE CONSTRUÇÃO (SUBSTAGE_xxx)
-    // ========================================================================
-    SUBSTAGE_NOT_FOUND("SUBSTAGE_001", "Sub-etapa não encontrada"),
-    SUBSTAGE_CREATE_ERROR("SUBSTAGE_002", "Erro ao criar sub-etapa"),
-    SUBSTAGE_UPDATE_ERROR("SUBSTAGE_003", "Erro ao atualizar sub-etapa"),
-    SUBSTAGE_DELETE_ERROR("SUBSTAGE_004", "Erro ao eliminar sub-etapa"),
-    SUBSTAGE_INVALID_NAME("SUBSTAGE_005", "Nome da sub-etapa inválido"),
-    SUBSTAGE_STAGE_NOT_FOUND("SUBSTAGE_006", "Etapa da sub-etapa não encontrada"),
+    // Importação de Excel (BUDGET_02x)
+    BUDGET_IMPORT_EMPTY_FILE("BUDGET_020", "Ficheiro de orçamento vazio"),
+    BUDGET_IMPORT_INVALID_TYPE("BUDGET_021", "O ficheiro tem de ser um Excel (.xlsx)"),
+    BUDGET_IMPORT_READ_ERROR("BUDGET_022", "Não foi possível ler o ficheiro de orçamento"),
+    BUDGET_IMPORT_NO_HEADER("BUDGET_023", "Não foi encontrada a linha de cabeçalho (coluna \"Art\") no Excel"),
+    BUDGET_IMPORT_NO_ROWS("BUDGET_024", "O Excel não tem rubricas para importar"),
+    BUDGET_IMPORT_NOT_EMPTY("BUDGET_025", "O projeto já tem orçamento — elimine-o antes de importar ou use replace=true"),
 
     // ========================================================================
     // DESPESAS DE CONSTRUÇÃO (EXPENSE_xxx)
@@ -356,29 +234,14 @@ public enum ErrorCode {
     EXPENSE_DELETE_ERROR("EXPENSE_004", "Erro ao eliminar despesa"),
     EXPENSE_INVALID_NAME("EXPENSE_005", "Nome da despesa inválido"),
     EXPENSE_INVALID_PRICE("EXPENSE_006", "Preço da despesa inválido"),
-    EXPENSE_SUBSTAGE_NOT_FOUND("EXPENSE_007", "Sub-etapa da despesa não encontrada"),
+    EXPENSE_BUDGET_ITEM_NOT_FOUND("EXPENSE_007", "Rubrica da despesa não encontrada"),
     EXPENSE_INVOICE_UPLOAD_ERROR("EXPENSE_008", "Erro ao carregar a fatura da despesa"),
+    EXPENSE_ITEM_NOT_EXPENSABLE("EXPENSE_009", "Só é possível lançar despesas em rubricas — títulos e notas não aceitam despesas"),
+    EXPENSE_ITEM_OTHER_ENTERPRISE("EXPENSE_010", "A rubrica indicada pertence a outro projeto"),
 
     // ========================================================================
     // LOCALIZAÇÕES (LOC_xxx)
     // ========================================================================
-    DISTRICT_NOT_FOUND("LOC_001", "Distrito não encontrado"),
-    DISTRICT_ALREADY_EXISTS("LOC_002", "Distrito já existe"),
-    DISTRICT_CREATE_ERROR("LOC_003", "Erro ao criar distrito"),
-    DISTRICT_DELETE_ERROR("LOC_004", "Erro ao eliminar distrito"),
-    DISTRICT_HAS_COUNTIES("LOC_005", "Distrito tem concelhos associados"),
-    COUNTY_NOT_FOUND("LOC_010", "Concelho não encontrado"),
-    COUNTY_ALREADY_EXISTS("LOC_011", "Concelho já existe"),
-    COUNTY_CREATE_ERROR("LOC_012", "Erro ao criar concelho"),
-    COUNTY_DELETE_ERROR("LOC_013", "Erro ao eliminar concelho"),
-    COUNTY_HAS_PARISHES("LOC_014", "Concelho tem freguesias associadas"),
-    COUNTY_DISTRICT_NOT_FOUND("LOC_015", "Distrito do concelho não encontrado"),
-    PARISH_NOT_FOUND("LOC_020", "Freguesia não encontrada"),
-    PARISH_ALREADY_EXISTS("LOC_021", "Freguesia já existe"),
-    PARISH_CREATE_ERROR("LOC_022", "Erro ao criar freguesia"),
-    PARISH_DELETE_ERROR("LOC_023", "Erro ao eliminar freguesia"),
-    PARISH_HAS_PROPERTIES("LOC_024", "Freguesia tem propriedades associadas"),
-    PARISH_COUNTY_NOT_FOUND("LOC_025", "Concelho da freguesia não encontrado"),
     LOCATION_INVALID_NAME("LOC_030", "Nome da localização inválido"),
     LOCATION_INVALID_CODE("LOC_031", "Código da localização inválido"),
     LOCATION_HIERARCHY_ERROR("LOC_032", "Erro na hierarquia de localizações"),
@@ -399,8 +262,10 @@ public enum ErrorCode {
     USER_NOT_FOUND("USER_004", "Utilizador não encontrado"),
     USER_ALREADY_EXISTS("USER_005", "Utilizador já existe"),
     USER_CREATE_ERROR("USER_006", "Erro ao criar utilizador"),
-    USER_UPDATE_ERROR("USER_004", "Erro ao atualizar utilizador"),
-    USER_DELETE_ERROR("USER_005", "Erro ao eliminar utilizador"),
+    // 007/008 e não 004/005: estes dois colidiam com USER_NOT_FOUND e
+    // USER_ALREADY_EXISTS, que são os que o código emite.
+    USER_UPDATE_ERROR("USER_007", "Erro ao atualizar utilizador"),
+    USER_DELETE_ERROR("USER_008", "Erro ao eliminar utilizador"),
     USER_INVALID_CREDENTIALS("USER_010", "Credenciais inválidas"),
     USER_NOT_AUTHENTICATED("USER_011", "Utilizador não autenticado"),
     USER_TOKEN_EXPIRED("USER_012", "Token expirado"),
@@ -418,7 +283,8 @@ public enum ErrorCode {
     USER_INVALID_EMAIL("USER_030", "Email do utilizador inválido"),
     USER_INVALID_PASSWORD("USER_031", "Password inválida"),
     USER_INVALID_NAME("USER_032", "Nome do utilizador inválido"),
-    USER_INVALID_PHONE("USER_033", "Telefone do utilizador inválido"),
+    // 035 e não 033: colidia com PROFILE_CANNOT_DELETE, que é o que o código emite.
+    USER_INVALID_PHONE("USER_035", "Telefone do utilizador inválido"),
     USER_DUPLICATE_EMAIL("USER_034", "Email já está registado"),
     USER_INACTIVE("USER_040", "Utilizador inativo"),
     USER_BLOCKED("USER_041", "Utilizador bloqueado"),
@@ -460,35 +326,6 @@ public enum ErrorCode {
     PAGINATION_OUT_OF_BOUNDS("PAGE_003", "Página fora dos limites"),
 
     // ========================================================================
-    // TRANSAÇÕES (TRANSACTION_xxx)
-    // ========================================================================
-    TRANSACTION_001("TRANSACTION_001", "Propriedade já tem transação ativa em curso"),
-    TRANSACTION_002("TRANSACTION_002", "Valor da transação deve ser positivo"),
-    TRANSACTION_003("TRANSACTION_003", "Preço de venda é obrigatório para vendas"),
-    TRANSACTION_004("TRANSACTION_004", "Preço de renda mensal é obrigatório para alugueres"),
-    TRANSACTION_005("TRANSACTION_005", "Não é possível cancelar transação já completada"),
-    TRANSACTION_006("TRANSACTION_006", "Data de conclusão não pode ser anterior à data da proposta"),
-    TRANSACTION_007("TRANSACTION_007", "Transação não encontrada"),
-    TRANSACTION_008("TRANSACTION_008", "Propriedade não encontrada"),
-    TRANSACTION_009("TRANSACTION_009", "Contacto comprador não encontrado"),
-    TRANSACTION_010("TRANSACTION_010", "Agente responsável não encontrado"),
-
-    // ========================================================================
-    // PAGAMENTOS (PAYMENT_xxx)
-    // ========================================================================
-    PAYMENT_001("PAYMENT_001", "Montante do pagamento deve ser positivo"),
-    PAYMENT_002("PAYMENT_002", "Pagamento já foi marcado como pago"),
-    PAYMENT_003("PAYMENT_003", "Pagamento não encontrado"),
-    PAYMENT_004("PAYMENT_004", "Data de vencimento não pode ser no passado"),
-    PAYMENT_005("PAYMENT_005", "Método de pagamento inválido"),
-
-    // ========================================================================
-    // COMISSÕES (COMMISSION_xxx)
-    // ========================================================================
-    COMMISSION_001("COMMISSION_001", "Comissão total não pode exceder 100%"),
-    COMMISSION_002("COMMISSION_002", "Percentagem de comissão inválida"),
-
-    // ========================================================================
     // AUDITORIA / ATIVIDADES (ACTIVITY_xxx)
     // ========================================================================
     ACTIVITY_NOT_FOUND("ACTIVITY_001", "Registo de atividade não encontrado"),
@@ -497,28 +334,10 @@ public enum ErrorCode {
     ACTIVITY_INVALID_ENTITY_TYPE("ACTIVITY_004", "Tipo de entidade inválido"),
 
     // ========================================================================
-    // LEADS (LEAD_xxx)
-    // ========================================================================
-    LEAD_NOT_FOUND("LEAD_001", "Lead não encontrado"),
-    LEAD_ALREADY_ASSIGNED("LEAD_002", "Esta lead já tem um angariador associado"),
-    LEAD_NOT_ASSIGNED("LEAD_003", "Esta lead não tem nenhum angariador associado"),
-
-    // ========================================================================
-    // BANNERS (BANNER_xxx)
-    // ========================================================================
-    BANNER_NOT_FOUND("BANNER_001", "Banner não encontrado"),
-    BANNER_DESCRIPTION_REQUIRED("BANNER_002", "A descrição do banner é obrigatória"),
-    BANNER_IMAGE_REQUIRED("BANNER_003", "A imagem do banner é obrigatória"),
-
-    // ========================================================================
     // TAREFAS (TASK_xxx)
     // ========================================================================
     TASK_NOT_FOUND("TASK_001", "Tarefa não encontrada"),
     TASK_ASSIGNEE_NOT_FOUND("TASK_002", "Um ou mais utilizadores atribuídos não foram encontrados");
-
-    // ========================================================================
-    // CAMPOS E CONSTRUTOR
-    // ========================================================================
 
     private final String code;
     private final String defaultMessage;
@@ -529,10 +348,6 @@ public enum ErrorCode {
         this.defaultMessage = defaultMessage;
     }
 
-    // ========================================================================
-    // GETTERS
-    // ========================================================================
-
     public String getCode() {
         return code;
     }
@@ -540,10 +355,6 @@ public enum ErrorCode {
     public String getDefaultMessage() {
         return defaultMessage;
     }
-
-    // ========================================================================
-    // MÉTODOS HELPER
-    // ========================================================================
 
     /**
      * Retorna o ErrorCode correspondente ao código fornecido.

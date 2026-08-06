@@ -1,27 +1,14 @@
-import { z } from "zod";
+/**
+ * Regras da fatura de despesa — espelham as validações do
+ * `ConstructionExpenseService` no backend (bucket `documents`).
+ *
+ * Os schemas Zod de etapa/sub-etapa/despesa foram removidos com a passagem do
+ * modelo de duas camadas para a árvore de orçamento (`construction_budget_item`);
+ * os novos entram quando a página de orçamento for construída.
+ */
 
 export const MAX_INVOICE_BYTES = 25 * 1024 * 1024; // 25 MB
 export const INVOICE_MIME = ["application/pdf", "image/jpeg", "image/png"];
-
-export const stageFormSchema = z.object({
-  name: z.string().min(1, "constructionStages.formErrors.nameRequired"),
-  description: z.string().optional(),
-});
-export type StageFormValues = z.infer<typeof stageFormSchema>;
-
-export const subStageFormSchema = z.object({
-  name: z.string().min(1, "constructionSubStages.formErrors.nameRequired"),
-  description: z.string().optional(),
-});
-export type SubStageFormValues = z.infer<typeof subStageFormSchema>;
-
-export const expenseFormSchema = z.object({
-  name: z.string().min(1, "constructionExpenses.formErrors.nameRequired"),
-  price: z
-    .number({ error: "constructionExpenses.formErrors.priceRequired" })
-    .positive("constructionExpenses.formErrors.pricePositive"),
-});
-export type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
 export function validateInvoiceFile(file: File): string | null {
   if (!INVOICE_MIME.includes(file.type)) {

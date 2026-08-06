@@ -58,6 +58,16 @@ server:
   tomcat:
     max-http-form-post-size: 25MB
     max-swallow-size: -1
+  # Desligada por omissão no Spring Boot. As respostas JSON desta API repetem os
+  # mesmos nomes de campo centenas de vezes — a árvore de orçamento traz ~198 nós
+  # com ~25 chaves cada — por isso comprimem muito bem. Só conta em ligações
+  # fracas (tablet em estaleiro); no escritório é indiferente.
+  # Não afeta as faturas: são PDF/imagem, já comprimidas, e são servidas
+  # directamente pelo Supabase via signed URL, sem passar por aqui.
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/plain,text/css,application/javascript
+    min-response-size: 2KB
 
 logging:
   level:
