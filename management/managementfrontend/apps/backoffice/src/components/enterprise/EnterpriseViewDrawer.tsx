@@ -1,5 +1,6 @@
 // src/components/enterprises/EnterpriseViewDrawer.tsx
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Drawer, Button, Skeleton, Empty, message } from "antd";
 import { EditOutlined, CloseOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -320,6 +321,7 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
   onClose,
   onUpdated,
 }) => {
+  const navigate = useNavigate();
   const [data, setData] = useState<EnterpriseFullResponseDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -435,9 +437,14 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid var(--ind-color-divider)", padding: "10.2px 20.4px", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-            {/* O link "Gerir fases de construção" saiu com as páginas de etapa/sub-etapa;
-                volta a entrar quando a página de orçamento em árvore for construída. */}
+          <div style={{ borderTop: "1px solid var(--ind-color-divider)", padding: "10.2px 20.4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <a
+              href="#"
+              onClick={(e) => { e.preventDefault(); if (enterpriseId) navigate(`/backoffice/empreendimentos/${enterpriseId}/budget`); }}
+              style={{ fontSize: 13 }}
+            >
+              Orçamento de obra →
+            </a>
             <div style={{ display: "flex", gap: "6.8px" }}>
               <Button disabled={current === 0} onClick={() => { setEditing(false); setCurrent((c) => Math.max(0, c - 1)); }}>Anterior</Button>
               <Button disabled={current === VIEW_STEPS.length - 1} onClick={() => { setEditing(false); setCurrent((c) => Math.min(VIEW_STEPS.length - 1, c + 1)); }}>Seguinte</Button>

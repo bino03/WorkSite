@@ -58,9 +58,8 @@ public class ConstructionBudgetItemService {
 
     @Transactional(readOnly = true)
     public BudgetTreeDTO getTree(UUID enterpriseId) {
-        if (!enterpriseRepository.existsById(enterpriseId)) {
-            throw new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND);
-        }
+        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
 
         List<ConstructionBudgetItem> items = repository.findTreeByEnterpriseId(enterpriseId);
         Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(enterpriseId);
@@ -89,6 +88,7 @@ public class ConstructionBudgetItemService {
 
         return new BudgetTreeDTO(
                 enterpriseId,
+                enterprise.getName(),
                 budgetTotal,
                 spentTotal,
                 budgetTotal.subtract(spentTotal),

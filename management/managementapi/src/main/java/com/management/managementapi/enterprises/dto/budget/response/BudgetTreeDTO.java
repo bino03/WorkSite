@@ -18,6 +18,8 @@ import java.util.UUID;
  */
 public record BudgetTreeDTO(
         UUID enterpriseId,
+        /** Nome do projeto — evita uma segunda chamada só para o cabeçalho da página. */
+        String enterpriseName,
         BigDecimal budgetTotal,
         BigDecimal spentTotal,
         BigDecimal remaining,

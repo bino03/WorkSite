@@ -48,6 +48,8 @@ public record ConstructionExpenseResponseDTO(
         boolean sentToAccountant,
         UUID sentToAccountantBy,
         String sentToAccountantByName,
+        /** `ADMIN` ou `EMPLOYEE` — o cliente traduz o rótulo. */
+        String sentToAccountantByRole,
         OffsetDateTime sentToAccountantAt,
 
         UUID createdBy,

@@ -108,6 +108,7 @@ public class ConstructionExpenseService {
                 expense.isSentToAccountant(),
                 expense.getSentToAccountantBy(),
                 resolveProfileName(expense.getSentToAccountantBy()),
+                resolveProfileRole(expense.getSentToAccountantBy()),
                 expense.getSentToAccountantAt(),
                 expense.getCreatedBy(),
                 resolveProfileName(expense.getCreatedBy()),
@@ -254,6 +255,15 @@ public class ConstructionExpenseService {
         }
         return profileRepository.findById(profileId)
                 .map(profile -> profile.getName())
+                .orElse(null);
+    }
+
+    private String resolveProfileRole(UUID profileId) {
+        if (profileId == null) {
+            return null;
+        }
+        return profileRepository.findById(profileId)
+                .map(profile -> profile.getRole() == null ? null : profile.getRole().name())
                 .orElse(null);
     }
 

@@ -3463,5 +3463,16 @@
       "invoiceInvalidType": "Tipo de ficheiro inválido. Aceites: PDF, JPEG, PNG.",
       "invoiceTooLarge": "O ficheiro excede o tamanho máximo de 25 MB."
     }
+  },
+  "budget": {
+    "formErrors": {
+      "nameRequired": "O nome é obrigatório.",
+      "dateRequired": "A data da fatura é obrigatória.",
+      "totalRequired": "O preço total é obrigatório.",
+      "totalPositive": "O preço total tem de ser positivo.",
+      "quantityNonNegative": "A quantidade não pode ser negativa.",
+      "unitPriceNonNegative": "O preço unitário não pode ser negativo.",
+      "endBeforeStart": "A data de fim não pode ser anterior à de início."
+    }
   }
 }

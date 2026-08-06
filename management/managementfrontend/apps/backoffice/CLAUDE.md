@@ -56,12 +56,14 @@ src/
 │       ├── BackofficeHome.tsx
 │       ├── EmployeesList.tsx
 │       ├── TasksPage.tsx
-│       └── employee/EmployeeProfilePage.tsx
+│       ├── employee/EmployeeProfilePage.tsx
+│       └── enterprise/ConstructionBudgetPage.tsx
 │
 ├── components/               # Organizados por domínio
 │   ├── enterprise/           # create/ (secções + schema Zod), edit/ (cards), Create/View drawers
 │   ├── tasks/                # TasksList, TaskFormDrawer, TaskDetailDrawer
-│   ├── construction/         # InvoicePreviewModal + regras da fatura (ver nota abaixo)
+│   ├── budget/               # Árvore de orçamento: drawers, modal de importação, utils
+│   ├── construction/         # InvoicePreviewModal + regras da fatura (reaproveitados)
 │   ├── employees/            # CreateEmployeeDrawer, EmployeeContextMenu
 │   ├── profile/              # MyProfileModal, ProfileView, ProfileDrawer, seeprofile/EmployeeMiniCard
 │   ├── invites/               # InvitesDrawer
@@ -72,7 +74,7 @@ src/
 │
 ├── services/                 # Chamadas à API por domínio
 │   ├── authService.ts / profileService.ts / adminService.ts
-│   ├── enterpriseService.ts / locationService.ts
+│   ├── enterpriseService.ts / budgetService.ts / locationService.ts
 │   └── general/notificationService.tsx
 │
 ├── hooks/
@@ -85,7 +87,8 @@ src/
 │   └── errorHandler.ts       # ErrorHandler.handle() centralizado
 │
 ├── types/
-│   └── profile.ts
+│   ├── profile.ts
+│   └── budget.ts
 │
 ├── config/
 │   ├── entityColors.ts       # `IND` — espelho em JS das vars `--ind-*` (só para casos que precisam do hex, ex. `stroke` de SVG)
@@ -114,20 +117,30 @@ This is a scoped copy of Property-Management's Backoffice — no property listin
   /backoffice/funcionarios                                  → EmployeesList
   /backoffice/funcionarios/:id                               → EmployeeProfilePage
   /backoffice/empreendimentos                                → EnterprisesList
+  /backoffice/empreendimentos/:enterpriseId/budget            → ConstructionBudgetPage
   /backoffice/tasks                                          → TasksPage
 ```
 
 `PrivateRoute` (`src/PrivateRoute.tsx`) verifica o `user` do `AuthContext` — sem sessão redireciona para `/login`.
 
-> ⚠️ **Orçamento de obra — frontend por construir.** O backend passou (migração `V15`) da
-> hierarquia de dois níveis etapa → sub-etapa para uma **árvore** de rubricas
-> (`/construction-budget/**`, ver [[../../../../docs/api.md]]). As três páginas encadeadas, os
-> respetivos drawers, o `constructionService.ts` e o `types/construction.ts` foram removidos
-> por terem ficado a apontar para endpoints que já não existem. Sobreviveram intactos, para
-> reaproveitar: `components/construction/InvoicePreviewModal.tsx` e o `validateInvoiceFile`
-> em `constructionFormSchemas.ts` — as regras da fatura não mudaram (PDF/JPEG/PNG, 25 MB,
-> signed URL). O link "Gerir fases de construção" foi retirado do rodapé do
-> `EnterpriseViewDrawer` e volta a entrar com a nova página.
+### Orçamento de obra
+
+`/backoffice/empreendimentos/:enterpriseId/budget` → `ConstructionBudgetPage`. Substituiu as
+três páginas encadeadas de etapa → sub-etapa → despesa, que foram removidas com a migração
+`V15` do backend para uma **árvore** de rubricas (`/construction-budget/**`, ver
+[[../../../../docs/api.md]]).
+
+- A árvore vem **toda numa chamada** — os agregados de cada nó são a soma da sua sub-árvore,
+  por isso não há carregamento por nível. Ao abrir, só os capítulos ficam expandidos.
+- Três tipos de linha (`rowKind`) distinguidos por **tipografia, não por cor**: `HEADING` em
+  maiúsculas sem colunas numéricas, `NOTE` em itálico esbatido, `ITEM` normal. A tag
+  "alternativa" marca as rubricas sem índice que têm preço — a cor fica reservada para
+  problemas de dinheiro (`overBudget`, `budgetMismatch`).
+- `components/budget/` — os drawers (despesas 900, detalhe 480, formulário 600, datas 480), o
+  modal de importação, e `budgetTree.ts` com os utilitários da árvore.
+- Reaproveitados do domínio anterior: `components/construction/InvoicePreviewModal.tsx` e o
+  `validateInvoiceFile` em `constructionFormSchemas.ts` — as regras da fatura não mudaram
+  (PDF/JPEG/PNG, 25 MB, signed URL).
 
 ---
 

@@ -111,8 +111,9 @@ na linha não bate certo com essa soma, e `budgetVariance` diz de quanto
 `spentTotal`, `remaining`, `percentSpent`, `overBudget`, `expenseCount`, `ownExpenseCount`,
 `missingInvoiceCount`, `pendingAccountantCount` e `pendingAccountantTotal`.
 
-O `BudgetTreeDTO` repete os totais do projeto inteiro e acrescenta `overBudgetCount` /
-`overBudgetAmount`. Estes contam apenas as rubricas **mais acima** de cada ramo em
+O `BudgetTreeDTO` traz ainda `enterpriseName` — o cabeçalho da página precisa dele e sem isso
+seria uma segunda chamada a `/enterprises/{id}` só para o título. Repete os totais do projeto
+inteiro e acrescenta `overBudgetCount` / `overBudgetAmount`. Estes contam apenas as rubricas **mais acima** de cada ramo em
 derrapagem: se um capítulo passou do orçamento, conta o capítulo e não também cada rubrica
 lá dentro — somar os dois contaria a mesma derrapagem duas vezes.
 
@@ -140,7 +141,8 @@ exige `replace=true` se o projeto já tiver orçamento.
 
 Só rubricas com `rowKind = ITEM` aceitam despesas (`EXPENSE_009` caso contrário). A resposta
 traz `invoiceUrl` como signed URL gerada na leitura, mais quem/quando fez o upload e
-quem/quando marcou o envio para a contabilidade.
+quem/quando marcou o envio para a contabilidade — incluindo `sentToAccountantByRole`
+(`ADMIN`/`EMPLOYEE` em cru, o cliente é que traduz o rótulo).
 
 `hasInvoice` é separado de `invoiceUrl` de propósito: a geração da signed URL pode falhar e
 nesse caso `invoiceUrl` vem `null` — sem o booleano, o cliente não distinguiria "não tem

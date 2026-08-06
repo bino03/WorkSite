@@ -3432,5 +3432,16 @@
       "invoiceInvalidType": "Invalid file type. Accepted: PDF, JPEG, PNG.",
       "invoiceTooLarge": "File exceeds the maximum size of 25 MB."
     }
+  },
+  "budget": {
+    "formErrors": {
+      "nameRequired": "Name is required.",
+      "dateRequired": "Invoice date is required.",
+      "totalRequired": "Total price is required.",
+      "totalPositive": "Total price must be positive.",
+      "quantityNonNegative": "Quantity cannot be negative.",
+      "unitPriceNonNegative": "Unit price cannot be negative.",
+      "endBeforeStart": "End date cannot be before the start date."
+    }
   }
 }
