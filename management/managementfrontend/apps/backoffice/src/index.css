@@ -1,7 +1,122 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap');
+
+/* ════════════════════════════════════════════════════════
+   Industry — design tokens (current visual system)
+   Steel-blue accent, Barlow / Barlow Condensed, square
+   "blueprint" cards with hairline borders + corner marks.
+   ════════════════════════════════════════════════════════ */
+:root {
+  --ind-color-bg: #f2f2f3;
+  --ind-color-surface: #e9e9ea;
+  --ind-color-text: #1d1f20;
+  --ind-color-accent: #5980a6;
+  --ind-color-accent-2: #728fab;
+  --ind-color-divider: color-mix(in srgb, #1d1f20 16%, transparent);
+
+  --ind-neutral-100: #f5f5f8;
+  --ind-neutral-200: #e7e7ea;
+  --ind-neutral-300: #d4d4d7;
+  --ind-neutral-400: #b7b7ba;
+  --ind-neutral-500: #98989b;
+  --ind-neutral-600: #7a7a7d;
+  --ind-neutral-700: #5d5d60;
+  --ind-neutral-800: #424244;
+  --ind-neutral-900: #2b2b2d;
+
+  --ind-accent-100: #eef6ff;
+  --ind-accent-200: #d6ebff;
+  --ind-accent-300: #b5d9fd;
+  --ind-accent-400: #94bce3;
+  --ind-accent-500: #749dc4;
+  --ind-accent-600: #597ea3;
+  --ind-accent-700: #416180;
+  --ind-accent-800: #2c455d;
+  --ind-accent-900: #1d2d3d;
+
+  --ind-accent-2-100: #eef6ff;
+  --ind-accent-2-200: #d6ebff;
+  --ind-accent-2-300: #bdd8f2;
+  --ind-accent-2-400: #9ebbd8;
+  --ind-accent-2-500: #7e9cb8;
+  --ind-accent-2-600: #627d98;
+  --ind-accent-2-700: #486077;
+  --ind-accent-2-800: #314457;
+  --ind-accent-2-900: #1f2d3a;
+
+  --ind-font-heading: "Barlow Condensed", system-ui, sans-serif;
+  --ind-font-body: "Barlow", system-ui, sans-serif;
+
+  --ind-space-1: 3.4px;
+  --ind-space-2: 6.8px;
+  --ind-space-3: 10.2px;
+  --ind-space-4: 13.6px;
+  --ind-space-6: 20.4px;
+  --ind-space-8: 27.2px;
+
+  --ind-shadow-sm: 0 1px 2px color-mix(in srgb, #2b2b2d 14%, transparent);
+  --ind-shadow-md: 0 3px 10px color-mix(in srgb, #2b2b2d 16%, transparent);
+  --ind-shadow-lg: 0 12px 32px color-mix(in srgb, #2b2b2d 22%, transparent);
+}
+
+body {
+  background: var(--ind-color-bg);
+  color: var(--ind-color-text);
+  font-family: var(--ind-font-body);
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--ind-font-heading);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+h6 { letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* Blueprint frame: hairline border + 4 small "+" registration marks. */
+.ind-blueprint { position: relative; }
+.ind-corner { position: absolute; width: 11px; height: 11px; color: color-mix(in srgb, var(--ind-color-text) 55%, transparent); }
+.ind-corner::before, .ind-corner::after { content: ""; position: absolute; background: currentColor; }
+.ind-corner::before { left: 5px; top: 0; width: 1px; height: 100%; }
+.ind-corner::after { top: 5px; left: 0; width: 100%; height: 1px; }
+.ind-corner.tl { top: -6px; left: -6px; }
+.ind-corner.tr { top: -6px; right: -6px; }
+.ind-corner.bl { bottom: -6px; left: -6px; }
+.ind-corner.br { bottom: -6px; right: -6px; }
+
+.ind-card {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--ind-space-2);
+  padding: var(--ind-space-3);
+  background: transparent;
+  border: 1px solid var(--ind-color-divider);
+}
+.ind-card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ind-color-accent); }
+.ind-card-title { font-family: var(--ind-font-heading); font-weight: 600; font-size: 17px; line-height: 1.2; }
+.ind-card-body { margin: 0; font-size: 13px; opacity: 0.8; }
+.ind-card-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: color-mix(in srgb, var(--ind-color-text) 50%, transparent); }
+.ind-elev-sm { box-shadow: var(--ind-shadow-sm); }
+.ind-elev-md { box-shadow: var(--ind-shadow-md); }
+.ind-elev-lg { box-shadow: var(--ind-shadow-lg); }
+
+.ind-tag { display: inline-flex; align-items: center; font-size: 11px; letter-spacing: 0.02em; padding: 3px 10px; }
+.ind-tag-accent { background: var(--ind-accent-100); color: var(--ind-accent-800); }
+.ind-tag-accent-2 { background: var(--ind-accent-2-100); color: var(--ind-accent-2-800); }
+.ind-tag-neutral { background: var(--ind-neutral-100); color: var(--ind-neutral-800); }
+.ind-tag-outline { border: 1px solid var(--ind-color-accent); color: var(--ind-color-accent); background: transparent; }
+
+@media (max-width: 767px) {
+  .login-grid { grid-template-columns: 1fr !important; }
+  .login-brand-panel { display: none !important; }
+}
+
+.ind-hatch {
+  background: repeating-linear-gradient(45deg, var(--ind-neutral-200), var(--ind-neutral-200) 4px, var(--ind-neutral-300) 4px, var(--ind-neutral-300) 8px);
+  border: 1px solid var(--ind-color-divider);
+}
 
 /* ════════════════════════════════════════════════════════
    Anthropic / Claude Design System — CSS Variables
+   (legacy — still used by Construction pages and Profile
+   components not yet migrated to the Industry system)
    ════════════════════════════════════════════════════════ */
 :root {
   /* Brand */
@@ -57,16 +172,12 @@
   /* Swap for actual Anthropic Serif when available */
 }
 
-body {
-  background-color: var(--parchment);
-  color: var(--near-black);
-  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-}
+/* body background/color/font now come from the Industry tokens above —
+   this legacy rule was superseded, kept only as a comment marker so a
+   future search for "body {" finds the active definition up top. */
 
 /* ── Layout ──────────────────────────────────────────────── */
-.container-page { @apply container mx-auto px-6; }
+.container-page { max-width: 1200px; margin: 0 auto; padding-left: 20.4px; padding-right: 20.4px; }
 
 /* ── Cards ───────────────────────────────────────────────── */
 .card {

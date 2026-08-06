@@ -1,13 +1,13 @@
-import { FC } from 'react';
-import { Table, Spin, Empty, Pagination, Tag, Button, Space, Popconfirm, Avatar, Tooltip } from 'antd';
-import { Eye, Pencil, Trash2 } from 'lucide-react';
+import type { FC } from 'react';
+import { Table, Spin, Empty, Pagination } from 'antd';
+import { ListActions, ListActionPrimary, ListActionSecondary, ListActionDanger } from '@/components/common/ListActions';
 import type { TaskResponse, TaskStatus } from '@/types/task';
 import { taskService } from '@/services/taskService';
 import { ErrorHandler } from '@/errors/errorHandler';
 import { notificationService } from '@/services/general/notificationService';
 import { formatDate } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
-import { D, actionButtonBaseStyle } from '@/config/entityColors';
+import { useConfirm } from '@/context/ConfirmDialogContext';
 
 interface TasksListProps {
   tasks: TaskResponse[];
@@ -24,15 +24,15 @@ interface TasksListProps {
   onDeleted: () => void;
 }
 
-const statusColorMap: Record<TaskStatus, string> = {
-  PENDING: 'default',
-  IN_PROGRESS: 'blue',
-  DONE: 'green',
+const statusClassMap: Record<TaskStatus, string> = {
+  PENDING: 'ind-tag-outline',
+  IN_PROGRESS: 'ind-tag-accent',
+  DONE: 'ind-tag-neutral',
 };
 
 const statusLabelMap: Record<TaskStatus, string> = {
   PENDING: 'Pendente',
-  IN_PROGRESS: 'Em Progresso',
+  IN_PROGRESS: 'Em curso',
   DONE: 'Concluída',
 };
 
@@ -46,6 +46,7 @@ export const TasksList: FC<TasksListProps> = ({
   onDeleted,
 }) => {
   const { profileId, isAdmin } = useAuth();
+  const confirm = useConfirm();
 
   const canEdit = (task: TaskResponse) =>
     isAdmin() || task.assignees.some((a) => a.id === profileId);
@@ -60,12 +61,20 @@ export const TasksList: FC<TasksListProps> = ({
     }
   };
 
+  const confirmDelete = (task: TaskResponse) => {
+    confirm({
+      message: `Eliminar a tarefa "${task.name}"? Esta ação não pode ser desfeita.`,
+      onConfirm: () => handleDelete(task),
+    });
+  };
+
   const columns = [
     {
       title: 'Nome',
       dataIndex: 'name',
       key: 'name',
       width: '20%',
+      render: (name: string) => <span style={{ fontFamily: 'var(--ind-font-heading)', fontWeight: 600 }}>{name}</span>,
     },
     {
       title: 'Prazo',
@@ -80,7 +89,7 @@ export const TasksList: FC<TasksListProps> = ({
       key: 'status',
       width: '13%',
       render: (status: TaskStatus) => (
-        <Tag color={statusColorMap[status]}>{statusLabelMap[status]}</Tag>
+        <span className={`ind-tag ${statusClassMap[status]}`}>{statusLabelMap[status]}</span>
       ),
     },
     {
@@ -94,7 +103,7 @@ export const TasksList: FC<TasksListProps> = ({
       key: 'assignees',
       width: '20%',
       render: (_: unknown, record: TaskResponse) => (
-        <Avatar.Group max={{ count: 4 }}>
+        <div style={{ display: 'flex' }}>
           {record.assignees.map((a) => {
             const initials = a.name
               ?.split(' ')
@@ -102,101 +111,38 @@ export const TasksList: FC<TasksListProps> = ({
               .join('')
               .toUpperCase() || '?';
             return (
-              <Tooltip key={a.id} title={a.name}>
-                <Avatar size={26} style={{ fontSize: 11 }}>{initials}</Avatar>
-              </Tooltip>
+              <div
+                key={a.id}
+                title={a.name}
+                style={{
+                  width: 24, height: 24, borderRadius: '50%',
+                  background: 'var(--ind-accent-100)', color: 'var(--ind-accent-800)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, fontFamily: 'var(--ind-font-heading)',
+                  border: '1.5px solid var(--ind-color-bg)', marginLeft: -6,
+                }}
+              >
+                {initials}
+              </div>
             );
           })}
-        </Avatar.Group>
+        </div>
       ),
     },
     {
-      title: 'Ações',
+      title: '',
       key: 'actions',
       width: 170,
       render: (_: unknown, record: TaskResponse) => (
-        <Space size={2} direction="vertical" style={{ width: '100%' }}>
-          <Button
-            type="text"
-            icon={<Eye size={14} />}
-            onClick={() => onView(record)}
-            style={{
-              ...actionButtonBaseStyle,
-              color: D.ivory,
-              background: D.terracotta,
-              border: 'none',
-              boxShadow: `0px 0px 0px 1px ${D.terracotta}`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = D.coral;
-              e.currentTarget.style.boxShadow = `0px 0px 0px 1px ${D.coral}`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = D.terracotta;
-              e.currentTarget.style.boxShadow = `0px 0px 0px 1px ${D.terracotta}`;
-            }}
-          >
-            Ver detalhes
-          </Button>
-
+        <ListActions>
+          <ListActionPrimary onClick={() => onView(record)}>Ver detalhes</ListActionPrimary>
           {canEdit(record) && (
-            <Button
-              type="text"
-              icon={<Pencil size={14} />}
-              onClick={() => onEdit(record)}
-              style={{
-                ...actionButtonBaseStyle,
-                color: D.charcoalWarm,
-                background: D.warmSand,
-                border: `1px solid ${D.borderWarm}`,
-                boxShadow: 'none',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = D.terracotta;
-                e.currentTarget.style.color = D.terracotta;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = D.borderWarm;
-                e.currentTarget.style.color = D.charcoalWarm;
-              }}
-            >
-              Editar
-            </Button>
+            <ListActionSecondary onClick={() => onEdit(record)}>Editar</ListActionSecondary>
           )}
-
           {isAdmin() && (
-            <Popconfirm
-              title="Eliminar esta tarefa?"
-              description={`"${record.name}" será eliminada permanentemente.`}
-              okText="Eliminar"
-              okType="danger"
-              cancelText="Cancelar"
-              onConfirm={() => handleDelete(record)}
-            >
-              <Button
-                type="text"
-                icon={<Trash2 size={14} />}
-                style={{
-                  ...actionButtonBaseStyle,
-                  color: '#b53333',
-                  background: D.warmSand,
-                  border: `1px solid ${D.borderWarm}`,
-                  boxShadow: 'none',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#b53333';
-                  e.currentTarget.style.background = '#fff5f5';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = D.borderWarm;
-                  e.currentTarget.style.background = D.warmSand;
-                }}
-              >
-                Eliminar
-              </Button>
-            </Popconfirm>
+            <ListActionDanger onClick={() => confirmDelete(record)}>Eliminar</ListActionDanger>
           )}
-        </Space>
+        </ListActions>
       ),
     },
   ];
@@ -206,14 +152,19 @@ export const TasksList: FC<TasksListProps> = ({
   }
 
   return (
-    <Spin spinning={loading}>
-      <Table
-        columns={columns}
-        dataSource={tasks.map((task) => ({ ...task, key: task.id }))}
-        pagination={false}
-        scroll={{ x: 1100 }}
-      />
-      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+    <div>
+      <div style={{ borderTop: '1px solid var(--ind-color-divider)' }}>
+        <Spin spinning={loading}>
+          <Table
+            columns={columns}
+            dataSource={tasks.map((task) => ({ ...task, key: task.id }))}
+            pagination={false}
+            scroll={{ x: 1100 }}
+          />
+        </Spin>
+      </div>
+      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>{pagination.totalElements} resultado(s)</p>
         <Pagination
           current={pagination.currentPage + 1}
           total={pagination.totalElements}
@@ -221,6 +172,6 @@ export const TasksList: FC<TasksListProps> = ({
           onChange={(page) => onPageChange(page - 1)}
         />
       </div>
-    </Spin>
+    </div>
   );
 };

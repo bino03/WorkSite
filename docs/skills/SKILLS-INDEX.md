@@ -39,7 +39,7 @@ These are **not skills** — nothing invokes `/code-best-practices` on its own. 
 ### [[frontend-visual-consistency]]
 **Router for verified visual/structural conventions in the Backoffice — points to the matching sub-file in `docs/skills/references/design/`**
 
-- **File**: `docs/skills/references/frontend-visual-consistency.md` (router) + 5 sub-files in `docs/skills/references/design/` (tokens, cards, drawers-and-modals, tables-and-lists, buttons-and-icons)
+- **File**: `docs/skills/references/frontend-visual-consistency.md` (router) + 8 sub-files in `docs/skills/references/design/` (tokens, cards, drawers-and-modals, tables-and-lists, buttons-and-icons, forms-and-validation, services-and-error-handling, app-shell-and-auth)
 - **Applies to**: Any skill that writes or generates UI code in the Backoffice
 - **Tags**: `#frontend` `#backoffice` `#design` `#consistency`
 - **Covers**: Real design tokens → component-area-specific conventions and documented drift to avoid repeating
@@ -136,6 +136,17 @@ Files live in `docs/skills/frontend/`.
 
 ---
 
+### [[skill-frontend-structure-brief]]
+**Snapshot factual da estrutura atual de uma página/componente, para discutir um redesign noutra conversa**
+
+- **File**: `docs/skills/frontend/skill-frontend-structure-brief.md`
+- **Time**: ~15-20 minutos
+- **Tags**: `#frontend` `#documentation` `#redesign` `#backoffice` `#communication`
+- **Covers**: Identificar o subject → Recolher factos estruturais (árvore, props, estado, dados, rotas, condicionais, validação, estilo) → Escrever o brief → Gravar em `notes/design-briefs/`
+- **Use when**: Antes de discutir um redesign de UI numa conversa sem acesso ao repo
+
+---
+
 ## Process Skills
 
 Files live in `docs/skills/process/`. Meta-workflow and commit conventions — neither strictly backend nor frontend.
@@ -159,6 +170,18 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - **Tags**: `#git` `#commits` `#conventions` `#style`
 - **Covers**: Message format → Types → Body → Footer → Examples
 - **Use when**: Before committing code
+
+---
+
+### [[skill-implement-todo]]
+**Orquestra o backlog: menu → âmbito → investigação → esclarecimento → prioridade → implementação sequencial**
+
+- **File**: `docs/skills/process/skill-implement-todo.md`
+- **Time**: ~1 min (ver estado) até várias horas (implementar o backlog todo)
+- **Tags**: `#process` `#backlog` `#planning` `#workflow` `#orchestration`
+- **Covers**: Preflight → Menu (retomar/implementar/planear/ver estado) → Investigação paralela por tema → Esclarecimento em bloco → Priorização + plano gravado → Execução com checkpoints → Bookkeeping → Fecho
+- **Use when**: Avançar `notes/ToDo.md`, priorizar, planear sem implementar, retomar um plano a meio, ou ver o estado do backlog
+- **Nota**: não escreve código diretamente — invoca as outras skills. Lê e mantém `notes/ToDo.md`, `notes/whatIveDone.md`, `notes/ideas.md` e `notes/roadmap/plans/`
 
 ---
 
@@ -190,6 +213,7 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - [[skill-git-commits]] — Clear commit messages
 - [[skill-frontend-integration-guide]] — Documenting for team
 - [[skill-create-new-skill]] — How to create a new skill
+- [[skill-implement-todo]] — Levar o backlog (`notes/ToDo.md`) até código, reutilizando as skills acima
 
 ---
 
@@ -229,27 +253,27 @@ docs/skills/
 ├── SKILLS-INDEX.md            ← This file
 ├── SKILLS-QUICK-REFERENCE.md  ← Fast lookup table
 ├── backend/                   ← 4 skills
-├── frontend/                  ← 3 skills
-├── process/                   ← 2 skills
-└── references/                ← 2 docs + design/ (5 sub-files), not invocable
+├── frontend/                  ← 4 skills
+├── process/                   ← 3 skills
+└── references/                ← 2 docs + design/ (8 sub-files), not invocable
 ```
 
 ## Statistics
 
 | Category | Count |
 |----------|-------|
-| References (not invocable) | 2 |
+| References (not invocable) | 2 (+ 8 design sub-files) |
 | Backend Skills | 4 |
-| Frontend Skills | 3 |
-| Process Skills | 2 |
-| **Total Invocable Skills** | **9** |
+| Frontend Skills | 4 |
+| Process Skills | 3 |
+| **Total Invocable Skills** | **11** |
 
 ---
 
 ## Last Updated
 
-- **Date**: 2026-07-26
-- **Latest**: Bootstrapped from the Property-Management project's skills — dropped the Portal-specific `design/` sub-files and routing questions since Worksite has no public portal.
+- **Date**: 2026-08-05
+- **Latest**: Added `skill-implement-todo` (backlog orchestration) + the three missing Backoffice design references (`forms-and-validation`, `services-and-error-handling`, `app-shell-and-auth`, all audited against this project's real code). Registered `skill-frontend-structure-brief`, which existed but was never indexed. Removed the remaining Portal/Zustand carry-overs from the skill texts — neither exists in Worksite.
 - **Next to Add**: As needed (update this index when adding)
 
 ---

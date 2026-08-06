@@ -221,24 +221,29 @@ try {
 
 ---
 
-## Step 5: Errors in Zustand Stores
+## Step 5: Errors in list hooks
+
+> Este projeto **não usa Zustand** (ver [[skill-frontend-design-system]]) — o estado de lista vive num hook local. O padrão de erro é o mesmo: apanhar, passar ao `ErrorHandler`, e guardar a mensagem se a UI precisar de a mostrar inline.
 
 ```typescript
-export const usePropertyStore = create<State>((set) => ({
-  error: null,
-  fetch: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const res = await getProperties();
-      set({ items: res.content });
-    } catch (e) {
-      ErrorHandler.handle(e);
-      set({ error: ErrorHandler.getMessage(e) });
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-}));
+// hooks/useSomething.ts
+const [items, setItems] = useState<Item[]>([]);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState<string | null>(null);
+
+const fetchItems = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    const res = await getItems();
+    setItems(res.content);
+  } catch (e) {
+    ErrorHandler.handle(e);
+    setError(ErrorHandler.getMessage(e));
+  } finally {
+    setLoading(false);
+  }
+};
 ```
 
 ---

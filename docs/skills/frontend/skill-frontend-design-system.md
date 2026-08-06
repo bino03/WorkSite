@@ -1,6 +1,6 @@
 # Skill: Follow Frontend Design System
 
-**When to use**: Building any UI component in React apps (backoffice or portal)
+**When to use**: Building any UI component in the Backoffice (the only frontend app in this project)
 
 **Time**: Part of component creation
 
@@ -15,7 +15,7 @@
 - **Tailwind CSS 4** for styling
 - **Ant Design 5** for components
 - **React Hook Form + Zod** for forms
-- **Zustand 5** for global state
+- **React Context** for cross-cutting state (`AuthContext`, `ConfirmDialogContext`) — **não há Zustand neste projeto** (nem em `package.json`, nem em `src/`)
 - **Axios** for HTTP (single instance in `src/api.ts`)
 
 ---
@@ -66,7 +66,7 @@ src/components/
 
 ## Idioma dos segmentos de rota (URL)
 
-O Backoffice tem hoje uma mistura real no `main.tsx`: os segmentos de topo de cada domínio existente estão em **português** (`empreendimentos`, `edificios`, `propriedades`, `funcionarios`, `contactos`, `localizacoes`, `certificados`), não em inglês como a tabela acima sugere — isso é o estado real do código, não um exemplo a copiar ao pé da letra.
+O Backoffice tem hoje uma mistura real no `main.tsx`: os segmentos de topo herdados estão em **português** (`empreendimentos`, `funcionarios`), e os criados já neste projeto estão em inglês (`tasks`, `construction`) — não é a tabela acima aplicada ao pé da letra, é o estado real do código. Ver [[backoffice-app-shell-and-auth]] para a lista completa de rotas.
 
 **Convenção daqui em diante**: qualquer segmento de rota **novo** (uma funcionalidade nova, ou sub-rotas aninhadas dentro de um domínio já existente) usa **termos em inglês**, mesmo que o segmento pai onde a nova rota se aninha esteja em português. Isto acompanha a decisão já tomada para nomes de ficheiros, componentes, tabelas na BD e endpoints do backend — só os segmentos de topo já existentes ficam em português por continuidade com o que já lá está, não é para migrar os antigos.
 
@@ -223,42 +223,25 @@ export function PropertyViewDrawer({ id, onClose }: Props) {
 
 ---
 
-## Global State (Zustand)
+## Estado partilhado — Context, não Zustand
 
-For list state (filters, pagination), not auth:
+> ⚠️ O projeto de origem (Property-Management) usava **Zustand** para o estado de listas. O Worksite **não tem Zustand** — não está em `package.json` nem é importado em lado nenhum de `src/`. Não crie stores Zustand: isso acrescentaria uma dependência nova sem necessidade.
+
+O que existe hoje:
+
+- **Estado de lista** (filtros, paginação, `loading`) — **local à página**, com `useState` + `useEffect`, ou via `hooks/useApiCall.ts` / `hooks/useTasks.ts`. Ver `EnterprisesList.tsx`, `EmployeesList.tsx`, `TasksPage.tsx`.
+- **Estado transversal** — React Context: `context/AuthContext.tsx` (sessão/utilizador, consumido por `useAuth()`) e `context/ConfirmDialogContext.tsx` (diálogo de confirmação partilhado, via `useConfirm()`).
 
 ```typescript
-// store/propertyStore.ts
-import { create } from "zustand";
+// hooks/useTasks.ts — o padrão a seguir para estado de lista:
+// o hook é dono do estado (dados + loading + paginação + filtros) e expõe as ações
+const { tasks, loading, pagination, filters, fetchTasks, handleFilterChange } = useTasks();
 
-interface State {
-  items: Property[];
-  total: number;
-  page: number;
-  isLoading: boolean;
-  setPage: (page: number) => void;
-  fetch: () => Promise<void>;
-}
-
-export const usePropertyStore = create<State>((set, get) => ({
-  items: [],
-  total: 0,
-  page: 0,
-  isLoading: false,
-  setPage: (page) => set({ page }),
-  fetch: async () => {
-    set({ isLoading: true });
-    try {
-      const res = await getProperties({ page: get().page, size: 10 });
-      set({ items: res.content, total: res.totalElements });
-    } catch (e) {
-      ErrorHandler.handle(e);
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-}));
+// hooks/useApiCall.ts — para uma chamada avulsa, não uma lista
+const { execute, loading, error } = useApiCall();
 ```
+
+Se um dia o estado de lista precisar mesmo de ser partilhado entre páginas, discute primeiro se um Context chega — introduzir uma biblioteca de estado é uma decisão de arquitetura, não um detalhe de implementação.
 
 ---
 
@@ -295,16 +278,16 @@ export function PropertyCard({ property }: Props) {
 - [ ] ErrorHandler used for user errors
 - [ ] No try/catch in services
 - [ ] Drawers used instead of separate pages
-- [ ] Zustand for list state only
+- [ ] Estado de lista num hook local (`useTasks`-style) ou `useState` na página — **nunca** um store Zustand (não existe neste projeto)
 - [ ] Tailwind for custom styles, Ant Design for components
 - [ ] Tested in browser before committing
-- [ ] Introduced a new visual/structural pattern (not just reused an existing one)? → update the matching `docs/skills/references/design/<project>-<area>.md` sub-file via [[frontend-visual-consistency]] (the git pre-commit hook flags `theme.ts`/`index.css`/Portal `globals.css`/component-folder changes, but the sub-file text itself needs updating by hand)
+- [ ] Introduced a new visual/structural pattern (not just reused an existing one)? → update the matching `docs/skills/references/design/backoffice-<area>.md` sub-file via [[frontend-visual-consistency]] (the git pre-commit hook flags `theme.ts`/`index.css`/`colors.css`/services/layout/form-component changes, but the sub-file text itself needs updating by hand — see [[vault-sync-hooks]])
 
 ---
 
 ## Related Skills
 
 - [[code-best-practices]] — General code quality rules
-- [[frontend-visual-consistency]] — Router to verified design tokens and known drift (Backoffice and Portal)
+- [[frontend-visual-consistency]] — Router to verified design tokens and known drift in the Backoffice
 - [[skill-frontend-integration-guide]] — How backend integrates with this
 - [[skill-frontend-error-handling]] — Error handling details

@@ -4,25 +4,20 @@ import {
   Table,
   Input,
   Select,
-  Tag,
   Badge,
   Avatar,
   Empty,
   message,
   Tooltip,
   Drawer,
-  Popconfirm,
   Space,
   Button,
-  Card,
   Typography,
 } from "antd";
 import {
   UserOutlined,
   PhoneOutlined,
   CrownOutlined,
-  TeamOutlined,
-  EyeOutlined,
   DeleteOutlined,
   UserAddOutlined,
   MailOutlined,
@@ -44,23 +39,24 @@ import type { AccountStatus } from "@/services/profileService";
 import CreateEmployeeDrawer from "@/components/employees/CreateEmployeeDrawer";
 import InvitesDrawer from "@/components/invites/InvitesDrawer";
 import EmployeeContextMenu from "@/components/employees/EmployeeContextMenu";
+import { useConfirm } from "@/context/ConfirmDialogContext";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
-// Paleta Anthropic
+// Paleta Industry
 const D = {
-  parchment: "#f5f4ed",
-  ivory: "#faf9f5",
-  nearBlack: "#141413",
-  terracotta: "#c96442",
-  coral: "#d97757",
-  oliveGray: "#5e5d59",
-  stoneGray: "#87867f",
-  warmSand: "#e8e6dc",
-  charcoalWarm: "#4d4c48",
-  borderCream: "#f0eee6",
-  borderWarm: "#e8e6dc",
-  whisper: "rgba(0,0,0,0.05) 0px 4px 24px",
+  parchment: "var(--ind-color-bg)",
+  ivory: "var(--ind-color-surface)",
+  nearBlack: "var(--ind-color-text)",
+  terracotta: "var(--ind-color-accent)",
+  coral: "var(--ind-accent-600)",
+  oliveGray: "var(--ind-neutral-700)",
+  stoneGray: "var(--ind-neutral-600)",
+  warmSand: "var(--ind-neutral-100)",
+  charcoalWarm: "var(--ind-neutral-800)",
+  borderCream: "var(--ind-color-divider)",
+  borderWarm: "var(--ind-color-divider)",
+  whisper: "var(--ind-shadow-sm)",
 };
 
 type Role = "ADMIN" | "EMPLOYEE";
@@ -100,23 +96,6 @@ function initialsFromName(name: string) {
   const last = parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "";
   return (first + last).toUpperCase();
 }
-
-// i18n keys para roles/status
-const ROLE_LABEL: Record<Role, string> = {
-  ADMIN: "employees.roles.ADMIN",
-  EMPLOYEE: "employees.roles.EMPLOYEE",
-};
-
-const ROLE_COLOR: Record<Role, string> = {
-  ADMIN: "red",
-  EMPLOYEE: "blue",
-};
-
-const STATUS_LABEL: Record<Status, string> = {
-  unlocked: "employees.status.unlocked",
-  blocked: "employees.status.blocked",
-  deleted: "employees.status.deleted",
-};
 
 function statusBadge(
   s: Status
@@ -182,6 +161,7 @@ function CopyableText({
 // component -------------------------------------------------------
 export default function EmployeesList() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   // filtros/estado de UI
   const [q, setQ] = useState("");
   const debouncedQ = useDebounced(q, 300);
@@ -342,19 +322,9 @@ export default function EmployeesList() {
         dataIndex: "role",
         key: "role",
         render: (r: Role) => (
-          <Tag
-            icon={r === "ADMIN" ? <CrownOutlined /> : <TeamOutlined />}
-            style={{
-              borderRadius: '16px',
-              padding: '4px 12px',
-              fontWeight: 600,
-              border: `1px solid ${D.borderWarm}`,
-              backgroundColor: D.warmSand,
-              color: r === "ADMIN" ? D.terracotta : D.charcoalWarm,
-            }}
-          >
+          <span className={`ind-tag ${r === "ADMIN" ? "ind-tag-accent" : "ind-tag-neutral"}`}>
             {t(`employees.roles.${r}`)}
-          </Tag>
+          </span>
         ),
       },
       {
@@ -420,51 +390,33 @@ export default function EmployeesList() {
         key: "actions",
         render: (_: unknown, record: Employee) => (
           <Space size="small">
-            <Tooltip title={t('employees.viewProfile')}>
-              <Button
-                type="text"
-                icon={<EyeOutlined />}
-                onClick={() => openProfile(record.id)}
-                aria-label={`${t('employees.viewProfile')} ${record.name}`}
-                disabled={record.status === "deleted"}
-                style={{
-                  color: D.terracotta,
-                  border: `1px solid ${D.borderCream}`,
-                  backgroundColor: D.ivory,
-                  boxShadow: `0px 0px 0px 1px ${D.borderWarm}`,
-                  fontWeight: 500,
-                }}
-              >
-                {t('employees.view')}
-              </Button>
-            </Tooltip>
-
-            <Popconfirm
-              title={t('employees.deleteAccount')}
-              description={t('employees.deleteConfirm')}
-              onConfirm={() => handleDelete(record.id)}
+            <Button
+              size="small"
+              onClick={() => openProfile(record.id)}
               disabled={record.status === "deleted"}
             >
-              <Tooltip title={t('employees.deleteAccount')}>
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  loading={deletingId === record.id}
-                  disabled={record.status === "deleted"}
-                  style={{
-                    border: `1px solid ${D.borderCream}`,
-                    backgroundColor: D.warmSand,
-                    color: '#b53333',
-                  }}
-                />
-              </Tooltip>
-            </Popconfirm>
+              {t('employees.view')}
+            </Button>
+
+            <Tooltip title={t('employees.deleteAccount')}>
+              <Button
+                type="text"
+                size="small"
+                icon={<DeleteOutlined />}
+                loading={deletingId === record.id}
+                disabled={record.status === "deleted"}
+                style={{ opacity: 0.75, color: "var(--ind-color-accent)" }}
+                onClick={() => confirm({
+                  message: `${t('employees.deleteConfirm')} (${record.name})`,
+                  onConfirm: () => handleDelete(record.id),
+                })}
+              />
+            </Tooltip>
           </Space>
         ),
       }
     ],
-    [sortBy, sortDir, openProfile, deletingId]
+    [sortBy, sortDir, openProfile, deletingId, confirm, t]
   );
 
   // fetch ---------------------------------------------------------
@@ -581,130 +533,66 @@ export default function EmployeesList() {
 
   // UI ------------------------------------------------------------
   return (
-    <div style={{ padding: '24px', minHeight: '100vh' }}>
+    <div>
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <Title level={2} style={{ margin: 0, color: D.nearBlack, marginBottom: '8px', fontFamily: 'Georgia, serif', fontWeight: 500 }}>
-          {t('employees.title')}
-        </Title>
-        <Text style={{ color: D.stoneGray, fontSize: '16px' }}>
-          {t('employees.subtitle')}
-        </Text>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "20.4px" }}>
+        <div>
+          <h6 style={{ color: "var(--ind-accent-700)" }}>Organização</h6>
+          <h1 style={{ margin: 0 }}>{t('employees.title')}</h1>
+        </div>
+        <Space size="middle">
+          <Button
+            icon={<StopOutlined />}
+            type={blockedOnly ? "primary" : "default"}
+            onClick={() => {
+              setBlockedOnly(!blockedOnly);
+              setPagination(prev => ({ ...prev, current: 1 }));
+            }}
+          >
+            {t('employees.blockedOnly')}
+          </Button>
+
+          <Tooltip title={t('employees.viewInvites')}>
+            <Button icon={<MailOutlined />} onClick={() => setInvitesDrawerOpen(true)} />
+          </Tooltip>
+
+          <Button type="primary" icon={<UserAddOutlined />} onClick={() => setCreateOpen(true)}>
+            {t('employees.addAccount')}
+          </Button>
+        </Space>
       </div>
 
-      {/* Filtros e Ações */}
-      <Card
-        style={{
-          marginBottom: '20px',
-          borderRadius: '12px',
-          border: `1px solid ${D.borderCream}`,
-          backgroundColor: D.ivory,
-          boxShadow: D.whisper,
-        }}
-        bodyStyle={{ padding: '20px' }}
-      >
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          {/* pesquisa e filtro */}
-          <div style={{ display: 'flex', gap: '12px', flex: 1, minWidth: '300px' }}>
-            <Search
-              placeholder={t('employees.searchPlaceholder')}
-              allowClear
-              size="large"
-              onChange={(e) => setQ(e.target.value)}
-              value={q}
-              onSearch={(value) => setQ(value)}
-              style={{ flex: 1, maxWidth: '400px' }}
-              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-            />
-            <Select
-              placeholder={t('employees.filterByRole')}
-              size="large"
-              value={role}
-              onChange={(v) => {
-                setRole(v as any);
-                setPagination((prev) =>
-                  prev.current === 1 ? prev : { ...prev, current: 1 }
-                );
-              }}
-              style={{ minWidth: '180px' }}
-              suffixIcon={<FilterOutlined style={{ color: '#bfbfbf' }} />}
-            >
-              <Option value="ALL">{t('employees.roles.all')}</Option>
-              <Option value="ADMIN">{t('employees.roles.admins')}</Option>
-              <Option value="EMPLOYEE">{t('employees.roles.employees')}</Option>
-            </Select>
-          </div>
-
-          {/* botões */}
-          <Space size="middle">
-            <Button
-              icon={<StopOutlined />}
-              onClick={() => {
-                setBlockedOnly(!blockedOnly);
-                setPagination(prev => ({ ...prev, current: 1 }));
-              }}
-              style={{
-                borderRadius: '8px',
-                fontWeight: 500,
-                backgroundColor: blockedOnly ? D.terracotta : D.warmSand,
-                color: blockedOnly ? '#fff' : D.charcoalWarm,
-                border: `1px solid ${blockedOnly ? D.terracotta : D.borderWarm}`,
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {t('employees.blockedOnly')}
-              </span>
-            </Button>
-
-            <Button
-              icon={<UserAddOutlined />}
-              onClick={() => setCreateOpen(true)}
-              size="large"
-              style={{
-                borderRadius: '8px',
-                fontWeight: 500,
-                backgroundColor: D.terracotta,
-                color: '#fff',
-                border: 'none',
-              }}
-            >
-              {t('employees.addAccount')}
-            </Button>
-
-            <Tooltip title={t('employees.viewInvites')}>
-              <Button
-                type="text"
-                icon={<MailOutlined />}
-                onClick={() => setInvitesDrawerOpen(true)}
-                size="large"
-                style={{
-                  color: D.charcoalWarm,
-                  border: `1px solid ${D.borderWarm}`,
-                  backgroundColor: D.warmSand,
-                  borderRadius: '8px',
-                }}
-              />
-            </Tooltip>
-          </Space>
-        </div>
-      </Card>
+      {/* Filtros */}
+      <div style={{ display: "flex", gap: "10.2px", alignItems: "center", marginBottom: "13.6px" }}>
+        <Search
+          placeholder={t('employees.searchPlaceholder')}
+          allowClear
+          onChange={(e) => setQ(e.target.value)}
+          value={q}
+          onSearch={(value) => setQ(value)}
+          style={{ maxWidth: 320 }}
+          prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
+        />
+        <Select
+          placeholder={t('employees.filterByRole')}
+          value={role}
+          onChange={(v) => {
+            setRole(v as any);
+            setPagination((prev) =>
+              prev.current === 1 ? prev : { ...prev, current: 1 }
+            );
+          }}
+          style={{ minWidth: 180 }}
+          suffixIcon={<FilterOutlined style={{ opacity: 0.5 }} />}
+        >
+          <Option value="ALL">{t('employees.roles.all')}</Option>
+          <Option value="ADMIN">{t('employees.roles.admins')}</Option>
+          <Option value="EMPLOYEE">{t('employees.roles.employees')}</Option>
+        </Select>
+      </div>
 
       {/* tabela */}
-      <Card
-        style={{
-          borderRadius: '12px',
-          border: `1px solid ${D.borderCream}`,
-          backgroundColor: D.ivory,
-          boxShadow: D.whisper,
-        }}
-        bodyStyle={{ padding: 0 }}
-      >
+      <div style={{ borderTop: "1px solid var(--ind-color-divider)" }}>
         <Table<Employee>
           rowKey="id"
           columns={columns}
@@ -731,12 +619,8 @@ export default function EmployeesList() {
               />
             )
           }}
-          style={{
-            borderRadius: '12px',
-            overflow: 'hidden'
-          }}
         />
-      </Card>
+      </div>
 
       {/* Drawer global (fora da tabela) */}
       <Drawer

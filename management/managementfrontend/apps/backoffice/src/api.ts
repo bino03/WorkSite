@@ -3,6 +3,15 @@ import axios from "axios";
 import { notificationService } from "@/services/general/notificationService";
 import type { ApiErrorResponse } from "@/errors/error.types";
 
+declare module "axios" {
+  interface AxiosRequestConfig {
+    // Quando true, um 401 nesta request não dispara o fluxo de refresh —
+    // usado em /auth/login, onde um 401 é "credenciais inválidas", não
+    // "sessão expirada".
+    noRefreshRetry?: boolean;
+  }
+}
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL, // ex.: "http://localhost:8080"
   withCredentials: true, // ✅ CRITICAL: Automatically send cookies with every request
@@ -20,6 +29,11 @@ function processQueue(error: unknown) {
 }
 
 function clearSessionAndRedirect() {
+  // Limpa a sessão guardada — sem isto, o AuthContext volta a tentar /auth/me
+  // no próximo load (com cookies inválidos), gerando um ciclo infinito de
+  // redirects.
+  sessionStorage.removeItem('session_user');
+
   // Show session expired notification before redirecting
   notificationService.warning('Sessão expirada', 'A sua sessão foi expirada. Por favor, faça login novamente.');
 

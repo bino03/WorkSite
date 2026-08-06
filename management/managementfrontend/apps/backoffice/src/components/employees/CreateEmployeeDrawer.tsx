@@ -74,8 +74,9 @@ export default function CreateEmployeeDrawer({ open, onClose, onCreated }: Props
     <Drawer
       width={640}
       title={
-        <div className="flex items-center gap-2">
-          <UserPlus size={18} /> <span>{t('employees_drawer.title')}</span>
+        <div>
+          <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Equipa</h6>
+          <h3 style={{ margin: 0 }}>{t('employees_drawer.title')}</h3>
         </div>
       }
       open={open}
@@ -226,14 +227,13 @@ export default function CreateEmployeeDrawer({ open, onClose, onCreated }: Props
             bottom: 0,
             paddingTop: 8,
             paddingBottom: 8,
-            background: "var(--surface)",
+            background: "var(--ind-color-bg)",
           }}
         >
           <div className="flex items-center justify-between">
             <Space>
               <Button
                 onClick={onClose}
-                className="btn btn-outline"
                 aria-label="Cancelar"
                 icon={<X size={16} />}
                 disabled={submitting}
@@ -245,7 +245,6 @@ export default function CreateEmployeeDrawer({ open, onClose, onCreated }: Props
             <Button
               onClick={() => form.submit()}
               loading={submitting}
-              className="btn btn-primary"
               aria-label={creationType === "manual" ? "Criar conta" : "Enviar convite"}
               icon={creationType === "manual" ? <Save size={16} /> : <Mail size={16} />}
               type="primary"

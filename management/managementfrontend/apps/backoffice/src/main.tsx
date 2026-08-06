@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider } from "antd";
 import { AuthProvider } from "./context/AuthContext";
+import { ConfirmDialogProvider } from "./context/ConfirmDialogContext";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { antdTheme } from "./theme";
 import { Login } from "./pages/Login";
@@ -15,9 +16,6 @@ import { PrivateRoute } from "./PrivateRoute";
 import EmployeesList from "./pages/backoffice/EmployeesList";
 import EmployeeProfilePage from "./pages/backoffice/employee/EmployeeProfilePage";
 import EnterprisesList from "./pages/enterprises/EnterprisesList";
-import ConstructionStagesPage from "./pages/backoffice/enterprise/ConstructionStagesPage";
-import ConstructionSubStagesPage from "./pages/backoffice/enterprise/ConstructionSubStagesPage";
-import ConstructionExpensesPage from "./pages/backoffice/enterprise/ConstructionExpensesPage";
 import TasksPage from "./pages/backoffice/TasksPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import "antd/dist/reset.css";
@@ -29,6 +27,7 @@ const App = () => (
     <ConfigProvider theme={antdTheme}>
       <ErrorBoundary>
         <AuthProvider>
+        <ConfirmDialogProvider>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
@@ -44,15 +43,13 @@ const App = () => (
               <Route path="funcionarios" element={<EmployeesList />} />
               <Route path="funcionarios/:id" element={<EmployeeProfilePage />} />
               <Route path="empreendimentos" element={<EnterprisesList />} />
-              <Route path="empreendimentos/:enterpriseId/construction" element={<ConstructionStagesPage />} />
-              <Route path="empreendimentos/:enterpriseId/construction/:stageId" element={<ConstructionSubStagesPage />} />
-              <Route path="empreendimentos/:enterpriseId/construction/:stageId/:subStageId" element={<ConstructionExpensesPage />} />
               <Route path="tasks" element={<TasksPage />} />
             </Route>
 
             {/* 404 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
+        </ConfirmDialogProvider>
         </AuthProvider>
       </ErrorBoundary>
     </ConfigProvider>

@@ -1,4 +1,5 @@
-import { FC, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { FC } from 'react';
 import { Drawer, Form, Input, DatePicker, Select, Button, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { taskService } from '@/services/taskService';
@@ -166,7 +167,7 @@ export const TaskFormDrawer: FC<Props> = ({ open, task, onClose, onSaved }) => {
                   <Tag color={u.role === 'ADMIN' ? 'gold' : 'blue'} style={{ marginInlineEnd: 0 }}>
                     {u.role === 'ADMIN' ? 'Admin' : 'Funcionário'}
                   </Tag>
-                  <span style={{ color: '#87867f', fontSize: 12 }}>{u.email}</span>
+                  <span style={{ opacity: 0.6, fontSize: 12 }}>{u.email}</span>
                 </span>
               ),
             }))}

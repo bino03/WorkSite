@@ -11,7 +11,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 | Reference | Description | Tags | Applies to |
 |-------|---|---|---|
 | [[code-best-practices]] | General code quality rules shared by every skill | `#quality` `#conventions` `#backend` `#frontend` | Any skill writing/reviewing code |
-| [[frontend-visual-consistency]] | Router → 5 sub-files in `docs/skills/references/design/` with verified tokens/drift per area | `#frontend` `#backoffice` `#design` | Any skill writing UI |
+| [[frontend-visual-consistency]] | Router → 8 sub-files in `docs/skills/references/design/` with verified tokens/drift per area | `#frontend` `#backoffice` `#design` | Any skill writing UI |
 
 ---
 
@@ -33,6 +33,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 | [[skill-frontend-design-system]] | React component patterns, naming, and architecture | `#frontend` `#react` `#components` | Part of component creation |
 | [[skill-frontend-error-handling]] | Centralized error handling, error codes, and messages | `#frontend` `#errors` `#validation` | ~15m |
 | [[skill-frontend-integration-guide]] | Generate frontend integration documentation from backend feature | `#frontend` `#integration` `#workflow` | ~15m |
+| [[skill-frontend-structure-brief]] | Snapshot da estrutura atual de uma página/componente para discutir redesign | `#frontend` `#redesign` `#documentation` | ~15-20m |
 
 ---
 
@@ -42,6 +43,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 |-------|---|---|---|
 | [[skill-create-new-skill]] | Plan, write, and add a new skill (or reference) to the project | `#process` `#documentation` `#meta` | ~30-45m |
 | [[skill-git-commits]] | Commit message style and conventions | `#git` `#commits` `#style` | ~1-2m |
+| [[skill-implement-todo]] | Backlog (`notes/ToDo.md`) → prioridade → implementação, orquestrando as outras skills | `#process` `#backlog` `#planning` | ~1m a várias horas |
 
 ---
 
@@ -51,20 +53,20 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 **Authentication & Security**: [[skill-permissions-and-auth]], [[skill-add-file-upload]]  
 **Database**: [[skill-add-database-table]], [[skill-add-backend-feature]]  
 **API Development**: [[skill-add-backend-feature]], [[skill-add-file-upload]], [[skill-permissions-and-auth]]  
-**Frontend**: [[skill-frontend-design-system]], [[skill-frontend-error-handling]], [[skill-frontend-integration-guide]]  
-**Process**: [[skill-create-new-skill]], [[skill-git-commits]]
+**Frontend**: [[skill-frontend-design-system]], [[skill-frontend-error-handling]], [[skill-frontend-integration-guide]], [[skill-frontend-structure-brief]]  
+**Process**: [[skill-create-new-skill]], [[skill-git-commits]], [[skill-implement-todo]]
 
 ---
 
-## Total: 9 Invocable Skills + 2 References
+## Total: 11 Invocable Skills + 2 References
 
-- References: 2
+- References: 2 (+ 8 design sub-files)
 - Backend: 4
-- Frontend: 3
-- Process: 2
+- Frontend: 4
+- Process: 3
 
 ---
 
-**Last Updated**: 2026-07-26
+**Last Updated**: 2026-08-05
 
 **Note**: When adding a new skill, update this file + [[docs/skills/SKILLS-INDEX.md]] + [[skill-create-new-skill.md]]. References don't get a `.claude/skills/` pointer — only skills do, see [[skill-create-new-skill]]. Files live under `docs/skills/{backend,frontend,process,references}/`.

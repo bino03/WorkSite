@@ -1,18 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Controller, useFormContext } from "react-hook-form";
-import { Input, Select, Button, Skeleton, Row, Col, Typography } from "antd";
+import { Input, Select, Button, Skeleton, Row, Col } from "antd";
 import { EnvironmentOutlined, GlobalOutlined, UndoOutlined } from "@ant-design/icons";
-import { MapPin } from "lucide-react";
 
-import SectionCard from "@/components/enterprise/create/ui/SectionCard";
-import Label from "@/components/common/Label";
+import BlueprintCard from "@/components/common/BlueprintCard";
 import { searchLocations } from "@/services/locationService";
 import MapLocationPickerDrawer, {
   type LocationPickData,
 } from "@/components/location/MapLocationPickerDrawer";
-
-const { Text } = Typography;
 
 const FIELD_SIZE = "large" as const;
 
@@ -158,119 +154,64 @@ export default function EnterpriseLocationSection() {
 
   if (initialLoading) {
     return (
-      <SectionCard title={t('buildingCreate.steps.location')} icon={<MapPin size={16} />}>
+      <BlueprintCard kicker="Localização" style={{ padding: "13.6px", gap: "10.2px" }}>
         <div className="space-y-4">
           <Skeleton.Button active size="large" block />
           <Skeleton.Input active size="large" block />
         </div>
-      </SectionCard>
+      </BlueprintCard>
     );
   }
 
   return (
-    <SectionCard title={t('common.location')} icon={<MapPin size={16} />}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "13.6px" }}>
       {/* Seleção de modo */}
-      <div style={{ marginBottom: "24px" }}>
-        <Row gutter={12}>
-          <Col span={12}>
-            <div
-              style={{
-                padding: "20px",
-                borderRadius: "12px",
-                cursor: "pointer",
-                border: `2px solid ${addMode === "new" ? "#52c41a" : "#e8e8e8"}`,
-                backgroundColor: addMode === "new" ? "#ecfccb" : "#fff",
-                transition: "all 0.2s ease",
-              }}
-              onClick={() => handleModeChange("new")}
+      <Row gutter={12}>
+        <Col span={12}>
+          <BlueprintCard
+            style={{
+              padding: "13.6px",
+              gap: "6.8px",
+              cursor: "pointer",
+              borderColor: addMode === "new" ? "var(--ind-color-accent)" : undefined,
+            }}
+            onClick={() => handleModeChange("new")}
+          >
+            <span
+              className="ind-card-title"
+              style={{ color: addMode === "new" ? "var(--ind-accent-800)" : undefined }}
             >
-              <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                <GlobalOutlined
-                  style={{
-                    fontSize: "22px",
-                    color: addMode === "new" ? "#52c41a" : "#8c8c8c",
-                  }}
-                />
-              </div>
-              <Text
-                strong
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  color: addMode === "new" ? "#52c41a" : "#262626",
-                  marginBottom: "2px",
-                }}
-              >
-                {t('enterpriseCreate.location.insertNew')}
-              </Text>
-              <Text
-                type="secondary"
-                style={{ fontSize: "12px", textAlign: "center", display: "block" }}
-              >
-                {t('enterpriseCreate.location.insertNewHint')}
-              </Text>
-            </div>
-          </Col>
-          <Col span={12}>
-            <div
-              style={{
-                padding: "20px",
-                borderRadius: "12px",
-                cursor: "pointer",
-                border: `2px solid ${addMode === "existing" ? "#78716c" : "#e8e8e8"}`,
-                backgroundColor: addMode === "existing" ? "#f5f5f4" : "#fff",
-                transition: "all 0.2s ease",
-              }}
-              onClick={() => handleModeChange("existing")}
+              Nova Localização
+            </span>
+            <p className="ind-card-body">Introduzir um endereço novo.</p>
+          </BlueprintCard>
+        </Col>
+        <Col span={12}>
+          <BlueprintCard
+            style={{
+              padding: "13.6px",
+              gap: "6.8px",
+              cursor: "pointer",
+              borderColor: addMode === "existing" ? "var(--ind-color-accent)" : undefined,
+            }}
+            onClick={() => handleModeChange("existing")}
+          >
+            <span
+              className="ind-card-title"
+              style={{ color: addMode === "existing" ? "var(--ind-accent-800)" : undefined }}
             >
-              <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                <EnvironmentOutlined
-                  style={{
-                    fontSize: "22px",
-                    color: addMode === "existing" ? "#78716c" : "#8c8c8c",
-                  }}
-                />
-              </div>
-              <Text
-                strong
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  color: addMode === "existing" ? "#78716c" : "#262626",
-                  marginBottom: "2px",
-                }}
-              >
-                {t('enterpriseCreate.location.useExisting')}
-              </Text>
-              <Text
-                type="secondary"
-                style={{ fontSize: "12px", textAlign: "center", display: "block" }}
-              >
-                {t('enterpriseCreate.location.useExistingHint')}
-              </Text>
-            </div>
-          </Col>
-        </Row>
-      </div>
+              Localização Existente
+            </span>
+            <p className="ind-card-body">Associar a uma localização já registada.</p>
+          </BlueprintCard>
+        </Col>
+      </Row>
 
       {/* ── Modo: Localização Existente ── */}
       {addMode === "existing" && (
-        <div
-          style={{
-            padding: "20px",
-            backgroundColor: "white",
-            borderRadius: "12px",
-            border: "1px solid #e8e8e8",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}>
-            <EnvironmentOutlined style={{ color: "#78716c", marginRight: "8px" }} />
-            <Text strong style={{ fontSize: "15px", color: "#262626" }}>
-              {t('enterpriseCreate.location.searchTitle')}
-            </Text>
-          </div>
-
-          <Label>{t('enterpriseCreate.location.searchLabel')}</Label>
+        <BlueprintCard kicker={t('enterpriseCreate.location.searchTitle')} style={{ padding: "13.6px", gap: "10.2px" }}>
+          <div className="field">
+            <label>{t('enterpriseCreate.location.searchLabel')}</label>
           <Controller
             control={control}
             name="existing_location_id"
@@ -300,36 +241,13 @@ export default function EnterpriseLocationSection() {
               />
             )}
           />
-        </div>
+          </div>
+        </BlueprintCard>
       )}
 
       {/* ── Modo: Nova Localização ── */}
       {addMode === "new" && (
-        <div
-          style={{
-            padding: "20px",
-            backgroundColor: "white",
-            borderRadius: "12px",
-            border: "1px solid #e8e8e8",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              marginBottom: "20px",
-              paddingBottom: "16px",
-              borderBottom: "1px solid #e8e8e8",
-            }}
-          >
-            <GlobalOutlined
-              style={{ color: "#52c41a", marginRight: "8px", fontSize: "18px" }}
-            />
-            <Text strong style={{ fontSize: "15px", color: "#262626" }}>
-              {t('enterpriseCreate.location.createNewTitle')}
-            </Text>
-          </div>
-
+        <BlueprintCard kicker={t('enterpriseCreate.location.createNewTitle')} style={{ padding: "13.6px", gap: "10.2px" }}>
           {/* Botão do mapa */}
           <div style={{ marginBottom: "20px" }}>
             <Button
@@ -447,195 +365,118 @@ export default function EnterpriseLocationSection() {
 
           {/* Campos de localização */}
           <Row gutter={16}>
-            <Col span={12}>
-              <Label>{t('common.country')}</Label>
+            <Col span={12} className="field">
+              <label>{t('common.country')}</label>
               <Controller
                 control={control}
                 name="new_location.country"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder={t('common.country')}
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder={t('common.country')} allowClear />
                 )}
               />
             </Col>
-            <Col span={12}>
-              <Label>{t('common.city')}</Label>
+            <Col span={12} className="field">
+              <label>{t('common.city')}</label>
               <Controller
                 control={control}
                 name="new_location.city"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder="Ex.: Lisboa"
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder="Ex.: Lisboa" allowClear />
                 )}
               />
             </Col>
-            <Col span={12}>
-              <Label>{t('common.municipality')}</Label>
+            <Col span={12} className="field">
+              <label>{t('common.municipality')}</label>
               <Controller
                 control={control}
                 name="new_location.municipality"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder="Ex.: Vila Real"
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder="Ex.: Vila Real" allowClear />
                 )}
               />
             </Col>
-            <Col span={12}>
-              <Label>{t('common.parish')}</Label>
+            <Col span={12} className="field">
+              <label>{t('common.parish')}</label>
               <Controller
                 control={control}
                 name="new_location.parish"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder="Ex.: Arroios"
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder="Ex.: Arroios" allowClear />
                 )}
               />
             </Col>
-            <Col span={16}>
-              <Label>{t('buildingCreate.location.addressLine1')}</Label>
+            <Col span={16} className="field">
+              <label>{t('buildingCreate.location.addressLine1')}</label>
               <Controller
                 control={control}
                 name="new_location.address_line1"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder="Rua / Avenida"
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder="Rua / Avenida" allowClear />
                 )}
               />
             </Col>
-            <Col span={8}>
-              <Label>{t('buildingCreate.location.addressLine2')}</Label>
+            <Col span={8} className="field">
+              <label>{t('buildingCreate.location.addressLine2')}</label>
               <Controller
                 control={control}
                 name="new_location.address_line2"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder="Andar / Fração"
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder="Andar / Fração" allowClear />
                 )}
               />
             </Col>
-            <Col span={12}>
-              <Label>{t('common.postalCode')}</Label>
+            <Col span={12} className="field">
+              <label>{t('common.postalCode')}</label>
               <Controller
                 control={control}
                 name="new_location.postal_code"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder="0000-000"
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder="0000-000" allowClear />
                 )}
               />
             </Col>
-            <Col span={12}>
-              <Label>{t('buildingCreate.location.state')}</Label>
+            <Col span={12} className="field">
+              <label>{t('buildingCreate.location.state')}</label>
               <Controller
                 control={control}
                 name="new_location.state"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder={t('buildingCreate.location.state')}
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder={t('buildingCreate.location.state')} allowClear />
                 )}
               />
             </Col>
-            <Col span={12}>
-              <Label>{t('buildingCreate.location.googlePlaceId')}</Label>
+            <Col span={12} className="field">
+              <label>{t('buildingCreate.location.googlePlaceId')}</label>
               <Controller
                 control={control}
                 name="new_location.google_place_id"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder="ID do Google Places"
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder="ID do Google Places" allowClear />
                 )}
               />
             </Col>
-            <Col span={12}>
-              <Label>{t('buildingCreate.location.locationName')}</Label>
+            <Col span={12} className="field">
+              <label>{t('buildingCreate.location.locationName')}</label>
               <Controller
                 control={control}
                 name="new_location.name"
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    value={field.value ?? ""}
-                    size={FIELD_SIZE}
-                    placeholder={t('buildingCreate.location.locationNamePlaceholder')}
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input {...field} value={field.value ?? ""} size={FIELD_SIZE} placeholder={t('buildingCreate.location.locationNamePlaceholder')} allowClear />
                 )}
               />
             </Col>
-            <Col span={24}>
-              <Label>{t('common.notes')}</Label>
+            <Col span={24} className="field">
+              <label>{t('common.notes')}</label>
               <Controller
                 control={control}
                 name="new_location.notes"
                 render={({ field }) => (
-                  <Input.TextArea
-                    {...field}
-                    value={field.value ?? ""}
-                    rows={3}
-                    placeholder={t('buildingCreate.location.notesPlaceholder')}
-                    allowClear
-                    style={{ borderRadius: "8px" }}
-                  />
+                  <Input.TextArea {...field} value={field.value ?? ""} rows={3} placeholder={t('buildingCreate.location.notesPlaceholder')} allowClear />
                 )}
               />
             </Col>
           </Row>
-        </div>
+        </BlueprintCard>
       )}
 
       {/* Drawer do mapa */}
@@ -645,6 +486,6 @@ export default function EnterpriseLocationSection() {
         onConfirm={handleMapConfirm}
         defaultCenter={{ lat: 41.2734, lng: -7.5863 }}
       />
-    </SectionCard>
+    </div>
   );
 }

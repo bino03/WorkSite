@@ -6,7 +6,7 @@
 
 **Time**: ~15 minutes (you answer questions, I generate and save the doc)
 
-> 📐 See also [[code-best-practices]] for general naming/error-handling conventions, and [[frontend-visual-consistency]] (a router — once you know Backoffice or Portal from this skill's own first question, it points to the matching sub-file) so generated code templates match real design tokens instead of inventing new ones.
+> 📐 See also [[code-best-practices]] for general naming/error-handling conventions, and [[frontend-visual-consistency]] (a router — it points to the sub-file matching the area you're generating code for) so generated code templates match real design tokens instead of inventing new ones.
 
 ---
 
@@ -14,21 +14,10 @@
 
 ### Step 1: You Call the Skill
 
-When you ask me to generate a frontend integration guide, I ask **2 initial questions**:
+When you ask me to generate a frontend integration guide, I ask **1 initial question** (there's only one frontend app in this project, so there's nothing to route between — the file always goes to `management/managementfrontend/apps/backoffice/docs/integration/`):
 
 ```
-QUESTION 1: "Backoffice or Portal?"
-   → Backoffice (Admin Dashboard)
-      File will be saved to: 
-      C:\Users\jlalv\Desktop\utad\projetos\Property-Management\
-      management\managementfrontend\apps\backoffice\docs\integration\
-   
-   → Portal (Client-Facing App)
-      File will be saved to:
-      C:\Users\jlalv\Desktop\utad\projetos\Property Management - Client Side\
-      Casa-Capital---Client-Side\docs\integration\
-
-QUESTION 2: "Is this the feature you just developed in this chat, or an existing feature you want to document?"
+QUESTION: "Is this the feature you just developed in this chat, or an existing feature you want to document?"
    → Feature from THIS CHAT
       I extract all details automatically (endpoints, DTOs, auth, error codes)
       
@@ -226,10 +215,7 @@ pages/
 
 **I ask:**
 ```
-Q1: Backoffice or Portal?
-→ You: Backoffice
-
-Q2: Is this the feature from this chat?
+Q: Is this the feature from this chat?
 → You: Yes
 ```
 
@@ -248,9 +234,8 @@ Q2: Is this the feature from this chat?
 
 **I generate the `.md` file → Automatically saved to:**
 ```
-C:\Users\jlalv\Desktop\utad\projetos\Property-Management\
 management\managementfrontend\apps\backoffice\docs\integration\
-lead-management-integration.md
+task-assignment-integration.md
 ```
 
 ---
@@ -269,10 +254,7 @@ Details:
 
 **I ask:**
 ```
-Q1: Backoffice or Portal?
-→ You: Portal
-
-Q2: Is this the feature from this chat?
+Q: Is this the feature from this chat?
 → You: No, it already exists
 ```
 
@@ -307,19 +289,18 @@ property-management-integration.md
 
 ---
 
-## The 7 Key Questions (Quick Ref)
+## The 6 Key Questions (Quick Ref)
 
 ```
-INITIAL QUESTIONS:
-1. Backoffice or Portal? (determines save location)
-2. Feature from this chat or existing? (determines data extraction method)
+INITIAL QUESTION:
+1. Feature from this chat or existing? (determines data extraction method)
 
 IMPLEMENTATION QUESTIONS:
-3. Where? (Location in app section - properties, enterprises, catalog, etc.)
-4. What UI? (List/form/modal/drawer/detail)
-5. Special fields? (Dropdowns/dates/uploads/validation)
-6. Workflow? (On create: redirect/stay? Edit how? Delete confirm?)
-7. Integrations? (Link to other features/entities)
+2. Where? (Location in app section - enterprises, construction, tasks, employees, etc.)
+3. What UI? (List/form/modal/drawer/detail)
+4. Special fields? (Dropdowns/dates/uploads/validation)
+5. Workflow? (On create: redirect/stay? Edit how? Delete confirm?)
+6. Integrations? (Link to other features/entities)
 ```
 
 Answer these and I generate and save the complete integration guide.
@@ -328,21 +309,13 @@ Answer these and I generate and save the complete integration guide.
 
 ## File Locations
 
-The skill automatically saves the generated `.md` file to the correct folder:
+The skill automatically saves the generated `.md` file to:
 
-**Backoffice:**
 ```
-C:\Users\jlalv\Desktop\utad\projetos\Property-Management\
-management\managementfrontend\apps\backoffice\docs\integration\
-{feature-name}-integration.md
+management\managementfrontend\apps\backoffice\docs\integration\{feature-name}-integration.md
 ```
 
-**Portal:**
-```
-C:\Users\jlalv\Desktop\utad\projetos\Property Management - Client Side\
-Casa-Capital---Client-Side\docs\integration\
-{feature-name}-integration.md
-```
+(Relative to the repo root. There's only one frontend app, so there's no routing decision to make.)
 
 ---
 
@@ -351,5 +324,5 @@ Casa-Capital---Client-Side\docs\integration\
 - [[code-best-practices]] — General code quality rules
 - [[skill-add-backend-feature]] — How you implement the backend
 - [[skill-frontend-design-system]] — Design patterns to follow in frontend
-- [[frontend-visual-consistency]] — Router to verified design tokens (Backoffice and Portal)
+- [[frontend-visual-consistency]] — Router to verified Backoffice design tokens
 - [[skill-add-file-upload]] — If feature involves file uploads

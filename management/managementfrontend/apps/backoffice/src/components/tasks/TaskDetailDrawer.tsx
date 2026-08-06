@@ -1,4 +1,5 @@
-import { FC, useState } from 'react';
+import { useState } from 'react';
+import type { FC } from 'react';
 import { Drawer, Descriptions, Tag, Form, Select, Button, Space, Spin } from 'antd';
 import { taskService } from '@/services/taskService';
 import { notificationService } from '@/services/general/notificationService';
@@ -39,7 +40,17 @@ export const TaskDetailDrawer: FC<Props> = ({ task, open, onClose, onStatusUpdat
   };
 
   return (
-    <Drawer title={task ? `Detalhes da Tarefa - ${task.name}` : 'Detalhes da Tarefa'} open={open} onClose={onClose} width={500}>
+    <Drawer
+      title={
+        <div>
+          <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Tarefa</h6>
+          <h3 style={{ margin: 0 }}>{task?.name ?? ""}</h3>
+        </div>
+      }
+      open={open}
+      onClose={onClose}
+      width={480}
+    >
       <Spin spinning={loading}>
         {task && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

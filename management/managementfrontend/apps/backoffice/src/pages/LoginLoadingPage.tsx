@@ -46,49 +46,35 @@ export const LoginLoadingPage = () => {
   return (
     <div
       style={{
-        height: "100vh",
+        minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 32,
-        background: "#f5f4ed",
+        gap: "13.6px",
+        background: "var(--ind-color-bg)",
       }}
     >
-      {/* Custom spinner */}
-      <div
-        style={{
-          position: "relative",
-          width: 60,
-          height: 60,
-        }}
+      <svg
+        width="40"
+        height="40"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--ind-color-accent)"
+        strokeWidth="1.5"
+        style={{ animation: "spin 1s linear infinite" }}
       >
-        <svg
-          width="60"
-          height="60"
-          viewBox="0 0 60 60"
-          style={{ animation: "spin 1.2s linear infinite" }}
-        >
-          <circle
-            cx="30"
-            cy="30"
-            r="26"
-            fill="none"
-            stroke="#c96442"
-            strokeWidth="4"
-            strokeDasharray="40 160"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
+        <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+      </svg>
 
       <p
         style={{
-          fontSize: 16,
-          fontWeight: 600,
-          color: "#c96442",
+          fontFamily: "var(--ind-font-heading)",
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          fontSize: 13,
+          color: "var(--ind-accent-700)",
           margin: 0,
-          letterSpacing: "0.3px",
         }}
       >
         {t(statusKey)}
@@ -96,12 +82,7 @@ export const LoginLoadingPage = () => {
 
       <style>{`
         @keyframes spin {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

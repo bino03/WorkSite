@@ -30,7 +30,7 @@ Drawer é o padrão dominante (25 ficheiros usam `<Drawer>` contra 12 com `<Moda
 - **Drawer** — qualquer criação/edição/visualização de uma entidade (o padrão já estabelecido e maioritário).
 - **Modal** — só para utilitários autocontidos e curtos: um seletor de pesquisa (`PropertySearchModal`), um visualizador de documento, um histórico (`DownloadHistoryModal`), ou reordenação de itens (`EditPhotoOrder`, `EditDivisionOrder`). Nunca um formulário completo de edição de entidade — isso é sempre Drawer.
 - `MyProfileModal.tsx` e `StatusChangeModal.tsx` são os dois exemplos claros a **não copiar**: são formulários de entidade que deviam ser Drawer. Migrar oportunisticamente, não é preciso reescrever já.
-- Confirmações simples continuam a usar `Popconfirm` (já é o padrão dominante); `Modal.confirm` só quando a confirmação precisa de mais contexto/explicação do que cabe num popover.
+- Confirmações de ações destrutivas usam o diálogo partilhado `useConfirm()` (`context/ConfirmDialogContext`) — ver [[backoffice-buttons-and-icons]]. `Popconfirm` só sobrevive em três ficheiros por migrar; não o uses em código novo. `Modal.confirm` só quando a confirmação precisa de mais contexto do que o diálogo partilhado permite.
 
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]

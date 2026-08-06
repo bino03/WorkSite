@@ -1,14 +1,14 @@
 // src/components/MediaUploadsSection.tsx
 
-import { Upload, Button, Input, Typography, message, Card, Row, Col, Tag } from "antd";
+import { Upload, Input, Typography, message, Row, Col, Tag } from "antd";
 import { useTranslation } from "react-i18next";
 import type { UploadFile, UploadProps } from "antd";
-import { 
-  PlusOutlined, 
-  PictureOutlined, 
+import {
+  PlusOutlined,
+  PictureOutlined,
   VideoCameraOutlined,
-  InfoCircleOutlined 
 } from "@ant-design/icons";
+import BlueprintCard from "@/components/common/BlueprintCard";
 
 const { Text } = Typography;
 
@@ -135,19 +135,10 @@ export default function MediaUploadsSection({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '13.6px' }}>
       {/* BANNER */}
-      <Card 
-        size="small" 
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PictureOutlined style={{ color: '#1890ff' }} />
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>{t('upload.bannerPhoto')}</span>
-          </div>
-        }
-        style={{ borderRadius: '8px' }}
-      >
-        <div style={{ marginBottom: '12px' }}>
+      <BlueprintCard kicker={t('upload.bannerPhoto')} style={{ padding: "13.6px", gap: "10.2px" }}>
+        <div>
           <Upload
             listType="picture-card"
             accept={IMG_ACCEPT}
@@ -170,34 +161,14 @@ export default function MediaUploadsSection({
           </Upload>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '8px 12px',
-          backgroundColor: '#f0f9ff',
-          borderRadius: '6px',
-          border: '1px solid #bae7ff'
-        }}>
-          <InfoCircleOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
-          <Text style={{ fontSize: '11px', color: '#595959' }}>
-            {t('upload.bannerHint', { limit: LIMIT_IMAGE_MB })}
-          </Text>
-        </div>
-      </Card>
+        <Text style={{ fontSize: '11px', opacity: 0.6 }}>
+          {t('upload.bannerHint', { limit: LIMIT_IMAGE_MB })}
+        </Text>
+      </BlueprintCard>
 
       {/* GALERIA */}
-      <Card 
-        size="small" 
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PictureOutlined style={{ color: '#52c41a' }} />
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>{t('upload.mediaGallery')}</span>
-          </div>
-        }
-        style={{ borderRadius: '8px' }}
-      >
-        <div style={{ marginBottom: '12px' }}>
+      <BlueprintCard kicker={t('upload.mediaGallery')} style={{ padding: "13.6px", gap: "10.2px" }}>
+        <div>
           <Upload
             listType="picture-card"
             accept={[IMG_ACCEPT, VID_ACCEPT].filter(Boolean).join(",")}
@@ -223,9 +194,7 @@ export default function MediaUploadsSection({
                 key={it.uid}
                 style={{
                   padding: '12px',
-                  backgroundColor: '#fafafa',
-                  borderRadius: '8px',
-                  border: '1px solid #e8e8e8'
+                  border: '1px solid var(--ind-color-divider)',
                 }}
               >
                 <Row gutter={[12, 8]} align="middle">
@@ -279,22 +248,10 @@ export default function MediaUploadsSection({
           </div>
         )}
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '8px 12px',
-          backgroundColor: '#f6ffed',
-          borderRadius: '6px',
-          border: '1px solid #b7eb8f',
-          marginTop: '12px'
-        }}>
-          <InfoCircleOutlined style={{ color: '#52c41a', fontSize: '12px' }} />
-          <Text style={{ fontSize: '11px', color: '#595959' }}>
-            {t('upload.mediaHint', { imgLimit: LIMIT_IMAGE_MB, vidLimit: LIMIT_VIDEO_MB })}
-          </Text>
-        </div>
-      </Card>
+        <Text style={{ fontSize: '11px', opacity: 0.6 }}>
+          {t('upload.mediaHint', { imgLimit: LIMIT_IMAGE_MB, vidLimit: LIMIT_VIDEO_MB })}
+        </Text>
+      </BlueprintCard>
     </div>
   );
 }

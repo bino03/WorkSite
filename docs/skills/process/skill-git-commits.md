@@ -6,7 +6,7 @@
 
 > 📐 See also [[code-best-practices]] for general naming/error-handling conventions used throughout this checklist.
 
-> 🔔 A `pre-commit` hook (in the main repo and in `portal/`) prints a **non-blocking** reminder when the staged diff touches files that usually need a matching vault doc update. It never fails the commit, only warns — see [[vault-sync-hooks]] for exactly what it checks and how to set it up on a new clone.
+> 🔔 A `pre-commit` hook (`.githooks/pre-commit`) prints a **non-blocking** reminder when the staged diff touches files that usually need a matching vault doc update. It never fails the commit, only warns — see [[vault-sync-hooks]] for exactly what it checks and how to set it up on a new clone (`git config core.hooksPath .githooks`).
 
 ---
 

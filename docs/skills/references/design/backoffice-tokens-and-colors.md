@@ -1,26 +1,50 @@
 # Backoffice — Tokens & Colors
 
-> Parte de [[../frontend-visual-consistency]]. Só Backoffice — o Portal tem o seu próprio ficheiro em [[portal-tokens-and-colors]].
+> Parte de [[../frontend-visual-consistency]]. Só Backoffice — é a única app frontend deste projeto. Auditoria 2026-08-05.
+
+O sistema visual é o **Industry ("blueprint")** — steel-blue, tipografia Barlow. Substituiu a paleta terracotta/parchment herdada do Property-Management; a migração ficou **completa** a 2026-08-05 com as três páginas de Construção.
 
 ## Fonte de verdade
 
-- **`src/theme.ts`** — tema Ant Design ("Anthropic/Claude Design System"): `colorPrimary: "#c96442"` (terracota), texto `#141413`, texto secundário `#5e5d59`, fundo `colorBgLayout: "#f5f4ed"`, `colorBgContainer`/`colorBgElevated: "#faf9f5"`, `borderRadius: 8` (LG 12, SM 6, XS 4), `fontSize: 15`, sombra base `rgba(0,0,0,0.05) 0px 4px 24px`. Overrides por componente para Button, Input, Select, Table (`headerBg: "#e8e6dc"`), Card, Modal (`borderRadius: 12`), Drawer, Tag, Tabs, Menu, Pagination, Tooltip, Segmented.
-- **`src/index.css`** — variáveis CSS complementares (`--terracotta`, `--parchment`, `--ivory`, etc.) + classes utilitárias `.card`, `.btn-primary`/`.btn-secondary`/`.btn-outline` + overrides diretos do AntD Table (`.ant-table-thead > tr > th { background: var(--warm-sand) !important; }`).
+- **`src/index.css`** — as variáveis CSS `--ind-*`. É aqui que vive a paleta:
+  - Base: `--ind-color-bg: #f2f2f3`, `--ind-color-surface: #e9e9ea`, `--ind-color-text: #1d1f20`, `--ind-color-divider`
+  - Acento: `--ind-color-accent: #5980a6` (steel-blue), `--ind-color-accent-2: #728fab`, escalas `--ind-accent-100…900`
+  - Neutros: `--ind-neutral-100…900`
+  - Tipografia: `--ind-font-heading: "Barlow Condensed"`, `--ind-font-body: "Barlow"`
+  - Sombras: `--ind-shadow-sm` / `-md` / `-lg`
+- **`src/theme.ts`** — o tema Ant Design que espelha essas cores (`colorPrimary: "#5980a6"`, `colorError: "#b53333"`, `colorSuccess: "#3a7d44"`, `colorWarning: "#a0622b"`). Os componentes AntD herdam daqui — não voltes a definir cor de botão/input/tabela por ficheiro.
+- **`src/colors.css`** — carregado a seguir ao `index.css`, para ajustes de cor complementares.
 
-**Regra**: qualquer cor/raio/sombra nova vem destes dois ficheiros — nunca um hex novo hardcoded num `style={{}}`.
+**Regra**: qualquer cor/raio/sombra nova vem destes ficheiros. Nunca um hex novo hardcoded num `style={{}}` — usa `var(--ind-*)`.
 
-## Drift encontrado — não repetir
+## Classes utilitárias disponíveis
 
-### `#1890ff` a vazar por cima do tema
-84 ocorrências do azul por omissão do próprio Ant Design, mesmo com `colorPrimary` a apontar para terracota. É quase sempre um bug visual — um componente que devia herdar a cor primária do tema mas tem a cor por omissão do AntD hardcoded por cima. Se precisares da cor primária, usa o token do tema (herdado automaticamente pelo componente AntD, ou `var(--terracotta)`), nunca `#1890ff`.
+`.ind-card`, `.ind-card-body`, `.ind-card-title`, `.ind-card-kicker`, `.ind-card-meta`, `.ind-tag` (+ `.ind-tag-accent`, `.ind-tag-accent-2`, `.ind-tag-neutral`, `.ind-tag-outline`), `.ind-elev-sm/md/lg`, `.ind-hatch`, `.ind-blueprint`, `.ind-corner`.
 
-### Paleta de "cor de entidade" copiada 3× nas listas
-`PropertiesList.tsx:88-102`, `EmployeesList.tsx:51-64`, `BuildingsList.tsx:90-103` definem, cada um, o mesmo objeto local `const D = { terracotta: "#c96442", warmSand: "#e8e6dc", ... }` com os valores exatamente iguais — copiado, não importado. `ContactsList.tsx:212-260` nem usa esse objeto: tem os hex soltos diretamente em `style={{ color: '#141413' }}`.
+Antes de escrever estilo novo, verifica se uma destas já resolve — ex. o cartão de total em `ConstructionExpensesPage` usa `className="ind-card"` em vez de um `<Card>` do AntD com `bodyStyle` à mão.
 
-**Convenção daqui em diante**: extrair este objeto para um módulo partilhado (ex. `src/config/entityColors.ts`, ou simplesmente re-exportar os tokens já existentes de `theme.ts`) e importar em todas as listas. Não voltar a copiar o objeto `D` para um ficheiro novo — se precisares dele, importa-o.
+## `config/entityColors.ts` — só `IND`
 
-**Já existe**: `src/config/entityColors.ts` exporta `D` **e** `actionButtonBaseStyle` (o estilo base dos botões da coluna de ações — ver [[backoffice-buttons-and-icons]] e [[backoffice-tables-and-lists]]). `TasksList.tsx` é o primeiro consumidor; migrar `PropertiesList`/`LeadsList`/`BuildingsList`/`LicensesList` para importar daqui em vez das cópias locais, oportunisticamente.
+O ficheiro exporta **apenas** o objeto `IND`, um espelho em JS das variáveis CSS, para o caso pontual que precisa mesmo do valor literal (ex.: a prop `stroke` de um SVG, que não aceita `var(...)`).
+
+**Removidos a 2026-08-05** (estavam a ser usados só pelas páginas de Construção, agora migradas):
+- `D` — a paleta legacy terracotta/warmSand
+- `actionButtonBaseStyle` — o estilo dos botões de ação, substituído pelo componente [[backoffice-tables-and-lists|`components/common/ListActions.tsx`]]
+- `industryActionButtonStyle` — nunca chegou a ser usado
+
+Se precisares de uma cor em JSX, usa `var(--ind-*)` numa string de `style`; `IND` é o último recurso.
+
+## Drift que ainda existe — não repetir
+
+### `#1890ff` (azul por omissão do AntD) hardcoded por cima do tema
+16 ocorrências em 6 ficheiros: `ProfileView.tsx` (5), `InvitesDrawer.tsx` (4), `MapLocationPickerDrawer.tsx` (4), `EmployeeContextMenu.tsx`, `EditEnterpriseOverviewCard.tsx`, `MediaUploadsSection.tsx`. É quase sempre um bug visual — um componente que devia herdar `colorPrimary` mas tem o azul do AntD escrito à mão. Usa `var(--ind-color-accent)`, ou deixa o componente AntD herdar do tema.
+
+### Paleta legacy ainda local em `MyProfileModal.tsx`
+`MyProfileModal.tsx:26-35` mantém um objeto `D` local com os hex terracotta reais (`#c96442`, `#e8e6dc`…) e usa `fontFamily: "Georgia, serif"` — é o último componente por migrar para o sistema Industry. Migrar quando for tocado.
+
+> Nota: `EmployeesList.tsx:51-64` também tem um objeto chamado `D`, mas os valores já apontam para `var(--ind-*)` — é só um alias local, não drift de cor.
 
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
-- [[backoffice-tables-and-lists]] — onde a duplicação da paleta `D` mais aparece
+- [[backoffice-tables-and-lists]] — onde estes tokens são aplicados em listas
+- [[backoffice-buttons-and-icons]] — variantes de botão que herdam do tema

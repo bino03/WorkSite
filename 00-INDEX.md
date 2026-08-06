@@ -12,9 +12,11 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 
 👉 **Go to [[docs/skills/SKILLS-INDEX.md]]** ← Master reference for all skills
 
-- 9 skills organized by topic (backend, frontend, process)
+- 11 skills organized by topic (backend, frontend, process)
 - Quick tags for filtering (`#backend`, `#frontend`, `#auth`, etc.)
 - Time estimates for each skill
+
+👉 **Para avançar o backlog**: [[docs/skills/process/skill-implement-todo]] (`/implement-todo`) — lê [[notes/ToDo.md]], prioriza e implementa
 
 ---
 
@@ -52,6 +54,8 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 - **System Architecture** → [[docs/architecture.md]]
 - **Database Schema** → [[docs/database.md]]
 - **Security & Auth** → [[docs/security.md]]
+- **API Reference** → [[docs/api.md]]
+- **Vault sync hooks** → [[docs/vault-sync-hooks.md]]
 
 ### 🎯 Working on Specific Tasks
 - **Add Backend Feature** → [[docs/skills/backend/skill-add-backend-feature]]
@@ -62,7 +66,14 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 
 ## 📝 My Notes
 
-- **Notes index** → [[notes/README.md]] (personal, git-ignored)
+Personal, git-ignored. O ciclo é `ideas → ToDo → plans → whatIveDone` — ver [[notes/README.md]].
+
+- **Notes index** → [[notes/README.md]]
+- **Backlog acionável** → [[notes/ToDo.md]] ⭐ (o que `/implement-todo` consome)
+- **Ideias em bruto** → [[notes/ideas.md]]
+- **Roadmap & planos** → [[notes/roadmap/README.md]]
+- **Work log** → [[notes/whatIveDone.md]]
+- **Bugs** → [[notes/bugs.md]] · **Refactoring** → [[notes/refactoring.md]] · **Learnings** → [[notes/learning.md]]
 
 ---
 
@@ -88,6 +99,7 @@ Add tags to notes for filtering:
 First time here? Complete these steps:
 
 - [ ] Read [[CLAUDE.md]] (main overview)
+- [ ] Enable the vault-sync reminder hook: `git config core.hooksPath .githooks` (ver [[docs/vault-sync-hooks.md]])
 - [ ] Create a **new Supabase project** (do not reuse Property-Management's)
 - [ ] Create `management/managementapi/.env` from `.env.example`
 - [ ] Create `management/managementfrontend/apps/backoffice/.env` (see [[management/managementfrontend/apps/backoffice/CLAUDE.md]])
@@ -108,12 +120,17 @@ First time here? Complete these steps:
 - [[docs/architecture.md]] — System design
 - [[docs/database.md]] — Database info
 - [[docs/security.md]] — Security notes
+- [[docs/api.md]] — API endpoint reference
+- [[docs/vault-sync-hooks.md]] — Pre-commit reminder hook (`.githooks/pre-commit`)
 - [[docs/skills/SKILLS-INDEX.md]] — All skills & references (backend/, frontend/, process/, references/)
 - [[docs/skills/references/code-best-practices.md]] — Code conventions (reference)
-- [[docs/skills/references/frontend-visual-consistency.md]] — Visual conventions router → `docs/skills/references/design/`
+- [[docs/skills/references/frontend-visual-consistency.md]] — Visual conventions router → `docs/skills/references/design/` (8 sub-files)
+
+### References (External)
+- [[references/useful-links.md]] — Links de documentação da stack e serviços
 
 ### Notes (Personal — not versioned)
-- [[notes/README.md]] — Notes index
+- [[notes/README.md]] — Notes index (ToDo, ideas, roadmap/, bugs, refactoring, learning, whatIveDone, design-briefs/)
 
 ### Project-Specific
 - [[management/managementapi/CLAUDE.md]] — Backend guide

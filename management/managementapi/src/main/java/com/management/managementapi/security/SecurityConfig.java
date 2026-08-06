@@ -18,6 +18,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -37,15 +38,17 @@ import com.management.managementapi.integrations.supabase.SupabaseProperties;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    // --- Decoder HS256 com o JWT secret do Supabase ---
+    // --- Decoder via JWKS do Supabase ---
+    // Projetos Supabase novos assinam com chaves assimétricas (ES256), não com
+    // o segredo HS256 partilhado legado — por isso validamos contra o endpoint
+    // JWKS, que suporta ES256/RS256 e rotação de chaves automaticamente.
     @Bean
     JwtDecoder jwtDecoder(SupabaseProperties props) {
-        var secret = props.getJwt().getSecret().trim(); // remove espaços acidentais
-        byte[] keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        javax.crypto.SecretKey key = new javax.crypto.spec.SecretKeySpec(keyBytes, "HmacSHA256");
-        return NimbusJwtDecoder
-                .withSecretKey(key)
-                .macAlgorithm(org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256)
+        String jwkSetUri = props.getUrl() + "/auth/v1/.well-known/jwks.json";
+        // NimbusJwtDecoder.withJwkSetUri(...) assume RS256 por omissão — o
+        // Supabase assina com ES256, por isso tem de ser declarado explicitamente.
+        return NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+                .jwsAlgorithm(SignatureAlgorithm.ES256)
                 .build();
     }
 

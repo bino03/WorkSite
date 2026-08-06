@@ -1,0 +1,87 @@
+#!/bin/sh
+# Non-blocking reminder: flags staged changes that usually need a matching
+# update in the Worksite vault (docs/). Never fails the commit — just prints
+# a warning. See docs/vault-sync-hooks.md for full context.
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+warned=0
+warn() {
+  if [ "$warned" -eq 0 ]; then
+    printf '\n\033[33m⚠ Vault reminder\033[0m — this commit touches files that usually need a matching doc update:\n'
+    warned=1
+  fi
+  printf '  - %s\n' "$1"
+}
+
+# --- Flyway migrations → docs/database.md ---------------------------------
+if echo "$staged" | grep -q 'managementapi/src/main/resources/db/migration/'; then
+  warn "New/changed Flyway migration → update docs/database.md (schema summary) if this adds/changes a table or relationship."
+  # Staleness check: does docs/database.md still mention the latest migration version?
+  latest_n=$(ls management/managementapi/src/main/resources/db/migration/ 2>/dev/null \
+    | grep -oE '^V[0-9]+' | sed 's/^V//' | sort -n | tail -1)
+  if [ -n "$latest_n" ] && ! grep -qE "V${latest_n}([^0-9]|$)" docs/database.md 2>/dev/null; then
+    warn "docs/database.md does not mention V${latest_n} — its migration-range line is stale."
+  fi
+fi
+
+# --- SecurityConfig → docs/security.md ------------------------------------
+if echo "$staged" | grep -q 'managementapi/.*security/SecurityConfig\.java'; then
+  warn "SecurityConfig.java changed → update docs/security.md (auth rules, CORS, public/protected endpoint list)."
+fi
+
+# --- Controllers → docs/api.md --------------------------------------------
+controllers=$(echo "$staged" | grep -E 'managementapi/src/main/java/.*controller/.*\.java$')
+if [ -n "$controllers" ]; then
+  # New controller file(s)
+  if git diff --cached --diff-filter=A --name-only -- $controllers 2>/dev/null | grep -q .; then
+    warn "New controller file → add its endpoints to docs/api.md."
+  fi
+  # Endpoint mappings added/changed in any staged controller (new OR existing)
+  if git diff --cached -- $controllers 2>/dev/null \
+    | grep -qE '^\+.*@(Get|Post|Put|Patch|Delete|Request)Mapping'; then
+    warn "Endpoint mapping added/changed in a controller → update docs/api.md (routes, params, access rules)."
+  fi
+fi
+
+# --- ErrorCode enum → frontend error enums --------------------------------
+if echo "$staged" | grep -q 'managementapi/.*dto/error/ErrorCode\.java'; then
+  warn "ErrorCode.java changed → mirror new codes in the frontend error map (see docs/skills/frontend/skill-frontend-error-handling.md)."
+fi
+
+# --- Backoffice design tokens → docs/skills/references/design/ -----------
+if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/src/(theme\.ts|index\.css|colors\.css)$'; then
+  warn "theme.ts/index.css/colors.css changed → update docs/skills/references/design/backoffice-tokens-and-colors.md if a token value or convention changed."
+fi
+
+# --- Backoffice services / error layer → design/services-and-error-handling
+if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/src/(services/|errors/|api\.ts$)'; then
+  warn "Backoffice service/error layer changed → check docs/skills/references/design/backoffice-services-and-error-handling.md still matches the service + error conventions."
+fi
+
+# --- Backoffice app shell / auth → design/app-shell-and-auth -------------
+if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/src/(main\.tsx$|PrivateRoute\.tsx$|layouts/|context/)'; then
+  warn "App shell/auth wiring changed → update docs/skills/references/design/backoffice-app-shell-and-auth.md (layout, routing, guards, auth context)."
+fi
+
+# --- Backoffice forms → design/forms-and-validation ----------------------
+if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/src/components/.*(Form|Drawer|Modal)\.tsx$'; then
+  warn "Form/Drawer/Modal component changed → check docs/skills/references/design/backoffice-forms-and-validation.md and backoffice-drawers-and-modals.md still match."
+fi
+
+# --- Stack version bumps → vault stack references -------------------------
+if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/package\.json$'; then
+  if git diff --cached -- '*apps/backoffice/package.json' 2>/dev/null \
+    | grep -qE '^\+.*"(react|react-dom|typescript|vite|antd|tailwindcss)":'; then
+    warn "Frontend stack version bumped → update the stack references in the vault (docs/architecture.md, 00-INDEX.md, CLAUDE.md files)."
+  fi
+fi
+if echo "$staged" | grep -qE 'managementapi/pom\.xml$'; then
+  if git diff --cached -- '*managementapi/pom.xml' 2>/dev/null \
+    | grep -qE '^\+.*<(java\.version|spring-boot\.version)>'; then
+    warn "Backend stack version bumped → update the stack references in the vault (docs/architecture.md, 00-INDEX.md, CLAUDE.md files)."
+  fi
+fi
+
+exit 0

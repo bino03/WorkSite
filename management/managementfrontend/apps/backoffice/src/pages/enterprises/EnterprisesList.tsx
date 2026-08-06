@@ -1,25 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Table,
-  Input,
-  Empty,
-  message,
-  Space,
-  Button,
-  Avatar,
-  Popconfirm,
-} from "antd";
-import { Eye, Trash2, Plus, Home, Building, Factory, Box } from "lucide-react";
+import { Table, Input, Empty, message, Button } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
-import { SearchOutlined, EnvironmentOutlined, BankOutlined } from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
+import { Plus } from "lucide-react";
 import api from "@/api";
 import { deleteEnterprise } from "@/services/enterpriseService";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/config/pagination";
 import CreateEnterpriseDrawer from "@/components/enterprise/CreateEnterpriseDrawer";
 import EnterpriseViewDrawer from "@/components/enterprise/EnterpriseViewDrawer";
-
-const { Search } = Input;
+import { useConfirm } from "@/context/ConfirmDialogContext";
+import { ListActions, ListActionPrimary, ListActionDanger } from "@/components/common/ListActions";
 
 // Tipos baseados na resposta da API
 export type EnterpriseStatus = 'planning' | 'under_construction' | 'completed' | 'suspended' | 'cancelled';
@@ -63,57 +54,21 @@ export interface PageResponse<T> {
   number: number;
 }
 
-// Mapeamento de status para labels
-const STATUS_LABEL: Record<EnterpriseStatus, string> = {
-  planning: "enterprises.status.planning",
-  under_construction: "enterprises.status.under_construction",
-  completed: "enterprises.status.completed",
-  suspended: "enterprises.status.suspended",
-  cancelled: "enterprises.status.cancelled",
+const STATUS_MAP: Record<EnterpriseStatus, { label: string; cls: string }> = {
+  planning: { label: "Planeamento", cls: "ind-tag-outline" },
+  under_construction: { label: "Em construção", cls: "ind-tag-accent" },
+  completed: { label: "Concluído", cls: "ind-tag-neutral" },
+  suspended: { label: "Suspenso", cls: "ind-tag-outline" },
+  cancelled: { label: "Cancelado", cls: "ind-tag-neutral" },
 };
 
-// Paleta Anthropic
-const D = {
-  parchment: "#f5f4ed",
-  ivory: "#faf9f5",
-  nearBlack: "#141413",
-  terracotta: "#c96442",
-  coral: "#d97757",
-  oliveGray: "#5e5d59",
-  stoneGray: "#87867f",
-  warmSand: "#e8e6dc",
-  charcoalWarm: "#4d4c48",
-  borderCream: "#f0eee6",
-  borderWarm: "#e8e6dc",
-  ivory2: "#faf9f5",
-  whisper: "rgba(0,0,0,0.05) 0px 4px 24px",
+const TYPE_MAP: Record<EnterpriseType, { label: string; cls: string }> = {
+  residential: { label: "Residencial", cls: "ind-tag-accent" },
+  commercial: { label: "Comercial", cls: "ind-tag-neutral" },
+  industrial: { label: "Industrial", cls: "ind-tag-outline" },
+  mixed_use: { label: "Uso misto", cls: "ind-tag-accent-2" },
 };
 
-// Mapeamento de tipos com ícones e cores
-const TYPE_CONFIG: Record<EnterpriseType, { labelKey: string; icon: React.ReactNode; color: string }> = {
-  residential: {
-    labelKey: "enterprises.types.residential",
-    icon: <Home size={14} />,
-    color: "#c96442"
-  },
-  commercial: {
-    labelKey: "enterprises.types.commercial",
-    icon: <Building size={14} />,
-    color: "#5e5d59"
-  },
-  industrial: {
-    labelKey: "enterprises.types.industrial",
-    icon: <Factory size={14} />,
-    color: "#87867f"
-  },
-  mixed_use: {
-    labelKey: "enterprises.types.mixed_use",
-    icon: <Box size={14} />,
-    color: "#4d4c48"
-  },
-};
-
-// Serviço para enterprises
 export const fetchEnterprises = async (params?: {
   page?: number;
   size?: number;
@@ -125,8 +80,7 @@ export const fetchEnterprises = async (params?: {
   return response.data;
 };
 
-// Formatação de moeda
-const formatCurrency = (value: number | undefined, currency: string = "EUR") => {
+const formatCurrency = (value: number | null | undefined, currency: string = "EUR") => {
   if (value == null) return "—";
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
@@ -138,7 +92,9 @@ const formatCurrency = (value: number | undefined, currency: string = "EUR") => 
 
 export default function EnterprisesList() {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState<EnterpriseStatus | "">("");
   const [data, setData] = useState<Enterprise[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<TablePaginationConfig>({
@@ -151,15 +107,10 @@ export default function EnterprisesList() {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  // Estados para os drawers
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [enterpriseDrawerOpen, setEnterpriseDrawerOpen] = useState(false);
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  const handleDrawerClose = () => {
-    setIsCreateDrawerOpen(false);
-  };
 
   const handleViewEnterprise = (id: string) => {
     setSelectedEnterpriseId(id);
@@ -175,7 +126,6 @@ export default function EnterprisesList() {
     setData(prevData =>
       prevData.map(item => {
         if (item.id === id) {
-          // O DTO completo usa array media; a lista usa banner como URL plana
           const bannerMedia = updated.media?.find((m: any) => m?.type === "banner");
           const bannerUrl = bannerMedia
             ? (bannerMedia.url || bannerMedia.downloadUrl || null)
@@ -202,10 +152,6 @@ export default function EnterprisesList() {
     setIsCreateDrawerOpen(false);
   };
 
-  const handleCreateEnterprise = () => {
-    setIsCreateDrawerOpen(true);
-  };
-
   const handleDeleteEnterprise = async (id: string) => {
     try {
       await deleteEnterprise(id);
@@ -216,67 +162,36 @@ export default function EnterprisesList() {
     }
   };
 
-  // Colunas da tabela - versão compacta com texto escuro e ícones coloridos
+  const confirmDelete = (enterprise: Enterprise) => {
+    confirm({
+      message: `Eliminar o empreendimento "${enterprise.name}"? Esta ação não pode ser desfeita.`,
+      onConfirm: () => handleDeleteEnterprise(enterprise.id),
+    });
+  };
+
+  const clearFilters = () => {
+    setQ("");
+    setStatusFilter("");
+  };
+
   const columns: ColumnsType<Enterprise> = useMemo(
     () => [
       {
-        title: t('enterprises.title'),
+        title: "Empreendimento",
         dataIndex: "banner",
         key: "banner",
-        render: (bannerUrl: string | null, record: Enterprise) => {
-          const typeConfig = record.type ? TYPE_CONFIG[record.type] : undefined;
-
+        render: (_bannerUrl: string | null, record: Enterprise) => {
+          const typeInfo = TYPE_MAP[record.type];
           return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Avatar
-                shape="square"
-                size={60}
-                src={bannerUrl || undefined}
-                icon={!bannerUrl ? <BankOutlined /> : undefined}
-                alt={record.name}
-                style={{
-                  boxShadow: D.whisper,
-                  border: `1px solid ${D.borderCream}`,
-                  backgroundColor: bannerUrl ? undefined : D.warmSand,
-                  color: bannerUrl ? undefined : D.charcoalWarm,
-                }}
-              />
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div className="ind-hatch" style={{ width: 40, height: 40, flexShrink: 0 }} />
               <div>
-                <div style={{
-                  fontWeight: 500,
-                  color: D.nearBlack,
-                  fontSize: '14px',
-                  marginBottom: '2px'
-                }}>
-                  {record.name}
-                </div>
+                <div style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600 }}>{record.name}</div>
                 {record.internalReference && (
-                  <div style={{
-                    fontSize: "12px",
-                    color: D.stoneGray,
-                    marginBottom: '4px'
-                  }}>
-                    {record.internalReference}
-                  </div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>{record.internalReference}</div>
                 )}
-                {typeConfig && (
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    color: typeConfig.color,
-                    background: D.warmSand,
-                    border: `1px solid ${D.borderWarm}`,
-                    borderRadius: '6px',
-                    padding: '2px 8px',
-                  }}>
-                    {React.cloneElement(typeConfig.icon as React.ReactElement, {
-                      style: { color: typeConfig.color }
-                    })}
-                    {t(typeConfig.labelKey)}
-                  </div>
+                {typeInfo && (
+                  <span className={`ind-tag ${typeInfo.cls}`} style={{ marginTop: 3 }}>{typeInfo.label}</span>
                 )}
               </div>
             </div>
@@ -285,123 +200,36 @@ export default function EnterprisesList() {
         width: 300,
       },
       {
-        title: t('enterprises.columns.status'),
+        title: "Estado",
         dataIndex: "status",
         key: "status",
-        render: (status: EnterpriseStatus) => (
-          <span style={{ color: D.nearBlack, fontSize: '13px', fontWeight: 600 }}>
-            {status && STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : '—'}
-          </span>
-        ),
-        width: 120,
-      },
-      {
-        title: t('enterprises.columns.location'),
-        key: "location",
-        render: (record: Enterprise) => {
-          const city = record.location?.city;
-
-          return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <EnvironmentOutlined style={{ color: D.stoneGray, fontSize: '12px' }} />
-              <span style={{ color: D.oliveGray, fontSize: '13px', fontWeight: 400 }}>
-                {city || '—'}
-              </span>
-            </div>
-          );
+        render: (status: EnterpriseStatus) => {
+          const info = status ? STATUS_MAP[status] : undefined;
+          return info ? <span className={`ind-tag ${info.cls}`}>{info.label}</span> : "—";
         },
-        width: 130,
+        width: 140,
       },
       {
-        title: t('enterprises.columns.investment'),
+        title: "Localização",
+        key: "location",
+        render: (record: Enterprise) => record.location?.city || "—",
+        width: 140,
+      },
+      {
+        title: "Investimento",
         dataIndex: "totalInvestment",
         key: "totalInvestment",
-        align: "right",
-        render: (investment: number | null, record: Enterprise) => (
-          <span style={{ color: D.nearBlack, fontSize: '13px', fontWeight: 600 }}>
-            {formatCurrency(investment, record.currency)}
-          </span>
-        ),
+        render: (investment: number | null, record: Enterprise) => formatCurrency(investment, record.currency),
         width: 150,
       },
       {
-        title: t('enterprises.columns.actions'),
+        title: "",
         key: "actions",
         render: (_: unknown, record: Enterprise) => (
-          <Space size={2} direction="vertical" style={{ width: '100%' }}>
-            <Button
-              type="text"
-              icon={<Eye size={14} />}
-              onClick={() => handleViewEnterprise(record.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-                width: '100%',
-                height: '32px',
-                borderRadius: '8px',
-                color: D.ivory,
-                fontSize: '12px',
-                fontWeight: 500,
-                padding: '0 12px',
-                background: D.terracotta,
-                border: 'none',
-                transition: 'all 0.2s ease',
-                boxShadow: `0px 0px 0px 1px ${D.terracotta}`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = D.coral;
-                e.currentTarget.style.boxShadow = `0px 0px 0px 1px ${D.coral}`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = D.terracotta;
-                e.currentTarget.style.boxShadow = `0px 0px 0px 1px ${D.terracotta}`;
-              }}
-            >
-              {t('enterprises.view')}
-            </Button>
-
-            <Popconfirm
-              title={t('enterprises.deleteConfirm')}
-              description={t('common.cannotBeUndone')}
-              okText={t('common.delete')}
-              cancelText={t('common.cancel')}
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDeleteEnterprise(record.id)}
-            >
-              <Button
-                type="text"
-                danger
-                icon={<Trash2 size={14} />}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  width: '100%',
-                  height: '32px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  padding: '0 12px',
-                  background: D.warmSand,
-                  color: '#b53333',
-                  border: `1px solid ${D.borderWarm}`,
-                  transition: 'all 0.2s ease',
-                  boxShadow: 'none',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#b53333';
-                  e.currentTarget.style.background = '#fff5f5';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = D.borderWarm;
-                  e.currentTarget.style.background = D.warmSand;
-                }}
-              >
-                {t('common.delete')}
-              </Button>
-            </Popconfirm>
-          </Space>
+          <ListActions>
+            <ListActionPrimary onClick={() => handleViewEnterprise(record.id)}>Ver detalhes</ListActionPrimary>
+            <ListActionDanger onClick={() => confirmDelete(record)}>Eliminar</ListActionDanger>
+          </ListActions>
         ),
         width: 120,
       },
@@ -409,7 +237,6 @@ export default function EnterprisesList() {
     []
   );
 
-  // Função para buscar os dados
   async function fetchData(
     p: { current?: number; pageSize?: number },
     controller: AbortController
@@ -426,12 +253,14 @@ export default function EnterprisesList() {
       });
       if (controller.signal.aborted) return;
 
-      setData(res.content ?? []);
+      const content = statusFilter ? res.content.filter((e) => e.status === statusFilter) : res.content;
+
+      setData(content);
       setPagination((prev) => ({
         ...prev,
         current: (res.number ?? 0) + 1,
         pageSize: res.size ?? size,
-        total: res.totalElements ?? 0,
+        total: statusFilter ? content.length : (res.totalElements ?? 0),
       }));
     } catch (err) {
       console.error("Erro ao carregar Empreendimentos:", err);
@@ -441,7 +270,6 @@ export default function EnterprisesList() {
     }
   }
 
-  // Efeito para buscar dados
   useEffect(() => {
     const controller = new AbortController();
     fetchData(
@@ -449,9 +277,9 @@ export default function EnterprisesList() {
       controller
     );
     return () => controller.abort();
-  }, [q, pagination.current, pagination.pageSize, refreshKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, statusFilter, pagination.current, pagination.pageSize, refreshKey]);
 
-  // Manipulador de mudança da tabela
   function onTableChange(p: TablePaginationConfig) {
     setPagination((prev) => ({
       ...prev,
@@ -461,96 +289,75 @@ export default function EnterprisesList() {
   }
 
   return (
-    <div className="container-page">
-      <header className="mb-6">
-        <h1 style={{ color: D.nearBlack, fontSize: "22px", fontWeight: 500, fontFamily: "Georgia, serif", margin: "0 0 4px 0", lineHeight: 1.2 }}>
-          {t('enterprises.title')}
-        </h1>
-        <p style={{ color: D.stoneGray, fontSize: "13px", margin: 0, lineHeight: 1.6 }}>
-          {t('enterprises.subtitle')}
-        </p>
-      </header>
-
-      <section className="card">
-        <div className="flex flex-col gap-3 px-6 py-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-1 gap-3">
-            <Search
-              allowClear
-              placeholder={t('enterprises.searchPlaceholder')}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              prefix={<SearchOutlined />}
-              className="w-full max-w-xl"
-            />
-          </div>
-
-          <div className="flex gap-3">
-            <Button
-              type="primary"
-              onClick={handleCreateEnterprise}
-              icon={<Plus size={16} />}
-              style={{
-                background: D.terracotta,
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 500,
-                fontSize: '14px',
-                padding: '8px 24px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: D.ivory,
-                boxShadow: `0px 0px 0px 1px ${D.terracotta}`,
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = D.coral;
-                e.currentTarget.style.boxShadow = `0px 0px 0px 1px ${D.coral}`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = D.terracotta;
-                e.currentTarget.style.boxShadow = `0px 0px 0px 1px ${D.terracotta}`;
-              }}
-            >
-              {t('enterprises.addEnterprise')}
-            </Button>
-          </div>
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "20.4px" }}>
+        <div>
+          <h6 style={{ color: "var(--ind-accent-700)" }}>Projetos</h6>
+          <h1 style={{ margin: 0 }}>Empreendimentos</h1>
         </div>
+        <Button type="primary" icon={<Plus size={14} />} onClick={() => setIsCreateDrawerOpen(true)}>
+          Novo Empreendimento
+        </Button>
+      </div>
 
-        <div className="mt-5 px-3 pb-6">
-          <Table<Enterprise>
-            rowKey="id"
-            columns={columns}
-            dataSource={data}
-            loading={loading}
-            onChange={onTableChange}
-            pagination={pagination}
-            scroll={{ x: 800 }}
-            locale={{
-              emptyText: (
-                <Empty
-                  description={t('enterprises.loadError')}
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              )
-            }}
-          />
+      <div style={{ display: "flex", gap: "10.2px", alignItems: "center", marginBottom: "13.6px" }}>
+        <Input
+          allowClear
+          placeholder="Pesquisar empreendimentos…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
+          style={{ maxWidth: 320 }}
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as EnterpriseStatus | "")}
+          style={{
+            maxWidth: 200,
+            minHeight: 36,
+            padding: "6px 10px",
+            background: "var(--ind-color-surface)",
+            border: "1px solid var(--ind-color-divider)",
+            color: "var(--ind-color-text)",
+          }}
+        >
+          <option value="">Todos os estados</option>
+          {Object.entries(STATUS_MAP).map(([value, info]) => (
+            <option key={value} value={value}>{info.label}</option>
+          ))}
+        </select>
+        <Button onClick={clearFilters}>Limpar</Button>
+      </div>
 
-          {/* Drawers */}
-          <CreateEnterpriseDrawer
-            open={isCreateDrawerOpen}
-            onClose={handleDrawerClose}
-            onCreated={handleEnterpriseCreated}
-          />
-          <EnterpriseViewDrawer
-            open={enterpriseDrawerOpen}
-            enterpriseId={selectedEnterpriseId || undefined}
-            onClose={handleCloseDrawer}
-            onUpdated={handleUpdated}
-          />
-        </div>
-      </section>
+      <div style={{ borderTop: "1px solid var(--ind-color-divider)" }}>
+        <Table<Enterprise>
+          rowKey="id"
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          onChange={onTableChange}
+          pagination={pagination}
+          scroll={{ x: 800 }}
+          locale={{
+            emptyText: (
+              <Empty description={t('enterprises.loadError')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )
+          }}
+        />
+      </div>
+      <p style={{ fontSize: 12, opacity: 0.6, marginTop: "10.2px" }}>{pagination.total ?? 0} resultado(s)</p>
+
+      <CreateEnterpriseDrawer
+        open={isCreateDrawerOpen}
+        onClose={() => setIsCreateDrawerOpen(false)}
+        onCreated={handleEnterpriseCreated}
+      />
+      <EnterpriseViewDrawer
+        open={enterpriseDrawerOpen}
+        enterpriseId={selectedEnterpriseId || undefined}
+        onClose={handleCloseDrawer}
+        onUpdated={handleUpdated}
+      />
     </div>
   );
 }

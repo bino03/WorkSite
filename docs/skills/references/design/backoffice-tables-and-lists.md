@@ -1,58 +1,107 @@
 # Backoffice — Tables & Lists
 
-> Parte de [[../frontend-visual-consistency]]. Só Backoffice. Baseado em `PropertiesList.tsx`, `EmployeesList.tsx`, `BuildingsList.tsx`, `ContactsList.tsx`, `LicensesList.tsx`.
+> Parte de [[../frontend-visual-consistency]]. Só Backoffice. Baseado em `TasksList.tsx`, `EnterprisesList.tsx`, `EmployeesList.tsx`, `ConstructionStagesPage.tsx`, `ConstructionSubStagesPage.tsx`, `ConstructionExpensesPage.tsx`. Auditoria 2026-08-05 (após a migração das páginas de Construção para o sistema Industry).
 
-## Definição de colunas — já é consistente, manter
+## Definição de colunas — consistente, manter
 
-Todos os 5 ficheiros definem as colunas da mesma forma: um `useMemo(() => [...], [deps])` que devolve `ColumnsType<T>`, inline no próprio ficheiro de lista (nenhum extrai para um `columns.ts` separado). **Isto é 100% consistente — segue este padrão em listas novas.**
+Todas as listas definem as colunas da mesma forma: um array (dentro de `useMemo` quando depende de `t`/estado) que devolve `ColumnsType<T>`, inline no próprio ficheiro. Nenhuma extrai para um `columns.ts` separado. **Segue este padrão em listas novas.**
 
-## Drift encontrado — e a convenção escolhida para cada um
+---
 
-### 1. Coluna de ações: dois layouts a competir
+## 1. Coluna de ações — padrão único: `components/common/ListActions.tsx`
 
-- **Botões verticais empilhados** (Properties, Buildings, Licenses, Leads, Tasks): `<Space direction="vertical" size={2}>` com botões de largura total, ícone + texto — `view`/ação principal = botão preenchido terracota (`D.terracotta`, hover `D.coral`), ação secundária = contorno `D.warmSand`/`D.borderWarm`, apagar = mesmo contorno mas texto `#b53333` com hover `background: '#fff5f5'`, sempre dentro de `Popconfirm`. Ver [[../../frontend/skill-frontend-design-system]] e `TasksList.tsx` para o template completo.
-- **Ícones horizontais compactos** (Employees, Contacts): `<Space size="small">` com botões pequenos só de ícone, `type="text"`, envolvidos em `Tooltip`.
+**Não repitas o objeto de estilo por ficheiro, e não uses `<Space direction="vertical">` com botões estilizados à mão.** Importa os componentes partilhados:
 
-**Convenção escolhida (revista): botões verticais empilhados de largura total com a paleta `D`** (o padrão de Properties/Leads/Tasks) — é agora a maioria real (5 de 7 listas) e foi o estilo pedido explicitamente para unificar toda a app. Cada ação tem um rótulo visível (não obriga o utilizador a passar o rato para descobrir o que faz um ícone), e a cor comunica hierarquia (preenchido = ação principal, contorno = secundária, vermelho = destrutiva) sem depender de `Tooltip`. Migrar `EmployeesList`/`ContactsList` para este padrão oportunisticamente quando forem tocados — não é preciso reescrever já.
+```tsx
+import { ListActions, ListActionPrimary, ListActionSecondary, ListActionDanger }
+  from "@/components/common/ListActions";
 
-Importar sempre `D` e `actionButtonBaseStyle` de `src/config/entityColors.ts` (ver [[backoffice-tokens-and-colors]]) em vez de redefinir localmente — `TasksList.tsx` já segue isto.
+{
+  title: "",            // a coluna de ações não tem cabeçalho
+  key: "actions",
+  width: 170,
+  render: (_, record) => (
+    <ListActions>
+      <ListActionPrimary onClick={() => onView(record)}>Ver detalhes</ListActionPrimary>
+      {canEdit(record) && (
+        <ListActionSecondary onClick={() => onEdit(record)}>Editar</ListActionSecondary>
+      )}
+      {isAdmin() && (
+        <ListActionDanger onClick={() => confirmDelete(record)}>Eliminar</ListActionDanger>
+      )}
+    </ListActions>
+  ),
+}
+```
 
-### 2. Renderização de "estado": 4 técnicas diferentes
+Hierarquia visual (definida uma vez, dentro do componente):
 
-- `PropertiesList.tsx:771-776` e `BuildingsList.tsx:432-436` — `<span>` simples com estilo inline, sem `Tag`/`Badge`.
-- `EmployeesList.tsx:121-133,379-395` — `<Badge status={...} text={...}>` mapeado para os estados semânticos do próprio AntD (`success`/`error`/`default`) via `statusBadge()`.
-- `LicensesList.tsx:363-368` — também `<Badge status={...}>`, mas mapeia diretamente para strings de cor com `as any`.
+| Componente | AntD | Uso |
+|---|---|---|
+| `ListActionPrimary` | `<Button size="small">` (default) | Ação principal — "Ver detalhes", "Ver sub-etapas", "Ver despesas" |
+| `ListActionSecondary` | `<Button type="text" size="small">` | Ação secundária — "Editar" |
+| `ListActionDanger` | `<Button type="text" size="small">` + `opacity .75` + `color: var(--ind-color-accent)` | Ação destrutiva — "Eliminar" |
 
-**Convenção escolhida: `<Badge status="..." text="..." />` com os estados semânticos do Ant Design** (`success`/`processing`/`error`/`default`/`warning`) — o padrão de `EmployeesList`, sem `as any`. Para uma categoria/tipo (não um estado binário), usar `<Tag>` com cor vinda dos tokens do tema, não estilo manual por ficheiro.
+Notas de comportamento já resolvidas pelo componente:
+- Botões empilhados na vertical, alinhados à esquerda, `minWidth: 110`.
+- **`stopPropagation` no contentor** — em listas cuja linha é clicável (`onRow.onClick`, como as de Construção), clicar num botão de ação já não dispara também a navegação da linha. Era um bug real antes da migração.
+- **Sem `onMouseEnter`/`onMouseLeave` a mexer em `style` diretamente.** O hover vem do tema AntD. Se precisares de um estado de hover novo, é CSS, não manipulação imperativa do DOM.
 
-### 3. Barra de pesquisa/filtros: 3 layouts diferentes
+> **Exceção conhecida**: `EmployeesList.tsx:391-414` usa `<Space size="small">` horizontal com um botão só-ícone (`DeleteOutlined` + `Tooltip`) para a ação destrutiva. É a única lista que ainda diverge — migrar para `ListActions` quando for tocada.
 
-- Tailwind flex (`className="flex flex-col gap-3 px-6 py-4 md:flex-row"`) — Properties, Buildings.
-- `style={{display:'flex', ...}}` inline (CSS-in-JS) — Employees.
-- `<Row gutter>`/`<Col>` do AntD — Contacts, Licenses.
+## 2. Cabeçalho da página — kicker + `h1`
 
-**Convenção escolhida: Tailwind flex** (o padrão de Properties/Buildings) — é a ferramenta de estilo primária da app (Tailwind 4 + `theme.ts`/`index.css`), evita depender do sistema de grelha do AntD para layout que o Tailwind já resolve, e já tem 2 dos 5 ficheiros a usá-lo.
+Todas as páginas de lista abrem com o mesmo bloco (ver `TasksPage.tsx:57-67`, `EnterprisesList.tsx`, e as três de Construção):
 
-### 4. Debounce da pesquisa: só em 3 de 5 listas
+```tsx
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "20.4px" }}>
+  <div>
+    <h6 style={{ color: "var(--ind-accent-700)" }}>Gestão</h6>   {/* kicker/secção */}
+    <h1 style={{ margin: 0 }}>Tarefas</h1>
+  </div>
+  <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>Nova Tarefa</Button>
+</div>
+```
 
-`EmployeesList`, `ContactsList`, `LicensesList` definem um hook local `useDebounced` **copiado** (não partilhado) em cada ficheiro. `PropertiesList`/`BuildingsList` não têm debounce nenhum — a pesquisa dispara a cada tecla.
+- O `<h6>` é o **kicker** (secção/contexto), não um subtítulo em prosa. Nas páginas aninhadas de Construção leva o nome do pai (projeto / etapa / sub-etapa).
+- **Não** usar `<Typography.Title>` com `fontFamily: "Georgia, serif"` — é o estilo legacy, já removido das páginas de Construção.
+- **Não** pôr `padding`/`minHeight` no contentor da página: `AppLayout` já aplica `padding: 27.2px 20.4px` ao `<main>`. As páginas de Construção tinham `padding: 24` a duplicar isso — corrigido.
 
-**Convenção**: toda a lista nova precisa de debounce (300ms). Extrair o `useDebounced` para `src/hooks/` em vez de continuar a copiar — e adicionar às duas listas que ainda não têm (é bug de performance, não só de estilo).
+Em páginas aninhadas, o `<Breadcrumb>` vem **antes** do cabeçalho, e um botão "Voltar" (`type="text" size="small"` + `ArrowLeftOutlined`, `opacity: 0.7`) fica por cima do kicker.
 
-### 5. Paginação hardcoded — mais espalhado do que parecia
+## 3. Tabela — moldura e estados
 
-Só `PropertiesList.tsx` e `BuildingsList.tsx` importam `DEFAULT_PAGE_SIZE`/`PAGE_SIZE_OPTIONS` de `src/config/pagination.ts`. **Employees, Contacts, Catalog, Locations e Licenses hardcodeiam** `pageSize: 20` e duplicam manualmente o array `[10, 20, 50, 100]` cada um — não é um caso isolado (`EmployeesList`), é a maioria das listas.
+```tsx
+<div style={{ borderTop: "1px solid var(--ind-color-divider)" }}>
+  <Table ... pagination={false} />
+</div>
+```
 
-**Convenção**: importar sempre de `config/pagination.ts`. Não hardcode o tamanho nem o array de opções em nenhuma lista nova ou editada.
+- **Loading**: `loading={loading}` (booleano local) no próprio `<Table>` — consistente, manter. `TasksList` envolve em `<Spin>` por ter o `<Table>` dentro de um componente separado; qualquer das duas formas serve.
+- **Empty**: `<Empty description="…" image={Empty.PRESENTED_IMAGE_SIMPLE} />` — discreto, adequado a UI administrativa densa.
+- **Célula de nome/identificador**: `<span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600 }}>` — é o que marca a coluna identificadora da linha. Valores monetários usam o mesmo tratamento.
+- **Célula vazia**: `"—"` simples. Não envolver num `<Text>` com cor própria.
+- **Estado/categoria**: `<span className={`ind-tag ${cls}`}>` com as classes `ind-tag-outline` / `ind-tag-accent` / `ind-tag-neutral` (ver `TasksList.tsx:26-36` e `EnterprisesList` `STATUS_MAP`/`TYPE_MAP`). Não usar `<Badge>` nem estilo inline por ficheiro.
 
-## Empty state & Loading
+## 4. Rodapé de contagem e paginação
 
-- **Loading**: `loading={loading}` (boolean local) diretamente no `<Table>` — consistente em todos os ficheiros, manter.
-- **Empty state**: `PropertiesList` usa `<Empty description={...} />` com a ilustração por omissão; `BuildingsList`/`EmployeesList` usam `image={Empty.PRESENTED_IMAGE_SIMPLE}`; `LicensesList` usa a ilustração por omissão; `ContactsList` não usa `Empty` — tem um bloco totalmente à mão (`ContactsOutlined` + `Title` + subtexto condicional).
+```tsx
+<div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+  <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>{total} resultado(s)</p>
+  <Pagination current={page + 1} total={total} pageSize={pageSize} onChange={(p) => onPageChange(p - 1)} />
+</div>
+```
 
-**Convenção escolhida: `<Empty description={...} image={Empty.PRESENTED_IMAGE_SIMPLE} />`** — mais discreta, adequada a uma UI administrativa densa. Retirar o bloco à mão do `ContactsList` quando for tocado.
+As listas de Construção **não paginam** (`pagination={false}`, sem rodapé) — são listas curtas por natureza (etapas de um projeto, sub-etapas de uma etapa). Se alguma crescer, adota o bloco acima em vez de inventar outro.
+
+Quando houver paginação, importar `DEFAULT_PAGE_SIZE`/`PAGE_SIZE_OPTIONS` de `config/pagination.ts` — não hardcodar o tamanho nem o array de opções.
+
+## 5. Barra de pesquisa/filtros
+
+`TasksPage.tsx:69-96` e `EnterprisesList` usam o mesmo bloco: `<Input>` com `prefix={<SearchOutlined style={{opacity:.5}}/>}` e `maxWidth: 320`, um `<select>` nativo estilizado com as vars `--ind-*`, e um `<Button>` "Limpar". **Segue este**, incluindo o `<select>` nativo — não trocar por `<Select>` do AntD só nesta lista.
 
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
-- [[backoffice-tokens-and-colors]] — a paleta `D` duplicada usada nas células de entidade destas listas
-- [[backoffice-buttons-and-icons]]
+- [[backoffice-buttons-and-icons]] — variantes de botão e confirmação de ações destrutivas
+- [[backoffice-tokens-and-colors]] — as variáveis `--ind-*` usadas aqui
+- [[backoffice-services-and-error-handling]] — o `catch` das chamadas que alimentam estas listas

@@ -1,36 +1,31 @@
-import type { CSSProperties } from "react";
-
-// Paleta Anthropic — extraída de PropertiesList/EmployeesList/BuildingsList para evitar duplicação em listas novas.
-export const D = {
-  parchment: "#f5f4ed",
-  ivory: "#faf9f5",
-  nearBlack: "#141413",
-  terracotta: "#c96442",
-  coral: "#d97757",
-  oliveGray: "#5e5d59",
-  stoneGray: "#87867f",
-  warmSand: "#e8e6dc",
-  charcoalWarm: "#4d4c48",
-  borderCream: "#f0eee6",
-  borderWarm: "#e8e6dc",
-  whisper: "rgba(0,0,0,0.05) 0px 4px 24px",
+// Paleta Industry — steel-blue "blueprint" system (sistema visual atual).
+// A fonte de verdade são as variáveis CSS em `index.css`/`colors.css` e o
+// `theme.ts` do Ant Design — usa as classes `ind-*` e `var(--ind-*)` no JSX.
+// Este objeto existe só para o caso pontual que precisa mesmo do valor em JS
+// (ex.: a prop `stroke` de um SVG, que não aceita `var(...)`).
+export const IND = {
+  bg: "#f2f2f3",
+  surface: "#e9e9ea",
+  text: "#1d1f20",
+  accent: "#5980a6",
+  accent2: "#728fab",
+  divider: "rgba(29,31,32,0.16)",
+  neutral100: "#f5f5f8",
+  neutral200: "#e7e7ea",
+  neutral300: "#d4d4d7",
+  neutral600: "#7a7a7d",
+  neutral700: "#5d5d60",
+  neutral900: "#2b2b2d",
+  accent100: "#eef6ff",
+  accent800: "#2c455d",
+  accent900: "#1d2d3d",
 };
 
-/**
- * Estilo base dos botões da coluna "Ações" em listas/tabelas — botões
- * empilhados de largura total (ver PropertiesList/LeadsList/TasksList).
- * Combinar com as cores de `D`: terracotta (ação principal/"ver"),
- * warmSand + borderWarm (ações secundárias), '#b53333' (destrutiva).
- */
-export const actionButtonBaseStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  width: '100%',
-  height: '32px',
-  borderRadius: '8px',
-  fontSize: '12px',
-  fontWeight: 500,
-  padding: '0 12px',
-  transition: 'all 0.2s ease',
-};
+// ─────────────────────────────────────────────────────────────────────────
+// Removido em 2026-08-05: a paleta legacy `D` (terracotta/warmSand) e o
+// `actionButtonBaseStyle` que a acompanhava. Eram usados só pelas três
+// páginas de Construção, agora migradas para o sistema Industry. Os botões
+// da coluna "Ações" passaram a vir de `components/common/ListActions.tsx`
+// — usa esses componentes, não recries um objeto de estilo por ficheiro.
+// Ver docs/skills/references/design/backoffice-tables-and-lists.md.
+// ─────────────────────────────────────────────────────────────────────────

@@ -45,10 +45,11 @@ export function clearUser(): void {
  * Backend returns user data and sets HttpOnly cookies automatically.
  */
 export async function login(email: string, password: string): Promise<UserInfo> {
-  const response = await api.post<LoginResponse>("/auth/login", {
-    email,
-    password,
-  });
+  const response = await api.post<LoginResponse>(
+    "/auth/login",
+    { email, password },
+    { noRefreshRetry: true }
+  );
 
   const raw = response.data.user;
   const userInfo: UserInfo = {

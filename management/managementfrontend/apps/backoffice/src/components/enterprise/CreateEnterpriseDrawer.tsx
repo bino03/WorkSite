@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Drawer, Button, Tabs, Tag, message } from "antd";
+import { Drawer, Button, Tabs, message } from "antd";
 import { useTranslation } from "react-i18next";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -69,11 +69,9 @@ export default function CreateEnterpriseDrawer({ open, onClose, onCreated }: Cre
         <div
             className="sticky top-0 z-10 px-6 pt-3 pb-2"
             style={{
-                background: "var(--surface-1, #fff)",
-                backdropFilter: "saturate(180%) blur(6px)",
-                WebkitBackdropFilter: "saturate(180%) blur(6px)",
-                borderBottom: "1px solid var(--border-color, rgba(0,0,0,0.06))",
-                boxShadow: elevated ? "0 6px 12px rgba(0,0,0,0.06)" : "none",
+                background: "var(--ind-color-bg)",
+                borderBottom: "1px solid var(--ind-color-divider)",
+                boxShadow: elevated ? "var(--ind-shadow-sm)" : "none",
                 transition: "box-shadow .2s ease",
             }}
         >
@@ -82,11 +80,11 @@ export default function CreateEnterpriseDrawer({ open, onClose, onCreated }: Cre
                 onChange={setTabKey}
                 animated
                 items={[
-                    { key: "basic", label: <span className="inline-flex items-center gap-2"><Building size={20} /> Informações Básicas</span> },
-                    { key: "timeline", label: <span className="inline-flex items-center gap-2"><Calendar size={20} /> Cronograma & Métricas</span> },
-                    { key: "financial", label: <span className="inline-flex items-center gap-2"><DollarSign size={20} /> Financeiro</span> },
-                    { key: "location", label: <span className="inline-flex items-center gap-2"><MapPin size={20} /> Localização</span> },
-                    { key: "media", label: <span className="inline-flex items-center gap-2"><ImageIcon size={20} /> Multimédia</span> },
+                    { key: "basic", label: <span className="inline-flex items-center gap-2"><Building size={16} /> Informações Básicas</span> },
+                    { key: "timeline", label: <span className="inline-flex items-center gap-2"><Calendar size={16} /> Cronograma & Métricas</span> },
+                    { key: "financial", label: <span className="inline-flex items-center gap-2"><DollarSign size={16} /> Financeiro</span> },
+                    { key: "location", label: <span className="inline-flex items-center gap-2"><MapPin size={16} /> Localização</span> },
+                    { key: "media", label: <span className="inline-flex items-center gap-2"><ImageIcon size={16} /> Multimédia</span> },
                 ]}
             />
         </div>
@@ -278,22 +276,19 @@ export default function CreateEnterpriseDrawer({ open, onClose, onCreated }: Cre
 
     return createPortal(
         <Drawer
-            width={900}
+            width="min(700px, 94vw)"
             title={
-                <div className="flex items-center gap-3">
-                    <span className="text-xl font-bold" style={{ color: "var(--text-strong)" }}>
-                        Criar Empreendimento
-                    </span>
-                    <Tag color="blue">Novo</Tag>
+                <div>
+                    <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Empreendimentos</h6>
+                    <h2 style={{ margin: 0 }}>Novo Empreendimento</h2>
                 </div>
             }
             open={open}
-            bodyStyle={{ paddingBottom: 88 }}
             onClose={resetAndClose}
             destroyOnClose
             styles={{
-                header: { borderBottom: "1px solid var(--border-color, rgba(0,0,0,0.08))" },
-                body: { padding: 0 },
+                header: { borderBottom: "1px solid var(--ind-color-divider)" },
+                body: { padding: 0, paddingBottom: 88 },
             }}
             footer={
                 <div className="flex items-center justify-between gap-3 px-6 py-3">

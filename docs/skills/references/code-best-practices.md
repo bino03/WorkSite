@@ -55,7 +55,7 @@ Em vez de repetir as mesmas regras de qualidade em cada skill (naming, tratament
 - **Todo o campo de texto num formulário restringe caracteres** (regex de lista branca), não só comprimento — o frontend nunca é mais permissivo que o backend: campo obrigatório no DTO é sempre obrigatório no Zod, só se pergunta ao utilizador sobre os campos que são opcionais no backend (ver [[skill-frontend-design-system]] → Forms)
 - **Visibilidade de campos por role pergunta-se sempre** (listas e formulários) e nunca se resolve só no frontend — o DTO do backend já deve filtrar o campo para quem não tem a role certa (ver [[skill-frontend-design-system]] → Visibilidade de campos por role, e [[skill-permissions-and-auth]])
 - **Testar no browser antes de dar como terminado** — type-check e lint não substituem testar o fluxo real
-- **Backoffice e Portal**: cores, larguras de drawer, tokens Tailwind e ícones seguem [[frontend-visual-consistency]] (router — decide o projeto primeiro, depois aponta para o sub-file certo) — não inventar valores novos quando já existe um token/convenção estabelecida
+- **Backoffice**: cores, larguras de drawer, tokens Tailwind e ícones seguem [[frontend-visual-consistency]] (router — aponta para o sub-file certo conforme a área que estás a tocar) — não inventar valores novos quando já existe um token/convenção estabelecida
 
 ---
 
@@ -77,6 +77,6 @@ Em vez de repetir as mesmas regras de qualidade em cada skill (naming, tratament
 - [[skill-add-file-upload]] — Regras específicas de upload
 - [[skill-permissions-and-auth]] — Autorização e ownership
 - [[skill-frontend-design-system]] — Padrões de componentes React
-- [[frontend-visual-consistency]] — Router para tokens visuais verificados (Backoffice e Portal)
+- [[frontend-visual-consistency]] — Router para tokens visuais verificados do Backoffice
 - [[skill-frontend-error-handling]] — Detalhe do `ErrorHandler`
 - [[skill-git-commits]] — Convenções de mensagens de commit
