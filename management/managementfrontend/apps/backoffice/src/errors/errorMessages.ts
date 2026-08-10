@@ -264,6 +264,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_009': 'Não foi possível obter o ficheiro original da fatura.',
   'INVOICE_010': 'Já existe uma fatura com este ATCUD neste projeto.',
   'INVOICE_011': 'Já existe uma fatura deste fornecedor com este número neste projeto.',
+  'INVOICE_012': 'Este ficheiro já foi carregado neste projeto — é igual, byte a byte, a uma fatura existente.',
 
   // ── Tarefas ────────────────────────────────────────────────────────────────
   'TASK_001': 'Tarefa não encontrada. Pode ter sido removida.',

@@ -253,6 +253,7 @@ public enum ErrorCode {
     INVOICE_FILE_UNAVAILABLE("INVOICE_009", "Não foi possível obter o ficheiro original da fatura"),
     INVOICE_DUPLICATE_ATCUD("INVOICE_010", "Já existe uma fatura com este ATCUD neste projeto"),
     INVOICE_DUPLICATE_DOCUMENT("INVOICE_011", "Já existe uma fatura deste fornecedor com este número neste projeto"),
+    INVOICE_DUPLICATE_FILE("INVOICE_012", "Este ficheiro já foi carregado neste projeto — é byte a byte igual a uma fatura existente"),
 
     // ========================================================================
     // LOCALIZAÇÕES (LOC_xxx)

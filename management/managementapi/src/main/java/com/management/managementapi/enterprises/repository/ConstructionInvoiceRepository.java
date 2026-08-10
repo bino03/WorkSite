@@ -80,6 +80,25 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                                        @Param("excludeId") UUID excludeId);
 
     /**
+     * Faturas do projeto com o mesmo checksum — o mesmo ficheiro, byte a byte.
+     *
+     * É a única chave que não depende de nada ter sido lido do QR nem escrito
+     * à mão: apanha o caso em que a mesma foto é carregada duas vezes e nenhuma
+     * das duas tem QR legível, que as outras duas chaves (ATCUD e NIF+número)
+     * deixam passar por falta de dados por onde comparar.
+     */
+    @Query("""
+            select i from ConstructionInvoice i
+            where i.enterprise.id = :enterpriseId
+              and i.checksumSha256 = :checksum
+              and (:excludeId is null or i.id <> :excludeId)
+            order by i.uploadedAt desc
+            """)
+    List<ConstructionInvoice> findByEnterpriseAndChecksum(@Param("enterpriseId") UUID enterpriseId,
+                                                           @Param("checksum") String checksum,
+                                                           @Param("excludeId") UUID excludeId);
+
+    /**
      * Faturas do projeto do mesmo fornecedor com o mesmo número de documento.
      *
      * O ATCUD é a chave fiscal, mas quem completa à mão uma fatura sem QR

@@ -52,6 +52,14 @@ public class ConstructionInvoice extends BaseEntity {
     @Column(name = "invoice_atcud")
     private String invoiceAtcud;
 
+    /**
+     * SHA-256 do ficheiro em hexadecimal, calculado no carregamento. Apanha o
+     * duplicado byte-a-byte mesmo quando não há QR legível — ao contrário do
+     * ATCUD e do par (NIF, número), não depende de nada ter sido lido.
+     */
+    @Column(name = "checksum_sha256", length = 64)
+    private String checksumSha256;
+
     /** Data da fatura. Null quando o QR não foi lido — ver {@link #needsReview()}. */
     @Column(name = "invoice_date")
     private LocalDate invoiceDate;
@@ -139,6 +147,9 @@ public class ConstructionInvoice extends BaseEntity {
 
     public String getInvoiceAtcud() { return invoiceAtcud; }
     public void setInvoiceAtcud(String invoiceAtcud) { this.invoiceAtcud = invoiceAtcud; }
+
+    public String getChecksumSha256() { return checksumSha256; }
+    public void setChecksumSha256(String checksumSha256) { this.checksumSha256 = checksumSha256; }
 
     public LocalDate getInvoiceDate() { return invoiceDate; }
     public void setInvoiceDate(LocalDate invoiceDate) { this.invoiceDate = invoiceDate; }

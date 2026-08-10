@@ -36,9 +36,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -103,6 +106,7 @@ public class ConstructionInvoiceService {
         ConstructionInvoice invoice = new ConstructionInvoice();
         invoice.setEnterprise(enterprise);
         invoice.setOriginalSizeBytes(originalSizeBytes);
+        invoice.setChecksumSha256(sha256Hex(content));
         authContext.currentProfileId().ifPresent(invoice::setCreatedBy);
 
         Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(content, mime);
@@ -130,6 +134,7 @@ public class ConstructionInvoiceService {
         String mime = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
 
         deleteStoredFiles(invoice);
+        invoice.setChecksumSha256(sha256Hex(content));
 
         Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(content, mime);
         // Só preenche o que está vazio: correções feitas à mão não são deitadas
@@ -502,26 +507,40 @@ public class ConstructionInvoiceService {
     /**
      * Recusa se a fatura colidir com outra do mesmo projeto.
      *
-     * São duas chaves porque servem momentos diferentes:
+     * Três chaves, verificadas por ordem de certeza — a mais forte primeiro:
      *
      * <ul>
+     *   <li><b>checksum</b> — o ficheiro, byte a byte. Não depende do QR nem de
+     *       nada escrito à mão, por isso é a única que apanha duas cópias do
+     *       mesmo ficheiro quando nenhuma tem QR legível (ver notes/bugs.md,
+     *       caso 3).</li>
      *   <li><b>ATCUD</b> — o identificador que a AT atribui ao documento. Vem do
-     *       QR, e é o que apanha o mesmo papel a entrar outra vez no
-     *       carregamento.</li>
+     *       QR, e é o que apanha o mesmo papel fotografado outra vez — bytes
+     *       diferentes, mesmo documento.</li>
      *   <li><b>(NIF do fornecedor, número do documento)</b> — a chave de negócio.
      *       É esta que apanha o duplicado quando o QR falhou e alguém completou
-     *       os campos à mão: nesse momento o ATCUD continua vazio e a primeira
-     *       chave não serve de nada. O mesmo fornecedor não emite dois
+     *       os campos à mão: nesse momento o ATCUD continua vazio e a chave
+     *       anterior não serve de nada. O mesmo fornecedor não emite dois
      *       documentos com o mesmo número.</li>
      * </ul>
      *
-     * Sem nenhuma das duas não há como comparar, e a fatura segue para revisão
+     * Sem nenhuma das três não há como comparar, e a fatura segue para revisão
      * manual como sempre.
      */
     private void rejectIfDuplicate(ConstructionInvoice invoice) {
         UUID enterpriseId = invoice.getEnterprise().getId();
         // No carregamento a fatura ainda não tem id; a query trata o null.
         UUID excludeId = invoice.getId();
+
+        if (!isBlank(invoice.getChecksumSha256())) {
+            repository.findByEnterpriseAndChecksum(enterpriseId, invoice.getChecksumSha256(), excludeId).stream()
+                    .findFirst()
+                    .ifPresent(other -> {
+                        throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_FILE, String.format(
+                                "Este ficheiro já foi carregado neste projeto (%s, %s)",
+                                describe(other), dateOf(other)));
+                    });
+        }
 
         if (!isBlank(invoice.getInvoiceAtcud())) {
             repository.findByEnterpriseAndAtcud(enterpriseId, invoice.getInvoiceAtcud(), excludeId).stream()
@@ -647,6 +666,18 @@ public class ConstructionInvoiceService {
             storageService.delete(bucket, key);
         } catch (IOException e) {
             log.warn("Não foi possível eliminar {}/{} do storage: {}", bucket, key, e.getMessage());
+        }
+    }
+
+    /** SHA-256 do conteúdo, em hexadecimal minúsculo — a chave de duplicado mais forte que há. */
+    private static String sha256Hex(byte[] content) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(content);
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 é garantido pela JVM (java.security.MessageDigestSpi
+            // standard algorithm names) — nunca acontece na prática.
+            throw new IllegalStateException("SHA-256 indisponível na JVM", e);
         }
     }
 
