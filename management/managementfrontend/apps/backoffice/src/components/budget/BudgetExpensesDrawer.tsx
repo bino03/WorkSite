@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FC } from "react";
-import { Button, Drawer, Empty, Spin, Table, Tooltip } from "antd";
+import { useNavigate } from "react-router-dom";
+import { Button, Drawer, Empty, Space, Spin, Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { FileTextOutlined, PlusOutlined } from "@ant-design/icons";
 
-import { listExpensesByBudgetItem, setSentToAccountant } from "@/services/budgetService";
+import { listExpensesByBudgetItem } from "@/services/budgetService";
+import { setInvoiceSentToAccountant } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,6 +27,7 @@ interface Props {
 
 export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onClose, onChanged }) => {
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [expenses, setExpenses] = useState<ConstructionExpense[]>([]);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState<ConstructionExpense | null>(null);
@@ -47,12 +50,17 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
     if (open) fetchExpenses();
   }, [open, fetchExpenses]);
 
+  /** A caixa de entrada abre já filtrada pelo que está por associar. */
+  const goToInvoices = () => navigate(`/backoffice/empreendimentos/${enterpriseId}/invoices`);
+
+  /** O estado na contabilidade é da fatura, não do lançamento. */
   const toggleAccountant = async (expense: ConstructionExpense) => {
+    if (!expense.invoice) return;
     try {
-      await setSentToAccountant(expense.id, !expense.sentToAccountant);
+      await setInvoiceSentToAccountant(expense.invoice.id, !expense.invoice.sentToAccountant);
       notificationService.success(
         "Contabilidade",
-        expense.sentToAccountant ? "Marcada como por enviar." : "Marcada como enviada."
+        expense.invoice.sentToAccountant ? "Marcada como por enviar." : "Marcada como enviada."
       );
       fetchExpenses();
       onChanged();
@@ -71,10 +79,11 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
     },
     { title: "Data", dataIndex: "expenseDate", width: 108, render: (d: string) => formatDate(d) },
     {
-      title: "Fornecedor (NIF)",
-      dataIndex: "supplierNif",
-      width: 140,
-      render: (nif: string | null) => nif ?? "—",
+      title: "Fornecedor",
+      dataIndex: ["invoice", "supplierName"],
+      width: 160,
+      render: (_: unknown, row) =>
+        row.invoice?.supplierName ?? row.invoice?.supplierNif ?? "—",
     },
     {
       title: "Valor",
@@ -88,22 +97,41 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
     },
     {
       title: "Fatura",
-      dataIndex: "hasInvoice",
+      dataIndex: "invoice",
       width: 84,
-      // Decide-se por hasInvoice e não por invoiceUrl: a signed URL pode falhar
-      // e vir null mesmo com ficheiro anexado.
-      render: (has: boolean) =>
-        has ? (
-          <FileTextOutlined style={{ color: "var(--ind-color-accent)" }} />
+      // A miniatura já vem na resposta e identifica o documento de relance;
+      // o ficheiro completo só é pedido ao abrir o detalhe.
+      render: (_: unknown, row) =>
+        row.invoice ? (
+          row.invoice.thumbnailUrl ? (
+            <img
+              src={row.invoice.thumbnailUrl}
+              alt={row.invoice.originalFilename ?? "fatura"}
+              loading="lazy"
+              style={{
+                width: 32,
+                height: 42,
+                objectFit: "cover",
+                display: "block",
+                border: "1px solid var(--ind-color-divider)",
+              }}
+            />
+          ) : (
+            <FileTextOutlined style={{ color: "var(--ind-color-accent)" }} />
+          )
         ) : (
-          <span style={{ fontSize: 11, opacity: 0.55 }}>sem ficheiro</span>
+          <span style={{ fontSize: 11, opacity: 0.55 }}>sem documento</span>
         ),
     },
     {
       title: "Contabilidade",
-      dataIndex: "sentToAccountant",
+      dataIndex: "invoice",
       width: 150,
-      render: (sent: boolean, row) => {
+      render: (_: unknown, row) => {
+        // Sem fatura não há papel para enviar ao contabilista.
+        if (!row.invoice) return <span style={{ fontSize: 11, opacity: 0.45 }}>—</span>;
+
+        const sent = row.invoice.sentToAccountant;
         const tag = (
           <span
             className={`ind-tag ${sent ? "ind-tag-accent" : "ind-tag-neutral"}`}
@@ -117,16 +145,18 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
           </span>
         );
 
-        if (!sent || !row.sentToAccountantByName) return tag;
+        if (!sent || !row.invoice.sentToAccountantByName) return tag;
 
         return (
           <Tooltip
             title={
               <div style={{ fontSize: 12 }}>
                 <div style={{ opacity: 0.7 }}>Enviado por</div>
-                <div style={{ fontWeight: 600 }}>{row.sentToAccountantByName}</div>
-                {row.sentToAccountantByRole && (
-                  <div style={{ opacity: 0.65 }}>{ROLE_LABEL[row.sentToAccountantByRole]}</div>
+                <div style={{ fontWeight: 600 }}>{row.invoice.sentToAccountantByName}</div>
+                {row.invoice.sentToAccountantByRole && (
+                  <div style={{ opacity: 0.65 }}>
+                    {ROLE_LABEL[row.invoice.sentToAccountantByRole]}
+                  </div>
                 )}
               </div>
             }
@@ -193,16 +223,22 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
               >
                 <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Despesas</h6>
                 {isAdmin() && (
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => {
-                      setEditing(null);
-                      setFormOpen(true);
-                    }}
-                  >
-                    Nova despesa
-                  </Button>
+                  <Space>
+                    {/* Caminho principal: a fatura entra pela caixa de entrada e
+                        é aí que se escolhe a rubrica. */}
+                    <Button type="primary" icon={<FileTextOutlined />} onClick={goToInvoices}>
+                      Associar fatura
+                    </Button>
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        setEditing(null);
+                        setFormOpen(true);
+                      }}
+                    >
+                      Gasto sem fatura
+                    </Button>
+                  </Space>
                 )}
               </div>
 
@@ -245,10 +281,10 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
 
       <BudgetExpenseFormDrawer
         open={formOpen}
-        enterpriseId={enterpriseId}
         budgetItem={item}
         expense={editing}
         onClose={() => setFormOpen(false)}
+        onGoToInvoices={goToInvoices}
         onSaved={() => {
           setFormOpen(false);
           fetchExpenses();

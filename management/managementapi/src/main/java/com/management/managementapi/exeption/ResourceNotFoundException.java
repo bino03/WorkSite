@@ -53,6 +53,13 @@ public class ResourceNotFoundException extends BusinessException {
         );
     }
 
+    public static ResourceNotFoundException constructionInvoice(String invoiceId) {
+        return new ResourceNotFoundException(
+            ErrorCode.INVOICE_NOT_FOUND,
+            "Fatura com ID " + invoiceId + " não encontrada"
+        );
+    }
+
     public static ResourceNotFoundException task(String taskId) {
         return new ResourceNotFoundException(
             ErrorCode.TASK_NOT_FOUND,

@@ -28,7 +28,9 @@ Drawer é o padrão dominante (25 ficheiros usam `<Drawer>` contra 12 com `<Moda
 
 **Convenção daqui em diante**:
 - **Drawer** — qualquer criação/edição/visualização de uma entidade (o padrão já estabelecido e maioritário).
-- **Modal** — só para utilitários autocontidos e curtos: um seletor de pesquisa (`PropertySearchModal`), um visualizador de documento, um histórico (`DownloadHistoryModal`), ou reordenação de itens (`EditPhotoOrder`, `EditDivisionOrder`). Nunca um formulário completo de edição de entidade — isso é sempre Drawer.
+- **Modal** — só para utilitários autocontidos e curtos: um seletor de pesquisa (`PropertySearchModal`, `BudgetItemPickerModal`), um visualizador de documento, um histórico (`DownloadHistoryModal`), ou reordenação de itens (`EditPhotoOrder`, `EditDivisionOrder`). Nunca um formulário completo de edição de entidade — isso é sempre Drawer.
+
+**Exemplo de aplicação (2026-08-09)**: o seletor de rubrica era `BudgetItemPickerDrawer` (600, à direita) e passou a `BudgetItemPickerModal` (centrado, `min(640px, 94vw)`, `max-height:88vh`) ao ser redesenhado. Escolher uma rubrica é um seletor de pesquisa, não a edição de uma entidade — cai do lado do Modal. O modal traz cabeçalho/rodapé fixos e uma lista que faz scroll no meio, e navega em **dois passos** (capítulo → rubrica) em vez de uma lista plana de ~200 linhas.
 - `MyProfileModal.tsx` e `StatusChangeModal.tsx` são os dois exemplos claros a **não copiar**: são formulários de entidade que deviam ser Drawer. Migrar oportunisticamente, não é preciso reescrever já.
 - Confirmações de ações destrutivas usam o diálogo partilhado `useConfirm()` (`context/ConfirmDialogContext`) — ver [[backoffice-buttons-and-icons]]. `Popconfirm` só sobrevive em três ficheiros por migrar; não o uses em código novo. `Modal.confirm` só quando a confirmação precisa de mais contexto do que o diálogo partilhado permite.
 

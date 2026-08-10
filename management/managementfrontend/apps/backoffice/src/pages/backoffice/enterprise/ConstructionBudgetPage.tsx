@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Empty, Input, Spin, Table } from "antd";
+import { Badge, Button, Empty, Input, Space, Spin, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ArrowLeftOutlined, EditOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
+import {
+  ArrowLeftOutlined,
+  EditOutlined,
+  FileTextOutlined,
+  SearchOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
 
 import { getBudgetTree } from "@/services/budgetService";
+import { countPendingInvoices } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/utils/formatters";
@@ -29,6 +36,8 @@ const ConstructionBudgetPage: FC = () => {
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set());
 
+  const [pendingInvoices, setPendingInvoices] = useState(0);
+
   const [expensesItem, setExpensesItem] = useState<BudgetItemNode | null>(null);
   const [datesItem, setDatesItem] = useState<BudgetItemNode | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -51,6 +60,12 @@ const ConstructionBudgetPage: FC = () => {
   useEffect(() => {
     fetchTree();
   }, [fetchTree]);
+
+  useEffect(() => {
+    if (!enterpriseId) return;
+    // Falhar aqui só custa o contador — não vale um erro na cara de ninguém.
+    countPendingInvoices(enterpriseId).then(setPendingInvoices).catch(() => setPendingInvoices(0));
+  }, [enterpriseId]);
 
   /**
    * A pesquisa mantém os ascendentes de qualquer nó que corresponda — sem isso
@@ -278,11 +293,22 @@ const ConstructionBudgetPage: FC = () => {
           <h6 style={{ color: "var(--ind-accent-700)" }}>Empreendimento</h6>
           <h1 style={{ margin: 0 }}>Orçamento de Obra</h1>
         </div>
-        {isAdmin() && (
-          <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
-            Importar Excel
-          </Button>
-        )}
+        <Space>
+          {/* O contador é o que faz alguém lembrar-se de ir classificar. */}
+          <Badge count={pendingInvoices} overflowCount={99} offset={[-4, 2]}>
+            <Button
+              icon={<FileTextOutlined />}
+              onClick={() => navigate(`/backoffice/empreendimentos/${enterpriseId}/invoices`)}
+            >
+              Faturas
+            </Button>
+          </Badge>
+          {isAdmin() && (
+            <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
+              Importar Excel
+            </Button>
+          )}
+        </Space>
       </div>
 
       {/* Três números fixos; as excepções só aparecem quando existem. */}

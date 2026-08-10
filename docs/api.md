@@ -133,20 +133,24 @@ exige `replace=true` se o projeto já tiver orçamento.
 | GET | `/construction-expenses/budget-item/{budgetItemId}` | `ADMIN` ou `EMPLOYEE` — lista de uma rubrica |
 | GET | `/construction-expenses/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — lista plana do projeto, paginada |
 | GET | `/construction-expenses/{id}` | `ADMIN` ou `EMPLOYEE` |
-| POST | `/construction-expenses/scan-invoice?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — lê o QR da AT; multipart `invoiceFile` |
-| POST | `/construction-expenses` | `ADMIN` — multipart: `expenseData` (JSON) + `invoiceFile` opcional |
-| PUT | `/construction-expenses/{id}` | `ADMIN` — mesma forma multipart |
-| PATCH | `/construction-expenses/{id}/accountant?sent=` | `ADMIN` — marca/desmarca fatura enviada ao contabilista |
+| POST | `/construction-expenses` | `ADMIN` — JSON, sem documento |
+| PUT | `/construction-expenses/{id}` | `ADMIN` |
 | DELETE | `/construction-expenses/{id}` | `ADMIN` |
 
-Só rubricas com `rowKind = ITEM` aceitam despesas (`EXPENSE_009` caso contrário). A resposta
-traz `invoiceUrl` como signed URL gerada na leitura, mais quem/quando fez o upload e
-quem/quando marcou o envio para a contabilidade — incluindo `sentToAccountantByRole`
-(`ADMIN`/`EMPLOYEE` em cru, o cliente é que traduz o rótulo).
+**Deixou de haver upload aqui.** O ficheiro, a leitura do QR e o envio para a contabilidade
+passaram para `/construction-invoices` (secção seguinte), porque a fatura existe antes de se
+saber a que rubrica pertence. O que resta neste controlador são os lançamentos feitos à mão,
+sem documento — o corpo é JSON, já não multipart, e os antigos `POST /scan-invoice` e
+`PATCH /{id}/accountant` não existem.
 
-`hasInvoice` é separado de `invoiceUrl` de propósito: a geração da signed URL pode falhar e
-nesse caso `invoiceUrl` vem `null` — sem o booleano, o cliente não distinguiria "não tem
-fatura" de "tem, mas não foi possível gerar o link".
+Só rubricas com `rowKind = ITEM` aceitam despesas (`EXPENSE_009` caso contrário).
+
+A despesa que nasceu de uma fatura traz o objeto `invoice` (`ExpenseInvoiceRefDTO`) com
+fornecedor, número, ATCUD, data, miniatura assinada e estado na contabilidade — incluindo
+`sentToAccountantByRole` (`ADMIN`/`EMPLOYEE` em cru, o cliente é que traduz o rótulo). Vem a
+`null` quando o lançamento foi feito à mão: é assim que o cliente distingue "não tem fatura"
+sem ter de adivinhar por campos vazios. O documento completo pede-se a
+`GET /construction-invoices/{id}`, e só quando alguém o abre.
 
 **`expenseDate` é a data da fatura, não a de registo** (`createdAt`). É obrigatória, e é
 sobre ela que assentam os filtros e qualquer mapa mensal — sem esta separação, lançar
@@ -162,43 +166,184 @@ opcionais e cumuláveis, `Page` com 20 por omissão ordenada por `expenseDate` d
 | `hasInvoice` | `false` → lançado sem documento anexado |
 | `q` | procura no nome e descrição da despesa e no índice e nome da rubrica |
 
-### Leitura da fatura pelo QR code da AT
+## Faturas de obra (`ConstructionInvoiceController`, `/construction-invoices`)
 
-`POST /construction-expenses/scan-invoice` evita transcrever a fatura à mão. Não grava nada:
-devolve os campos para o formulário e o utilizador confirma antes de criar a despesa.
+A fatura é o **documento**; a despesa é a sua afetação a uma rubrica. Estão separados porque
+**registar e classificar são momentos diferentes**: quem chega da obra com quinze faturas
+carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa associada
+(`allocated: false`) é o que está por classificar — é essa a caixa de entrada.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/construction-invoices?enterpriseId=&originalSizeBytes=` | `ADMIN` ou `EMPLOYEE` — multipart `file`; devolve `201` |
+| GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/pending-count` | `ADMIN` ou `EMPLOYEE` — quantas por associar |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida; `204` sem histórico |
+| GET | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — única resposta com `fileUrl` |
+| PUT | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — correção manual |
+| POST | `/construction-invoices/{id}/file` | `ADMIN` ou `EMPLOYEE` — substitui o ficheiro, relê o QR |
+| POST | `/construction-invoices/{id}/rescan` | `ADMIN` ou `EMPLOYEE` — relê o QR do ficheiro arquivado e repõe os campos fiscais |
+| PATCH | `/construction-invoices/{id}/allocate?budgetItemId=` | `ADMIN` — liga a uma rubrica, cria o lançamento |
+| DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz, devolve à caixa de entrada |
+| PATCH | `/construction-invoices/{id}/accountant?sent=` | `ADMIN` — marca/desmarca enviada ao contabilista |
+| DELETE | `/construction-invoices/{id}` | `ADMIN` — apaga fatura, ficheiro, miniatura e lançamento |
+
+Não há endpoint de lote **de propósito**: o cliente chama o `POST` uma vez por ficheiro
+largado, para que cada um tenha o seu resultado e um QR ilegível não estrague os restantes.
+`originalSizeBytes` é o tamanho antes da compressão feita no browser e serve só para mostrar
+a poupança.
+
+O upload **nunca falha por dados em falta**. Sem QR legível a fatura entra na mesma, com
+`needsReview: true`, e alguém completa os campos depois. A obrigatoriedade de data e total só
+aparece no `allocate` (`INVOICE_006`), porque é a despesa que os exige.
+
+`needsReview` e `allocated` são **derivados**, não colunas: com uma fatura por rubrica, um
+estado guardado só arriscava ficar dessincronizado.
+
+`thumbnailUrl` vem em todas as respostas; `fileUrl` só no detalhe (`GET /{id}`). Assinar o
+documento completo de cada linha de uma lista de 20 seria trabalho deitado fora — quase
+nenhum é aberto. Ambas são signed URLs geradas na leitura; a chave de storage nunca sai daqui.
+
+Resposta do upload e do `PUT /{id}/file`:
+
+```jsonc
+{
+  "invoice": { /* ConstructionInvoiceResponseDTO — existe sempre, mesmo sem QR */ },
+  "qrRead": true,
+  "duplicates": [
+    { "invoiceId": "…", "supplierName": "Betão Liz", "invoiceNumber": "FT 2026/114",
+      "invoiceDate": "2026-01-15", "totalAmount": 14760.00,
+      "budgetItemCode": "4.2.1", "budgetItemName": "Sapatas Isoladas" }
+  ],
+  "warnings": []
+}
+```
+
+### Duplicados — bloqueio, em dois momentos
+
+Um duplicado é **recusado**, não avisado. `duplicates` vem vazio no upload e no
+`POST /{id}/file` justamente por isso: se houvesse um, o pedido não chegava a passar.
+Só o `POST /{id}/rescan` ainda o preenche.
+
+A verificação corre com **duas chaves**, porque servem momentos diferentes:
+
+| Chave | Quando apanha | Erro |
+|---|---|---|
+| `invoiceAtcud` | o QR foi lido — é o identificador que a AT atribui ao documento | `INVOICE_010` |
+| (`supplierNif`, `invoiceNumber`) | o QR falhou e alguém completou os campos à mão | `INVOICE_011` |
+
+A segunda existe porque a primeira só funciona quando já não é precisa: sem QR legível não
+há ATCUD, e a fatura entrava sem passar por verificação nenhuma. Quem completa uma fatura
+"por rever" escreve o NIF e o número, raramente o ATCUD — e o mesmo fornecedor não emite dois
+documentos com o mesmo número.
+
+Por isso a verificação corre **no `PUT /{id}` também**, e não só no carregamento: é na
+correção manual que uma fatura sem QR ganha identidade pela primeira vez. Sem isso, completar
+à mão duas fotografias da mesma fatura criava dois lançamentos iguais no orçamento. No `PUT`
+só corre quando a **identidade muda** (ATCUD, NIF ou número) — de outro modo um duplicado já
+existente na base bloqueava qualquer edição, incluindo mexer só nas notas.
+
+O ATCUD tem ainda uma garantia ao nível da base: `uq_invoice_enterprise_atcud` (`V17`), único
+e parcial sobre `(enterprise_id, invoice_atcud)`. A verificação no serviço é
+SELECT-depois-INSERT em transações separadas, e o cliente carrega com três pedidos em
+paralelo — dois ficheiros iguais em voo ao mesmo tempo passavam os dois. Aconteceu: duas
+linhas com o mesmo ATCUD gravadas com 20 ms de diferença. O índice fecha essa janela; o
+serviço continua a existir para dar a mensagem legível em vez de uma violação de constraint.
+
+O par (NIF, número) **não** leva índice de propósito: só entra em jogo na correção manual, uma
+pessoa de cada vez, onde não há corrida — e um índice ali criaria falsos positivos em gralhas.
+
+Filtros da caixa de entrada, todos opcionais e cumuláveis. `Page` com 20 por omissão,
+ordenada por `uploadedAt` descendente:
+
+| Parâmetro | Efeito |
+|---|---|
+| `allocated` | `false` → o que está por classificar (o que o cliente abre por omissão) |
+| `needsReview` | `true` → falta a data ou o total |
+| `sentToAccountant` | `false` → o que falta enviar |
+| `from` / `to` | intervalo de `invoiceDate` (ISO `AAAA-MM-DD`) |
+| `q` | procura no nome e NIF do fornecedor, número, ATCUD, nome do ficheiro e notas |
+
+A sugestão de rubrica é a que as faturas deste fornecedor costumam levar **neste projeto**. É
+o que transforma a associação num clique a partir da segunda fatura do mesmo fornecedor.
+
+### Leitura do QR code da AT
 
 Escolheu-se o QR em vez de OCR por ser **determinístico** — obrigatório nas faturas
 portuguesas desde 2022, traz os campos fiscais já estruturados, corre offline e a fatura não
 sai do servidor. Implementado em `AtInvoiceQrService` com ZXing (descodificação) e PDFBox
 (rasterização quando a fatura é PDF; varre até 5 páginas, o QR costuma estar na última).
 
-```jsonc
-{
-  "read": true,
-  "issuerNif": "509442013", "buyerNif": "999999990",
-  "documentType": "FT", "documentStatus": "N",
-  "documentNumber": "FT 2026/114", "atcud": "CSDF7T5H-0114",
-  "invoiceDate": "2026-01-15",
-  "taxableAmount": 12000.00, "taxAmount": 2760.00, "totalAmount": 14760.00,
-  "alreadyRegistered": [
-    { "expenseId": "…", "expenseName": "Betão fundações",
-      "budgetItemCode": "4.2.1", "budgetItemName": "Sapatas Isoladas",
-      "expenseDate": "2026-01-15", "totalPrice": 3381.38 }
-  ],
-  "warnings": []
-}
-```
+Do QR saem `supplierNif`, `invoiceNumber`, `invoiceAtcud`, `invoiceDate`, `totalAmount`,
+`taxableAmount` e `taxAmount`. O preenchimento **só toca em campos vazios** — correções feitas
+à mão não são deitadas fora por se ter substituído a digitalização. O `supplierName` nunca vem
+do QR: a AT só declara o NIF do emitente.
 
-`alreadyRegistered` lista despesas do projeto com o mesmo ATCUD. É **aviso, não bloqueio**:
-repartir uma fatura por várias rubricas da obra é prática normal. Os campos `supplierNif`,
-`invoiceNumber` e `invoiceAtcud` ficam guardados na despesa — é o que torna esta deteção
-possível.
+A procura é uma escalada, do barato para o caro: imagem inteira primeiro (duas binarizações),
+e só se essa não trouxer um QR da AT é que a imagem é recortada em quadros sobrepostos, cada
+um ampliado. O segundo degrau existe para a **fotografia da fatura inteira tirada ao
+telemóvel**, em que o QR ocupa uns 150 px de 1600 — na imagem toda o detetor não o localiza.
+Para PDF a escalada é 200 DPI → 300 DPI → mosaico, por isso o PDF nascido de um ERP
+resolve-se logo no primeiro. Medido contra 19 fotografias reais de faturas: 8 lidas só com a
+imagem inteira, 14 com o mosaico.
 
-`warnings` assinala documento anulado na AT (`documentStatus = "A"`), nota de crédito
-(`documentType = "NC"`, que abate em vez de somar) e campos ilegíveis.
+`warnings` assinala documento anulado na AT (campo de estado `"A"`), nota de crédito
+(tipo `"NC"`, que abate em vez de somar) e campos ilegíveis. São frases já em português,
+prontas a mostrar.
 
-**Sem QR legível** — fornecedor estrangeiro, documento anterior a 2022, digitalização má —
-devolve `read: false` com o resto a `null` e o preenchimento segue manual. Nunca é erro.
+**Sem QR legível** — fornecedor estrangeiro, documento anterior a 2022, impressão gasta —
+devolve `qrRead: false`, a fatura entra como `needsReview` e o preenchimento segue manual.
+Nunca é erro.
+
+### Correção manual (`PUT /{id}`)
+
+Todos os campos são opcionais: a fatura entra a partir do ficheiro, não deste formulário.
+
+`taxableAmount` e `taxAmount` **não fazem parte do corpo**. São o que o QR da AT declarou, não
+campos de edição — enquanto lá estiveram, um `PUT` que os omitisse (como o do próprio
+Backoffice, que nunca os mostrou como editáveis) apagava-os à primeira correção de qualquer
+outro campo. Corrigir o total à mão não os recalcula: o que lá está é o que a AT recebeu.
+
+Apagar a data ou o total de uma fatura **já associada** é recusado com `INVOICE_006` — o
+lançamento ficaria sem os campos que a despesa exige. A despesa que dela nasceu acompanha a
+correção, senão o orçamento continuava a somar o valor errado.
+
+### Repor os dados do QR (`POST /{id}/rescan`)
+
+O desfazer de uma correção manual feita por engano. Vai buscar ao Storage o ficheiro que já lá
+está, relê o QR e **sobrepõe** os campos fiscais — ao contrário do upload e do
+`POST /{id}/file`, que só preenchem o que está vazio. É a única operação em que o QR ganha ao
+que foi escrito à mão, porque é exatamente isso que se está a pedir.
+
+Não recebe corpo nem ficheiro: para trocar a digitalização é `POST /{id}/file`. Não toca no
+documento nem na miniatura, e **`supplierName` e `notes` ficam intactos** — não vêm do QR, são
+escritos por gente.
+
+Devolve o mesmo `InvoiceUploadResultDTO` do upload (com `qrRead: true`, `duplicates` e os
+`warnings` do QR). Falha com `INVOICE_008` quando o documento não tem QR da AT legível — nada
+é apagado, a fatura fica como estava. Se a fatura já estiver associada e o QR trouxer a data
+ou o total ilegíveis, é recusado com `INVOICE_006`, pela mesma razão do `PUT /{id}`. A despesa
+associada acompanha os novos valores.
+
+### Códigos de erro
+
+| Código | Quando |
+|---|---|
+| `INVOICE_001` | Fatura não encontrada |
+| `INVOICE_002` | Projeto da fatura não encontrado |
+| `INVOICE_003` | Erro ao carregar o ficheiro |
+| `INVOICE_004` | Já associada a uma rubrica — desassociar primeiro |
+| `INVOICE_005` | Não está associada a nenhuma rubrica |
+| `INVOICE_006` | Falta a data ou o total para associar |
+| `INVOICE_007` | A rubrica indicada pertence a outro projeto |
+| `INVOICE_008` | `rescan` não encontrou QR da AT legível no documento |
+| `INVOICE_009` | `rescan` não conseguiu obter o ficheiro original do Storage |
+| `INVOICE_010` | já existe uma fatura com este ATCUD no projeto (upload, `/file` ou `PUT`) |
+| `INVOICE_011` | já existe uma fatura deste fornecedor com este número (sobretudo no `PUT`) |
+
+Ficheiro: PDF, JPEG ou PNG, até 25 MB, bucket `documents`, chave
+`construction-invoices/{enterpriseId}/…`. A miniatura é um extra — falhar a gerá-la não custa
+a fatura, a lista cai num ícone de ficheiro.
 
 ## Tarefas (`TaskController`, `/tasks`)
 

@@ -8,11 +8,10 @@ import java.util.UUID;
 /**
  * Despesa devolvida ao cliente.
  *
- * {@code invoiceUrl} é sempre uma signed URL gerada no momento da leitura —
- * a chave de storage nunca sai daqui. Como essa geração pode falhar (e nesse
- * caso devolve null), {@code hasInvoice} diz separadamente se há mesmo ficheiro:
- * sem ele, o cliente não conseguiria distinguir "não tem fatura" de
- * "tem, mas não foi possível gerar o link".
+ * {@code invoice} é null quando o lançamento foi feito à mão, sem documento —
+ * é a forma de o cliente distinguir "não tem fatura" sem ter de adivinhar por
+ * campos vazios. As URLs lá dentro são sempre signed URLs geradas na leitura;
+ * a chave de storage nunca sai daqui.
  */
 public record ConstructionExpenseResponseDTO(
         UUID id,
@@ -29,28 +28,8 @@ public record ConstructionExpenseResponseDTO(
         BigDecimal totalPrice,
         String observations,
 
-        // ── identificação da fatura (QR da AT) ──
-        String supplierNif,
-        String invoiceNumber,
-        String invoiceAtcud,
-
-        // ── fatura ──
-        boolean hasInvoice,
-        String invoiceUrl,
-        String originalFilename,
-        String mimeType,
-        Long sizeBytes,
-        UUID uploadedBy,
-        String uploadedByName,
-        OffsetDateTime uploadedAt,
-
-        // ── contabilidade ──
-        boolean sentToAccountant,
-        UUID sentToAccountantBy,
-        String sentToAccountantByName,
-        /** `ADMIN` ou `EMPLOYEE` — o cliente traduz o rótulo. */
-        String sentToAccountantByRole,
-        OffsetDateTime sentToAccountantAt,
+        /** A fatura de onde este lançamento saiu; null se foi registado à mão. */
+        ExpenseInvoiceRefDTO invoice,
 
         UUID createdBy,
         String createdByName,

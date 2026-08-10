@@ -5,19 +5,29 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -72,6 +82,20 @@ class AtInvoiceQrServiceTest {
         assertThat(data.atcud()).isEqualTo("CSDF7T5H-0114");
     }
 
+    /**
+     * O caso que motivou o mosaico: a fotografia da fatura inteira, com o QR a
+     * ocupar uma nesga da página. Na imagem toda o detetor não o localiza — é
+     * preciso recortar e ampliar.
+     */
+    @Test
+    @DisplayName("lê o QR pequeno numa fotografia da fatura inteira")
+    void readsSmallQrInFullPagePhoto() throws Exception {
+        var data = service.read(photoOfInvoice(AT_QR, 15), "image/jpeg").orElseThrow();
+
+        assertThat(data.issuerNif()).isEqualTo("509442013");
+        assertThat(data.totalAmount()).isEqualByComparingTo("14760.00");
+    }
+
     @Test
     @DisplayName("ignora QR codes que não são da AT")
     void ignoresNonAtQr() throws Exception {
@@ -118,7 +142,11 @@ class AtInvoiceQrServiceTest {
     // ── fixtures ──────────────────────────────────────────────
 
     private static byte[] qrAsPng(String content) throws Exception {
-        BitMatrix matrix = new QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 400, 400);
+        return qrAsPng(content, 400);
+    }
+
+    private static byte[] qrAsPng(String content, int pixels) throws Exception {
+        BitMatrix matrix = new QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, pixels, pixels);
         var out = new ByteArrayOutputStream();
         MatrixToImageWriter.writeToStream(matrix, "PNG", out);
         return out.toByteArray();
@@ -126,6 +154,79 @@ class AtInvoiceQrServiceTest {
 
     private static byte[] qrInsidePdf(String content) throws Exception {
         return qrInsidePdf(content, 1);
+    }
+
+    /**
+     * O que o servidor recebe quando alguém fotografa a fatura: uma página A4
+     * com texto e o QR a {@code qrMillimetres}, rasterizada, reduzida a 2200 px
+     * de lado maior pelo browser e reencodada em JPEG.
+     *
+     * O texto à volta não é enfeite — é ele que dá à binarização o contraste de
+     * uma página real, em vez do branco liso onde qualquer QR se lê.
+     */
+    private static byte[] photoOfInvoice(String content, int qrMillimetres) throws Exception {
+        float points = qrMillimetres * 72f / 25.4f;
+
+        byte[] pdf;
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            try (PDPageContentStream stream = new PDPageContentStream(document, page)) {
+                stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
+                for (int line = 0; line < 40; line++) {
+                    stream.beginText();
+                    stream.newLineAtOffset(60, 760 - line * 16);
+                    stream.showText("Rubrica " + line
+                            + "   Betao C25/30   12,50 EUR   qtd 4,00   total 50,00 EUR");
+                    stream.endText();
+                }
+                // 600 px reduzidos a 15 mm é a reamostragem que a impressora e a
+                // câmara fazem ao QR — desenhá-lo já pequeno daria um teste mais
+                // fácil do que a realidade.
+                PDImageXObject qr = PDImageXObject.createFromByteArray(
+                        document, qrAsPng(content, 600), "qr");
+                stream.drawImage(qr, 60, 60, points, points);
+            }
+            var out = new ByteArrayOutputStream();
+            document.save(out);
+            pdf = out.toByteArray();
+        }
+
+        BufferedImage rendered;
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            rendered = new PDFRenderer(document).renderImageWithDPI(0, 300);
+        }
+        return asJpeg(downscale(rendered, 2200), 0.82f);
+    }
+
+    /** A redução que o browser faz antes do upload (`compressInvoiceFile`). */
+    private static BufferedImage downscale(BufferedImage image, int maxEdge) {
+        double factor = maxEdge / (double) Math.max(image.getWidth(), image.getHeight());
+        int width = (int) Math.round(image.getWidth() * factor);
+        int height = (int) Math.round(image.getHeight() * factor);
+
+        BufferedImage scaled = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = scaled.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, width, height);
+        g.drawImage(image, 0, 0, width, height, null);
+        g.dispose();
+        return scaled;
+    }
+
+    private static byte[] asJpeg(BufferedImage image, float quality) throws Exception {
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+        ImageWriteParam param = writer.getDefaultWriteParam();
+        param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+        param.setCompressionQuality(quality);
+
+        var out = new ByteArrayOutputStream();
+        writer.setOutput(new MemoryCacheImageOutputStream(out));
+        writer.write(null, new IIOImage(image, null, null), param);
+        writer.dispose();
+        return out.toByteArray();
     }
 
     /** PDF com {@code pages} páginas e o QR só na última, como numa fatura real. */

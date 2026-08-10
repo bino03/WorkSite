@@ -17,6 +17,7 @@ import EmployeesList from "./pages/backoffice/EmployeesList";
 import EmployeeProfilePage from "./pages/backoffice/employee/EmployeeProfilePage";
 import EnterprisesList from "./pages/enterprises/EnterprisesList";
 import ConstructionBudgetPage from "./pages/backoffice/enterprise/ConstructionBudgetPage";
+import EnterpriseInvoicesPage from "./pages/backoffice/enterprise/EnterpriseInvoicesPage";
 import TasksPage from "./pages/backoffice/TasksPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import "antd/dist/reset.css";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="funcionarios/:id" element={<EmployeeProfilePage />} />
               <Route path="empreendimentos" element={<EnterprisesList />} />
               <Route path="empreendimentos/:enterpriseId/budget" element={<ConstructionBudgetPage />} />
+              <Route path="empreendimentos/:enterpriseId/invoices" element={<EnterpriseInvoicesPage />} />
               <Route path="tasks" element={<TasksPage />} />
             </Route>
 

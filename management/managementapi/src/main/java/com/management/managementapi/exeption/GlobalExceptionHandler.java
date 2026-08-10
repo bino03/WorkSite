@@ -143,15 +143,29 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
         
         log.error("Database constraint violation: {}", ex.getMessage());
-        
+
+        // O índice único do ATCUD (V17) é a rede que apanha o que o SELECT do
+        // serviço não vê: dois carregamentos do mesmo documento em paralelo,
+        // cada um em sua transação. Chegar aqui é raro, mas quem está do outro
+        // lado merece a mesma frase que teria no caminho normal, e não
+        // "violação de constraint".
+        boolean duplicateAtcud = String.valueOf(ex.getMessage())
+                .contains("uq_invoice_enterprise_atcud");
+
+        ErrorCode code = duplicateAtcud
+                ? ErrorCode.INVOICE_DUPLICATE_ATCUD
+                : ErrorCode.DATABASE_CONSTRAINT_VIOLATION;
+
         ErrorResponseDTO error = new ErrorResponseDTO(
             HttpStatus.CONFLICT.value(),
             "Conflict",
-            "Violação de constraint na base de dados",
+            duplicateAtcud
+                ? code.getDefaultMessage()
+                : "Violação de constraint na base de dados",
             request.getRequestURI(),
-            ErrorCode.DATABASE_CONSTRAINT_VIOLATION.getCode()
+            code.getCode()
         );
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
     
@@ -160,7 +174,10 @@ public class GlobalExceptionHandler {
             StorageException ex,
             HttpServletRequest request) {
 
-        log.error("Storage error: {}", ex.getMessage());
+        // Passar `ex` e não só a mensagem: a causa traz o HTTP e o corpo da
+        // resposta do Supabase ("Bucket not found", "Payload too large", …).
+        // Sem ela o log diz apenas que falhou, e não porquê.
+        log.error("Storage error: {}", ex.getMessage(), ex);
 
         ErrorResponseDTO error = new ErrorResponseDTO(
             HttpStatus.BAD_GATEWAY.value(),

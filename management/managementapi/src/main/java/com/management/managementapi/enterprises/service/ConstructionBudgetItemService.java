@@ -213,9 +213,14 @@ public class ConstructionBudgetItemService {
     private Map<UUID, ExpenseRollup> loadExpenseRollups(UUID enterpriseId) {
         Map<UUID, ExpenseRollup> byItem = new HashMap<>();
         for (ConstructionExpense expense : expenseRepository.findAllByEnterpriseId(enterpriseId)) {
+            // O documento vive na fatura: sem fatura associada não há nada para
+            // enviar ao contabilista, por isso conta como "por enviar" nenhuma
+            // das duas coisas.
+            boolean hasInvoice = expense.getInvoice() != null;
+            boolean sentToAccountant = hasInvoice && expense.getInvoice().isSentToAccountant();
+
             byItem.computeIfAbsent(expense.getBudgetItem().getId(), k -> new ExpenseRollup())
-                    .add(expense.getTotalPrice(), expense.isSentToAccountant(),
-                            expense.getStorageKey() != null);
+                    .add(expense.getTotalPrice(), sentToAccountant, hasInvoice);
         }
         return byItem;
     }

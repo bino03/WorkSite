@@ -12,6 +12,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 |-------|---|---|---|
 | [[code-best-practices]] | General code quality rules shared by every skill | `#quality` `#conventions` `#backend` `#frontend` | Any skill writing/reviewing code |
 | [[frontend-visual-consistency]] | Router → 8 sub-files in `docs/skills/references/design/` with verified tokens/drift per area | `#frontend` `#backoffice` `#design` | Any skill writing UI |
+| [[project-vocabulary]] | Dicionário partilhado — Drawer vs. Modal, fatura vs. despesa, rubrica, token | `#vocabulary` `#frontend` `#domain` | Any skill describing code to a person |
 
 ---
 
@@ -49,7 +50,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 
 ## By Category
 
-**References (not invocable)**: [[code-best-practices]], [[frontend-visual-consistency]]  
+**References (not invocable)**: [[code-best-practices]], [[frontend-visual-consistency]], [[project-vocabulary]]  
 **Authentication & Security**: [[skill-permissions-and-auth]], [[skill-add-file-upload]]  
 **Database**: [[skill-add-database-table]], [[skill-add-backend-feature]]  
 **API Development**: [[skill-add-backend-feature]], [[skill-add-file-upload]], [[skill-permissions-and-auth]]  
@@ -58,15 +59,15 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 
 ---
 
-## Total: 11 Invocable Skills + 2 References
+## Total: 11 Invocable Skills + 3 References
 
-- References: 2 (+ 8 design sub-files)
+- References: 3 (+ 8 design sub-files)
 - Backend: 4
 - Frontend: 4
 - Process: 3
 
 ---
 
-**Last Updated**: 2026-08-05
+**Last Updated**: 2026-08-09
 
 **Note**: When adding a new skill, update this file + [[docs/skills/SKILLS-INDEX.md]] + [[skill-create-new-skill.md]]. References don't get a `.claude/skills/` pointer — only skills do, see [[skill-create-new-skill]]. Files live under `docs/skills/{backend,frontend,process,references}/`.

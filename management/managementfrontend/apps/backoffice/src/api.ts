@@ -9,6 +9,11 @@ declare module "axios" {
     // usado em /auth/login, onde um 401 é "credenciais inválidas", não
     // "sessão expirada".
     noRefreshRetry?: boolean;
+
+    // Quando true, o interceptor global não mostra notificação de erro — quem
+    // chamou trata dele. Para operações em lote, onde o erro pertence à linha
+    // do ficheiro e não a um toast por falha.
+    skipErrorNotification?: boolean;
   }
 }
 
@@ -165,6 +170,12 @@ api.interceptors.response.use(
   (error) => {
     // 401 é tratado pelo interceptor de refresh acima — não duplicar
     if (error.response?.status === 401) {
+      return Promise.reject(error);
+    }
+
+    // Operações em lote (ex.: carregar dez faturas de uma vez) mostram o erro
+    // na linha de cada ficheiro. Uma notificação por falha seria só ruído.
+    if (error.config?.skipErrorNotification) {
       return Promise.reject(error);
     }
 

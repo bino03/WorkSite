@@ -240,6 +240,21 @@ public enum ErrorCode {
     EXPENSE_ITEM_OTHER_ENTERPRISE("EXPENSE_010", "A rubrica indicada pertence a outro projeto"),
 
     // ========================================================================
+    // FATURAS DE OBRA (INVOICE_xxx)
+    // ========================================================================
+    INVOICE_NOT_FOUND("INVOICE_001", "Fatura não encontrada"),
+    INVOICE_ENTERPRISE_NOT_FOUND("INVOICE_002", "Projeto da fatura não encontrado"),
+    INVOICE_UPLOAD_ERROR("INVOICE_003", "Erro ao carregar o ficheiro da fatura"),
+    INVOICE_ALREADY_ALLOCATED("INVOICE_004", "Esta fatura já está associada a uma rubrica — desassocie-a primeiro"),
+    INVOICE_NOT_ALLOCATED("INVOICE_005", "Esta fatura não está associada a nenhuma rubrica"),
+    INVOICE_INCOMPLETE("INVOICE_006", "Preencha a data e o total da fatura antes de a associar a uma rubrica"),
+    INVOICE_ITEM_OTHER_ENTERPRISE("INVOICE_007", "A rubrica indicada pertence a outro projeto"),
+    INVOICE_QR_UNREADABLE("INVOICE_008", "Não foi possível ler o QR da AT neste documento — os campos têm de ser preenchidos à mão"),
+    INVOICE_FILE_UNAVAILABLE("INVOICE_009", "Não foi possível obter o ficheiro original da fatura"),
+    INVOICE_DUPLICATE_ATCUD("INVOICE_010", "Já existe uma fatura com este ATCUD neste projeto"),
+    INVOICE_DUPLICATE_DOCUMENT("INVOICE_011", "Já existe uma fatura deste fornecedor com este número neste projeto"),
+
+    // ========================================================================
     // LOCALIZAÇÕES (LOC_xxx)
     // ========================================================================
     LOCATION_INVALID_NAME("LOC_030", "Nome da localização inválido"),

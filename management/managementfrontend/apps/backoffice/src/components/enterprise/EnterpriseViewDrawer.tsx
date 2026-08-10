@@ -438,13 +438,22 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
           </div>
 
           <div style={{ borderTop: "1px solid var(--ind-color-divider)", padding: "10.2px 20.4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <a
-              href="#"
-              onClick={(e) => { e.preventDefault(); if (enterpriseId) navigate(`/backoffice/empreendimentos/${enterpriseId}/budget`); }}
-              style={{ fontSize: 13 }}
-            >
-              Orçamento de obra →
-            </a>
+            <div style={{ display: "flex", gap: "13.6px" }}>
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); if (enterpriseId) navigate(`/backoffice/empreendimentos/${enterpriseId}/budget`); }}
+                style={{ fontSize: 13 }}
+              >
+                Orçamento de obra →
+              </a>
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); if (enterpriseId) navigate(`/backoffice/empreendimentos/${enterpriseId}/invoices`); }}
+                style={{ fontSize: 13 }}
+              >
+                Faturas →
+              </a>
+            </div>
             <div style={{ display: "flex", gap: "6.8px" }}>
               <Button disabled={current === 0} onClick={() => { setEditing(false); setCurrent((c) => Math.max(0, c - 1)); }}>Anterior</Button>
               <Button disabled={current === VIEW_STEPS.length - 1} onClick={() => { setEditing(false); setCurrent((c) => Math.min(VIEW_STEPS.length - 1, c + 1)); }}>Seguinte</Button>

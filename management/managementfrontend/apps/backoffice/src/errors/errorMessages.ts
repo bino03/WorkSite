@@ -252,6 +252,19 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'EXPENSE_009': 'Só é possível lançar despesas em rubricas — títulos e notas não aceitam despesas.',
   'EXPENSE_010': 'A rubrica indicada pertence a outro projeto.',
 
+  // Faturas de obra
+  'INVOICE_001': 'Fatura não encontrada.',
+  'INVOICE_002': 'Projeto da fatura não encontrado.',
+  'INVOICE_003': 'Não foi possível carregar o ficheiro da fatura.',
+  'INVOICE_004': 'Esta fatura já está associada a uma rubrica — desassocie-a primeiro.',
+  'INVOICE_005': 'Esta fatura não está associada a nenhuma rubrica.',
+  'INVOICE_006': 'Preencha a data e o total da fatura antes de a associar a uma rubrica.',
+  'INVOICE_007': 'A rubrica indicada pertence a outro projeto.',
+  'INVOICE_008': 'Não foi possível ler o QR da AT neste documento — os campos têm de ser preenchidos à mão.',
+  'INVOICE_009': 'Não foi possível obter o ficheiro original da fatura.',
+  'INVOICE_010': 'Já existe uma fatura com este ATCUD neste projeto.',
+  'INVOICE_011': 'Já existe uma fatura deste fornecedor com este número neste projeto.',
+
   // ── Tarefas ────────────────────────────────────────────────────────────────
   'TASK_001': 'Tarefa não encontrada. Pode ter sido removida.',
   'TASK_002': 'Um ou mais utilizadores atribuídos não foram encontrados.',

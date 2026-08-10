@@ -80,6 +80,38 @@ public class SupabaseStorageService {
     }
 
 
+    /**
+     * Descarrega o objeto para memória.
+     *
+     * Os restantes downloads fazem stream directo para o cliente; este existe
+     * para o servidor voltar a <b>ler</b> um ficheiro que já guardou — hoje,
+     * reler o QR de uma fatura arquivada. Carregar tudo em memória é aceitável
+     * porque o teto do upload são 25 MB.
+     */
+    public byte[] download(String bucket, String path) throws IOException {
+        ensureArgs(bucket, path);
+        final String url = baseStorageUrl() + "/object/"
+                + encodeSegment(bucket) + "/"
+                + encodePath(path);
+
+        Request req = addAuth(new Request.Builder()
+                .url(url)
+                .get())
+                .header("X-Client-Info", "GestaoAPI/StorageService")
+                .build();
+
+        try (Response res = http.newCall(req).execute()) {
+            if (!res.isSuccessful()) {
+                handleDownloadError(res, path);
+            }
+            ResponseBody body = res.body();
+            if (body == null) {
+                throw new IOException("Resposta sem corpo ao descarregar: " + path);
+            }
+            return body.bytes();
+        }
+    }
+
 public void streamDownload(String bucket, String path, HttpServletResponse clientRes) throws IOException {
     ensureArgs(bucket, path, clientRes);
     final String url = baseStorageUrl() + "/object/"

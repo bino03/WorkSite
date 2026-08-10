@@ -59,7 +59,7 @@ Worksite/
 │   └── skills/              ← Fonte de verdade das skills + referências
 │       ├── SKILLS-INDEX.md / SKILLS-QUICK-REFERENCE.md
 │       ├── backend/ (4) · frontend/ (4) · process/ (3)
-│       └── references/      ← code-best-practices, frontend-visual-consistency + design/ (8 sub-files)
+│       └── references/      ← code-best-practices, frontend-visual-consistency, project-vocabulary + design/ (8 sub-files)
 │
 ├── references/              ← Links externos (useful-links.md)
 │

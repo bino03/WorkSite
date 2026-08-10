@@ -96,6 +96,29 @@ export interface BudgetItemSaveResponse {
 
 /* ========= Despesas ========= */
 
+/**
+ * A fatura vista de dentro de uma despesa. O documento completo pede-se a
+ * `getInvoice(id)`, e só quando alguém o abre — ver `types/invoice.ts`.
+ */
+export interface ExpenseInvoiceRef {
+  id: string;
+  supplierName: string | null;
+  supplierNif: string | null;
+  invoiceNumber: string | null;
+  invoiceAtcud: string | null;
+  invoiceDate: string | null;
+
+  thumbnailUrl: string | null;
+  originalFilename: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+
+  sentToAccountant: boolean;
+  sentToAccountantByName: string | null;
+  sentToAccountantByRole: "ADMIN" | "EMPLOYEE" | null;
+  sentToAccountantAt: string | null;
+}
+
 export interface ConstructionExpense {
   id: string;
   budgetItemId: string;
@@ -112,25 +135,8 @@ export interface ConstructionExpense {
   totalPrice: number;
   observations: string | null;
 
-  supplierNif: string | null;
-  invoiceNumber: string | null;
-  invoiceAtcud: string | null;
-
-  /** Distinto de `invoiceUrl`: a signed URL pode falhar e vir null com ficheiro anexado. */
-  hasInvoice: boolean;
-  invoiceUrl: string | null;
-  originalFilename: string | null;
-  mimeType: string | null;
-  sizeBytes: number | null;
-  uploadedBy: string | null;
-  uploadedByName: string | null;
-  uploadedAt: string | null;
-
-  sentToAccountant: boolean;
-  sentToAccountantBy: string | null;
-  sentToAccountantByName: string | null;
-  sentToAccountantByRole: "ADMIN" | "EMPLOYEE" | null;
-  sentToAccountantAt: string | null;
+  /** Null quando o lançamento foi feito à mão, sem documento. */
+  invoice: ExpenseInvoiceRef | null;
 
   createdBy: string | null;
   createdByName: string | null;
@@ -138,6 +144,10 @@ export interface ConstructionExpense {
   updatedAt: string;
 }
 
+/**
+ * Lançamento **sem documento**. Com fatura, o caminho é carregá-la na caixa de
+ * entrada e associá-la — ver `services/invoiceService.ts`.
+ */
 export interface ConstructionExpenseUpsert {
   budgetItemId: string;
   name: string;
@@ -148,39 +158,6 @@ export interface ConstructionExpenseUpsert {
   unitPrice?: number | null;
   totalPrice: number;
   observations?: string | null;
-  supplierNif?: string | null;
-  invoiceNumber?: string | null;
-  invoiceAtcud?: string | null;
-}
-
-/* ========= Leitura do QR da AT ========= */
-
-export interface RegisteredInvoiceRef {
-  expenseId: string;
-  expenseName: string;
-  budgetItemId: string;
-  budgetItemCode: string | null;
-  budgetItemName: string;
-  expenseDate: string;
-  totalPrice: number;
-}
-
-export interface InvoiceScanResult {
-  /** `false` não é erro — é fornecedor estrangeiro, documento antigo ou digitalização má. */
-  read: boolean;
-  issuerNif: string | null;
-  buyerNif: string | null;
-  documentType: string | null;
-  documentStatus: string | null;
-  documentNumber: string | null;
-  atcud: string | null;
-  invoiceDate: string | null;
-  taxableAmount: number | null;
-  taxAmount: number | null;
-  totalAmount: number | null;
-  /** Mesma fatura já lançada no projeto. Aviso, não bloqueio. */
-  alreadyRegistered: RegisteredInvoiceRef[];
-  warnings: string[];
 }
 
 /* ========= Importação de Excel ========= */

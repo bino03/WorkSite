@@ -44,6 +44,14 @@ These are **not skills** — nothing invokes `/code-best-practices` on its own. 
 - **Tags**: `#frontend` `#backoffice` `#design` `#consistency`
 - **Covers**: Real design tokens → component-area-specific conventions and documented drift to avoid repeating
 
+### [[project-vocabulary]]
+**Dicionário partilhado — o que cada termo significa exatamente neste código (Drawer vs. Modal, fatura vs. despesa, rubrica, token)**
+
+- **File**: `docs/skills/references/project-vocabulary.md`
+- **Applies to**: Any skill that describes existing code to a person, or reads a request in prose to decide what to build
+- **Tags**: `#vocabulary` `#frontend` `#domain` `#communication`
+- **Covers**: Drawer vs. Modal → contentores de UI → termos de domínio (fatura/despesa/rubrica) → termos de estilo → como referir um componente sem ambiguidade
+
 ---
 
 ## Backend Skills
@@ -206,6 +214,7 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 ### Frontend Development
 - [[skill-frontend-design-system]] — Components, patterns, architecture
 - [[frontend-visual-consistency]] — Router to Backoffice design sub-files (tokens, drawers, tables, listings, etc.) — reference, not a skill
+- [[project-vocabulary]] — Drawer vs. Modal, fatura vs. despesa, rubrica — reference, not a skill
 - [[skill-frontend-error-handling]] — Error handling, validation
 - [[skill-frontend-integration-guide]] — Integrating backend changes
 
@@ -255,14 +264,14 @@ docs/skills/
 ├── backend/                   ← 4 skills
 ├── frontend/                  ← 4 skills
 ├── process/                   ← 3 skills
-└── references/                ← 2 docs + design/ (8 sub-files), not invocable
+└── references/                ← 3 docs + design/ (8 sub-files), not invocable
 ```
 
 ## Statistics
 
 | Category | Count |
 |----------|-------|
-| References (not invocable) | 2 (+ 8 design sub-files) |
+| References (not invocable) | 3 (+ 8 design sub-files) |
 | Backend Skills | 4 |
 | Frontend Skills | 4 |
 | Process Skills | 3 |
@@ -272,8 +281,9 @@ docs/skills/
 
 ## Last Updated
 
-- **Date**: 2026-08-05
-- **Latest**: Added `skill-implement-todo` (backlog orchestration) + the three missing Backoffice design references (`forms-and-validation`, `services-and-error-handling`, `app-shell-and-auth`, all audited against this project's real code). Registered `skill-frontend-structure-brief`, which existed but was never indexed. Removed the remaining Portal/Zustand carry-overs from the skill texts — neither exists in Worksite.
+- **Date**: 2026-08-09
+- **Latest**: Added the `project-vocabulary` reference — o dicionário partilhado (Drawer vs. Modal, fatura vs. despesa, rubrica, token). Nasceu de uma confusão real: um Drawer tratado por "modal" mandava quem lê para o sub-ficheiro de design errado.
+- **Anterior (2026-08-05)**: Added `skill-implement-todo` (backlog orchestration) + the three missing Backoffice design references (`forms-and-validation`, `services-and-error-handling`, `app-shell-and-auth`, all audited against this project's real code). Registered `skill-frontend-structure-brief`, which existed but was never indexed. Removed the remaining Portal/Zustand carry-overs from the skill texts — neither exists in Worksite.
 - **Next to Add**: As needed (update this index when adding)
 
 ---

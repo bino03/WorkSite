@@ -4,6 +4,8 @@ import { Button, Drawer } from "antd";
 import { EditOutlined } from "@ant-design/icons";
 
 import { useAuth } from "@/hooks/useAuth";
+import { getInvoice } from "@/services/invoiceService";
+import { ErrorHandler } from "@/errors/errorHandler";
 import { formatCurrency, formatDate, formatDateTime } from "@/utils/formatters";
 import type { ConstructionExpense } from "@/types/budget";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
@@ -38,6 +40,27 @@ const Fact: FC<{ label: string; children: React.ReactNode }> = ({ label, childre
 export const BudgetExpenseDetailDrawer: FC<Props> = ({ expense, open, onClose, onEdit }) => {
   const { isAdmin } = useAuth();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [loadingFile, setLoadingFile] = useState(false);
+
+  /**
+   * A lista de despesas só traz a miniatura da fatura. O link assinado do
+   * documento completo é pedido aqui, ao clicar — não vale a pena assinar o
+   * PDF de cada linha quando quase nenhum é aberto.
+   */
+  const openPreview = async () => {
+    if (!expense?.invoice) return;
+    setLoadingFile(true);
+    try {
+      const invoice = await getInvoice(expense.invoice.id);
+      setFileUrl(invoice.fileUrl);
+      setPreviewOpen(true);
+    } catch (error) {
+      ErrorHandler.handle(error);
+    } finally {
+      setLoadingFile(false);
+    }
+  };
 
   return (
     <>
@@ -81,52 +104,62 @@ export const BudgetExpenseDetailDrawer: FC<Props> = ({ expense, open, onClose, o
             <Card kicker="Fatura">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px", fontSize: 14 }}>
                 <Fact label="Data">{formatDate(expense.expenseDate)}</Fact>
-                <Fact label="Fornecedor (NIF)">{expense.supplierNif ?? "—"}</Fact>
-                <Fact label="Nº fatura">{expense.invoiceNumber ?? "—"}</Fact>
-                <Fact label="ATCUD">{expense.invoiceAtcud ?? "—"}</Fact>
+                <Fact label="Fornecedor">
+                  {expense.invoice?.supplierName ?? expense.invoice?.supplierNif ?? "—"}
+                </Fact>
+                <Fact label="Nº fatura">{expense.invoice?.invoiceNumber ?? "—"}</Fact>
+                <Fact label="ATCUD">{expense.invoice?.invoiceAtcud ?? "—"}</Fact>
               </div>
 
-              {expense.hasInvoice ? (
-                <Button
-                  onClick={() => setPreviewOpen(true)}
-                  disabled={!expense.invoiceUrl}
-                  title={
-                    expense.invoiceUrl
-                      ? undefined
-                      : "O ficheiro existe mas não foi possível gerar o link de acesso."
-                  }
-                >
-                  {expense.invoiceUrl ? "Ver fatura" : "Fatura indisponível"}
-                </Button>
+              {expense.invoice ? (
+                <div style={{ display: "flex", gap: "10.2px", alignItems: "center" }}>
+                  {expense.invoice.thumbnailUrl && (
+                    <img
+                      src={expense.invoice.thumbnailUrl}
+                      alt={expense.invoice.originalFilename ?? "fatura"}
+                      style={{
+                        width: 48,
+                        height: 64,
+                        objectFit: "cover",
+                        border: "1px solid var(--ind-color-divider)",
+                      }}
+                    />
+                  )}
+                  <Button onClick={openPreview} loading={loadingFile}>
+                    Ver fatura
+                  </Button>
+                </div>
               ) : (
-                <div style={{ fontSize: 12, opacity: 0.6 }}>Sem ficheiro de fatura anexado.</div>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  Lançamento registado à mão, sem documento.
+                </div>
               )}
             </Card>
 
-            <Card kicker="Contabilidade">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, flexWrap: "wrap" }}>
-                <span
-                  className={`ind-tag ${expense.sentToAccountant ? "ind-tag-accent" : "ind-tag-neutral"}`}
-                >
-                  {expense.sentToAccountant ? "enviada" : "por enviar"}
-                </span>
-                {expense.sentToAccountant && expense.sentToAccountantByName && (
-                  <span style={{ fontSize: 12, opacity: 0.6 }}>
-                    por {expense.sentToAccountantByName}
-                    {expense.sentToAccountantByRole
-                      ? ` (${ROLE_LABEL[expense.sentToAccountantByRole]})`
-                      : ""}
-                    {expense.sentToAccountantAt ? ` · ${formatDateTime(expense.sentToAccountantAt)}` : ""}
+            {expense.invoice && (
+              <Card kicker="Contabilidade">
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, flexWrap: "wrap" }}>
+                  <span
+                    className={`ind-tag ${
+                      expense.invoice.sentToAccountant ? "ind-tag-accent" : "ind-tag-neutral"
+                    }`}
+                  >
+                    {expense.invoice.sentToAccountant ? "enviada" : "por enviar"}
                   </span>
-                )}
-              </div>
-              {expense.uploadedByName && (
-                <span style={{ fontSize: 12, opacity: 0.6 }}>
-                  carregado por {expense.uploadedByName}
-                  {expense.uploadedAt ? ` · ${formatDateTime(expense.uploadedAt)}` : ""}
-                </span>
-              )}
-            </Card>
+                  {expense.invoice.sentToAccountant && expense.invoice.sentToAccountantByName && (
+                    <span style={{ fontSize: 12, opacity: 0.6 }}>
+                      por {expense.invoice.sentToAccountantByName}
+                      {expense.invoice.sentToAccountantByRole
+                        ? ` (${ROLE_LABEL[expense.invoice.sentToAccountantByRole]})`
+                        : ""}
+                      {expense.invoice.sentToAccountantAt
+                        ? ` · ${formatDateTime(expense.invoice.sentToAccountantAt)}`
+                        : ""}
+                    </span>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
         )}
       </Drawer>
@@ -134,9 +167,9 @@ export const BudgetExpenseDetailDrawer: FC<Props> = ({ expense, open, onClose, o
       <InvoicePreviewModal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        invoiceUrl={expense?.invoiceUrl ?? null}
-        mimeType={expense?.mimeType ?? null}
-        filename={expense?.originalFilename ?? null}
+        invoiceUrl={fileUrl}
+        mimeType={expense?.invoice?.mimeType ?? null}
+        filename={expense?.invoice?.originalFilename ?? null}
       />
     </>
   );

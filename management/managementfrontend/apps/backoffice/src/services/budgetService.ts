@@ -7,7 +7,6 @@ import type {
   BudgetTree,
   ConstructionExpense,
   ConstructionExpenseUpsert,
-  InvoiceScanResult,
 } from "@/types/budget";
 
 /* ========= Árvore de rubricas ========= */
@@ -86,54 +85,31 @@ export async function getExpenseById(id: string): Promise<ConstructionExpense> {
   return response.data;
 }
 
-export async function createExpense(
-  dto: ConstructionExpenseUpsert,
-  invoiceFile?: File
-): Promise<ConstructionExpense> {
-  const form = new FormData();
-  form.append("expenseData", new Blob([JSON.stringify(dto)], { type: "application/json" }));
-  if (invoiceFile) form.append("invoiceFile", invoiceFile);
-  const response = await api.post(`/construction-expenses`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+/**
+ * Lançamento **sem documento**.
+ *
+ * O upload deixou de passar por aqui: uma despesa com fatura nasce de
+ * `uploadInvoice` + `allocateInvoice` (`services/invoiceService.ts`), porque a
+ * fatura existe antes de se saber a que rubrica pertence.
+ */
+export async function createExpense(dto: ConstructionExpenseUpsert): Promise<ConstructionExpense> {
+  const response = await api.post(`/construction-expenses`, dto);
   return response.data;
 }
 
 export async function updateExpense(
   id: string,
-  dto: ConstructionExpenseUpsert,
-  invoiceFile?: File
+  dto: ConstructionExpenseUpsert
 ): Promise<ConstructionExpense> {
-  const form = new FormData();
-  form.append("expenseData", new Blob([JSON.stringify(dto)], { type: "application/json" }));
-  if (invoiceFile) form.append("invoiceFile", invoiceFile);
-  const response = await api.put(`/construction-expenses/${id}`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await api.put(`/construction-expenses/${id}`, dto);
   return response.data;
-}
-
-export async function setSentToAccountant(id: string, sent: boolean): Promise<ConstructionExpense> {
-  const response = await api.patch(`/construction-expenses/${id}/accountant`, null, {
-    params: { sent },
-  });
-  return response.data;
-}
-
-export async function deleteExpense(id: string): Promise<void> {
-  await api.delete(`/construction-expenses/${id}`);
 }
 
 /**
- * Lê o QR code da AT de uma fatura e devolve os campos para pré-preencher o
- * formulário. Não grava nada — o utilizador confirma antes de criar a despesa.
+ * Apaga o lançamento. A fatura, se existir, volta à caixa de entrada — é o que
+ * se quer quando a classificação estava errada. Para eliminar também o
+ * documento, `deleteInvoice`.
  */
-export async function scanInvoice(enterpriseId: string, invoiceFile: File): Promise<InvoiceScanResult> {
-  const form = new FormData();
-  form.append("invoiceFile", invoiceFile);
-  const response = await api.post(`/construction-expenses/scan-invoice`, form, {
-    params: { enterpriseId },
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return response.data;
+export async function deleteExpense(id: string): Promise<void> {
+  await api.delete(`/construction-expenses/${id}`);
 }

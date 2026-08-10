@@ -41,11 +41,5 @@ public record ConstructionExpenseUpsertDTO(
         @Positive(message = "Preço total tem de ser positivo")
         BigDecimal totalPrice,
 
-        String observations,
-
-        // ── identificação da fatura; normalmente vem preenchida do QR da AT
-        //    através de POST /construction-expenses/scan-invoice ──
-        String supplierNif,
-        String invoiceNumber,
-        String invoiceAtcud
+        String observations
 ) {}

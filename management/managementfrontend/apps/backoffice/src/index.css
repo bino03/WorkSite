@@ -230,41 +230,89 @@ h6 { letter-spacing: 0.08em; text-transform: uppercase; }
   background: var(--warm-sand);
 }
 
-/* ── Ant Design overrides ────────────────────────────────── */
-.ant-table-cell {
-  padding-left: 24px !important;
-  padding-right: 24px !important;
-}
-
-.employees-table .ant-table-cell {
-  padding-left: 24px;
-  padding-right: 24px;
-}
-
-/* Warm Ant Table */
+/* ── Ant Design overrides — Industry table ───────────────────
+   The warm terracotta table skin that lived here painted every
+   AntD table ivory/warm-sand, which contradicted the Industry
+   system the rest of the app moved to. Replaced 2026-08-09 with
+   the design's `.table` spec: transparent ground, uppercase
+   hairline headers, dividers instead of fills.
+   ──────────────────────────────────────────────────────────── */
 .ant-table {
-  background: var(--ivory) !important;
+  background: transparent !important;
+  font-size: 14px;
 }
 .ant-table-thead > tr > th {
-  background: var(--warm-sand) !important;
-  color: var(--charcoal-warm) !important;
-  border-bottom: 1px solid var(--border-warm) !important;
-  font-weight: 500 !important;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--ind-color-text) 60%, transparent) !important;
+  border-bottom: 1px solid var(--ind-color-divider) !important;
+  font-family: var(--ind-font-body);
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
+/* AntD draws a vertical hairline between headers; the blueprint
+   table separates columns by alignment alone. */
+.ant-table-thead > tr > th::before { display: none !important; }
 .ant-table-tbody > tr > td {
-  border-bottom: 1px solid var(--border-cream) !important;
-  color: var(--near-black) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ind-color-text) 8%, transparent) !important;
+  color: var(--ind-color-text) !important;
 }
-.ant-table-tbody > tr:hover > td {
-  background: #f2f1ea !important;
+.ant-table-tbody > tr:hover > td,
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background: color-mix(in srgb, var(--ind-color-text) 4%, transparent) !important;
 }
+.ant-table-placeholder:hover > td { background: transparent !important; }
 
-/* Warm pagination */
 .ant-pagination-item-active {
-  border-color: var(--terracotta) !important;
+  border-color: var(--ind-color-accent) !important;
 }
 .ant-pagination-item-active a {
-  color: var(--terracotta) !important;
+  color: var(--ind-color-accent) !important;
+}
+
+/* ── Picker rows (budget-item picker) ─────────────────────────
+   Hover/focus live here, not in onMouseEnter handlers writing to
+   e.currentTarget.style — that pattern was removed 2026-08-05.
+   The transparent border keeps the row from shifting 1px when it
+   becomes selected.
+   ──────────────────────────────────────────────────────────── */
+/* O Spin embrulha o conteúdo em dois divs próprios; sem isto a cadeia de
+   flex quebra aí e a lista deixa de encolher dentro do modal. */
+.ind-picker-spin,
+.ind-picker-spin > .ant-spin-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ind-picker-row {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  padding: var(--ind-space-3);
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ind-color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.ind-picker-row:hover {
+  background: var(--ind-accent-100);
+  border-color: var(--ind-color-accent);
+}
+.ind-picker-row:focus-visible {
+  outline: 2px solid var(--ind-color-accent);
+  outline-offset: 2px;
+}
+.ind-picker-row[aria-selected="true"] {
+  background: var(--ind-accent-100);
+  border-color: var(--ind-color-accent);
 }
 
 /* ── Animations ──────────────────────────────────────────── */

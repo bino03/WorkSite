@@ -100,6 +100,12 @@ Quando houver paginação, importar `DEFAULT_PAGE_SIZE`/`PAGE_SIZE_OPTIONS` de `
 
 `TasksPage.tsx:69-96` e `EnterprisesList` usam o mesmo bloco: `<Input>` com `prefix={<SearchOutlined style={{opacity:.5}}/>}` e `maxWidth: 320`, um `<select>` nativo estilizado com as vars `--ind-*`, e um `<Button>` "Limpar". **Segue este**, incluindo o `<select>` nativo — não trocar por `<Select>` do AntD só nesta lista.
 
+## 6. Pele da tabela — vem do CSS global, não por ficheiro
+
+`index.css` estiliza `.ant-table` uma vez para toda a app, segundo a spec `.table` do sistema Industry: fundo **transparente**, cabeçalhos em maiúsculas 11px com `letter-spacing:.08em` a 60% do texto, linhas separadas por hairline a 8%, hover a 4%. **Não redefinas cor de tabela por ficheiro** — herda daqui.
+
+> Corrigido a 2026-08-09: até essa data o `index.css` ainda tinha a pele terracotta herdada (`.ant-table` a `--ivory`, cabeçalhos a `--warm-sand`, `padding: 24px !important`), que pintava **todas** as tabelas na paleta legacy e contradizia o resto da app. Foi substituída pela pele Industry. Se vires warm sand numa tabela, é drift a voltar — não o repitas.
+
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
 - [[backoffice-buttons-and-icons]] — variantes de botão e confirmação de ações destrutivas
