@@ -40,6 +40,10 @@ interface Props {
  * preenche fornecedor, número, data e total, e a classificação fica para
  * depois. Cada ficheiro tem o seu estado — um QR ilegível não interrompe os
  * restantes, entra como "por rever" e alguém o completa mais tarde.
+ *
+ * Largar ficheiros só os põe "por guardar" — nada sobe até se premir
+ * "Guardar". Dá para rever a lista, remover (❌) o que entrou por engano, e só
+ * então decidir enviar.
  */
 export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, onUploaded }) => {
   const { t } = useTranslation();
@@ -61,6 +65,13 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
    * o truque da referência do `fileList` falhar nalgum fluxo do AntD.
    */
   const runningRef = useRef(false);
+  /**
+   * Os `File` das linhas "por guardar". Não vive no `Row` porque `Row` é
+   * estado do React (serializável, mostrado na lista) e o `File` só é
+   * preciso no momento de enviar — guardá-lo aqui evita re-render a
+   * carregar um objeto que a UI nunca lê.
+   */
+  const filesRef = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
     if (open) {
@@ -69,32 +80,39 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
       runningRef.current = false;
       uploadedAny.current = false;
       processedBatch.current = null;
+      filesRef.current.clear();
     }
   }, [open]);
 
   const patch = (key: string, changes: Partial<Row>) =>
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, ...changes } : row)));
 
-  /** Só faz sentido para linhas paradas — a meio do envio, tirá-la da lista não cancela nada. */
-  const removeRow = (key: string) => setRows((prev) => prev.filter((row) => row.key !== key));
+  /** Tira da lista e do mapa de ficheiros — a meio do envio, tirá-la não cancela nada. */
+  const removeRow = (key: string) => {
+    filesRef.current.delete(key);
+    setRows((prev) => prev.filter((row) => row.key !== key));
+  };
 
   /**
-   * Aceita um novo lote de ficheiros. Ignora silenciosamente ficheiros cuja
-   * chave já esteja na lista (mesmo nome+tamanho+data), para que arrastar o
-   * mesmo ficheiro duas vezes não crie linhas duplicadas nem duplique o upload
-   * — quem quiser tentar de novo remove a linha (❌) e larga outra vez.
+   * Aceita um novo lote de ficheiros e põe-nos "por guardar" — não envia nada
+   * ainda. O envio só acontece quando se prime "Guardar", para dar
+   * oportunidade de rever ou remover (❌) antes de qualquer coisa ir para o
+   * servidor.
+   *
+   * Ignora silenciosamente ficheiros cuja chave já esteja na lista (mesmo
+   * nome+tamanho+data), para que arrastar o mesmo ficheiro duas vezes não
+   * crie linhas duplicadas.
    */
   const handleFiles = (fileList: File[]) => {
     if (runningRef.current) return;
 
     // Lê `rows` do closure, não de um updater funcional do `setRows`: um
     // updater deve ser puro (o React pode invocá-lo mais que uma vez, p.ex.
-    // em StrictMode), e `runQueue` dispara pedidos de rede — um efeito
-    // secundário não pode viver aí dentro. `runningRef`/`processedBatch`
-    // já garantem que só há uma chamada a `handleFiles` por lote, por isso
-    // o `rows` deste closure está sempre atualizado.
+    // em StrictMode). `runningRef`/`processedBatch` já garantem que só há
+    // uma chamada a `handleFiles` por lote, por isso o `rows` deste closure
+    // está sempre atualizado.
     const existingKeys = new Set(rows.map((row) => row.key));
-    const accepted: { row: Row; file: File }[] = [];
+    const accepted: Row[] = [];
 
     for (const file of fileList) {
       const key = `${file.name}-${file.size}-${file.lastModified}`;
@@ -104,19 +122,29 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
       const invalid = validateInvoiceFile(file);
       if (invalid) {
         // `validateInvoiceFile` devolve a chave de tradução, não a frase.
-        accepted.push({
-          row: { key, filename: file.name, status: "failed", error: t(invalid) },
-          file,
-        });
+        accepted.push({ key, filename: file.name, status: "failed", error: t(invalid) });
         continue;
       }
-      accepted.push({ row: { key, filename: file.name, status: "queued" }, file });
+      filesRef.current.set(key, file);
+      accepted.push({ key, filename: file.name, status: "queued" });
     }
 
     if (accepted.length === 0) return;
 
-    setRows((prev) => [...prev, ...accepted.map((entry) => entry.row)]);
-    void runQueue(accepted.filter((entry) => entry.row.status === "queued"));
+    setRows((prev) => [...prev, ...accepted]);
+  };
+
+  /** Envia todas as linhas "por guardar" — é o único sítio que dispara upload. */
+  const handleSave = () => {
+    const queue = rows
+      .filter((row) => row.status === "queued")
+      .map((row) => {
+        const file = filesRef.current.get(row.key);
+        return file ? { row, file } : null;
+      })
+      .filter((entry): entry is { row: Row; file: File } => entry !== null);
+
+    void runQueue(queue);
   };
 
   const runQueue = async (queue: { row: Row; file: File }[]) => {
@@ -155,6 +183,10 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
             // qualquer erro — Axios, rede, ou falha na compressão do browser —
             // nenhum ficheiro trava os restantes da fila.
             patch(row.key, { status: "failed", error: getErrorMessage(error) });
+          } finally {
+            // O ficheiro já foi enviado (ou falhou de vez) — não há retentativa
+            // automática, por isso não há razão para o manter em memória.
+            filesRef.current.delete(row.key);
           }
         }
       };
@@ -170,6 +202,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
     if (uploadedAny.current) onUploaded();
   };
 
+  const pending = rows.filter((r) => r.status === "queued").length;
   const done = rows.filter((r) => r.status === "done").length;
   const failed = rows.filter((r) => r.status === "failed").length;
   const review = rows.filter((r) => r.needsReview).length;
@@ -192,13 +225,23 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
           <span style={{ fontSize: 12, opacity: 0.65 }}>
             {rows.length === 0
               ? "Nenhum ficheiro selecionado"
-              : `${done} de ${rows.length} carregadas${failed ? ` · ${failed} com erro` : ""}${
-                  review ? ` · ${review} por rever` : ""
-                }`}
+              : [
+                  pending ? `${pending} por guardar` : null,
+                  done ? `${done} carregada${done > 1 ? "s" : ""}` : null,
+                  failed ? `${failed} com erro` : null,
+                  review ? `${review} por rever` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
           </span>
-          <Button type="primary" onClick={onClose} disabled={running}>
-            {running ? "A carregar…" : "Concluir"}
-          </Button>
+          <Space>
+            <Button onClick={onClose} disabled={running}>
+              Fechar
+            </Button>
+            <Button type="primary" onClick={handleSave} disabled={running || pending === 0}>
+              {running ? "A carregar…" : pending ? `Guardar (${pending})` : "Guardar"}
+            </Button>
+          </Space>
         </Space>
       }
     >
@@ -229,8 +272,8 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
             Largue aqui as faturas — PDF, JPEG ou PNG
           </p>
           <p style={{ fontSize: 11, opacity: 0.6, margin: "4px 0 0" }}>
-            As fotos são comprimidas antes de subir e o QR da AT preenche os campos.
-            A rubrica escolhe-se depois.
+            Escolha os ficheiros e prima "Guardar" para os carregar — nada sobe
+            antes disso. O QR da AT preenche os campos; a rubrica escolhe-se depois.
           </p>
         </Upload.Dragger>
 
@@ -249,7 +292,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
               <span style={{ fontSize: 13, wordBreak: "break-all" }}>{row.filename}</span>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <StatusTag row={row} />
-                {(row.status === "done" || row.status === "failed") && (
+                {(row.status === "queued" || row.status === "done" || row.status === "failed") && (
                   <Button
                     type="text"
                     size="small"
@@ -285,7 +328,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
 };
 
 const STATUS_LABEL: Record<Status, string> = {
-  queued: "em fila",
+  queued: "por guardar",
   compressing: "a comprimir",
   uploading: "a ler QR",
   done: "carregada",
