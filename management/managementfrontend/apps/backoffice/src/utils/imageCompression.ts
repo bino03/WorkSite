@@ -19,6 +19,19 @@
 const DEFAULT_MAX_EDGE = 2200;
 const DEFAULT_QUALITY = 0.82;
 
+/**
+ * Abaixo disto, comprimir não poupa Storage que se note — e arrisca o QR.
+ *
+ * As fotos de 4-8 MB do sensor da câmara são o caso que a compressão existe
+ * para resolver. Mas boa parte das faturas chega já reencodada por outra
+ * app (WhatsApp fica tipicamente por 100-500 KB) — reencodar de novo em JPEG
+ * não tem opção sem perdas: cada passagem requantiza os coeficientes, e é
+ * exatamente a textura fina do QR que primeiro se perde. Um QR já no limite
+ * do legível não sobrevive a duas compressões com perdas, e não há
+ * poupança de Storage que compense reintroduzir preenchimento manual.
+ */
+const SKIP_COMPRESSION_BELOW_BYTES = 1.5 * 1024 * 1024;
+
 export interface CompressionResult {
   /** O ficheiro a enviar — o comprimido, ou o original se comprimir não compensou. */
   file: File;
@@ -52,6 +65,7 @@ export async function compressInvoiceFile(
   };
 
   if (!file.type.startsWith("image/")) return unchanged;
+  if (file.size <= SKIP_COMPRESSION_BELOW_BYTES) return unchanged;
 
   try {
     // `imageOrientation` não é opcional: sem ele as fotos de telemóvel, que
