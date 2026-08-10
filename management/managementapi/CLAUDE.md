@@ -47,7 +47,7 @@ This is a scoped copy of [Property-Management](https://github.com/bino03/Propert
 ### Database
 
 - Schemas: `worksite` (main), `settings` (config/invites), `tasks` (standalone task management), `auth` (Supabase-managed — never touch)
-- Migrations: `src/main/resources/db/migration/` — Flyway V1–V17, `ddl-auto: none`
+- Migrations: `src/main/resources/db/migration/` — Flyway V1–V18, `ddl-auto: none`
 - When adding a new table: create a new `V{next}__description.sql` in `db/migration/` — never alter the DB directly via Supabase. See [[../../docs/skills/backend/skill-add-database-table]]
 - Base entity: UUID PK + `createdAt`/`updatedAt` (JPA auditing enabled)
 
@@ -93,7 +93,7 @@ Max 25 MB (configured in `application.yml`). Construction expense invoices go th
 
 ### Ficheiros lidos, não só guardados
 
-Duas dependências existem só para **ler** ficheiros que os clientes enviam:
+Dependências que existem só para **ler** ficheiros que os clientes enviam:
 
 - **Apache POI** (`poi-ooxml`) — `BudgetExcelImportService` importa o orçamento da obra a
   partir do `.xlsx` do empreiteiro, reconstruindo a árvore de rubricas.
@@ -101,6 +101,25 @@ Duas dependências existem só para **ler** ficheiros que os clientes enviam:
   a página quando o documento é PDF, ZXing descodifica). Preferido a OCR por ser
   determinístico e correr offline; nada sai do servidor. Sem QR legível devolve vazio e o
   preenchimento segue manual — nunca é erro.
+- **OpenCV/WeChat QRCode** (`org.bytedeco:opencv`, via JavaCPP) — `WeChatQrCodeService`, o
+  último degrau da escalada de `AtInvoiceQrService`. Só corre quando o ZXing (incluindo o
+  mosaico) não encontra QR nenhum: uma CNN detetora + super-resolução, treinada para QR
+  pequeno/desfocado dentro de uma foto maior — o caso que mata o ZXing (fotos de WhatsApp,
+  QR com poucos pixels por módulo). Medido contra 19 faturas reais: subiu a leitura de 14/19
+  para 15/19. Continua em processo, nada sai do servidor.
+  - Modelos (~1,1 MB) em `src/main/resources/models/wechat-qrcode/`, de
+    [WeChatCV/opencv_3rdparty](https://github.com/WeChatCV/opencv_3rdparty/tree/wechat_qrcode)
+    (Apache 2.0). `WeChatQrCodeService` extrai-os para uma pasta temporária no arranque
+    (`@Async` + `ApplicationReadyEvent`, para a primeira fatura real não pagar o carregamento).
+  - **Duas dependências de classifier por versão** (`opencv` e `openblas`, cada uma
+    `windows-x86_64` + `linux-x86_64`) — nunca usar `opencv-platform` sozinho: arrasta
+    android/iOS/macOS também e o jar final passa de ~200 MB para ~460 MB. Esquecer o
+    classifier do `openblas` (usado pelo DNN por baixo do OpenCV) não dá erro à compilação,
+    só `UnsatisfiedLinkError` na primeira chamada real — se um dia isto rebentar depois de
+    mudar a versão, é a primeira coisa a verificar.
+  - Se a biblioteca nativa não carregar nesta máquina (falta o classifier certo para o SO,
+    falha de permissões, etc.), o degrau fica silenciosamente desligado — nunca é a fatura a
+    falhar por causa disto.
 
 ### Compressão HTTP
 

@@ -219,36 +219,48 @@ Resposta do upload e do `PUT /{id}/file`:
 }
 ```
 
-### Duplicados — bloqueio, em dois momentos
+### Duplicados — bloqueio, em três chaves
 
 Um duplicado é **recusado**, não avisado. `duplicates` vem vazio no upload e no
 `POST /{id}/file` justamente por isso: se houvesse um, o pedido não chegava a passar.
 Só o `POST /{id}/rescan` ainda o preenche.
 
-A verificação corre com **duas chaves**, porque servem momentos diferentes:
+A verificação corre com **três chaves**, por ordem de certeza — a mais forte primeiro —
+porque servem momentos e falhas diferentes:
 
 | Chave | Quando apanha | Erro |
 |---|---|---|
+| `checksumSha256` | o ficheiro é byte-a-byte igual a um já carregado — não depende de nada ter sido lido | `INVOICE_012` |
 | `invoiceAtcud` | o QR foi lido — é o identificador que a AT atribui ao documento | `INVOICE_010` |
 | (`supplierNif`, `invoiceNumber`) | o QR falhou e alguém completou os campos à mão | `INVOICE_011` |
 
-A segunda existe porque a primeira só funciona quando já não é precisa: sem QR legível não
-há ATCUD, e a fatura entrava sem passar por verificação nenhuma. Quem completa uma fatura
-"por rever" escreve o NIF e o número, raramente o ATCUD — e o mesmo fornecedor não emite dois
-documentos com o mesmo número.
+O checksum existe para o caso em que **nenhuma das outras duas serve**: a mesma foto
+carregada duas vezes, sem QR legível em nenhuma das cópias — sem ATCUD nem NIF/número por
+onde comparar, o ficheiro entrava sempre. Calculado (SHA-256, hex) a partir dos bytes já em
+memória no upload e no `POST /{id}/file`, não custa uma leitura extra.
 
-Por isso a verificação corre **no `PUT /{id}` também**, e não só no carregamento: é na
-correção manual que uma fatura sem QR ganha identidade pela primeira vez. Sem isso, completar
-à mão duas fotografias da mesma fatura criava dois lançamentos iguais no orçamento. No `PUT`
-só corre quando a **identidade muda** (ATCUD, NIF ou número) — de outro modo um duplicado já
-existente na base bloqueava qualquer edição, incluindo mexer só nas notas.
+A segunda chave existe porque a primeira só funciona quando já não é precisa: sem QR legível
+não há ATCUD. A terceira existe porque a segunda só funciona quando o ficheiro já mudou de
+bytes entre uma cópia e outra (duas fotos diferentes do mesmo papel) — quem completa uma
+fatura "por rever" escreve o NIF e o número, raramente o ATCUD, e o mesmo fornecedor não
+emite dois documentos com o mesmo número.
 
-O ATCUD tem ainda uma garantia ao nível da base: `uq_invoice_enterprise_atcud` (`V17`), único
-e parcial sobre `(enterprise_id, invoice_atcud)`. A verificação no serviço é
-SELECT-depois-INSERT em transações separadas, e o cliente carrega com três pedidos em
-paralelo — dois ficheiros iguais em voo ao mesmo tempo passavam os dois. Aconteceu: duas
-linhas com o mesmo ATCUD gravadas com 20 ms de diferença. O índice fecha essa janela; o
-serviço continua a existir para dar a mensagem legível em vez de uma violação de constraint.
+Por isso a verificação por ATCUD e por (NIF, número) corre **no `PUT /{id}` também**, e não só
+no carregamento: é na correção manual que uma fatura sem QR ganha identidade pela primeira
+vez. Sem isso, completar à mão duas fotografias da mesma fatura criava dois lançamentos
+iguais no orçamento. No `PUT` só corre quando a **identidade muda** (ATCUD, NIF ou número) —
+de outro modo um duplicado já existente na base bloqueava qualquer edição, incluindo mexer só
+nas notas. O checksum não entra no `PUT`: a edição manual não troca o ficheiro, só
+`POST /{id}/file` o faz.
+
+O ATCUD e o checksum têm ainda uma garantia ao nível da base: `uq_invoice_enterprise_atcud`
+(`V17`) e `uq_invoice_enterprise_checksum` (`V18`), ambos únicos e parciais — sobre
+`(enterprise_id, invoice_atcud)` e `(enterprise_id, checksum_sha256)`, respetivamente. A
+verificação no serviço é SELECT-depois-INSERT em transações separadas, e o cliente carrega
+com três pedidos em paralelo — dois ficheiros iguais em voo ao mesmo tempo passavam os dois.
+Aconteceu com o ATCUD: duas linhas gravadas com 20 ms de diferença. Os índices fecham essa
+janela; o serviço continua a existir para dar a mensagem legível em vez de uma violação de
+constraint.
 
 O par (NIF, número) **não** leva índice de propósito: só entra em jogo na correção manual, uma
 pessoa de cada vez, onde não há corrida — e um índice ali criaria falsos positivos em gralhas.
@@ -279,13 +291,21 @@ Do QR saem `supplierNif`, `invoiceNumber`, `invoiceAtcud`, `invoiceDate`, `total
 à mão não são deitadas fora por se ter substituído a digitalização. O `supplierName` nunca vem
 do QR: a AT só declara o NIF do emitente.
 
-A procura é uma escalada, do barato para o caro: imagem inteira primeiro (duas binarizações),
-e só se essa não trouxer um QR da AT é que a imagem é recortada em quadros sobrepostos, cada
-um ampliado. O segundo degrau existe para a **fotografia da fatura inteira tirada ao
-telemóvel**, em que o QR ocupa uns 150 px de 1600 — na imagem toda o detetor não o localiza.
-Para PDF a escalada é 200 DPI → 300 DPI → mosaico, por isso o PDF nascido de um ERP
-resolve-se logo no primeiro. Medido contra 19 fotografias reais de faturas: 8 lidas só com a
-imagem inteira, 14 com o mosaico.
+A procura é uma escalada, do barato para o caro, em três degraus:
+
+1. **Imagem inteira** (duas binarizações do ZXing).
+2. **Mosaico** — só se o primeiro não trouxer um QR da AT: a imagem é recortada em quadros
+   sobrepostos, cada um ampliado. Existe para a **fotografia da fatura inteira tirada ao
+   telemóvel**, em que o QR ocupa uns 150 px de 1600 — na imagem toda o detetor não o localiza.
+3. **Detetor da WeChat** (`WeChatQrCodeService`, `org.bytedeco:opencv`) — só se o mosaico
+   também falhar: uma CNN com super-resolução, treinada para QR pequeno/desfocado, em vez de
+   só binarizar. Continua em processo, nada sai do servidor. Corre por último por ser o mais
+   caro (a primeira chamada por arranque do servidor carrega o modelo, ~15-20 s; feito em
+   segundo plano no arranque para não atrasar a primeira fatura real).
+
+Para PDF a escalada é 200 DPI → 300 DPI → mosaico → WeChat, por isso o PDF nascido de um ERP
+resolve-se logo no primeiro degrau. Medido contra 19 fotografias reais de faturas: 8 lidas só
+com a imagem inteira, 14 com o mosaico, 15 com o detetor da WeChat.
 
 `warnings` assinala documento anulado na AT (campo de estado `"A"`), nota de crédito
 (tipo `"NC"`, que abate em vez de somar) e campos ilegíveis. São frases já em português,
@@ -340,6 +360,7 @@ associada acompanha os novos valores.
 | `INVOICE_009` | `rescan` não conseguiu obter o ficheiro original do Storage |
 | `INVOICE_010` | já existe uma fatura com este ATCUD no projeto (upload, `/file` ou `PUT`) |
 | `INVOICE_011` | já existe uma fatura deste fornecedor com este número (sobretudo no `PUT`) |
+| `INVOICE_012` | este ficheiro já foi carregado no projeto — igual, byte a byte (upload ou `/file`) |
 
 Ficheiro: PDF, JPEG ou PNG, até 25 MB, bucket `documents`, chave
 `construction-invoices/{enterpriseId}/…`. A miniatura é um extra — falhar a gerá-la não custa

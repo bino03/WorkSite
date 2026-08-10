@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V17`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V18`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -9,22 +9,34 @@ Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[arc
 ```
 enterprises (projeto — nome de tabela/pacote mantido do Property-Management)
  ├── enterprises_location / enterprises_media (1:1 / 1:N)
+ ├── construction_invoice (o documento — ficheiro + dados do QR da AT, N:1 → enterprises)
  └── construction_budget_item (rubrica do orçamento, N:1 → enterprises)
       └── construction_budget_item (parent_id — árvore de profundidade livre)
-           └── construction_expense (despesa, N:1 → construction_budget_item)
-                — mesmos campos de medição da rubrica + fatura + envio ao contabilista
+           └── construction_expense (a afetação, N:1 → construction_budget_item)
+                — mesmos campos de medição da rubrica + invoice_id (nullable) + envio ao contabilista
 ```
 
-A despesa tem ainda três grupos de campos próprios:
+**`construction_invoice`** e **`construction_expense`** estão separados desde a `V16` porque
+**registar e classificar são momentos diferentes**: quem chega da obra com quinze faturas
+carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa associada
+(`invoice_id` de nenhuma linha aponta para ela) é a caixa de entrada — "por associar". Ver
+[[api.md]] → "Faturas de obra".
 
-- **`expense_date`** (not null) — a data da **fatura**, deliberadamente distinta do `created_at`
-  (data de registo). Sem esta separação, lançar faturas atrasadas em bloco atirava-as todas
-  para o mês em que foram escritas na app, e qualquer mapa mensal ficava errado.
-- **`supplier_nif` · `invoice_number` · `invoice_atcud`** — lidos do QR code da AT
-  (obrigatório nas faturas portuguesas desde 2022). O `invoice_atcud` tem índice parcial e
-  serve para avisar quando a mesma fatura é lançada duas vezes — **aviso, não restrição**:
-  repartir uma fatura por várias rubricas da obra é prática normal.
-- **`sent_to_accountant`** (+ `_by` / `_at`) e **`uploaded_by`** / **`uploaded_at`**.
+- **`construction_invoice`** — o documento: `bucket`/`storage_key`/`thumbnail_key` do
+  ficheiro, e os campos lidos do QR code da AT (obrigatório nas faturas portuguesas desde
+  2022) — `supplier_nif`, `invoice_number`, `invoice_atcud`, `invoice_date`, `total_amount`,
+  `taxable_amount`, `tax_amount`. Todos **nullable**: sem QR legível a fatura entra na mesma,
+  marcada "por rever" (`AtInvoiceQrService`, ver [[api.md]] → "Leitura do QR code da AT").
+  Três chaves de duplicado, cada uma com o seu índice único parcial por projeto:
+  `checksum_sha256` (`V18`, o ficheiro byte-a-byte — a única que não depende de nada ter sido
+  lido), `invoice_atcud` (`V17`), e o par (`supplier_nif`, `invoice_number`) — este sem
+  índice, verificado só na correção manual. `sent_to_accountant` (+ `_by`/`_at`) e
+  `uploaded_by`/`uploaded_at` também vivem aqui, não na despesa.
+- **`construction_expense`** — a afetação: `invoice_id` (nullable — uma despesa lançada à mão,
+  sem documento, continua possível), `expense_date` (a data da **fatura**, deliberadamente
+  distinta do `created_at`/data de registo — sem esta separação, lançar faturas atrasadas em
+  bloco atirava-as todas para o mês em que foram escritas na app) e `total_price`.
+  `uq_expense_invoice` garante 1 fatura → no máximo 1 despesa.
 
 A árvore substituiu (em `V15`) a hierarquia rígida de dois níveis
 `construction_stage` → `construction_sub_stage`, que não comportava os orçamentos reais:
