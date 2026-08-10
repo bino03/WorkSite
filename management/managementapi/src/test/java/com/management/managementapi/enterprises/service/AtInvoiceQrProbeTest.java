@@ -25,7 +25,7 @@ import java.util.Optional;
  */
 class AtInvoiceQrProbeTest {
 
-    private final AtInvoiceQrService service = new AtInvoiceQrService();
+    private final AtInvoiceQrService service = new AtInvoiceQrService(new WeChatQrCodeService());
 
     @Test
     @EnabledIfSystemProperty(named = "invoice.file", matches = ".+")

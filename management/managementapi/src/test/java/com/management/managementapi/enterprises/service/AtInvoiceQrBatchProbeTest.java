@@ -26,7 +26,7 @@ import java.util.stream.Stream;
  */
 class AtInvoiceQrBatchProbeTest {
 
-    private final AtInvoiceQrService service = new AtInvoiceQrService();
+    private final AtInvoiceQrService service = new AtInvoiceQrService(new WeChatQrCodeService());
 
     @Test
     @EnabledIfSystemProperty(named = "invoice.dir", matches = ".+")

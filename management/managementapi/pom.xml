@@ -105,6 +105,49 @@
       <version>3.0.3</version>
     </dependency>
 
+    <!-- Último degrau da escalada do QR: quando o ZXing não lê (QR pequeno,
+         desfocado pela compressão), o detetor da WeChat resolve alguns —
+         combina uma CNN de deteção com super-resolução treinada para QR
+         codes pequenos/desfocados, ao contrário do ZXing que só binariza.
+         Corre em processo, nada sai do servidor.
+
+         "opencv-platform" sozinho arrastava windows+linux+macOS+android+iOS
+         de uma vez — jar final de 460 MB. O OpenCV também precisa do
+         classifier certo do openblas (a lib de álgebra linear por baixo do
+         DNN); esquecê-lo dá UnsatisfiedLinkError só na primeira chamada real,
+         não à compilação — por isso os dois classifiers a github, sempre aos
+         pares, para as duas plataformas deste projeto: dev em Windows,
+         produção em Linux. -->
+    <dependency>
+      <groupId>org.bytedeco</groupId>
+      <artifactId>opencv</artifactId>
+      <version>4.10.0-1.5.11</version>
+    </dependency>
+    <dependency>
+      <groupId>org.bytedeco</groupId>
+      <artifactId>opencv</artifactId>
+      <version>4.10.0-1.5.11</version>
+      <classifier>windows-x86_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.bytedeco</groupId>
+      <artifactId>opencv</artifactId>
+      <version>4.10.0-1.5.11</version>
+      <classifier>linux-x86_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.bytedeco</groupId>
+      <artifactId>openblas</artifactId>
+      <version>0.3.28-1.5.11</version>
+      <classifier>windows-x86_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.bytedeco</groupId>
+      <artifactId>openblas</artifactId>
+      <version>0.3.28-1.5.11</version>
+      <classifier>linux-x86_64</classifier>
+    </dependency>
+
     <!-- Lombok -->
     <dependency>
       <groupId>org.projectlombok</groupId>

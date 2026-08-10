@@ -11,6 +11,7 @@ import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.GlobalHistogramBinarizer;
 import com.google.zxing.common.HybridBinarizer;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pdfbox.Loader;
@@ -53,14 +54,21 @@ import java.util.Optional;
  * digitalizações más), por isso nada aqui lança exceção por não encontrar —
  * devolve vazio e o preenchimento segue manual.
  *
- * A procura é uma escalada, do barato para o caro: imagem inteira primeiro e
- * mosaico ampliado depois (ver {@link #decodeInTiles}). O caso que obriga ao
- * segundo degrau é a fotografia da fatura inteira tirada ao telemóvel, em que o
- * QR ocupa uma nesga da imagem.
+ * A procura é uma escalada, do barato para o caro: imagem inteira primeiro,
+ * mosaico ampliado depois (ver {@link #decodeInTiles}), e só por fim o
+ * detetor da WeChat ({@link WeChatQrCodeService}), o mais caro dos três. O
+ * caso que obriga ao segundo degrau é a fotografia da fatura inteira tirada
+ * ao telemóvel, em que o QR ocupa uma nesga da imagem; o terceiro existe para
+ * quando esse QR, já recortado, ainda assim tem pouca resolução para o ZXing
+ * — módulos de poucos pixels, desfocados pela compressão do WhatsApp — e só
+ * uma CNN treinada para reconstruir QR pequeno/desfocado o lê.
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AtInvoiceQrService {
+
+    private final WeChatQrCodeService weChatQrCodeService;
 
     /**
      * Resoluções a tentar, por ordem. A 200 DPI resolve-se a esmagadora maioria
@@ -148,9 +156,10 @@ public class AtInvoiceQrService {
     }
 
     /**
-     * Escalada em três degraus, do barato para o caro: páginas inteiras a 200
-     * DPI, depois a 300, e só então o mosaico. Cada degrau só se paga quando o
-     * anterior falhou, e o PDF nascido de um ERP resolve-se logo no primeiro.
+     * Escalada em quatro degraus, do barato para o caro: páginas inteiras a
+     * 200 DPI, depois a 300, o mosaico, e só então a WeChat sobre a página
+     * inteira à DPI mais fina — o degrau caro fica para o fim, e o PDF
+     * nascido de um ERP resolve-se logo no primeiro.
      */
     private void decodeFromPdf(byte[] content, List<String> found) throws Exception {
         try (PDDocument document = Loader.loadPDF(content)) {
@@ -166,8 +175,17 @@ public class AtInvoiceQrService {
             }
 
             int finestDpi = PDF_RENDER_DPI[PDF_RENDER_DPI.length - 1];
+            List<BufferedImage> rendered = new ArrayList<>();
             for (int page = 0; page < pages; page++) {
-                if (decodeInTiles(renderer.renderImageWithDPI(page, finestDpi), found)) {
+                BufferedImage image = renderer.renderImageWithDPI(page, finestDpi);
+                rendered.add(image);
+                if (decodeInTiles(image, found)) {
+                    return;
+                }
+            }
+
+            for (BufferedImage image : rendered) {
+                if (decodeWithWeChat(image, found)) {
                     return;
                 }
             }
@@ -175,15 +193,32 @@ public class AtInvoiceQrService {
     }
 
     /**
-     * A página inteira primeiro; o mosaico só se aquela não trouxer o QR da AT.
-     *
-     * A fatura pode ter mais do que um QR — o da AT e o do multibanco — por isso
+     * A página inteira primeiro, o mosaico depois, e só por fim a WeChat — a
+     * fatura pode ter mais do que um QR (o da AT e o do multibanco), por isso
      * encontrar um qualquer não é motivo para parar. Quem decide é
      * {@link #containsAtQr}, e é também por isso que se devolvem todos: o filtro
      * de qual interessa faz-se em {@link #read}.
      */
     private boolean decodeFromImage(BufferedImage image, List<String> found) {
-        return decodeWholeImage(image, found) || decodeInTiles(image, found);
+        return decodeWholeImage(image, found)
+                || decodeInTiles(image, found)
+                || decodeWithWeChat(image, found);
+    }
+
+    /**
+     * O degrau mais caro: uma CNN treinada para achar e reconstruir QR
+     * pequeno/desfocado, em vez de só binarizar. Corre sobre a imagem
+     * inteira — o próprio modelo já deteta a região do QR, mosaico manual
+     * não é preciso aqui.
+     */
+    private boolean decodeWithWeChat(BufferedImage image, List<String> found) {
+        List<String> texts = weChatQrCodeService.decode(image);
+        for (String text : texts) {
+            if (!found.contains(text)) {
+                found.add(text);
+            }
+        }
+        return containsAtQr(found);
     }
 
     /**
