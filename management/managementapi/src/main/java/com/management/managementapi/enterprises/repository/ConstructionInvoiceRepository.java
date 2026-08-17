@@ -99,27 +99,31 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                                            @Param("excludeId") UUID excludeId);
 
     /**
-     * Faturas do projeto do mesmo fornecedor com o mesmo número de documento.
+     * Faturas do projeto do mesmo fornecedor, para o serviço comparar o número
+     * do documento já normalizado — ver
+     * {@code ConstructionInvoiceService#normalizeDocumentNumber}.
      *
      * O ATCUD é a chave fiscal, mas quem completa à mão uma fatura sem QR
      * legível escreve o NIF e o número — o ATCUD raramente. Sem esta segunda
      * via, a verificação de duplicado só funcionava justamente nos casos em que
      * já não era precisa. O par (NIF, número) é a chave de negócio de uma
      * fatura portuguesa: o mesmo fornecedor não emite dois documentos com o
-     * mesmo número.
+     * mesmo número — mas cada software escreve esse número de forma diferente
+     * (espaços, hífens, barras), por isso a comparação não pode ser feita aqui
+     * com um {@code =} exato: filtra-se só por fornecedor, e é o serviço que
+     * normaliza e compara.
      */
     @Query("""
             select i from ConstructionInvoice i
             where i.enterprise.id = :enterpriseId
               and i.supplierNif = :supplierNif
-              and i.invoiceNumber = :invoiceNumber
+              and i.invoiceNumber is not null
               and (:excludeId is null or i.id <> :excludeId)
             order by i.uploadedAt desc
             """)
-    List<ConstructionInvoice> findByEnterpriseAndSupplierDocument(@Param("enterpriseId") UUID enterpriseId,
-                                                                  @Param("supplierNif") String supplierNif,
-                                                                  @Param("invoiceNumber") String invoiceNumber,
-                                                                  @Param("excludeId") UUID excludeId);
+    List<ConstructionInvoice> findByEnterpriseAndSupplierNif(@Param("enterpriseId") UUID enterpriseId,
+                                                              @Param("supplierNif") String supplierNif,
+                                                              @Param("excludeId") UUID excludeId);
 
     /**
      * Rubricas onde as faturas deste fornecedor já foram lançadas, da mais usada

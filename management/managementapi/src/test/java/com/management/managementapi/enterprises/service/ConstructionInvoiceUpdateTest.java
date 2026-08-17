@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
@@ -7,6 +8,7 @@ import com.management.managementapi.enterprises.repository.ConstructionBudgetIte
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
+import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.repository.ProfileRepository;
@@ -26,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -78,7 +81,7 @@ class ConstructionInvoiceUpdateTest {
         // Preencher o número e o ATCUD muda a identidade do documento, logo o
         // update procura colisões. Aqui não há nenhuma.
         when(repository.findByEnterpriseAndAtcud(any(), any(), any())).thenReturn(List.of());
-        when(repository.findByEnterpriseAndSupplierDocument(any(), any(), any(), any()))
+        when(repository.findByEnterpriseAndSupplierNif(any(), any(), any()))
                 .thenReturn(List.of());
         when(repository.save(any(ConstructionInvoice.class))).thenAnswer(call -> call.getArgument(0));
 
@@ -90,5 +93,35 @@ class ConstructionInvoiceUpdateTest {
         assertThat(saved.getSupplierName()).isEqualTo("Betão Liz");
         assertThat(saved.getTaxableAmount()).isEqualByComparingTo("12000.00");
         assertThat(saved.getTaxAmount()).isEqualByComparingTo("2760.00");
+    }
+
+    @Test
+    @DisplayName("recusa um número escrito de forma diferente da mesma fatura já registada")
+    void rejectsDuplicateDocumentNumberWrittenDifferently() {
+        UUID id = UUID.randomUUID();
+        Enterprise enterprise = new Enterprise();
+        enterprise.setId(UUID.randomUUID());
+
+        ConstructionInvoice invoice = new ConstructionInvoice();
+        invoice.setId(id);
+        invoice.setEnterprise(enterprise);
+        invoice.setSupplierNif("509442013");
+
+        ConstructionInvoice existing = new ConstructionInvoice();
+        existing.setId(UUID.randomUUID());
+        existing.setSupplierNif("509442013");
+        // Mesmo número, escrito de forma diferente: maiúsculas, espaço a mais,
+        // hífen em vez de barra.
+        existing.setInvoiceNumber("ft2026-114");
+
+        when(repository.findById(id)).thenReturn(Optional.of(invoice));
+        when(repository.findByEnterpriseAndSupplierNif(any(), any(), any()))
+                .thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> service.update(id, new ConstructionInvoiceUpsertDTO(
+                null, "509442013", "FT 2026/114", null, null, null, null)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.INVOICE_DUPLICATE_DOCUMENT));
     }
 }

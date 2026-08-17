@@ -257,6 +257,13 @@ bytes entre uma cópia e outra (duas fotos diferentes do mesmo papel) — quem c
 fatura "por rever" escreve o NIF e o número, raramente o ATCUD, e o mesmo fornecedor não
 emite dois documentos com o mesmo número.
 
+O número **não** é comparado por igualdade exata: cada software de faturação formata-o à sua
+maneira ("FT 2024/123", "FT2024-123", "ft.2024.123", …), e é escrito à mão dos dois lados da
+comparação. `ConstructionInvoiceService.normalizeDocumentNumber` reduz a maiúsculas e só
+letras/dígitos antes de comparar — `findByEnterpriseAndSupplierNif` filtra só por fornecedor,
+e é o serviço que normaliza e compara em memória. Não se aplica ao ATCUD nem ao checksum:
+nenhum dos dois é escrito à mão.
+
 Por isso a verificação por ATCUD e por (NIF, número) corre **no `PUT /{id}` também**, e não só
 no carregamento: é na correção manual que uma fatura sem QR ganha identidade pela primeira
 vez. Sem isso, completar à mão duas fotografias da mesma fatura criava dois lançamentos

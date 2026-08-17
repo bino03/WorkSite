@@ -44,6 +44,7 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -603,7 +604,11 @@ public class ConstructionInvoiceService {
      *       É esta que apanha o duplicado quando o QR falhou e alguém completou
      *       os campos à mão: nesse momento o ATCUD continua vazio e a chave
      *       anterior não serve de nada. O mesmo fornecedor não emite dois
-     *       documentos com o mesmo número.</li>
+     *       documentos com o mesmo número — mas o número é escrito à mão dos
+     *       dois lados, e cada software de faturação formata-o à sua maneira
+     *       ("FT 2024/123", "FT2024-123", …). Por isso a comparação é feita
+     *       normalizada ({@link #normalizeDocumentNumber}), não por igualdade
+     *       exata.</li>
      * </ul>
      *
      * Sem nenhuma das três não há como comparar, e a fatura segue para revisão
@@ -635,9 +640,10 @@ public class ConstructionInvoiceService {
         }
 
         if (!isBlank(invoice.getSupplierNif()) && !isBlank(invoice.getInvoiceNumber())) {
-            repository.findByEnterpriseAndSupplierDocument(
-                            enterpriseId, invoice.getSupplierNif(), invoice.getInvoiceNumber(), excludeId)
+            String normalizedNumber = normalizeDocumentNumber(invoice.getInvoiceNumber());
+            repository.findByEnterpriseAndSupplierNif(enterpriseId, invoice.getSupplierNif(), excludeId)
                     .stream()
+                    .filter(other -> normalizedNumber.equals(normalizeDocumentNumber(other.getInvoiceNumber())))
                     .findFirst()
                     .ifPresent(other -> {
                         throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_DOCUMENT, String.format(
@@ -819,5 +825,17 @@ public class ConstructionInvoiceService {
             }
         }
         return null;
+    }
+
+    /**
+     * Normaliza um número de documento para comparar duplicados: maiúsculas e só
+     * letras/dígitos. Cada software de faturação escreve o mesmo número de
+     * forma diferente ("FT 2024/123", "FT2024-123", "ft.2024.123") — sem isto,
+     * a mesma fatura escrita à mão duas vezes de forma ligeiramente diferente
+     * escapava à verificação por (NIF, número). Não se aplica ao ATCUD nem ao
+     * checksum: nenhum dos dois é escrito à mão.
+     */
+    private static String normalizeDocumentNumber(String value) {
+        return isBlank(value) ? "" : value.replaceAll("[^\\p{L}\\p{N}]", "").toUpperCase(Locale.ROOT);
     }
 }
