@@ -41,6 +41,15 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
+    <!-- .env loading — application.yml reads ${DB_URL} etc. from the process
+         environment; nothing sources .env into it otherwise (mvnw spring-boot:run
+         does not, regardless of terminal/IDE) -->
+    <dependency>
+      <groupId>me.paulschwarz</groupId>
+      <artifactId>spring-dotenv</artifactId>
+      <version>4.0.0</version>
+    </dependency>
+
     <!-- DB -->
     <dependency>
       <groupId>org.postgresql</groupId>

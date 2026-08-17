@@ -40,11 +40,11 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 
 ## Process Skills
 
-| Skill | Description | Tags | Time |
-|-------|---|---|---|
-| [[skill-create-new-skill]] | Plan, write, and add a new skill (or reference) to the project | `#process` `#documentation` `#meta` | ~30-45m |
-| [[skill-git-commits]] | Commit message style and conventions | `#git` `#commits` `#style` | ~1-2m |
-| [[skill-implement-todo]] | Backlog (`notes/ToDo.md`) → prioridade → implementação, orquestrando as outras skills | `#process` `#backlog` `#planning` | ~1m a várias horas |
+| Skill                      | Description                                                                           | Tags                                | Time               |
+| -------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------- | ------------------ |
+| [[skill-create-new-skill]] | Plan, write, and add a new skill (or reference) to the project                        | `#process` `#documentation` `#meta` | ~30-45m            |
+| [[skill-git-commits]]      | Commit message style and conventions                                                  | `#git` `#commits` `#style`          | ~1-2m              |
+| [[skill-implement-todo]]   | Backlog (`notes/ToDo.md`) → prioridade → implementação, orquestrando as outras skills | `#process` `#backlog` `#planning`   | ~1m a várias horas |
 
 ---
 
