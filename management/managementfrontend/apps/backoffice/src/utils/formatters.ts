@@ -67,3 +67,16 @@ export function formatRelativeTime(date: string | undefined | null): string {
   if (!date) return "-";
   return dayjs(date).fromNow();
 }
+
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Percentagem poupada, para se poder mostrar "4,2 MB → 380 KB (−91%)". */
+export function savingsPercent(originalSize: number | null, finalSize: number | null): number | null {
+  if (!originalSize || !finalSize || originalSize <= finalSize) return null;
+  return Math.round((1 - finalSize / originalSize) * 100);
+}

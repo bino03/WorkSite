@@ -144,22 +144,29 @@ public class GlobalExceptionHandler {
         
         log.error("Database constraint violation: {}", ex.getMessage());
 
-        // O índice único do ATCUD (V17) é a rede que apanha o que o SELECT do
+        // Os índices únicos de fatura são a rede que apanha o que o SELECT do
         // serviço não vê: dois carregamentos do mesmo documento em paralelo,
-        // cada um em sua transação. Chegar aqui é raro, mas quem está do outro
-        // lado merece a mesma frase que teria no caminho normal, e não
-        // "violação de constraint".
-        boolean duplicateAtcud = String.valueOf(ex.getMessage())
-                .contains("uq_invoice_enterprise_atcud");
-
-        ErrorCode code = duplicateAtcud
-                ? ErrorCode.INVOICE_DUPLICATE_ATCUD
-                : ErrorCode.DATABASE_CONSTRAINT_VIOLATION;
+        // cada um em sua transação, nenhum a ver o INSERT do outro. Chegar
+        // aqui é raro, mas quem está do outro lado merece a mesma frase que
+        // teria no caminho normal, e não "violação de constraint".
+        //
+        //   uq_invoice_enterprise_atcud     (V17) — mesmo ATCUD da AT
+        //   uq_invoice_enterprise_checksum  (V18) — mesmo ficheiro, byte a byte
+        String message = String.valueOf(ex.getMessage());
+        ErrorCode code;
+        if (message.contains("uq_invoice_enterprise_atcud")) {
+            code = ErrorCode.INVOICE_DUPLICATE_ATCUD;
+        } else if (message.contains("uq_invoice_enterprise_checksum")) {
+            code = ErrorCode.INVOICE_DUPLICATE_FILE;
+        } else {
+            code = ErrorCode.DATABASE_CONSTRAINT_VIOLATION;
+        }
+        boolean knownDuplicate = code != ErrorCode.DATABASE_CONSTRAINT_VIOLATION;
 
         ErrorResponseDTO error = new ErrorResponseDTO(
             HttpStatus.CONFLICT.value(),
             "Conflict",
-            duplicateAtcud
+            knownDuplicate
                 ? code.getDefaultMessage()
                 : "Violação de constraint na base de dados",
             request.getRequestURI(),

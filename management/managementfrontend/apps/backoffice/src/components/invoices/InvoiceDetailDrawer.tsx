@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import {
   deallocateInvoice,
+  deleteInvoice,
   getInvoice,
   setInvoiceSentToAccountant,
   updateInvoice,
@@ -15,11 +16,20 @@ import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
-import { formatCurrency, formatDate } from "@/utils/formatters";
-import { formatBytes, savingsPercent } from "@/utils/imageCompression";
+import { parseApiError } from "@/utils/apiError";
+import { formatBytes, formatCurrency, formatDate, savingsPercent } from "@/utils/formatters";
 import type { ConstructionInvoice } from "@/types/invoice";
 
 const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrador", EMPLOYEE: "Funcionário" };
+
+/**
+ * ErrorCode de `dto/error/ErrorCode.java` — as três chaves de duplicado que
+ * `rejectIfDuplicate` pode acusar ao corrigir os campos à mão (ver
+ * `ConstructionInvoiceService.update`). O checksum não muda numa correção
+ * manual, mas fica incluído por segurança: mais vale reconhecer de mais do
+ * que deixar cair no aviso genérico.
+ */
+const DUPLICATE_ERROR_CODES = new Set(["INVOICE_010", "INVOICE_011", "INVOICE_012"]);
 
 interface Props {
   invoiceId: string | null;
@@ -65,6 +75,14 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const fetchInvoice = useCallback(async () => {
     if (!invoiceId) return;
     setLoading(true);
+    // Limpa já a fatura anterior: trocar de linha na lista sem fechar a
+    // drawer muda só o `invoiceId`, não desmonta o componente — sem isto, o
+    // `needsReview` (e o `fileUrl`) da fatura antiga ficavam a decidir a
+    // pré-visualização até a resposta chegar, abrindo/fechando o painel
+    // sozinho e pedindo um ficheiro que já não interessa.
+    setInvoice(null);
+    setValues(null);
+    setPreviewOpen(false);
     try {
       const data = await getInvoice(invoiceId);
       setInvoice(data);
@@ -108,7 +126,28 @@ export const InvoiceDetailDrawer: FC<Props> = ({
       await fetchInvoice();
       onChanged();
     } catch (error) {
-      ErrorHandler.handle(error);
+      const apiError = parseApiError(error);
+      if (apiError && DUPLICATE_ERROR_CODES.has(apiError.errorCode)) {
+        // O ErrorHandler genérico mostraria só um toast — aqui a correção
+        // óbvia é apagar esta fatura (a redundante), por isso oferece-se logo.
+        confirm({
+          title: "Fatura duplicada",
+          message: `${apiError.message} Esta fatura já está registada no sistema. Queres apagá-la?`,
+          actionLabel: "Apagar fatura",
+          onConfirm: async () => {
+            try {
+              await deleteInvoice(invoice.id);
+              notificationService.success("Fatura", "Fatura eliminada.");
+              onChanged();
+              onClose();
+            } catch (deleteError) {
+              ErrorHandler.handle(deleteError);
+            }
+          },
+        });
+      } else {
+        ErrorHandler.handle(error);
+      }
     } finally {
       setSaving(false);
     }
@@ -133,29 +172,40 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     });
   };
 
-  const handleAccountant = async () => {
+  const handleAccountant = () => {
     if (!invoice) return;
-    try {
-      await setInvoiceSentToAccountant(invoice.id, !invoice.sentToAccountant);
-      notificationService.success(
-        "Contabilidade",
-        invoice.sentToAccountant ? "Marcada como por enviar." : "Marcada como enviada."
-      );
-      await fetchInvoice();
-      onChanged();
-    } catch (error) {
-      ErrorHandler.handle(error);
-    }
+    const action = invoice.sentToAccountant ? "desmarcar como enviada" : "marcar como enviada";
+    confirm({
+      message: `${action.charAt(0).toUpperCase() + action.slice(1)} para a contabilidade?`,
+      onConfirm: async () => {
+        try {
+          await setInvoiceSentToAccountant(invoice.id, !invoice.sentToAccountant);
+          notificationService.success(
+            "Contabilidade",
+            invoice.sentToAccountant ? "Marcada como por enviar." : "Marcada como enviada."
+          );
+          await fetchInvoice();
+          onChanged();
+        } catch (error) {
+          ErrorHandler.handle(error);
+        }
+      },
+    });
   };
 
   const savings = savingsPercent(invoice?.originalSizeBytes ?? null, invoice?.sizeBytes ?? null);
+  // Falta o essencial para associar — mostra o documento ao lado dos campos
+  // logo de início, para preencher a olhar para ele sem andar a abrir e
+  // fechar o modal de pré-visualização a cada campo.
+  const showInlinePreview = invoice?.needsReview ?? false;
 
   return (
     <>
       <Drawer
         open={open}
         onClose={onClose}
-        width={640}
+        width={showInlinePreview ? "min(1500px, 96vw)" : 640}
+        styles={showInlinePreview ? { body: { padding: "13.6px 20.4px" } } : undefined}
         destroyOnClose
         title={
           <div>
@@ -180,7 +230,51 @@ export const InvoiceDetailDrawer: FC<Props> = ({
       >
         <Spin spinning={loading}>
           {invoice && values && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20.4px" }}>
+            <div style={{ display: "flex", gap: "10.2px", alignItems: "flex-start" }}>
+              {showInlinePreview && (
+                <div
+                  style={{
+                    flex: "1 1 60%",
+                    position: "sticky",
+                    top: 0,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    maxHeight: "calc(100vh - 140px)",
+                    overflowY: "auto",
+                    background: "var(--ind-color-surface)",
+                  }}
+                >
+                  {invoice.fileUrl ? (
+                    invoice.mimeType?.startsWith("image/") ? (
+                      <img
+                        src={invoice.fileUrl}
+                        alt={invoice.originalFilename ?? "fatura"}
+                        style={{ width: "100%", display: "block" }}
+                      />
+                    ) : (
+                      <embed
+                        src={invoice.fileUrl}
+                        type="application/pdf"
+                        style={{ width: "100%", height: "calc(100vh - 140px)", display: "block" }}
+                      />
+                    )
+                  ) : (
+                    <div style={{ padding: 24, fontSize: 13, opacity: 0.6 }}>
+                      Sem pré-visualização disponível.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div
+                style={{
+                  flex: "1 1 40%",
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "13.6px",
+                }}
+              >
               {/* Documento ------------------------------------------------ */}
               <div className="ind-card ind-blueprint ind-elev-sm" style={{ padding: "13.6px" }}>
                 <i className="ind-corner tl" />
@@ -376,6 +470,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                     {formatCurrency(invoice.taxAmount ?? 0)}
                   </div>
                 )}
+              </div>
               </div>
             </div>
           )}

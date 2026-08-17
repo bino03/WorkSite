@@ -21,8 +21,10 @@ interface Props {
   onSelectionChange: (ids: string[]) => void;
   onPageChange: (page: number, size: number) => void;
   onView: (invoice: ConstructionInvoice) => void;
+  onImageClick: (invoiceId: string) => void;
   onAllocate: (invoice: ConstructionInvoice) => void;
   onDeallocate: (invoice: ConstructionInvoice) => void;
+  onSendToAccountant: (invoice: ConstructionInvoice) => void;
   onDelete: (invoice: ConstructionInvoice) => void;
 }
 
@@ -42,8 +44,10 @@ export const InvoicesList: FC<Props> = ({
   onSelectionChange,
   onPageChange,
   onView,
+  onImageClick,
   onAllocate,
   onDeallocate,
+  onSendToAccountant,
   onDelete,
 }) => {
   const { isAdmin } = useAuth();
@@ -55,20 +59,38 @@ export const InvoicesList: FC<Props> = ({
       width: 56,
       render: (url: string | null, row) =>
         url ? (
-          <img
-            src={url}
-            alt={row.originalFilename ?? "fatura"}
-            loading="lazy"
-            style={{
-              width: 40,
-              height: 52,
-              objectFit: "cover",
-              display: "block",
-              border: "1px solid var(--ind-color-divider)",
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onImageClick(row.id);
             }}
-          />
+            style={{
+              padding: 0,
+              border: "1px solid var(--ind-color-divider)",
+              background: "var(--ind-color-surface)",
+              cursor: "pointer",
+            }}
+          >
+            <img
+              src={url}
+              alt={row.originalFilename ?? "fatura"}
+              loading="lazy"
+              style={{
+                width: 40,
+                height: 52,
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </button>
         ) : (
-          <span
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onImageClick(row.id);
+            }}
             style={{
               width: 40,
               height: 52,
@@ -76,10 +98,13 @@ export const InvoicesList: FC<Props> = ({
               placeItems: "center",
               border: "1px solid var(--ind-color-divider)",
               color: "var(--ind-color-accent)",
+              background: "var(--ind-color-surface)",
+              cursor: "pointer",
+              padding: 0,
             }}
           >
             <FileTextOutlined />
-          </span>
+          </button>
         ),
     },
     {
@@ -147,7 +172,7 @@ export const InvoicesList: FC<Props> = ({
     {
       title: "",
       key: "actions",
-      width: 150,
+      width: 200,
       render: (_: unknown, row) => (
         <ListActions>
           <ListActionPrimary onClick={() => onView(row)}>Ver detalhes</ListActionPrimary>
@@ -168,6 +193,11 @@ export const InvoicesList: FC<Props> = ({
                 </span>
               </Tooltip>
             ))}
+          {isAdmin() && (
+            <ListActionSecondary onClick={() => onSendToAccountant(row)}>
+              {row.sentToAccountant ? "Desmarcar envio" : "Enviar"}
+            </ListActionSecondary>
+          )}
           {isAdmin() && <ListActionDanger onClick={() => onDelete(row)}>Eliminar</ListActionDanger>}
         </ListActions>
       ),

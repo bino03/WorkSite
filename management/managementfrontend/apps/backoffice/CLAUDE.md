@@ -57,12 +57,14 @@ src/
 │       ├── EmployeesList.tsx
 │       ├── TasksPage.tsx
 │       ├── employee/EmployeeProfilePage.tsx
-│       └── enterprise/ConstructionBudgetPage.tsx
+│       ├── enterprise/ConstructionBudgetPage.tsx
+│       └── enterprise/EnterpriseInvoicesPage.tsx
 │
 ├── components/               # Organizados por domínio
 │   ├── enterprise/           # create/ (secções + schema Zod), edit/ (cards), Create/View drawers
 │   ├── tasks/                # TasksList, TaskFormDrawer, TaskDetailDrawer
 │   ├── budget/               # Árvore de orçamento: drawers, modal de importação, utils
+│   ├── invoices/             # InvoicesList, InvoiceUploadDrawer (2 fases), InvoiceDetailDrawer, BudgetItemPickerModal
 │   ├── construction/         # InvoicePreviewModal + regras da fatura (reaproveitados)
 │   ├── employees/            # CreateEmployeeDrawer, EmployeeContextMenu
 │   ├── profile/              # MyProfileModal, ProfileView, ProfileDrawer, seeprofile/EmployeeMiniCard
@@ -74,7 +76,7 @@ src/
 │
 ├── services/                 # Chamadas à API por domínio
 │   ├── authService.ts / profileService.ts / adminService.ts
-│   ├── enterpriseService.ts / budgetService.ts / locationService.ts
+│   ├── enterpriseService.ts / budgetService.ts / locationService.ts / invoiceService.ts
 │   └── general/notificationService.tsx
 │
 ├── hooks/
@@ -88,7 +90,8 @@ src/
 │
 ├── types/
 │   ├── profile.ts
-│   └── budget.ts
+│   ├── budget.ts
+│   └── invoice.ts
 │
 ├── config/
 │   ├── entityColors.ts       # `IND` — espelho em JS das vars `--ind-*` (só para casos que precisam do hex, ex. `stroke` de SVG)
@@ -118,6 +121,7 @@ This is a scoped copy of Property-Management's Backoffice — no property listin
   /backoffice/funcionarios/:id                               → EmployeeProfilePage
   /backoffice/empreendimentos                                → EnterprisesList
   /backoffice/empreendimentos/:enterpriseId/budget            → ConstructionBudgetPage
+  /backoffice/empreendimentos/:enterpriseId/invoices           → EnterpriseInvoicesPage
   /backoffice/tasks                                          → TasksPage
 ```
 
@@ -141,6 +145,30 @@ três páginas encadeadas de etapa → sub-etapa → despesa, que foram removida
 - Reaproveitados do domínio anterior: `components/construction/InvoicePreviewModal.tsx` e o
   `validateInvoiceFile` em `constructionFormSchemas.ts` — as regras da fatura não mudaram
   (PDF/JPEG/PNG, 25 MB, signed URL).
+
+### Faturas de obra
+
+`/backoffice/empreendimentos/:enterpriseId/invoices` → `EnterpriseInvoicesPage`. A caixa de
+entrada das faturas — o documento é registado aqui, a rubrica escolhe-se a seguir através do
+`BudgetItemPickerModal` (ver [[../../../../docs/api.md]], secção "Faturas de obra").
+
+- `components/invoices/InvoiceUploadDrawer.tsx` — carregamento em massa, em **duas fases**:
+  "Enviar" chama `POST /preview` por ficheiro (lê o QR, verifica duplicados, não grava nada);
+  só depois de rever o resultado é que "Guardar" grava a sério. Duplicadas — quer apanhadas
+  pelo servidor, quer pelo checksum calculado no próprio browser contra o resto do lote — são
+  excluídas do "Guardar" sozinhas, sem ação manual. Fecha-se sozinho quando tudo o que tentou
+  guardar teve sucesso.
+- `components/invoices/InvoiceDetailDrawer.tsx` — o detalhe e a correção manual. Quando falta a
+  data ou o total (`needsReview`), a drawer alarga e mostra o documento **ao lado** dos campos,
+  para preencher a olhar para ele sem abrir/fechar um modal a cada correção; caso contrário fica
+  na largura normal e o documento só se vê a pedido (`components/construction/InvoicePreviewModal.tsx`,
+  que tem os únicos botões de zoom — só para imagem, um PDF já traz o zoom próprio do
+  visualizador do browser). Se a correção colidir com uma fatura já registada, oferece logo um
+  confirm para apagar esta (repetida) — ficheiro, miniatura e linha.
+- Trocar de fatura sem fechar a drawer (clicar noutra linha da lista) não a desmonta — só muda
+  o `invoiceId`. `fetchInvoice()` limpa o estado antes do pedido, de propósito: sem isso a
+  fatura anterior ficava visível (e a decidir se a pré-visualização abre) até a resposta nova
+  chegar.
 
 ---
 

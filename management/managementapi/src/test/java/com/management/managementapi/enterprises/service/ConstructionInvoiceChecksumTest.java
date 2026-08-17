@@ -55,6 +55,7 @@ class ConstructionInvoiceChecksumTest {
     @Mock private SignedUrlService signedUrls;
     @Mock private AtInvoiceQrService qrService;
     @Mock private InvoiceThumbnailService thumbnailService;
+    @Mock private InvoiceCompressionService compressionService;
     @Mock private AuthContext authContext;
 
     @InjectMocks private ConstructionInvoiceService service;
@@ -78,7 +79,7 @@ class ConstructionInvoiceChecksumTest {
         when(repository.findByEnterpriseAndChecksum(any(), any(), any()))
                 .thenReturn(List.of(existing));
 
-        assertThatThrownBy(() -> service.upload(enterpriseId, file, null))
+        assertThatThrownBy(() -> service.upload(enterpriseId, file))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                         .isEqualTo(ErrorCode.INVOICE_DUPLICATE_FILE));
@@ -102,7 +103,7 @@ class ConstructionInvoiceChecksumTest {
         when(repository.findByEnterpriseAndChecksum(any(), any(), any())).thenReturn(List.of());
         when(repository.save(any(ConstructionInvoice.class))).thenAnswer(call -> call.getArgument(0));
 
-        service.upload(enterpriseId, file, null);
+        service.upload(enterpriseId, file);
 
         ArgumentCaptor<ConstructionInvoice> captor = ArgumentCaptor.forClass(ConstructionInvoice.class);
         verify(repository).save(captor.capture());

@@ -1,10 +1,10 @@
 import api from "@/api";
-import { compressInvoiceFile } from "@/utils/imageCompression";
 import type {
   BudgetItemSuggestion,
   ConstructionInvoice,
   ConstructionInvoiceUpsert,
   InvoiceFilters,
+  InvoicePreviewResult,
   InvoiceUploadResult,
 } from "@/types/invoice";
 
@@ -37,28 +37,48 @@ function normalizePage(data: unknown): InvoicePage {
 }
 
 /**
- * Carrega uma fatura, comprimindo a imagem antes de a enviar.
+ * Lê o QR e verifica duplicados sem gravar nada — o "Enviar" do carregamento
+ * em duas fases. Não sobe nada ao Storage nem grava na base de dados; só
+ * depois de rever o resultado é que se chama {@link uploadInvoice} ("Guardar").
+ */
+export async function previewInvoice(
+  enterpriseId: string,
+  file: File
+): Promise<InvoicePreviewResult> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await api.post(`/construction-invoices/preview`, form, {
+    params: { enterpriseId },
+    headers: { "Content-Type": "multipart/form-data" },
+    // O erro pertence à linha do ficheiro; dez falhas não são dez toasts.
+    skipErrorNotification: true,
+  });
+  return response.data;
+}
+
+/**
+ * Grava uma fatura, enviando sempre o ficheiro original — é o "Guardar" do
+ * carregamento em duas fases, chamado só depois de {@link previewInvoice} ter
+ * mostrado o que o ficheiro trouxe.
+ *
+ * A compressão acontece no servidor, e só depois de o QR da AT ser lido com
+ * sucesso — ler antes de comprimir já fez a diferença entre uma fatura
+ * legível e uma "por rever". Ver `InvoiceCompressionService` no backend.
  *
  * Não há endpoint de lote de propósito: o cliente chama isto uma vez por
- * ficheiro largado, para que cada um tenha o seu resultado e um QR ilegível não
- * estrague os restantes.
- *
- * @param onProgress avisa em que fase vai, para a lista de upload mostrar estado
+ * ficheiro, para que cada um tenha o seu resultado e uma falha não estrague
+ * os restantes.
  */
 export async function uploadInvoice(
   enterpriseId: string,
-  file: File,
-  onProgress?: (phase: "compressing" | "uploading") => void
+  file: File
 ): Promise<InvoiceUploadResult> {
-  onProgress?.("compressing");
-  const { file: toSend, originalSize } = await compressInvoiceFile(file);
-
-  onProgress?.("uploading");
   const form = new FormData();
-  form.append("file", toSend);
+  form.append("file", file);
 
   const response = await api.post(`/construction-invoices`, form, {
-    params: { enterpriseId, originalSizeBytes: originalSize },
+    params: { enterpriseId },
     headers: { "Content-Type": "multipart/form-data" },
     // O erro pertence à linha do ficheiro; dez falhas não são dez toasts.
     skipErrorNotification: true,
@@ -108,9 +128,8 @@ export async function updateInvoice(
 }
 
 export async function replaceInvoiceFile(id: string, file: File): Promise<InvoiceUploadResult> {
-  const { file: toSend } = await compressInvoiceFile(file);
   const form = new FormData();
-  form.append("file", toSend);
+  form.append("file", file);
 
   const response = await api.post(`/construction-invoices/${id}/file`, form, {
     headers: { "Content-Type": "multipart/form-data" },

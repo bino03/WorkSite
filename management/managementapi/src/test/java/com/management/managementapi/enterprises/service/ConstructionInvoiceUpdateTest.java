@@ -49,6 +49,7 @@ class ConstructionInvoiceUpdateTest {
     @Mock private SignedUrlService signedUrls;
     @Mock private AtInvoiceQrService qrService;
     @Mock private InvoiceThumbnailService thumbnailService;
+    @Mock private InvoiceCompressionService compressionService;
     @Mock private AuthContext authContext;
 
     @InjectMocks private ConstructionInvoiceService service;

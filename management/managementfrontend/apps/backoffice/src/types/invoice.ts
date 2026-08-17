@@ -36,7 +36,7 @@ export interface ConstructionInvoice {
   originalFilename: string | null;
   mimeType: string | null;
   sizeBytes: number | null;
-  /** Tamanho antes da compressão no browser; null se o cliente não o reportou. */
+  /** Tamanho do ficheiro que foi carregado, antes de qualquer compressão no servidor. */
   originalSizeBytes: number | null;
   uploadedBy: string | null;
   uploadedByName: string | null;
@@ -85,6 +85,29 @@ export interface InvoiceUploadResult {
   qrRead: boolean;
   duplicates: DuplicateInvoiceRef[];
   /** Frases já em português, prontas a mostrar. */
+  warnings: string[];
+}
+
+/**
+ * Resultado de ler uma fatura sem a gravar — o "Enviar" do carregamento em
+ * duas fases. Nada foi tocado no Storage nem na base de dados.
+ */
+export interface InvoicePreviewResult {
+  qrRead: boolean;
+  /**
+   * Colide com uma fatura já registada neste projeto. `false` não garante que
+   * não haja uma cópia idêntica no mesmo lote ainda por guardar — só compara
+   * com o que já está persistido.
+   */
+  duplicate: boolean;
+  /** Frase pronta a mostrar, identificando a fatura com que colide. */
+  duplicateMessage: string | null;
+  supplierName: string | null;
+  supplierNif: string | null;
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  totalAmount: number | null;
+  needsReview: boolean;
   warnings: string[];
 }
 

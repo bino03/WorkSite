@@ -128,6 +128,15 @@ e as respostas desta API repetem os mesmos nomes de campo centenas de vezes — 
 orçamento traz ~198 nós com ~25 chaves cada. Não afeta as faturas: são PDF/imagem, já
 comprimidas, e servidas directamente pelo Supabase via signed URL.
 
+### Compressão de imagens de faturas
+
+`InvoiceCompressionService` (`ImageIO` + `Graphics2D`, mesmo padrão do `InvoiceThumbnailService`
+— sem dependências novas). Corre **depois** do QR ser lido, e **só quando a leitura teve
+sucesso** — nunca antes: comprimir primeiro já tirou legibilidade a QR que liam bem em
+qualidade total. Sem QR legível, o original fica intacto em Storage — melhor hipótese para
+revisão manual ou para um `/rescan` mais tarde, se o pipeline de leitura melhorar. Por isso o
+cliente já não comprime nada antes do upload; envia sempre o ficheiro original.
+
 ### CORS
 
 Configured in `SecurityConfig.java` (`corsConfigurationSource()` method) — `WebConfig.java` is intentionally empty. Update the allowed origins list for your actual Backoffice dev/prod URLs (defaults to `http://localhost:5173`).

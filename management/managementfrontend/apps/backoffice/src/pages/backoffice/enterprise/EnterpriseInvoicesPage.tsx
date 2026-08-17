@@ -9,6 +9,8 @@ import {
   deallocateInvoice,
   deleteInvoice,
   listInvoices,
+  getInvoice,
+  setInvoiceSentToAccountant,
 } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
@@ -20,6 +22,7 @@ import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
+import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import type { ConstructionInvoice, InvoiceFilters } from "@/types/invoice";
 
 /** Os filtros que se usam de facto — cada um responde a uma pergunta concreta. */
@@ -65,6 +68,9 @@ const EnterpriseInvoicesPage: FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   /** Faturas a associar na próxima escolha de rubrica — uma ou várias. */
   const [allocating, setAllocating] = useState<ConstructionInvoice[]>([]);
   const [saving, setSaving] = useState(false);
@@ -105,6 +111,20 @@ const EnterpriseInvoicesPage: FC = () => {
   };
 
   const handleView = (invoice: ConstructionInvoice) => setDetailId(invoice.id);
+
+  const handleImageClick = async (invoiceId: string) => {
+    setPreviewInvoiceId(invoiceId);
+    setPreviewLoading(true);
+    try {
+      const invoice = await getInvoice(invoiceId);
+      setPreviewInvoice(invoice);
+    } catch (error) {
+      ErrorHandler.handle(error);
+      setPreviewInvoiceId(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const handleAllocate = async (budgetItemId: string) => {
     setSaving(true);
@@ -159,6 +179,25 @@ const EnterpriseInvoicesPage: FC = () => {
         try {
           await deleteInvoice(invoice.id);
           notificationService.success("Faturas", "Fatura eliminada.");
+          reload();
+        } catch (error) {
+          ErrorHandler.handle(error);
+        }
+      },
+    });
+  };
+
+  const handleSendToAccountant = (invoice: ConstructionInvoice) => {
+    const action = invoice.sentToAccountant ? "desmarcar como enviada" : "marcar como enviada";
+    confirm({
+      message: `${action.charAt(0).toUpperCase() + action.slice(1)} para a contabilidade?`,
+      onConfirm: async () => {
+        try {
+          await setInvoiceSentToAccountant(invoice.id, !invoice.sentToAccountant);
+          notificationService.success(
+            "Contabilidade",
+            invoice.sentToAccountant ? "Marcada como por enviar." : "Marcada como enviada."
+          );
           reload();
         } catch (error) {
           ErrorHandler.handle(error);
@@ -259,8 +298,10 @@ const EnterpriseInvoicesPage: FC = () => {
           fetch(next);
         }}
         onView={handleView}
+        onImageClick={handleImageClick}
         onAllocate={(invoice) => setAllocating([invoice])}
         onDeallocate={handleDeallocate}
+        onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
       />
 
@@ -298,6 +339,17 @@ const EnterpriseInvoicesPage: FC = () => {
             saving={saving}
             onClose={() => setAllocating([])}
             onPick={(item) => handleAllocate(item.id)}
+          />
+
+          <InvoicePreviewModal
+            open={!!previewInvoiceId && !previewLoading}
+            onClose={() => {
+              setPreviewInvoiceId(null);
+              setPreviewInvoice(null);
+            }}
+            invoiceUrl={previewInvoice?.fileUrl ?? null}
+            mimeType={previewInvoice?.mimeType ?? null}
+            filename={previewInvoice?.originalFilename ?? null}
           />
         </>
       )}

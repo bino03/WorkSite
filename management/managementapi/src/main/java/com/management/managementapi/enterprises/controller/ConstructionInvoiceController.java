@@ -3,6 +3,7 @@ package com.management.managementapi.enterprises.controller;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -58,21 +59,34 @@ public class ConstructionInvoiceController {
     private final AuthContext authContext;
 
     /**
+     * Lê o QR e verifica duplicados sem gravar nada — o "Enviar" do
+     * carregamento em duas fases. Devolve o que se mostra ao utilizador antes
+     * de ele decidir "Guardar" (que é o {@code POST /} abaixo).
+     */
+    @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<InvoicePreviewResultDTO> preview(
+            @RequestParam UUID enterpriseId,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(service.preview(enterpriseId, file));
+    }
+
+    /**
      * Carrega uma fatura. O cliente chama isto uma vez por ficheiro largado, em
      * paralelo — não há endpoint de lote de propósito: assim cada ficheiro tem o
      * seu resultado e um QR ilegível não estraga os restantes.
      *
-     * @param originalSizeBytes tamanho do ficheiro antes da compressão feita no
-     *                          browser; só para se poder mostrar a poupança
+     * O ficheiro chega sempre por comprimir: o servidor lê o QR a partir do
+     * original e só comprime depois, quando a leitura teve sucesso — ver
+     * {@link ConstructionInvoiceService}.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
     public ResponseEntity<InvoiceUploadResultDTO> upload(
             @RequestParam UUID enterpriseId,
             @RequestPart("file") MultipartFile file,
-            @RequestParam(required = false) Long originalSizeBytes,
             HttpServletRequest request) {
-        InvoiceUploadResultDTO result = service.upload(enterpriseId, file, originalSizeBytes);
+        InvoiceUploadResultDTO result = service.upload(enterpriseId, file);
 
         authContext.currentProfileId().ifPresent(uid ->
                 activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),

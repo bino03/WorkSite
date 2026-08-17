@@ -4,6 +4,7 @@ import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.DuplicateInvoiceRefDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
@@ -80,42 +81,95 @@ public class ConstructionInvoiceService {
     private final SignedUrlService signedUrls;
     private final AtInvoiceQrService qrService;
     private final InvoiceThumbnailService thumbnailService;
+    private final InvoiceCompressionService compressionService;
     private final AuthContext authContext;
 
     // ── carregar ──────────────────────────────────────────────
 
     /**
-     * Cria uma fatura a partir do ficheiro: lê o QR da AT, gera a miniatura e
-     * grava. É o endpoint do registo em massa — o cliente chama-o uma vez por
-     * ficheiro largado.
-     *
-     * Nunca rejeita por falta de dados. Sem QR legível a fatura entra na mesma,
-     * marcada como "por rever", e alguém completa os campos mais tarde.
-     *
-     * @param originalSizeBytes tamanho antes da compressão feita no browser;
-     *                          opcional, serve só para mostrar a poupança
+     * Lê o QR e verifica duplicados sem gravar nada — o "Enviar" do
+     * carregamento em duas fases. Primeiro mostra-se o que cada ficheiro
+     * trouxe (e se colide com uma fatura já registada), só depois é que
+     * {@link #upload} grava de facto. Não toca no Storage nem na base de
+     * dados: por isso corre em transação só de leitura, e pode chamar-se
+     * quantas vezes for preciso sem custar nada.
      */
-    public InvoiceUploadResultDTO upload(UUID enterpriseId, MultipartFile file, Long originalSizeBytes) {
+    @Transactional(readOnly = true)
+    public InvoicePreviewResultDTO preview(UUID enterpriseId, MultipartFile file) {
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_ENTERPRISE_NOT_FOUND));
 
         validateFile(file);
-        byte[] content = readBytes(file);
+        byte[] original = readBytes(file);
+        String mime = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
+
+        // Fatura de trabalho, nunca gravada — só para reaproveitar a mesma
+        // lógica de leitura do QR e de deteção de duplicado que o upload usa.
+        ConstructionInvoice draft = new ConstructionInvoice();
+        draft.setEnterprise(enterprise);
+        draft.setChecksumSha256(sha256Hex(original));
+
+        Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(original, mime);
+        qr.ifPresent(data -> applyQrData(draft, data));
+
+        boolean duplicate = false;
+        String duplicateMessage = null;
+        try {
+            rejectIfDuplicate(draft);
+        } catch (BusinessException e) {
+            duplicate = true;
+            duplicateMessage = e.getMessage();
+        }
+
+        return new InvoicePreviewResultDTO(
+                qr.isPresent(),
+                duplicate,
+                duplicateMessage,
+                draft.getSupplierName(),
+                draft.getSupplierNif(),
+                draft.getInvoiceNumber(),
+                draft.getInvoiceDate(),
+                draft.getTotalAmount(),
+                draft.needsReview(),
+                qr.map(AtInvoiceQrService.AtInvoiceData::warnings).orElse(List.of()));
+    }
+
+    /**
+     * Cria uma fatura a partir do ficheiro: lê o QR da AT, gera a miniatura e
+     * grava. É o "Guardar" do carregamento em duas fases — o cliente já
+     * mostrou o resultado de {@link #preview} antes de chegar aqui, mas este
+     * método relê e revalida tudo de novo: nunca confia cegamente no que foi
+     * mostrado, porque outra fatura pode ter entrado entretanto.
+     *
+     * Nunca rejeita por falta de dados. Sem QR legível a fatura entra na mesma,
+     * marcada como "por rever", e alguém completa os campos mais tarde.
+     *
+     * O QR lê-se sempre do ficheiro <b>original</b>, antes de qualquer
+     * compressão — ver {@link InvoiceCompressionService}. Comprimir primeiro
+     * já custou faturas que liam bem em qualidade total.
+     */
+    public InvoiceUploadResultDTO upload(UUID enterpriseId, MultipartFile file) {
+        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_ENTERPRISE_NOT_FOUND));
+
+        validateFile(file);
+        byte[] original = readBytes(file);
         String mime = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
 
         ConstructionInvoice invoice = new ConstructionInvoice();
         invoice.setEnterprise(enterprise);
-        invoice.setOriginalSizeBytes(originalSizeBytes);
-        invoice.setChecksumSha256(sha256Hex(content));
+        invoice.setOriginalSizeBytes((long) original.length);
+        invoice.setChecksumSha256(sha256Hex(original));
         authContext.currentProfileId().ifPresent(invoice::setCreatedBy);
 
-        Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(content, mime);
+        Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(original, mime);
         qr.ifPresent(data -> applyQrData(invoice, data));
 
         rejectIfDuplicate(invoice);
 
-        storeDocument(invoice, enterpriseId, file, content, mime);
-        storeThumbnail(invoice, enterpriseId, content, mime);
+        StoredContent stored = compressIfReadable(original, mime, file.getOriginalFilename(), qr.isPresent());
+        storeDocument(invoice, enterpriseId, stored.filename(), stored.content(), stored.mimeType());
+        storeThumbnail(invoice, enterpriseId, stored.content(), stored.mimeType());
         ConstructionInvoice saved = repository.save(invoice);
 
         return new InvoiceUploadResultDTO(
@@ -130,13 +184,14 @@ public class ConstructionInvoiceService {
         ConstructionInvoice invoice = getById(id);
 
         validateFile(file);
-        byte[] content = readBytes(file);
+        byte[] original = readBytes(file);
         String mime = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
 
         deleteStoredFiles(invoice);
-        invoice.setChecksumSha256(sha256Hex(content));
+        invoice.setChecksumSha256(sha256Hex(original));
+        invoice.setOriginalSizeBytes((long) original.length);
 
-        Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(content, mime);
+        Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(original, mime);
         // Só preenche o que está vazio: correções feitas à mão não são deitadas
         // fora por se ter substituído a digitalização.
         qr.ifPresent(data -> applyQrData(invoice, data));
@@ -144,8 +199,9 @@ public class ConstructionInvoiceService {
         UUID enterpriseId = invoice.getEnterprise().getId();
         rejectIfDuplicate(invoice);
 
-        storeDocument(invoice, enterpriseId, file, content, mime);
-        storeThumbnail(invoice, enterpriseId, content, mime);
+        StoredContent stored = compressIfReadable(original, mime, file.getOriginalFilename(), qr.isPresent());
+        storeDocument(invoice, enterpriseId, stored.filename(), stored.content(), stored.mimeType());
+        storeThumbnail(invoice, enterpriseId, stored.content(), stored.mimeType());
         ConstructionInvoice saved = repository.save(invoice);
 
         return new InvoiceUploadResultDTO(
@@ -153,6 +209,32 @@ public class ConstructionInvoiceService {
                 qr.isPresent(),
                 List.of(),
                 qr.map(AtInvoiceQrService.AtInvoiceData::warnings).orElse(List.of()));
+    }
+
+    private record StoredContent(byte[] content, String mimeType, String filename) {}
+
+    /**
+     * Comprime para guardar — mas só quando o QR já foi lido com sucesso.
+     * Sem QR legível o original fica intacto: é a melhor hipótese para
+     * revisão manual ou para um {@link #rescan} futuro.
+     */
+    private StoredContent compressIfReadable(byte[] original, String mime, String originalFilename, boolean qrRead) {
+        if (!qrRead) {
+            return new StoredContent(original, mime, originalFilename);
+        }
+        return compressionService.compress(original, mime)
+                .map(result -> new StoredContent(result.content(), result.mimeType(), toJpegName(originalFilename)))
+                .orElseGet(() -> new StoredContent(original, mime, originalFilename));
+    }
+
+    /** O conteúdo passou a JPEG; a extensão tem de acompanhar. */
+    private static String toJpegName(String name) {
+        if (name == null) {
+            return "fatura.jpg";
+        }
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        return base + ".jpg";
     }
 
     /**
@@ -606,22 +688,24 @@ public class ConstructionInvoiceService {
      * para elas quando é preciso ir lá ver à mão.
      */
     private void storeDocument(ConstructionInvoice invoice, UUID enterpriseId,
-                               MultipartFile file, byte[] content, String mime) {
-        String safeName = storageService.sanitizeFileName(file.getOriginalFilename());
+                               String originalFilename, byte[] content, String mime) {
+        String safeName = storageService.sanitizeFileName(originalFilename);
         String key = String.format("construction-invoices/%s/%s_%s",
                 enterpriseId, UUID.randomUUID().toString().substring(0, 8), safeName);
 
         try (InputStream in = new ByteArrayInputStream(content)) {
             storageService.upload(BUCKET, key, mime, in);
         } catch (IOException e) {
-            throw StorageException.uploadError(file.getOriginalFilename(), e);
+            throw StorageException.uploadError(originalFilename, e);
         }
 
         invoice.setBucket(BUCKET);
         invoice.setStorageKey(key);
-        invoice.setOriginalFilename(file.getOriginalFilename());
+        invoice.setOriginalFilename(originalFilename);
         invoice.setMimeType(mime);
-        invoice.setSizeBytes(file.getSize());
+        // O tamanho é o do que realmente foi para o Storage — `content` pode já
+        // vir comprimido por InvoiceCompressionService, diferente do upload recebido.
+        invoice.setSizeBytes((long) content.length);
         invoice.setUploadedAt(OffsetDateTime.now());
         authContext.currentProfileId().ifPresent(invoice::setUploadedBy);
     }

@@ -175,7 +175,8 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
 
 | Método | Rota | Acesso |
 |---|---|---|
-| POST | `/construction-invoices?enterpriseId=&originalSizeBytes=` | `ADMIN` ou `EMPLOYEE` — multipart `file`; devolve `201` |
+| POST | `/construction-invoices/preview?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — lê o QR e verifica duplicados, não grava nada |
+| POST | `/construction-invoices?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — multipart `file`; devolve `201` |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/pending-count` | `ADMIN` ou `EMPLOYEE` — quantas por associar |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida; `204` sem histórico |
@@ -190,8 +191,19 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
 
 Não há endpoint de lote **de propósito**: o cliente chama o `POST` uma vez por ficheiro
 largado, para que cada um tenha o seu resultado e um QR ilegível não estrague os restantes.
-`originalSizeBytes` é o tamanho antes da compressão feita no browser e serve só para mostrar
-a poupança.
+
+O carregamento em massa do Backoffice é em **duas fases**, e usa dois endpoints diferentes de
+propósito: "Enviar" chama `POST /preview` para cada ficheiro — lê o QR e verifica duplicados,
+mas não toca no Storage nem na base de dados — e só depois de rever o resultado é que
+"Guardar" chama o `POST /` de sempre, um por ficheiro. `POST /preview` corre em transação só de
+leitura e pode chamar-se quantas vezes for preciso sem custar nada; quem decide gravar é sempre
+o `POST /` (que relê e revalida tudo de novo — nunca confia cegamente no que o preview mostrou,
+porque outra fatura pode ter entrado entretanto).
+
+O ficheiro sobe sempre por comprimir. O servidor lê o QR da AT a partir do original e só
+comprime depois — e só quando a leitura teve sucesso — para guardar em Storage; ver
+`InvoiceCompressionService`. Sem QR legível o original fica intacto, para a melhor hipótese
+possível numa revisão manual ou num `/rescan` mais tarde.
 
 O upload **nunca falha por dados em falta**. Sem QR legível a fatura entra na mesma, com
 `needsReview: true`, e alguém completa os campos depois. A obrigatoriedade de data e total só
@@ -253,6 +265,11 @@ de outro modo um duplicado já existente na base bloqueava qualquer edição, in
 nas notas. O checksum não entra no `PUT`: a edição manual não troca o ficheiro, só
 `POST /{id}/file` o faz.
 
+Quando o `PUT` recusa por duplicado, o Backoffice não mostra só o toast genérico: oferece logo
+um confirm para apagar **esta** fatura (ficheiro e miniatura do Storage, e a linha) — é o caso
+normal de quem está a completar uma fatura "por rever" à mão e só aí percebe que já a tinha
+carregado antes.
+
 O ATCUD e o checksum têm ainda uma garantia ao nível da base: `uq_invoice_enterprise_atcud`
 (`V17`) e `uq_invoice_enterprise_checksum` (`V18`), ambos únicos e parciais — sobre
 `(enterprise_id, invoice_atcud)` e `(enterprise_id, checksum_sha256)`, respetivamente. A
@@ -261,6 +278,17 @@ com três pedidos em paralelo — dois ficheiros iguais em voo ao mesmo tempo pa
 Aconteceu com o ATCUD: duas linhas gravadas com 20 ms de diferença. Os índices fecham essa
 janela; o serviço continua a existir para dar a mensagem legível em vez de uma violação de
 constraint.
+
+Quando a janela fecha mesmo assim (dois pedidos em voo, nenhum vê o `INSERT` do outro), o
+Postgres recusa com um `unique_violation` — e é o `GlobalExceptionHandler` que traduz isso de
+volta para a mesma mensagem que o serviço teria dado no caminho normal: reconhece tanto
+`uq_invoice_enterprise_atcud` (`INVOICE_010`) como `uq_invoice_enterprise_checksum`
+(`INVOICE_012`) pelo nome na exceção do driver. Sem essa tradução por índice, cai no genérico
+`DATABASE_CONSTRAINT_VIOLATION` — foi o que aconteceu ao checksum até este ficar coberto, já
+que o handler só conhecia o ATCUD desde a `V17`. O Backoffice ainda reduz a corrida do lado do
+cliente: calcula o SHA-256 de cada ficheiro no browser antes do "Enviar" e recusa localmente um
+que já esteja reivindicado por outro do mesmo lote, sem gastar pedido nenhum ao servidor — mas
+isso só apanha duplicados dentro do próprio lote, nunca substitui a garantia da base.
 
 O par (NIF, número) **não** leva índice de propósito: só entra em jogo na correção manual, uma
 pessoa de cada vez, onde não há corrida — e um índice ali criaria falsos positivos em gralhas.
