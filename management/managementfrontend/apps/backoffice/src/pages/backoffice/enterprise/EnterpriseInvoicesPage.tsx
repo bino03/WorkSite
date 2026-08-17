@@ -187,6 +187,37 @@ const EnterpriseInvoicesPage: FC = () => {
     });
   };
 
+  /** Marca todas as selecionadas de uma vez — só marca, nunca desmarca em bloco. */
+  const handleBulkSendToAccountant = () => {
+    const targets = selectedInvoices;
+    confirm({
+      title: "Contabilidade",
+      message: `Marcar ${targets.length} fatura${targets.length > 1 ? "s" : ""} como enviada${
+        targets.length > 1 ? "s" : ""
+      } para a contabilidade?`,
+      actionLabel: "Marcar como enviadas",
+      onConfirm: async () => {
+        try {
+          // Sequencial, como o handleAllocate: um erro a meio deixa as
+          // anteriores marcadas em vez de um estado indefinido.
+          for (const invoice of targets) {
+            await setInvoiceSentToAccountant(invoice.id, true);
+          }
+          notificationService.success(
+            "Contabilidade",
+            targets.length === 1
+              ? "Fatura marcada como enviada."
+              : `${targets.length} faturas marcadas como enviadas.`
+          );
+          reload();
+        } catch (error) {
+          ErrorHandler.handle(error);
+          reload();
+        }
+      },
+    });
+  };
+
   const handleSendToAccountant = (invoice: ConstructionInvoice) => {
     const action = invoice.sentToAccountant ? "desmarcar como enviada" : "marcar como enviada";
     confirm({
@@ -278,6 +309,11 @@ const EnterpriseInvoicesPage: FC = () => {
         {selectedIds.length > 0 && (
           <Button type="primary" onClick={() => setAllocating(selectedInvoices)}>
             Associar {selectedIds.length} à mesma rubrica
+          </Button>
+        )}
+        {selectedIds.length > 0 && isAdmin() && (
+          <Button onClick={handleBulkSendToAccountant}>
+            Marcar {selectedIds.length} como enviada{selectedIds.length > 1 ? "s" : ""} à contabilidade
           </Button>
         )}
       </div>

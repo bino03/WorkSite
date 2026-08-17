@@ -169,6 +169,11 @@ entrada das faturas — o documento é registado aqui, a rubrica escolhe-se a se
   o `invoiceId`. `fetchInvoice()` limpa o estado antes do pedido, de propósito: sem isso a
   fatura anterior ficava visível (e a decidir se a pré-visualização abre) até a resposta nova
   chegar.
+- Seleção em bloco (`selectedIds`, `InvoicesList` com `rowSelection`) alimenta duas ações na
+  barra de filtros: "Associar N à mesma rubrica" (abre o `BudgetItemPickerModal`) e "Marcar N
+  como enviadas à contabilidade" (só `ADMIN`, só marca — nunca desmarca em bloco). As duas
+  chamam a API sequencialmente, uma fatura de cada vez, para um erro a meio deixar as
+  anteriores já gravadas em vez de um estado indefinido.
 
 ---
 
