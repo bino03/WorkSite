@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
-import type { FC, ReactNode } from "react";
-import { Button, DatePicker, Drawer, Input, InputNumber, Space, Spin, Tooltip } from "antd";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties, FC, ReactNode } from "react";
+import { Button, DatePicker, Drawer, Input, InputNumber, Select, Space, Spin, Tooltip } from "antd";
 import { FileTextOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
+import {
+  DEFAULT_INVOICE_TYPE,
+  INVOICE_TYPES,
+  isKnownInvoiceType,
+  joinInvoiceNumber,
+  splitInvoiceNumber,
+} from "@/components/invoices/invoiceNumber";
 import {
   deallocateInvoice,
   deleteInvoice,
@@ -37,11 +44,19 @@ interface Props {
   onClose: () => void;
   onChanged: () => void;
   onAllocate: (invoice: ConstructionInvoice) => void;
+  /**
+   * Tipo de documento a pré-selecionar quando o número está por preencher —
+   * o mais usado nas faturas já registadas (ver `suggestInvoiceType`).
+   */
+  suggestedInvoiceType?: string;
 }
 
 type Values = {
   supplierName: string;
   supplierNif: string;
+  /** Só o prefixo ("FR"); junta-se ao número na gravação. */
+  invoiceType: string;
+  /** Só a série/número ("2026/114"), sem o tipo. */
   invoiceNumber: string;
   invoiceAtcud: string;
   invoiceDate: string;
@@ -62,6 +77,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   onClose,
   onChanged,
   onAllocate,
+  suggestedInvoiceType = DEFAULT_INVOICE_TYPE,
 }) => {
   const { isAdmin } = useAuth();
   const confirm = useConfirm();
@@ -71,6 +87,16 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  /**
+   * Numa ref e não nas dependências do `fetchInvoice`: a sugestão vem da lista
+   * do lado, que recarrega a cada gravação — dependê-la traria a fatura outra
+   * vez do servidor a meio de uma correção e deitava fora o que já estava
+   * escrito. Só interessa o valor no momento em que a fatura abre.
+   */
+  const suggestedTypeRef = useRef(suggestedInvoiceType);
+  useEffect(() => {
+    suggestedTypeRef.current = suggestedInvoiceType;
+  }, [suggestedInvoiceType]);
 
   const fetchInvoice = useCallback(async () => {
     if (!invoiceId) return;
@@ -86,10 +112,16 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     try {
       const data = await getInvoice(invoiceId);
       setInvoice(data);
+      // O tipo ("FR", "FT", …) é a única parte do número que se consegue
+      // adivinhar — e só quando não há número nenhum, ou seja quando o QR
+      // falhou. Com número lido do QR, o que lá está manda: uma fatura cujo
+      // número não traz prefixo fica sem prefixo, não ganha um inventado.
+      const number = splitInvoiceNumber(data.invoiceNumber);
       setValues({
         supplierName: data.supplierName ?? "",
         supplierNif: data.supplierNif ?? "",
-        invoiceNumber: data.invoiceNumber ?? "",
+        invoiceType: data.invoiceNumber ? number.type : suggestedTypeRef.current,
+        invoiceNumber: number.rest,
         invoiceAtcud: data.invoiceAtcud ?? "",
         invoiceDate: data.invoiceDate ?? "",
         totalAmount: data.totalAmount,
@@ -109,6 +141,21 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const set = <K extends keyof Values>(key: K, value: Values[K]) =>
     setValues((prev) => (prev ? { ...prev, [key]: value } : prev));
 
+  /**
+   * Quem copia o número inteiro do papel ("FR 2026/114") escreve-o de uma vez
+   * na caixa do número — em vez de o deixar lá com o prefixo repetido, o tipo
+   * salta sozinho para a lista ao lado. Só com tipos conhecidos: uma série que
+   * comece por letras ("AB/12") tem de ficar intacta.
+   */
+  const handleInvoiceNumberChange = (raw: string) => {
+    const { type, rest } = splitInvoiceNumber(raw);
+    if (type && rest && isKnownInvoiceType(type)) {
+      setValues((prev) => (prev ? { ...prev, invoiceType: type, invoiceNumber: rest } : prev));
+      return;
+    }
+    set("invoiceNumber", raw);
+  };
+
   const handleSave = async () => {
     if (!invoice || !values) return;
     setSaving(true);
@@ -116,7 +163,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
       await updateInvoice(invoice.id, {
         supplierName: values.supplierName || null,
         supplierNif: values.supplierNif || null,
-        invoiceNumber: values.invoiceNumber || null,
+        invoiceNumber: joinInvoiceNumber(values.invoiceType, values.invoiceNumber) || null,
         invoiceAtcud: values.invoiceAtcud || null,
         invoiceDate: values.invoiceDate || null,
         totalAmount: values.totalAmount,
@@ -396,81 +443,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               )}
 
               {/* Campos --------------------------------------------------- */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "13.6px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" }}>
-                  <Field label="Fornecedor">
-                    <Input
-                      value={values.supplierName}
-                      disabled={!isAdmin()}
-                      onChange={(e) => set("supplierName", e.target.value)}
-                      placeholder="Betão Liz, Lda."
-                    />
-                  </Field>
-                  <Field label="NIF">
-                    <Input
-                      value={values.supplierNif}
-                      disabled={!isAdmin()}
-                      onChange={(e) => set("supplierNif", e.target.value)}
-                    />
-                  </Field>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" }}>
-                  <Field label="Data da fatura" required>
-                    <DatePicker
-                      style={{ width: "100%" }}
-                      format="DD/MM/YYYY"
-                      disabled={!isAdmin()}
-                      value={values.invoiceDate ? dayjs(values.invoiceDate) : null}
-                      disabledDate={(d) => d && d.isAfter(dayjs(), "day")}
-                      onChange={(d) => set("invoiceDate", d ? d.format("YYYY-MM-DD") : "")}
-                    />
-                  </Field>
-                  <Field label="Total (€)" required>
-                    <InputNumber
-                      style={{ width: "100%" }}
-                      step={0.01}
-                      min={0}
-                      disabled={!isAdmin()}
-                      value={values.totalAmount}
-                      onChange={(v) => set("totalAmount", v as number | null)}
-                    />
-                  </Field>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" }}>
-                  <Field label="Nº da fatura">
-                    <Input
-                      value={values.invoiceNumber}
-                      disabled={!isAdmin()}
-                      onChange={(e) => set("invoiceNumber", e.target.value)}
-                    />
-                  </Field>
-                  <Field label="ATCUD">
-                    <Input
-                      value={values.invoiceAtcud}
-                      disabled={!isAdmin()}
-                      onChange={(e) => set("invoiceAtcud", e.target.value)}
-                    />
-                  </Field>
-                </div>
-
-                <Field label="Notas">
-                  <Input.TextArea
-                    rows={2}
-                    value={values.notes}
-                    disabled={!isAdmin()}
-                    onChange={(e) => set("notes", e.target.value)}
-                  />
-                </Field>
-
-                {(invoice.taxableAmount != null || invoice.taxAmount != null) && (
-                  <div style={{ fontSize: 11, opacity: 0.6 }}>
-                    Lido do QR: sem impostos {formatCurrency(invoice.taxableAmount ?? 0)} · impostos{" "}
-                    {formatCurrency(invoice.taxAmount ?? 0)}
-                  </div>
-                )}
-              </div>
+              <InvoiceFields
+                invoice={invoice}
+                values={values}
+                editable={isAdmin()}
+                onChange={set}
+                onInvoiceNumberChange={handleInvoiceNumberChange}
+              />
               </div>
             </div>
           )}
@@ -488,15 +467,247 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   );
 };
 
-const Field: FC<{ label: string; required?: boolean; children: ReactNode }> = ({
-  label,
-  required,
-  children,
-}) => (
+/** Duas colunas iguais — o par de campos que anda sempre junto. */
+const PAIR: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" };
+
+/**
+ * Os campos corrigíveis da fatura.
+ *
+ * Desenhados para o caso mau: o QR não se leu e alguém tem de copiar o papel
+ * para aqui. Daí o que aqui está e não é decoração —
+ *
+ * - **o que falta vem primeiro**: com `needsReview`, a data e o total sobem
+ *   para cima de tudo, com um aviso a dizer o que falta e um segundo aviso a
+ *   confirmar quando já está preenchido (é uma live region, por isso também se
+ *   ouve num leitor de ecrã);
+ * - **o tipo do documento escolhe-se, não se escreve**: "FR", "FT", … é a
+ *   única parte do número que se consegue adivinhar, e vem já escolhida (ver
+ *   `suggestInvoiceType`);
+ * - **cada campo tem `label` ligado por `htmlFor`** e um exemplo por baixo, em
+ *   vez do `placeholder` que desaparece mal se começa a escrever.
+ */
+const InvoiceFields: FC<{
+  invoice: ConstructionInvoice;
+  values: Values;
+  editable: boolean;
+  onChange: <K extends keyof Values>(key: K, value: Values[K]) => void;
+  onInvoiceNumberChange: (raw: string) => void;
+}> = ({ invoice, values, editable, onChange, onInvoiceNumberChange }) => {
+  const missingDate = !values.invoiceDate;
+  const missingTotal = values.totalAmount == null;
+  /** Só se assinala o que falta quando é mesmo isso que está a travar a fatura. */
+  const flagMissing = invoice.needsReview;
+
+  // Um tipo gravado que não esteja na lista (fornecedor com código próprio)
+  // tem de continuar a aparecer escolhido — senão abrir a fatura apagava-o.
+  const typeOptions =
+    values.invoiceType && !isKnownInvoiceType(values.invoiceType)
+      ? [{ value: values.invoiceType, label: values.invoiceType }, ...INVOICE_TYPES]
+      : INVOICE_TYPES;
+
+  const supplier = (
+    <div style={PAIR}>
+      <Field id="invoice-supplier" label="Fornecedor" hint="Nome que vem no topo da fatura.">
+        <Input
+          id="invoice-supplier"
+          size="large"
+          value={values.supplierName}
+          disabled={!editable}
+          onChange={(e) => onChange("supplierName", e.target.value)}
+          placeholder="Betão Liz, Lda."
+        />
+      </Field>
+      <Field id="invoice-nif" label="NIF do fornecedor" hint="Nove dígitos.">
+        <Input
+          id="invoice-nif"
+          size="large"
+          inputMode="numeric"
+          maxLength={9}
+          value={values.supplierNif}
+          disabled={!editable}
+          onChange={(e) => onChange("supplierNif", e.target.value)}
+          placeholder="500123456"
+        />
+      </Field>
+    </div>
+  );
+
+  const amounts = (
+    <div style={PAIR}>
+      <Field
+        id="invoice-date"
+        label="Data da fatura"
+        required
+        hint="Escreva 05/03/2026 ou escolha no calendário."
+      >
+        <DatePicker
+          id="invoice-date"
+          size="large"
+          style={{ width: "100%" }}
+          format="DD/MM/YYYY"
+          placeholder="DD/MM/AAAA"
+          disabled={!editable}
+          status={flagMissing && missingDate ? "error" : undefined}
+          aria-required
+          value={values.invoiceDate ? dayjs(values.invoiceDate) : null}
+          disabledDate={(d) => d && d.isAfter(dayjs(), "day")}
+          onChange={(d) => onChange("invoiceDate", d ? d.format("YYYY-MM-DD") : "")}
+        />
+      </Field>
+      <Field id="invoice-total" label="Total a pagar" required hint="Com IVA incluído.">
+        <InputNumber
+          id="invoice-total"
+          size="large"
+          style={{ width: "100%" }}
+          step={0.01}
+          min={0}
+          precision={2}
+          addonAfter="€"
+          inputMode="decimal"
+          disabled={!editable}
+          status={flagMissing && missingTotal ? "error" : undefined}
+          aria-required
+          // Vírgula, como no papel — o AntD continua a aceitar o ponto de quem
+          // escreve pelo teclado numérico.
+          decimalSeparator=","
+          value={values.totalAmount}
+          onChange={(v) => onChange("totalAmount", v as number | null)}
+        />
+      </Field>
+    </div>
+  );
+
+  const numbers = (
+    <div style={PAIR}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 0.6fr) 1fr", gap: 6 }}>
+        <Field id="invoice-type" label="Tipo">
+          <Select
+            id="invoice-type"
+            size="large"
+            style={{ width: "100%" }}
+            disabled={!editable}
+            allowClear
+            value={values.invoiceType || undefined}
+            onChange={(value) => onChange("invoiceType", value ?? "")}
+            options={typeOptions}
+            // O código curto na caixa; a explicação só na lista aberta.
+            optionLabelProp="value"
+            aria-label="Tipo de documento"
+          />
+        </Field>
+        <Field id="invoice-number" label="Nº da fatura" hint="Só a série e o número.">
+          <Input
+            id="invoice-number"
+            size="large"
+            value={values.invoiceNumber}
+            disabled={!editable}
+            onChange={(e) => onInvoiceNumberChange(e.target.value)}
+            placeholder="2026/114"
+          />
+        </Field>
+      </div>
+      <Field id="invoice-atcud" label="ATCUD" hint="Impresso por baixo do QR. Pode deixar em branco.">
+        <Input
+          id="invoice-atcud"
+          size="large"
+          value={values.invoiceAtcud}
+          disabled={!editable}
+          onChange={(e) => onChange("invoiceAtcud", e.target.value)}
+          placeholder="CSDF7T5H-0114"
+        />
+      </Field>
+    </div>
+  );
+
+  return (
+    <div className="ind-card" style={{ padding: "13.6px", gap: "13.6px" }}>
+      <span className="ind-card-kicker">Dados da fatura</span>
+
+      {flagMissing && (
+        <div
+          role="status"
+          style={{
+            borderLeft: `4px solid var(${missingDate || missingTotal ? "--color-error" : "--ind-color-accent"})`,
+            background: "var(--ind-color-surface)",
+            padding: "10.2px 13.6px",
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}
+        >
+          {missingDate || missingTotal ? (
+            <>
+              <strong>O QR desta fatura não foi lido.</strong> Falta preencher{" "}
+              {missingDate && missingTotal ? "a data e o total" : missingDate ? "a data" : "o total"} — é
+              só isso que impede a fatura de ser associada a uma rubrica. Os outros campos são opcionais.
+            </>
+          ) : (
+            <>
+              <strong>Está preenchido.</strong> Prima <em>Guardar</em> para a fatura deixar de estar por
+              rever.
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Com o QR lido a ordem natural é fornecedor → valores; sem ele, o que
+          falta preencher tem de ser a primeira coisa que se vê. */}
+      {flagMissing ? (
+        <>
+          {amounts}
+          {supplier}
+        </>
+      ) : (
+        <>
+          {supplier}
+          {amounts}
+        </>
+      )}
+
+      {numbers}
+
+      <Field id="invoice-notes" label="Notas">
+        <Input.TextArea
+          id="invoice-notes"
+          rows={2}
+          value={values.notes}
+          disabled={!editable}
+          onChange={(e) => onChange("notes", e.target.value)}
+        />
+      </Field>
+
+      {(invoice.taxableAmount != null || invoice.taxAmount != null) && (
+        <div style={{ fontSize: 12, opacity: 0.7 }}>
+          Lido do QR: sem impostos {formatCurrency(invoice.taxableAmount ?? 0)} · impostos{" "}
+          {formatCurrency(invoice.taxAmount ?? 0)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Etiqueta + exemplo, ambos dentro do `<label>` — assim o leitor de ecrã lê a
+ * ajuda junto com o nome do campo, em vez de a deixar para trás.
+ */
+const Field: FC<{
+  id: string;
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: ReactNode;
+}> = ({ id, label, required, hint, children }) => (
   <div>
-    <label style={{ display: "block", fontSize: 12, marginBottom: 5, opacity: 0.7 }}>
+    <label htmlFor={id} style={{ display: "block", fontSize: 13, marginBottom: 5 }}>
       {label}
-      {required && <span style={{ color: "#b53333" }}> *</span>}
+      {required && (
+        <>
+          <span aria-hidden style={{ color: "var(--color-error)" }}> *</span>
+          <span className="sr-only"> (obrigatório)</span>
+        </>
+      )}
+      {hint && (
+        <span style={{ display: "block", fontSize: 12, opacity: 0.65, marginTop: 2 }}>{hint}</span>
+      )}
     </label>
     {children}
   </div>

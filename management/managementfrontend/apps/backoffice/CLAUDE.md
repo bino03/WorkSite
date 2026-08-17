@@ -165,6 +165,13 @@ entrada das faturas — o documento é registado aqui, a rubrica escolhe-se a se
   que tem os únicos botões de zoom — só para imagem, um PDF já traz o zoom próprio do
   visualizador do browser). Se a correção colidir com uma fatura já registada, oferece logo um
   confirm para apagar esta (repetida) — ficheiro, miniatura e linha.
+- O preenchimento à mão está desenhado para o caso `needsReview`: a data e o total sobem para
+  cima de tudo com um aviso a dizer o que falta (live region, muda para "Está preenchido"), e o
+  **tipo do documento** ("FT", "FR", …) é uma lista já pré-selecionada com o mais usado no
+  projeto (`FT` quando ainda não há faturas) em vez de texto a escrever —
+  `components/invoices/invoiceNumber.ts` parte e junta `invoiceNumber` ("FT 2026/114" ↔ tipo +
+  série/número) e calcula a sugestão a partir das faturas já carregadas na página. Escrever o número inteiro na caixa da série também funciona:
+  o prefixo salta sozinho para a lista.
 - Trocar de fatura sem fechar a drawer (clicar noutra linha da lista) não a desmonta — só muda
   o `invoiceId`. `fetchInvoice()` limpa o estado antes do pedido, de propósito: sem isso a
   fatura anterior ficava visível (e a decidir se a pré-visualização abre) até a resposta nova

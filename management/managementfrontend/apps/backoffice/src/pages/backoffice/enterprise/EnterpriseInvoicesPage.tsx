@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Input } from "antd";
@@ -22,6 +22,7 @@ import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
+import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import type { ConstructionInvoice, InvoiceFilters } from "@/types/invoice";
 
@@ -238,6 +239,7 @@ const EnterpriseInvoicesPage: FC = () => {
   };
 
   const selectedInvoices = invoices.filter((i) => selectedIds.includes(i.id));
+  const suggestedInvoiceType = useMemo(() => suggestInvoiceType(invoices), [invoices]);
 
   return (
     <div>
@@ -353,6 +355,9 @@ const EnterpriseInvoicesPage: FC = () => {
           <InvoiceDetailDrawer
             invoiceId={detailId}
             open={!!detailId}
+            // Preencher à mão o "FR"/"FT" de cada fatura é escrita repetida sem
+            // ganho nenhum: a drawer já abre com o tipo mais usado nesta obra.
+            suggestedInvoiceType={suggestedInvoiceType}
             onClose={() => setDetailId(null)}
             onChanged={reload}
             onAllocate={(invoice) => {
