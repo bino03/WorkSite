@@ -70,6 +70,14 @@ if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/src/components/
   warn "Form/Drawer/Modal component changed → check docs/skills/references/design/backoffice-forms-and-validation.md and backoffice-drawers-and-modals.md still match."
 fi
 
+# --- Novo domínio/porta de entrada → docs/code-map.md ---------------------
+# Só pastas e ficheiros que criam um sítio novo onde procurar: um componente a
+# mais dentro de components/invoices/ não muda o mapa, uma pasta nova sim.
+if git diff --cached --diff-filter=A --name-only 2>/dev/null \
+  | grep -qE 'managementfrontend/apps/backoffice/src/(pages|services)/.+\.tsx?$|managementapi/src/main/java/.*/(controller|service)/[^/]+\.java$'; then
+  warn "Nova página/serviço/controller → acrescenta-o a docs/code-map.md (domínio → ficheiros) se for uma porta de entrada nova."
+fi
+
 # --- Stack version bumps → vault stack references -------------------------
 if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/package\.json$'; then
   if git diff --cached -- '*apps/backoffice/package.json' 2>/dev/null \

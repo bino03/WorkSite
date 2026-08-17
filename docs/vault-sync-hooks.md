@@ -37,6 +37,7 @@ Se um dia os avisos pararem de aparecer numa máquina nova, é a primeira coisa 
 | `backoffice/src/services/`, `errors/` ou `api.ts` | [[backoffice-services-and-error-handling]] |
 | `backoffice/src/main.tsx`, `PrivateRoute.tsx`, `layouts/` ou `context/` | [[backoffice-app-shell-and-auth]] |
 | Componente `*Form.tsx` / `*Drawer.tsx` / `*Modal.tsx` em `backoffice/src/components/` | [[backoffice-forms-and-validation]] + [[backoffice-drawers-and-modals]] |
+| **Nova** página/serviço no Backoffice, ou novo controller/service no backend | [[code-map.md]] — se for uma porta de entrada nova (só ficheiros adicionados, não alterados: um componente a mais dentro de uma pasta que já existe não muda o mapa) |
 | `apps/backoffice/package.json` com bump de `react`/`react-dom`/`typescript`/`vite`/`antd`/`tailwindcss` | Referências de stack no vault (`docs/architecture.md`, `00-INDEX.md`, ficheiros `CLAUDE.md`) |
 | `managementapi/pom.xml` com bump de `java.version` ou `spring-boot.version` | Idem — referências de stack no vault |
 

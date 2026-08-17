@@ -51,6 +51,7 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 ## 📖 Documentation
 
 ### 🏗️ Architecture & Design
+- **Onde está o código disto?** → [[docs/code-map.md]] ← mapa domínio → ficheiros, e "onde procurar por sintoma"
 - **System Architecture** → [[docs/architecture.md]]
 - **Database Schema** → [[docs/database.md]]
 - **Security & Auth** → [[docs/security.md]]

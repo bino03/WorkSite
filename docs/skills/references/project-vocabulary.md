@@ -37,7 +37,7 @@ Dizer "modal" quando é um Drawer faz com que se leia o sub-ficheiro de design e
 
 | Termo | O que é | Exemplos reais |
 |---|---|---|
-| **Drawer** (ou "painel lateral") | `<Drawer>` do AntD | `InvoiceDetailDrawer`, `InvoiceUploadDrawer`, `CreateEnterpriseDrawer`, `EnterpriseViewDrawer` |
+| **Drawer** (ou "painel lateral") | `<Drawer>` do AntD | `InvoiceDetailDrawer`, `InvoiceUploadDrawer`, `SuppliersDrawer`, `CreateEnterpriseDrawer`, `EnterpriseViewDrawer` |
 | **Modal** | `<Modal>` do AntD | `BudgetItemPickerModal`, `BudgetImportModal`, `InvoicePreviewModal`, `MyProfileModal` |
 | **Diálogo de confirmação** | `useConfirm()`, partilhado | o "Eliminar esta fatura?" |
 | **Página** | tem rota em `main.tsx` | `EnterpriseInvoicesPage`, `ConstructionBudgetPage` |
@@ -63,8 +63,29 @@ O que mais poupa tempo, porque estas palavras mapeiam 1:1 para entidades do back
 | **Associar** | ligar fatura → rubrica, criando a despesa | `allocate` |
 | **Caixa de entrada** | as faturas com `allocated: false` | filtro "Por associar" |
 | **Por rever** | falta a data ou o total; não dá para associar | `needsReview` (derivado, não é coluna) |
+| **Fornecedor** | a empresa que emitiu a fatura, no catálogo NIF → nome | `Supplier` / `SuppliersDrawer` |
 
 **"Fatura" e "despesa" não são sinónimos.** A separação é deliberada: registar e classificar são momentos diferentes — quem chega da obra com quinze faturas carrega-as todas sem decidir nada, e classifica depois. Ver [[../../api]] → "Faturas de obra".
+
+---
+
+## Vocabulário — o papel fiscal português
+
+Estes quatro termos aparecem em conversa como se fossem intermutáveis e não são. Todos saem do **QR code da AT**, obrigatório nas faturas portuguesas desde 2022, que `AtInvoiceQrService` lê (campos `A:`, `D:`, `G:`, `H:` …).
+
+| Termo | O que é | No código |
+|---|---|---|
+| **NIF** | número de contribuinte de **quem emitiu** a fatura. É a única identificação do fornecedor que o QR traz — **não há campo para o nome da empresa** | `supplierNif` (campo `A` do QR) |
+| **Nome do fornecedor** | o nome da empresa. Nunca vem do QR: ou está no catálogo (`Supplier`), ou alguém o escreveu à mão | `supplierName` |
+| **Tipo de documento** | `FT` fatura · `FR` fatura-recibo · `FS` simplificada · `VD` venda a dinheiro · `NC` nota de crédito · `ND` nota de débito | campo `D` do QR; lista em `invoiceNumber.ts` |
+| **Nº da fatura** | o tipo **junto** com a série/número — `"FT 2026/114"`, tudo numa string | `invoiceNumber` (campo `G` do QR) |
+| **ATCUD** | código único que a AT atribui ao documento (`"CSDF7T5H-0114"`). É a chave fiscal e a melhor chave de duplicado | `invoiceAtcud` (campo `H` do QR) |
+
+Três consequências que se repetem em conversa:
+
+- **"o fornecedor não aparece"** quase nunca é bug de leitura — o QR não traz o nome. É o catálogo de fornecedores que resolve; ver [[../../api]] → "Fornecedores".
+- **"a fatura começa por FR"** é o *tipo de documento*, não parte da série. No preenchimento manual escolhe-se numa lista, não se escreve.
+- **"fatura repetida"** compara-se por três chaves diferentes (checksum do ficheiro, ATCUD, e o par NIF+número) — ver [[../../api]] → "Duplicados".
 
 ---
 

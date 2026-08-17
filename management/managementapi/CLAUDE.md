@@ -47,7 +47,7 @@ This is a scoped copy of [Property-Management](https://github.com/bino03/Propert
 ### Database
 
 - Schemas: `worksite` (main), `settings` (config/invites), `tasks` (standalone task management), `auth` (Supabase-managed — never touch)
-- Migrations: `src/main/resources/db/migration/` — Flyway V1–V18, `ddl-auto: none`
+- Migrations: `src/main/resources/db/migration/` — Flyway V1–V19, `ddl-auto: none`
 - When adding a new table: create a new `V{next}__description.sql` in `db/migration/` — never alter the DB directly via Supabase. See [[../../docs/skills/backend/skill-add-database-table]]
 - Base entity: UUID PK + `createdAt`/`updatedAt` (JPA auditing enabled)
 
@@ -90,6 +90,19 @@ Annotation processor order in `pom.xml` is intentional: **Lombok must run before
 ### File uploads
 
 Max 25 MB (configured in `application.yml`). Construction expense invoices go through `SupabaseStorageService` (bucket `"documents"`) — see [[../../docs/skills/backend/skill-add-file-upload]].
+
+### Catálogo de fornecedores (`Supplier`, `V19`)
+
+O QR da AT identifica o emitente **só pelo NIF** — não existe campo para o nome da empresa. Sem
+catálogo, o nome era escrito à mão uma vez por fatura. `worksite.supplier` guarda o par NIF →
+nome, **global** (o mesmo NIF é a mesma empresa em todas as obras) e ligado às faturas **pelo
+NIF, não por FK** — uma fatura tem de poder existir com um fornecedor ainda desconhecido, que é
+o estado normal de uma acabada de carregar.
+
+Propaga nos dois sentidos: `SupplierService` escreve o nome nas faturas desse NIF que estejam
+**sem** nome (nunca sobrepõe uma correção manual), e `ConstructionInvoiceService.applyKnownSupplierName`
+consulta o catálogo no upload/preview para a fatura nascer já identificada. Ver [[../../docs/api.md]]
+→ "Fornecedores".
 
 ### Ficheiros lidos, não só guardados
 

@@ -4,6 +4,7 @@ Central documentation for the Worksite project (backend + backoffice).
 
 ## Structure
 
+- **code-map.md** — Onde vive cada funcionalidade (domínio → ficheiros) + tabela "onde procurar, por sintoma". É por aqui que se começa quando a pergunta é *"onde está o código disto?"*
 - **architecture.md** — System architecture overview
 - **database.md** — Database schema and design
 - **security.md** — Security & authorization

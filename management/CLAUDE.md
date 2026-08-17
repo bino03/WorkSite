@@ -77,7 +77,7 @@ management/
 │   │   └── resources/
 │   │       ├── application.yml
 │   │       ├── application.properties
-│   │       └── db/migration/           ← Flyway migrations (V1-V18)
+│   │       └── db/migration/           ← Flyway migrations (V1-V19)
 │   └── CLAUDE.md                       ← Backend guidance
 │
 ├── managementfrontend/                 ← React frontend

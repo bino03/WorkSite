@@ -11,6 +11,7 @@
 
 | I want to... | Go to |
 |-------------|--------|
+| **Find where something lives in the code** | [[docs/code-map.md]] |
 | **Work on Backend** | [[management/managementapi/CLAUDE.md]] |
 | **Work on Backoffice (frontend)** | [[management/managementfrontend/CLAUDE.md]] |
 | **Read Documentation** | [[docs/README.md]] |

@@ -42,7 +42,7 @@ O backend é a única fonte de verdade e o único componente com acesso direto �
 ## Backend — `managementapi`
 
 - **Spring Boot 3.5.6**, Java 21.
-- Persistência: **Spring Data JPA** + **PostgreSQL**, migrações geridas por **Flyway** (`src/main/resources/db/migration/`, `V1` a `V18`). Ver [[database.md]] para o schema completo.
+- Persistência: **Spring Data JPA** + **PostgreSQL**, migrações geridas por **Flyway** (`src/main/resources/db/migration/`, `V1` a `V19`). Ver [[database.md]] para o schema completo.
 - Mapeamento DTO ↔ entidade via **MapStruct 1.6.0**.
 - Autenticação: **Spring OAuth2 Resource Server** a validar JWTs emitidos pelo **Supabase** (HS256, chave partilhada). Ver [[security.md]].
 - Não usa um SDK oficial do Supabase — a integração é feita por chamadas REST próprias via **OkHttp**.
