@@ -60,6 +60,13 @@ public class ResourceNotFoundException extends BusinessException {
         );
     }
 
+    public static ResourceNotFoundException supplier(String supplierId) {
+        return new ResourceNotFoundException(
+            ErrorCode.SUPPLIER_NOT_FOUND,
+            "Fornecedor com ID " + supplierId + " não encontrado"
+        );
+    }
+
     public static ResourceNotFoundException task(String taskId) {
         return new ResourceNotFoundException(
             ErrorCode.TASK_NOT_FOUND,

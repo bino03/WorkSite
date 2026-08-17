@@ -256,6 +256,12 @@ public enum ErrorCode {
     INVOICE_DUPLICATE_FILE("INVOICE_012", "Este ficheiro já foi carregado neste projeto — é byte a byte igual a uma fatura existente"),
 
     // ========================================================================
+    // FORNECEDORES (SUPPLIER_xxx)
+    // ========================================================================
+    SUPPLIER_NOT_FOUND("SUPPLIER_001", "Fornecedor não encontrado"),
+    SUPPLIER_NIF_ALREADY_EXISTS("SUPPLIER_002", "Já existe um fornecedor com este NIF"),
+
+    // ========================================================================
     // LOCALIZAÇÕES (LOC_xxx)
     // ========================================================================
     LOCATION_INVALID_NAME("LOC_030", "Nome da localização inválido"),

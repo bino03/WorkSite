@@ -75,6 +75,7 @@ atrás. O ficheiro de fatura é guardado apenas como `bucket`/`storage_key` (buc
 
 | Tabela | Schema | Propósito |
 |---|---|---|
+| `supplier` | `worksite` | Catálogo NIF → nome da empresa (`V19`). O QR da AT só traz o NIF do emitente; sem isto o nome era escrito à mão fatura a fatura. Global, sem `enterprise_id` — o mesmo NIF é a mesma empresa em todas as obras — e ligado às faturas **pelo NIF, não por FK**, para uma fatura poder existir com um fornecedor ainda desconhecido. `nif` único (`uq_supplier_nif`) |
 | `profile` | `worksite` | Utilizador interno (liga a `auth_user_id` do Supabase); `role` = `ADMIN` ou `EMPLOYEE` |
 | `location` | `worksite` | Localização standalone (endereço, cidade, coordenadas), reutilizada por `enterprises` |
 | `activity_log` | `worksite` | Auditoria genérica (login/logout + CRUD em `enterprises`/`construction_budget_item`/`construction_expense`) |
@@ -89,7 +90,7 @@ atrás. O ficheiro de fatura é guardado apenas como `bucket`/`storage_key` (buc
 - Todas as PKs são `UUID DEFAULT gen_random_uuid()`, exceto `revoked_token` (BIGSERIAL).
 - Trigger genérico `worksite.tg_set_updated_at()` (definido em `V1`) mantém `updated_at` automaticamente — aplicado a todas as tabelas `worksite` com essa coluna via loop dinâmico em `V11`, e explicitamente às tabelas de construção em `V15`.
 - Enums nativos do Postgres: `role_enum` (`ADMIN`/`EMPLOYEE`), `account_status_enum` (`unlocked`/`blocked`/`deleted`), `media_type_enum`, `visibility_enum`, `activity_type`, `entity_type` (`V2`) e `budget_row_kind` (`ITEM`/`HEADING`/`NOTE`, `V15`).
-- `entity_type` ganhou `budget_item` em `V15`. Os valores `construction_stage` e `construction_sub_stage` **mantêm-se de propósito**: há linhas históricas em `activity_log` que ainda os referenciam, e um valor não se remove de um enum do Postgres.
+- `entity_type` ganhou `budget_item` em `V15`, `construction_invoice` em `V16` e `supplier` em `V19`. Os valores `construction_stage` e `construction_sub_stage` **mantêm-se de propósito**: há linhas históricas em `activity_log` que ainda os referenciam, e um valor não se remove de um enum do Postgres.
 - `V8` concede permissões explícitas aos roles do Supabase (`anon`, `authenticated`, `service_role`) — necessário porque a validação de JWT é feita localmente pelo backend, mas o Supabase continua a gerir os utilizadores de autenticação (`auth.users`).
 - `V9` cria a FK condicional `profile.auth_user_id → auth.users(id)` (só se o schema `auth` existir — é o caso quando a app corre contra um projeto Supabase real).
 

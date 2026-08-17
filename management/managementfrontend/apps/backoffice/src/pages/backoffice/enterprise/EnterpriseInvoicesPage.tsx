@@ -23,6 +23,7 @@ import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
+import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import type { ConstructionInvoice, InvoiceFilters } from "@/types/invoice";
 
@@ -97,6 +98,15 @@ const EnterpriseInvoicesPage: FC = () => {
     fetch(filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enterpriseId]);
+
+  // Dar nome a um NIF (drawer de fornecedores, no cabeçalho) reescreve o
+  // fornecedor de faturas que estão nesta lista — sem isto os nomes novos só
+  // apareciam ao recarregar a página.
+  useEffect(() => {
+    const reload = () => fetch(filters);
+    window.addEventListener(SUPPLIERS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(SUPPLIERS_CHANGED_EVENT, reload);
+  }, [fetch, filters]);
 
   /** Qualquer mudança de filtro volta à primeira página — senão fica-se num vazio. */
   const applyFilters = (changes: Partial<InvoiceFilters>) => {

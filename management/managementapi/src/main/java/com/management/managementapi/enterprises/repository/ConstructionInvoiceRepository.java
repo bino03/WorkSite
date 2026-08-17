@@ -5,11 +5,13 @@ import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -140,4 +142,67 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
     List<UUID> findBudgetItemIdsUsedBySupplier(@Param("enterpriseId") UUID enterpriseId,
                                                @Param("supplierNif") String supplierNif,
                                                Pageable pageable);
+
+    // ── catálogo de fornecedores (ver Supplier) ───────────────
+
+    /** Um NIF que aparece nas faturas e ainda não tem empresa associada. */
+    interface UnknownSupplierNif {
+        String getNif();
+        long getInvoiceCount();
+        /**
+         * Um nome que alguém já escreveu à mão nalguma fatura deste NIF, se
+         * existir — poupa a escrita quando o trabalho já foi feito uma vez.
+         */
+        String getSuggestedName();
+        LocalDate getLastInvoiceDate();
+    }
+
+    /**
+     * Os NIFs vistos nas faturas de todos os projetos que ainda não estão no
+     * catálogo, do mais frequente para o menos — é esta a lista de trabalho de
+     * quem vai dar nome às empresas.
+     */
+    @Query("""
+            select i.supplierNif      as nif,
+                   count(i)           as invoiceCount,
+                   max(i.supplierName) as suggestedName,
+                   max(i.invoiceDate)  as lastInvoiceDate
+            from ConstructionInvoice i
+            where i.supplierNif is not null
+              and not exists (select 1 from Supplier s where s.nif = i.supplierNif)
+            group by i.supplierNif
+            order by count(i) desc, i.supplierNif
+            """)
+    List<UnknownSupplierNif> findUnknownSupplierNifs();
+
+    interface SupplierNifCount {
+        String getNif();
+        long getInvoiceCount();
+    }
+
+    /** Quantas faturas tem cada NIF do catálogo — numa query, não uma por linha. */
+    @Query("""
+            select i.supplierNif as nif, count(i) as invoiceCount
+            from ConstructionInvoice i
+            where i.supplierNif in :nifs
+            group by i.supplierNif
+            """)
+    List<SupplierNifCount> countBySupplierNifs(@Param("nifs") Collection<String> nifs);
+
+    /**
+     * Escreve o nome da empresa nas faturas deste NIF que estejam sem nome.
+     *
+     * Só nas vazias: um nome escrito à mão é uma correção deliberada de alguém
+     * que tinha o papel à frente, e o catálogo não tem autoridade para a deitar
+     * fora.
+     *
+     * @return quantas faturas foram atualizadas
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update ConstructionInvoice i set i.supplierName = :name
+            where i.supplierNif = :nif
+              and (i.supplierName is null or trim(i.supplierName) = '')
+            """)
+    int fillMissingSupplierName(@Param("nif") String nif, @Param("name") String name);
 }

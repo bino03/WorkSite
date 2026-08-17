@@ -266,6 +266,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_011': 'Já existe uma fatura deste fornecedor com este número neste projeto.',
   'INVOICE_012': 'Este ficheiro já foi carregado neste projeto — é igual, byte a byte, a uma fatura existente.',
 
+  // Fornecedores
+  'SUPPLIER_001': 'Fornecedor não encontrado.',
+  'SUPPLIER_002': 'Já existe um fornecedor com este NIF.',
+
   // ── Tarefas ────────────────────────────────────────────────────────────────
   'TASK_001': 'Tarefa não encontrada. Pode ter sido removida.',
   'TASK_002': 'Um ou mais utilizadores atribuídos não foram encontrados.',

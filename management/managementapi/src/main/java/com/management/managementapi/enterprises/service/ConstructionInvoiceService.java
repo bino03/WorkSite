@@ -10,10 +10,12 @@ import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
+import com.management.managementapi.enterprises.model.Supplier;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
+import com.management.managementapi.enterprises.repository.SupplierRepository;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.exeption.FileUploadException;
 import com.management.managementapi.exeption.ResourceNotFoundException;
@@ -77,6 +79,7 @@ public class ConstructionInvoiceService {
     private final ConstructionExpenseRepository expenseRepository;
     private final ConstructionBudgetItemRepository budgetItemRepository;
     private final EnterpriseRepository enterpriseRepository;
+    private final SupplierRepository supplierRepository;
     private final ProfileRepository profileRepository;
     private final SupabaseStorageService storageService;
     private final SignedUrlService signedUrls;
@@ -313,6 +316,23 @@ public class ConstructionInvoiceService {
         if (invoice.getTotalAmount() == null)    invoice.setTotalAmount(data.totalAmount());
         if (invoice.getTaxableAmount() == null)  invoice.setTaxableAmount(data.taxableAmount());
         if (invoice.getTaxAmount() == null)      invoice.setTaxAmount(data.taxAmount());
+
+        applyKnownSupplierName(invoice);
+    }
+
+    /**
+     * O QR da AT identifica o emitente <b>só pelo NIF</b> — não existe campo
+     * para o nome. Se esse NIF já estiver no catálogo, a fatura nasce logo com
+     * o nome da empresa em vez de ficar anónima à espera de alguém o escrever.
+     *
+     * Ver {@link Supplier} e {@link SupplierService}.
+     */
+    private void applyKnownSupplierName(ConstructionInvoice invoice) {
+        if (!isBlank(invoice.getSupplierName()) || isBlank(invoice.getSupplierNif())) {
+            return;
+        }
+        supplierRepository.findByNif(invoice.getSupplierNif().trim())
+                .ifPresent(supplier -> invoice.setSupplierName(supplier.getName()));
     }
 
     // ── leitura ───────────────────────────────────────────────

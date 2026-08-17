@@ -45,7 +45,7 @@ src/
 ├── index.css / colors.css    # Tailwind + variáveis CSS globais
 │
 ├── layouts/
-│   └── AppLayout.tsx         # Layout principal (nav: Home, Projetos, Tarefas, Equipa)
+│   └── AppLayout.tsx         # Layout principal (nav: Home, Projetos, Tarefas, Equipa) + ⚙️ Definições → Fornecedores
 │
 ├── pages/
 │   ├── Login.tsx / LoginLoadingPage.tsx / ForgotPassword.tsx / NotFoundPage.tsx
@@ -65,6 +65,7 @@ src/
 │   ├── tasks/                # TasksList, TaskFormDrawer, TaskDetailDrawer
 │   ├── budget/               # Árvore de orçamento: drawers, modal de importação, utils
 │   ├── invoices/             # InvoicesList, InvoiceUploadDrawer (2 fases), InvoiceDetailDrawer, BudgetItemPickerModal
+│   ├── suppliers/            # SuppliersDrawer (catálogo NIF → nome da empresa)
 │   ├── construction/         # InvoicePreviewModal + regras da fatura (reaproveitados)
 │   ├── employees/            # CreateEmployeeDrawer, EmployeeContextMenu
 │   ├── profile/              # MyProfileModal, ProfileView, ProfileDrawer, seeprofile/EmployeeMiniCard
@@ -181,6 +182,24 @@ entrada das faturas — o documento é registado aqui, a rubrica escolhe-se a se
   como enviadas à contabilidade" (só `ADMIN`, só marca — nunca desmarca em bloco). As duas
   chamam a API sequencialmente, uma fatura de cada vez, para um erro a meio deixar as
   anteriores já gravadas em vez de um estado indefinido.
+
+### Fornecedores
+
+`components/suppliers/SuppliersDrawer.tsx`, aberta pelo ⚙️ **Definições** no cabeçalho
+(`AppLayout`). O QR da AT traz o NIF do emitente mas nunca o nome da empresa.
+
+Dois **separadores** com o número na etiqueta, não duas secções empilhadas — são duas listas sem
+limite de tamanho, e quarenta NIFs por identificar empurravam o catálogo para fora do ecrã:
+**"Por identificar"** (`GET /suppliers/unknown-nifs`, do mais frequente para o menos, já com o
+nome pré-preenchido se alguém o escreveu nalguma fatura) e **"Empresas"** (catálogo, com
+pesquisa; o botão "Guardar" de cada linha só aparece com alterações por gravar). Abre no
+primeiro separador, ou no segundo quando não há nada por identificar — e não muda de separador
+sozinho a meio do trabalho. Gravar um nome preenche as faturas desse NIF que estejam sem nome,
+em todos os projetos, e o número aparece na notificação. Só `ADMIN` escreve; `EMPLOYEE` vê.
+
+Como a drawer vive no cabeçalho e a lista de faturas noutra página, gravar dispara o evento de
+janela `SUPPLIERS_CHANGED_EVENT` (`"suppliers:changed"`), que a `EnterpriseInvoicesPage` ouve
+para recarregar — sem isso os nomes novos só apareciam ao recarregar a página.
 
 ---
 

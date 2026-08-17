@@ -1,6 +1,8 @@
 import { Outlet, NavLink } from "react-router-dom";
 import type { CSSProperties } from "react";
+import { Dropdown } from "antd";
 import MyProfileModal from "@/components/profile/MyProfileModal";
+import { SuppliersDrawer } from "@/components/suppliers/SuppliersDrawer";
 import { useState, useEffect } from "react";
 import api from "@/api";
 import { useTranslation } from "react-i18next";
@@ -12,6 +14,8 @@ import {
   TeamOutlined,
   LogoutOutlined,
   GlobalOutlined,
+  SettingOutlined,
+  ShopOutlined,
 } from "@ant-design/icons";
 
 function initialsOf(name: string) {
@@ -26,6 +30,7 @@ export default function AppLayout() {
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
+  const [isSuppliersDrawerOpen, setIsSuppliersDrawerOpen] = useState(false);
 
   const userPhoto = user?.photoUrl ?? null;
   const userName = user?.name ?? t("common.user");
@@ -142,6 +147,30 @@ export default function AppLayout() {
           </span>
         </div>
 
+        {/* Definições: o sítio das coisas transversais aos projetos — hoje o
+            catálogo de fornecedores, amanhã o que mais aparecer. */}
+        <Dropdown
+          trigger={["click"]}
+          menu={{
+            items: [
+              {
+                key: "suppliers",
+                icon: <ShopOutlined />,
+                label: "Fornecedores",
+                onClick: () => setIsSuppliersDrawerOpen(true),
+              },
+            ],
+          }}
+        >
+          <button
+            title="Definições"
+            aria-label="Definições"
+            style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.7, display: "flex", padding: 4 }}
+          >
+            <SettingOutlined style={{ fontSize: 16 }} />
+          </button>
+        </Dropdown>
+
         <button
           title={i18n.language === "en" ? "Português" : "English"}
           onClick={toggleLanguage}
@@ -166,6 +195,11 @@ export default function AppLayout() {
       {isProfileModalVisible && (
         <MyProfileModal onClose={() => setIsProfileModalVisible(false)} />
       )}
+
+      <SuppliersDrawer
+        open={isSuppliersDrawerOpen}
+        onClose={() => setIsSuppliersDrawerOpen(false)}
+      />
     </div>
   );
 }

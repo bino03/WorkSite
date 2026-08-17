@@ -401,6 +401,40 @@ Ficheiro: PDF, JPEG ou PNG, até 25 MB, bucket `documents`, chave
 `construction-invoices/{enterpriseId}/…`. A miniatura é um extra — falhar a gerá-la não custa
 a fatura, a lista cai num ícone de ficheiro.
 
+## Fornecedores (`SupplierController`, `/suppliers`)
+
+Catálogo **NIF → nome da empresa**. Existe porque o QR da AT identifica o emitente só pelo NIF
+(campo `A`) — **não há campo para o nome** na especificação. Sem catálogo, o nome era escrito à
+mão uma vez por fatura, para sempre.
+
+É **global, não por projeto**: o mesmo NIF é a mesma empresa em todas as obras. A ligação às
+faturas faz-se pelo NIF e não por chave estrangeira, para uma fatura poder existir com um
+fornecedor que ainda não está no catálogo — que é o estado normal de uma fatura acabada de
+carregar.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/suppliers?q=` | `ADMIN` ou `EMPLOYEE` — catálogo por ordem alfabética, com `invoiceCount` |
+| GET | `/suppliers/unknown-nifs` | `ADMIN` ou `EMPLOYEE` — NIFs vistos nas faturas ainda sem empresa, do mais frequente para o menos |
+| POST | `/suppliers` | `ADMIN` — dá nome a um NIF; devolve `201` |
+| PUT | `/suppliers/{id}` | `ADMIN` — renomeia |
+| DELETE | `/suppliers/{id}` | `ADMIN` — tira do catálogo; devolve `204` |
+
+**Gravar propaga-se às faturas.** `POST` e `PUT` escrevem o nome nas faturas desse NIF que
+estejam **sem nome** — de todos os projetos — e devolvem quantas foram (`invoicesUpdated`). Só
+as vazias: um nome escrito à mão é uma correção deliberada de quem tinha o papel à frente, e o
+catálogo não tem autoridade para a deitar fora. No sentido inverso, o `upload`/`preview` de uma
+fatura nova consulta o catálogo e nasce já com o nome (`applyKnownSupplierName`).
+
+`DELETE` **não** limpa o nome das faturas: o nome já lá está escrito e é um dado do documento,
+não uma referência viva à tabela. Apagar só significa "deixa de preencher sozinho a partir de
+agora".
+
+`unknown-nifs` traz `suggestedName` — um nome que alguém já escreveu à mão nalguma fatura desse
+NIF, se existir — para o ecrã o mostrar pré-preenchido em vez de o pedir outra vez.
+
+Códigos de erro: `SUPPLIER_001` (não encontrado), `SUPPLIER_002` (NIF já no catálogo).
+
 ## Tarefas (`TaskController`, `/tasks`)
 
 Tarefas isoladas no seu próprio schema `tasks`, atribuíveis a um ou mais utilizadores `worksite.profile`. **Não estão ligadas a nenhum imóvel/ativo** — esse conceito não existe no Worksite.
