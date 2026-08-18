@@ -27,10 +27,12 @@ interface EmployeeContextMenuProps {
   onView?: (id: string) => void;
   onStatusChanged?: (id: string, newStatus: AccountStatus) => void;
   onDeleted?: (id: string) => void;
+  /** Chamado na própria linha, onde o menu só oferece editar o perfil. */
+  onEditMyProfile?: () => void;
 }
 
 const EmployeeContextMenu: React.FC<EmployeeContextMenuProps> = ({
-  visible, x, y, record, onClose, onView, onStatusChanged, onDeleted,
+  visible, x, y, record, onClose, onView, onStatusChanged, onDeleted, onEditMyProfile,
 }) => {
   const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -127,7 +129,17 @@ const EmployeeContextMenu: React.FC<EmployeeContextMenuProps> = ({
   };
 
   // ── Items do menu ──
-  const items: MenuItem[] = [
+  // Na própria linha as ações de gestão não se aplicam: o backend recusa o
+  // auto-delete, e ver-se a si próprio é o que a modal de perfil já faz melhor.
+  const items: MenuItem[] = record.me ? [
+    {
+      icon: <UserOutlined />,
+      label: t('myProfile.editProfile'),
+      color: '#1890ff',
+      disabled: false,
+      onClick: () => { onClose(); onEditMyProfile?.(); },
+    },
+  ] : [
     {
       icon: <EyeOutlined />,
       label: t('employeeContext.viewProfile'),

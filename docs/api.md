@@ -43,6 +43,15 @@ CRUD sobre `worksite.profile` — não existe entidade `Employee` separada.
 | PATCH | `/employees/{id}/role` | `ADMIN` |
 | PUT | `/employees/{id}/avatar` | `ADMIN` |
 
+Todas as respostas com `EmployeeResponseDTO` trazem `me: boolean` — verdadeiro na linha do
+próprio utilizador autenticado. Existe para o frontend não ter de guardar o id da sessão só
+para se comparar a cada linha da lista; no Backoffice é o que troca as ações da linha por um
+único "Editar perfil".
+
+`DELETE /employees/{id}` recusa o próprio com `USER_036` (`PROFILE_CANNOT_DELETE_SELF`): um
+admin a eliminar-se ficava de fora sem ninguém que lhe repusesse a conta. `USER_033`
+(`PROFILE_CANNOT_DELETE`) continua a ser o de já eliminado / inexistente.
+
 ## Perfil (`ProfileController`, `/profile`)
 
 | Método | Rota | Acesso |

@@ -261,6 +261,7 @@ public enum ErrorCode {
     SUPPLIER_NOT_FOUND("SUPPLIER_001", "Fornecedor não encontrado"),
     SUPPLIER_NIF_ALREADY_EXISTS("SUPPLIER_002", "Já existe um fornecedor com este NIF"),
 
+
     // ========================================================================
     // LOCALIZAÇÕES (LOC_xxx)
     // ========================================================================
@@ -299,6 +300,7 @@ public enum ErrorCode {
     PROFILE_CANNOT_BLOCK("USER_028", "Utilizador não pode ser bloqueado (já bloqueado ou eliminado)"),
     PROFILE_CANNOT_UNBLOCK("USER_029", "Utilizador não pode ser desbloqueado (não está bloqueado)"),
     PROFILE_CANNOT_DELETE("USER_033", "Utilizador não pode ser eliminado (já eliminado ou não existe)"),
+    PROFILE_CANNOT_DELETE_SELF("USER_036", "Não pode eliminar a sua própria conta"),
     USER_ROLE_NOT_FOUND("USER_021", "Role do utilizador não encontrado"),
     USER_CANNOT_ACCESS_RESOURCE("USER_022", "Utilizador não pode aceder a este recurso"),
     USER_CANNOT_MODIFY_RESOURCE("USER_023", "Utilizador não pode modificar este recurso"),

@@ -26,5 +26,11 @@ public record EmployeeResponseDTO(
         @Schema(description = "Criado em")
         OffsetDateTime createdAt,
         @Schema(description = "Atualizado em")
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        /**
+         * Verdadeiro quando esta linha é o próprio utilizador autenticado. Poupa ao
+         * frontend guardar o id da sessão só para se comparar a cada linha da lista.
+         */
+        @Schema(description = "É o próprio utilizador autenticado")
+        boolean me
 ) {}

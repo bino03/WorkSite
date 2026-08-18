@@ -33,6 +33,7 @@ import type { SortOrder } from "antd/es/table/interface";
 import dayjs from "dayjs";
 import api from "@/api";
 import ProfileView from "@/components/profile/ProfileView";
+import MyProfileModal from "@/components/profile/MyProfileModal";
 import type { Employee } from "@/services/profileService";
 import { markAccountDeleted } from "@/services/profileService";
 import type { AccountStatus } from "@/services/profileService";
@@ -171,6 +172,9 @@ export default function EmployeesList() {
 
   // Drawer de criação
   const [createOpen, setCreateOpen] = useState(false);
+
+  // A própria linha não se vê nem se elimina — edita-se, na mesma modal do header.
+  const [myProfileOpen, setMyProfileOpen] = useState(false);
   const closeCreate = () => setCreateOpen(false);
 
   // ABRIR DRAWER DE CONVITES
@@ -388,32 +392,39 @@ export default function EmployeesList() {
       {
         title: t('employees.columns.actions'),
         key: "actions",
-        render: (_: unknown, record: Employee) => (
-          <Space size="small">
-            <Button
-              size="small"
-              onClick={() => openProfile(record.id)}
-              disabled={record.status === "deleted"}
-            >
-              {t('employees.view')}
+        render: (_: unknown, record: Employee) =>
+          record.me ? (
+            // Ver-se a si próprio numa drawer de consulta e ter um botão de eliminar
+            // que o backend recusa não serve para nada — aqui só há o que é útil.
+            <Button size="small" onClick={() => setMyProfileOpen(true)}>
+              {t('myProfile.editProfile')}
             </Button>
-
-            <Tooltip title={t('employees.deleteAccount')}>
+          ) : (
+            <Space size="small">
               <Button
-                type="text"
                 size="small"
-                icon={<DeleteOutlined />}
-                loading={deletingId === record.id}
+                onClick={() => openProfile(record.id)}
                 disabled={record.status === "deleted"}
-                style={{ opacity: 0.75, color: "var(--ind-color-accent)" }}
-                onClick={() => confirm({
-                  message: `${t('employees.deleteConfirm')} (${record.name})`,
-                  onConfirm: () => handleDelete(record.id),
-                })}
-              />
-            </Tooltip>
-          </Space>
-        ),
+              >
+                {t('employees.view')}
+              </Button>
+
+              <Tooltip title={t('employees.deleteAccount')}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  loading={deletingId === record.id}
+                  disabled={record.status === "deleted"}
+                  style={{ opacity: 0.75, color: "var(--ind-color-accent)" }}
+                  onClick={() => confirm({
+                    message: `${t('employees.deleteConfirm')} (${record.name})`,
+                    onConfirm: () => handleDelete(record.id),
+                  })}
+                />
+              </Tooltip>
+            </Space>
+          ),
       }
     ],
     [sortBy, sortDir, openProfile, deletingId, confirm, t]
@@ -660,6 +671,20 @@ export default function EmployeesList() {
         onClose={() => setInvitesDrawerOpen(false)}
       />
 
+      {/* A mesma modal que o avatar do header abre — o perfil próprio edita-se num sítio só. */}
+      {myProfileOpen && (
+        <MyProfileModal
+          onClose={() => setMyProfileOpen(false)}
+          onProfileUpdated={() => {
+            const controller = new AbortController();
+            fetchData(
+              { current: toInt(pagination.current, 1), pageSize: toInt(pagination.pageSize, 20) },
+              controller
+            );
+          }}
+        />
+      )}
+
       {/* Context menu botão direito */}
       <EmployeeContextMenu
         visible={ctxMenu.visible}
@@ -670,6 +695,7 @@ export default function EmployeesList() {
         onView={(id) => { closeCtxMenu(); openProfile(id); }}
         onStatusChanged={handleCtxStatusChanged}
         onDeleted={handleCtxDeleted}
+        onEditMyProfile={() => setMyProfileOpen(true)}
       />
     </div>
   );

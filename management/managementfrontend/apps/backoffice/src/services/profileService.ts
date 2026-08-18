@@ -33,6 +33,8 @@ export type Employee = {
   status: AccountStatus;
   createdAt: string;
   updatedAt: string;
+  /** Vem do backend: esta linha é o próprio utilizador autenticado. */
+  me: boolean;
 };
 
 export type SignedUrlResponse = {

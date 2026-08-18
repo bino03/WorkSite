@@ -54,8 +54,18 @@ public class EmployeeServiceImpl implements EmployeeService {
                 (String) row.get("role"),
                 (String) row.get("account_status"),
                 toOffsetDateTime(row.get("created_at")),
-                toOffsetDateTime(row.get("updated_at"))
+                toOffsetDateTime(row.get("updated_at")),
+                isSelf((UUID) row.get("id"))
         );
+    }
+
+    /**
+     * O auditor traz o id do <b>profile</b> autenticado (não o de auth.users) e é
+     * cacheado por request, por isso chamar isto por linha não custa consultas.
+     */
+    private boolean isSelf(@Nullable UUID profileId) {
+        if (profileId == null) return false;
+        return auditorAware.getCurrentAuditor().map(profileId::equals).orElse(false);
     }
 
     private String baseSelect() {
@@ -347,6 +357,13 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public void deleteProfile(UUID id) {
+        // Um admin a eliminar-se a si próprio perdia o acesso sem que ninguém
+        // pudesse repor a conta a não ser por outro admin — e pode não haver outro.
+        if (isSelf(id)) {
+            throw new BusinessException(ErrorCode.PROFILE_CANNOT_DELETE_SELF,
+                    "Não pode eliminar a sua própria conta");
+        }
+
         int updated = jdbc.update("""
                 update worksite.profile
                    set account_status = cast('deleted' as worksite.account_status_enum),
