@@ -303,7 +303,10 @@ const ConstructionBudgetPage: FC = () => {
               Faturas
             </Button>
           </Badge>
-          {isAdmin() && (
+          {/* Importar por cima de um orçamento existente duplicava a árvore toda. O
+              backend recusa na mesma (`BUDGET_IMPORT_NOT_EMPTY`); aqui tira-se o botão
+              da frente. Com `tree` ainda por carregar não aparece, para não piscar. */}
+          {isAdmin() && tree?.roots.length === 0 && (
             <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
               Importar Excel
             </Button>
