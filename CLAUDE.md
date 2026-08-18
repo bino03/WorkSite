@@ -1,144 +1,72 @@
-# CLAUDE.md - Worksite Central Hub
+# CLAUDE.md — Worksite
 
-**Welcome!** This is the central hub for the **Worksite** project — a project & staff management app bootstrapped from [Property-Management](https://github.com/bino03/Property-Management)'s auth/enterprises/construction-management foundations.
+> **Toda a documentação deste projeto vive no vault Obsidian: `docs/` e `notes/`.**
+> Este ficheiro é um ponteiro, não um sítio para documentar.
 
-> **Obsidian Vault:** This entire folder is configured as an Obsidian vault for easy navigation and search.
-> Start here: [[00-INDEX|00-INDEX.md]] or use **Ctrl+P** to search.
+## Antes de responder: ler o vault
 
----
+Perante qualquer pedido sobre este projeto, **o primeiro passo é consultar o vault** — não
+responder de memória nem só a partir do código:
 
-## 📍 Quick Navigation
+1. **[[00-INDEX]]** para navegar.
+2. O ficheiro do `docs/` que corresponde à pergunta (ver a tabela de atalhos abaixo).
+3. **[[notes/ToDo]]** e **[[notes/whatIveDone]]** quando a pergunta é sobre o que falta ou o que
+   já foi feito — o work log guarda *porque* é que as coisas ficaram como estão, que é o que o
+   código não diz.
 
-| I want to... | Go to |
-|-------------|--------|
-| **Find where something lives in the code** | [[docs/code-map.md]] |
-| **Work on Backend** | [[management/managementapi/CLAUDE.md]] |
-| **Work on Backoffice (frontend)** | [[management/managementfrontend/CLAUDE.md]] |
-| **Read Documentation** | [[docs/README.md]] |
-| **Add Notes/Ideas** | [[notes/README.md]] |
-| **View Architecture** | [[docs/architecture.md]] |
+O código é a verdade sobre o que a aplicação faz **hoje**; o vault é a verdade sobre o que foi
+decidido e porquê. Uma resposta que ignore o segundo repete decisões já tomadas.
 
----
+Ao terminar um trabalho, o resultado escreve-se no vault (`docs/` para factos,
+`notes/whatIveDone.md` para o que foi feito e porquê) — nunca num `CLAUDE.md`.
 
-## 🏗️ The 2 Applications
+## Regra
 
-```
-Worksite/                     ← You are here (Obsidian vault)
-└── management/               ← Single repo (Backend + Backoffice)
-    ├── managementapi/        ← Backend (Spring Boot)
-    └── managementfrontend/   ← Frontend (React)
-        └── apps/
-            └── backoffice/   ← Admin app (projects, construction, staff)
-```
+**Não escrever documentação aqui nem em nenhum outro `CLAUDE.md`.** Se um facto sobre o projeto
+precisa de ficar registado, o sítio é `docs/`. Um `CLAUDE.md` só pode conter: para onde ir, e
+convenções sobre *como trabalhar* neste repo.
 
-| App | Repo path | Tech Stack |
-|-----|-----|-----------|
-| **Backend API** | `management/managementapi` | Spring Boot 3.5, Java 21 |
-| **Backoffice** | `management/managementfrontend/apps/backoffice` | React 18, Vite, TypeScript |
+O motivo não é estético. Havia duas cópias da tabela de rotas do Backoffice — uma aqui, outra em
+`docs/` — e a do `docs/` ficou a listar três páginas apagadas na `V15` durante meses. Duas cópias
+do mesmo facto divergem sempre, e nunca se sabe qual é a boa. O `.githooks/pre-commit` só vigia o
+`docs/`, o que torna qualquer cópia fora de lá ainda mais frágil.
 
-Unlike Property-Management, there is **no public portal** — this is an internal-only tool, single repo, no git submodules.
+## Começar aqui
 
----
+**[[00-INDEX]]** — o índice do vault. Tudo se alcança a partir de lá.
 
-## 📁 Folder Structure
+## Atalhos, por pergunta
 
-```
-Worksite/
-├── .obsidian/               ← Obsidian config
-├── .claude/skills/          ← 11 invocable skills (thin pointers to docs/skills/)
-├── .githooks/pre-commit     ← Aviso não-bloqueante de docs por atualizar (ver docs/vault-sync-hooks.md)
-│
-├── management/
-│   ├── managementapi/       ← Spring Boot backend
-│   ├── managementfrontend/  ← React frontend (apps/backoffice)
-│   └── CLAUDE.md
-│
-├── docs/                    ← Centralized documentation
-│   ├── README.md
-│   ├── architecture.md / database.md / security.md / api.md
-│   ├── vault-sync-hooks.md
-│   └── skills/              ← Fonte de verdade das skills + referências
-│       ├── SKILLS-INDEX.md / SKILLS-QUICK-REFERENCE.md
-│       ├── backend/ (4) · frontend/ (4) · process/ (3)
-│       └── references/      ← code-best-practices, frontend-visual-consistency, project-vocabulary + design/ (8 sub-files)
-│
-├── references/              ← Links externos (useful-links.md)
-│
-├── notes/                   ← Personal notes (NOT versioned — git ignored)
-│   ├── ToDo.md              ← Backlog acionável (o que /implement-todo consome)
-│   ├── ideas.md / bugs.md / refactoring.md / learning.md / whatIveDone.md
-│   ├── roadmap/             ← backlog.md + plans/ (planos datados) + plans/archive/
-│   └── design-briefs/       ← Gerados por /frontend-structure-brief
-│
-└── CLAUDE.md                ← This file
-```
+| A pergunta | O ficheiro |
+|---|---|
+| Onde vive o código disto? | [[docs/code-map]] |
+| Como arranco, testo, faço build? | [[docs/commands]] |
+| Que variáveis de ambiente preciso? | [[docs/environment]] |
+| Que rotas tem a API? | [[docs/api]] |
+| Como é o schema da base de dados? | [[docs/database]] |
+| Autenticação, roles, CORS? | [[docs/security]] |
+| Convenções e armadilhas do backend? | [[docs/backend-conventions]] |
+| Convenções visuais do Backoffice? | [[docs/skills/references/frontend-visual-consistency]] |
+| Porque é que a tabela se chama `enterprise`? | [[docs/provenance]] |
+| Que skills existem? | [[docs/skills/SKILLS-INDEX]] |
+| O que está por fazer? | [[notes/ToDo]] |
+| O que já foi feito, e porquê? | [[notes/whatIveDone]] |
 
-## 🔁 Fluxo de trabalho do backlog
+## O repositório
 
 ```
-notes/ideas.md → notes/ToDo.md → /implement-todo → notes/roadmap/plans/ → notes/whatIveDone.md
+Worksite/                     ← o vault Obsidian é a raiz do repo
+├── docs/                     ← documentação (fonte de verdade)
+├── notes/                    ← backlog e notas pessoais (git-ignored)
+└── management/               ← o código, repo único
+    ├── managementapi/        ← Backend — Spring Boot 3.5, Java 21
+    └── managementfrontend/
+        └── apps/backoffice/  ← Backoffice — React 18, Vite, TypeScript
 ```
 
-`/implement-todo` abre com um menu (retomar plano / implementar / só planear / ver estado), pergunta âmbito e orçamento, investiga o código em paralelo por tema, esclarece dúvidas em bloco, grava um plano com checkpoints e implementa **uma tarefa de cada vez**, invocando as outras skills. Ver [[docs/skills/process/skill-implement-todo.md]].
+Não há portal público: é uma ferramenta interna. Detalhe em [[docs/architecture]].
 
----
+## Fluxo de trabalho
 
-## 🚀 Quick Start
-
-```bash
-# Backend
-cd management/managementapi
-# Create .env from .env.example with your own Supabase project's credentials
-./mvnw spring-boot:run
-
-# Frontend (separate terminal)
-cd management/managementfrontend/apps/backoffice
-npm install
-npm run dev
-# Opens: Backoffice on 5173
-```
-
-> You need your **own Supabase project** (Auth + Storage + Postgres) — do not reuse Property-Management's. See `management/managementapi/.env.example` for the required variables.
-
----
-
-## 📖 Documentation
-
-- **Architecture** → [[docs/architecture.md]]
-- **Database** → [[docs/database.md]]
-- **Security** → [[docs/security.md]]
-- **API** → [[docs/api.md]]
-- **Skills index** → [[docs/skills/SKILLS-INDEX.md]]
-- **Backend guide** → [[management/managementapi/CLAUDE.md]]
-- **Frontend guide** → [[management/managementfrontend/CLAUDE.md]]
-- **Notes / backlog** → [[notes/README.md]]
-
----
-
-## 🧬 Provenance — what came from Property-Management
-
-This project started as a scoped copy of the [Property-Management](https://github.com/bino03/Property-Management) monorepo, keeping only:
-
-- **Auth/accounts**: Supabase JWT auth, `worksite.profile` (staff/users, roles `ADMIN`/`EMPLOYEE`), admin invite flow.
-- **Enterprises** (renamed conceptually to "projects" — the `enterprises` table/package names were kept as-is to minimize risk).
-- **Construction management**: originally `construction_stage` → `construction_sub_stage` → `construction_expense`. Replaced in `V15` by a single self-referencing tree, `construction_budget_item` → `construction_expense`, so a work budget of arbitrary depth maps 1:1 onto the Excel the company receives — including an `.xlsx` importer. Invoice upload kept as-is.
-- **Employees**: CRUD over `worksite.profile` (no separate entity).
-- **Tasks**: standalone tasks assignable to one or more `worksite.profile` users, isolated in their own `tasks` schema (no link to any asset/property — that concept doesn't exist here).
-
-Deliberately **not** carried over: property listings (`property_asset`, `buildings`, agency/characteristics/contacts/licenses), leads, banners, payments, the public portal, notifications/SSE — none of these were part of the original ask; they're candidates for future features, not gaps.
-
----
-
-## 🧠 Using Obsidian
-
-This vault provides:
-- **Search**: **Ctrl+Shift+F** — Search all docs
-- **Graph**: **Ctrl+G** — Visualize connections
-- **Quick Open**: **Ctrl+P** — Find any file
-- **Backlinks**: **Ctrl+Shift+I** — See what references this file
-
----
-
-## 📞 Need Help?
-
-See [[00-INDEX.md]] for the full index, or use Obsidian search (Ctrl+Shift+F).
+`notes/ideas.md` → `notes/ToDo.md` → `notes/roadmap/plans/` → `notes/whatIveDone.md`.
+A skill `implement-todo` (`/implement-todo`) percorre este ciclo. Ver [[notes/README]].

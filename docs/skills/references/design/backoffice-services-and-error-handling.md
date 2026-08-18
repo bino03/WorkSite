@@ -42,6 +42,23 @@ Estado real dos 7 serviços em `services/`:
 
 **Convenção**: funções nomeadas (`export async function getX(...)`), uma por operação, sobre a instância `api` partilhada, **sem `try/catch`** — deixar o erro subir intacto até ao `ErrorHandler` no componente. Migrar `taskService` oportunisticamente.
 
+## 3.1 Forma das respostas paginadas (Spring)
+
+Tudo o que o backend pagina chega no formato do Spring `Page`, e o frontend tem de o desembrulhar
+sempre da mesma maneira:
+
+```ts
+type SpringPageMeta = { size: number; number: number; totalElements: number; totalPages: number };
+type WrappedPageResponse<T> = { content: T[]; page: SpringPageMeta };
+```
+
+Atenção ao `number`: é **0-based** do lado do Spring e 1-based na paginação do Ant Design — a
+conversão é feita à mão em cada lista (ver `EmployeesList.tsx`), e é uma fonte recorrente de
+listas que abrem na página errada.
+
+> Este tipo esteve declarado três vezes no código (`EmployeesList.tsx`, `EnterprisesList.tsx`,
+> `locationService.ts`) com nomes diferentes para a mesma coisa. Se for preciso mexer, unificar
+> em vez de acrescentar uma quarta.
 ## 4. Toasts: `message.*` (antd) vs `notificationService`
 
 `services/general/notificationService.tsx` é o wrapper próprio à volta do `notification` do antd, e é o que o `ErrorHandler` usa internamente. Fora da infraestrutura, é chamado pelo domínio de tarefas e pelas três páginas de Construção (que trocaram `message.success` por `notificationService.success` na migração de 2026-08-05). Os restantes 20 ficheiros usam `message.*` do antd diretamente para o mesmo tipo de evento ("guardado com sucesso", "erro ao guardar") — a escolha correlaciona com o domínio, não com o tipo de evento.

@@ -1,189 +1,27 @@
-# CLAUDE.md - Management API (Backend)
+# CLAUDE.md — Backend (`managementapi`)
 
-This file provides guidance to Claude Code when working with the **backend**.
+> A documentação vive no vault: `docs/` e `notes/`. **Não documentar aqui.**
+> Ver a regra em [[../../CLAUDE]].
 
-> 📦 Related documentation:
-> - **Project root:** [`../../CLAUDE.md`](../../CLAUDE.md)
-> - **Management folder:** [`../CLAUDE.md`](../CLAUDE.md)
-> - **Frontend (general):** [`../managementfrontend/CLAUDE.md`](../managementfrontend/CLAUDE.md)
-> - **Backoffice app:** [`../managementfrontend/apps/backoffice/CLAUDE.md`](../managementfrontend/apps/backoffice/CLAUDE.md)
+Spring Boot 3.5, Java 21, PostgreSQL via Supabase, Flyway, MapStruct.
 
-## Commands
+## Onde ir
 
-```bash
-./mvnw spring-boot:run                          # Run
-./mvnw clean install                             # Build
-./mvnw test                                      # Run all tests
-./mvnw test -Dtest=ManagementApiApplicationTests # Run a single test class
-./mvnw package -DskipTests                       # Package JAR
-```
+| A pergunta | O ficheiro |
+|---|---|
+| Comandos (correr, testar, empacotar) | [[../../docs/commands]] |
+| Variáveis de ambiente | [[../../docs/environment]] |
+| Rotas, acessos, códigos de erro | [[../../docs/api]] |
+| Schema, migrações, enums | [[../../docs/database]] |
+| Auth, roles, CORS, filtros | [[../../docs/security]] |
+| MapStruct, erros, compressão, QR, signed URLs | [[../../docs/backend-conventions]] |
+| Camadas e desenho do sistema | [[../../docs/architecture]] |
+| Onde vive o código de X | [[../../docs/code-map]] |
 
-The app requires environment variables from a `.env` file (or system env) — copy `.env.example` and fill in your **own** Supabase project's credentials: `DB_URL`, `DB_USER`, `DB_PASS`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`.
+## Ao mexer aqui
 
-## Architecture
-
-**Stack:** Spring Boot 3.5 · Java 21 · PostgreSQL (Supabase) · Flyway · MapStruct · Lombok
-
-### Layer structure
-
-```
-controller/       → REST endpoints (auth, profile, employees, locations, activities)
-service/          → Business logic
-repository/       → JPA repositories (Spring Data)
-model/            → JPA entities
-dto/              → Request/Response objects (dto/common/* is shared: location, media)
-mapper/           → MapStruct mappers (entity ↔ DTO; mapper/common/* is shared)
-security/         → JWT auth, filters, security config, authorization
-config/           → Spring config classes (JPA auditing, async, Supabase)
-integrations/     → Supabase auth + storage clients
-enterprises/      → Enterprise (project) & construction-management sub-module
-exeption/         → Custom exceptions (BusinessException, ResourceNotFoundException, etc.)
-infra/            → Infrastructure utilities (datasource diagnostics, startup failure logging)
-util/             → General utilities (TokenHash, etc.)
-```
-
-This is a scoped copy of [Property-Management](https://github.com/bino03/Property-Management)'s backend — see [[../../docs/database.md]] for exactly what was kept vs. dropped (no property listings, no payments, no portal-facing endpoints).
-
-### Database
-
-- Schemas: `worksite` (main), `settings` (config/invites), `tasks` (standalone task management), `auth` (Supabase-managed — never touch)
-- Migrations: `src/main/resources/db/migration/` — Flyway V1–V19, `ddl-auto: none`
-- When adding a new table: create a new `V{next}__description.sql` in `db/migration/` — never alter the DB directly via Supabase. See [[../../docs/skills/backend/skill-add-database-table]]
-- Base entity: UUID PK + `createdAt`/`updatedAt` (JPA auditing enabled)
-
-### Security & Authorization
-
-**Authentication:** Fully delegated to Supabase (JWT HS256). Spring Security config (`SecurityConfig.java`) sets up an OAuth2 Resource Server with a custom JWT decoder.
-
-**JWT Handling:**
-- Decoding: HS256 with Supabase secret (loaded from `SUPABASE_JWT_SECRET`)
-- Custom filters handle token revocation checks and account lock status
-- `AuthContext.java` provides current user information and role resolution
-
-**Authorization:**
-- Role-based access control (RBAC) using JWT claims (`app_metadata`) and `Profile.role`
-- Method-level security with `@PreAuthorize` annotations
-- Custom filters (`AccountLockFilter`, `TokenRevocationFilter`) enforce account-status/lock and revocation rules at request level — they are not role-based authorization
-
-**Token Revocation:**
-- Revoked tokens stored in database (`RevokedTokenRepository`)
-- Cleanup scheduled via `RevokedTokenCleanupConfig`
-- Hash utility: `TokenHash.java` for secure token comparison
-
-See [[../../docs/skills/backend/skill-permissions-and-auth]] for adding access control to a new endpoint.
-
-### MapStruct + Lombok
-
-Annotation processor order in `pom.xml` is intentional: **Lombok must run before MapStruct**. Do not reorder these processors.
-
-### Error handling
-
-- **ErrorCode enum** (`dto/error/ErrorCode.java`) — codes organized by domain module
-- **Custom exceptions** (`exeption/` package — note: typo in package name, kept for consistency with the original):
-  - `BusinessException` — domain business logic violations
-  - `ResourceNotFoundException` — resource not found (404)
-  - `FileUploadException` — file upload failures
-  - `StorageException` — Supabase storage errors
-  - `ForbiddenException` — authorization failures (403)
-- **Global exception handler** (`GlobalExceptionHandler.java`) — maps exceptions → structured error responses with ErrorCode. This is the *only* `@RestControllerAdvice` in the app — the original project had a second, conflicting one in `infra/` that was dropped during the copy (dead code + duplicate `HttpMediaTypeNotSupportedException` handler).
-
-### File uploads
-
-Max 25 MB (configured in `application.yml`). Construction expense invoices go through `SupabaseStorageService` (bucket `"documents"`) — see [[../../docs/skills/backend/skill-add-file-upload]].
-
-### Catálogo de fornecedores (`Supplier`, `V19`)
-
-O QR da AT identifica o emitente **só pelo NIF** — não existe campo para o nome da empresa. Sem
-catálogo, o nome era escrito à mão uma vez por fatura. `worksite.supplier` guarda o par NIF →
-nome, **global** (o mesmo NIF é a mesma empresa em todas as obras) e ligado às faturas **pelo
-NIF, não por FK** — uma fatura tem de poder existir com um fornecedor ainda desconhecido, que é
-o estado normal de uma acabada de carregar.
-
-Propaga nos dois sentidos: `SupplierService` escreve o nome nas faturas desse NIF que estejam
-**sem** nome (nunca sobrepõe uma correção manual), e `ConstructionInvoiceService.applyKnownSupplierName`
-consulta o catálogo no upload/preview para a fatura nascer já identificada. Ver [[../../docs/api.md]]
-→ "Fornecedores".
-
-### Ficheiros lidos, não só guardados
-
-Dependências que existem só para **ler** ficheiros que os clientes enviam:
-
-- **Apache POI** (`poi-ooxml`) — `BudgetExcelImportService` importa o orçamento da obra a
-  partir do `.xlsx` do empreiteiro, reconstruindo a árvore de rubricas.
-- **ZXing + PDFBox** — `AtInvoiceQrService` lê o QR code da AT nas faturas (PDFBox rasteriza
-  a página quando o documento é PDF, ZXing descodifica). Preferido a OCR por ser
-  determinístico e correr offline; nada sai do servidor. Sem QR legível devolve vazio e o
-  preenchimento segue manual — nunca é erro.
-- **OpenCV/WeChat QRCode** (`org.bytedeco:opencv`, via JavaCPP) — `WeChatQrCodeService`, o
-  último degrau da escalada de `AtInvoiceQrService`. Só corre quando o ZXing (incluindo o
-  mosaico) não encontra QR nenhum: uma CNN detetora + super-resolução, treinada para QR
-  pequeno/desfocado dentro de uma foto maior — o caso que mata o ZXing (fotos de WhatsApp,
-  QR com poucos pixels por módulo). Medido contra 19 faturas reais: subiu a leitura de 14/19
-  para 15/19. Continua em processo, nada sai do servidor.
-  - Modelos (~1,1 MB) em `src/main/resources/models/wechat-qrcode/`, de
-    [WeChatCV/opencv_3rdparty](https://github.com/WeChatCV/opencv_3rdparty/tree/wechat_qrcode)
-    (Apache 2.0). `WeChatQrCodeService` extrai-os para uma pasta temporária no arranque
-    (`@Async` + `ApplicationReadyEvent`, para a primeira fatura real não pagar o carregamento).
-  - **Duas dependências de classifier por versão** (`opencv` e `openblas`, cada uma
-    `windows-x86_64` + `linux-x86_64`) — nunca usar `opencv-platform` sozinho: arrasta
-    android/iOS/macOS também e o jar final passa de ~200 MB para ~460 MB. Esquecer o
-    classifier do `openblas` (usado pelo DNN por baixo do OpenCV) não dá erro à compilação,
-    só `UnsatisfiedLinkError` na primeira chamada real — se um dia isto rebentar depois de
-    mudar a versão, é a primeira coisa a verificar.
-  - Se a biblioteca nativa não carregar nesta máquina (falta o classifier certo para o SO,
-    falha de permissões, etc.), o degrau fica silenciosamente desligado — nunca é a fatura a
-    falhar por causa disto.
-
-### Compressão HTTP
-
-Ligada em `application.yml` (`server.compression`). Está desligada por omissão no Spring Boot,
-e as respostas desta API repetem os mesmos nomes de campo centenas de vezes — a árvore de
-orçamento traz ~198 nós com ~25 chaves cada. Não afeta as faturas: são PDF/imagem, já
-comprimidas, e servidas directamente pelo Supabase via signed URL.
-
-### Compressão de imagens de faturas
-
-`InvoiceCompressionService` (`ImageIO` + `Graphics2D`, mesmo padrão do `InvoiceThumbnailService`
-— sem dependências novas). Corre **depois** do QR ser lido, e **só quando a leitura teve
-sucesso** — nunca antes: comprimir primeiro já tirou legibilidade a QR que liam bem em
-qualidade total. Sem QR legível, o original fica intacto em Storage — melhor hipótese para
-revisão manual ou para um `/rescan` mais tarde, se o pipeline de leitura melhorar. Por isso o
-cliente já não comprime nada antes do upload; envia sempre o ficheiro original.
-
-### CORS
-
-Configured in `SecurityConfig.java` (`corsConfigurationSource()` method) — `WebConfig.java` is intentionally empty. Update the allowed origins list for your actual Backoffice dev/prod URLs (defaults to `http://localhost:5173`).
-
-### Email
-
-`spring-boot-starter-mail` is included. Used for the admin-invite flow (`AdminAuthController` → `EmailService`), configured via `settings.email_providers`.
-
-### Photo URLs in API responses
-
-Whenever an endpoint returns a photo/media URL, **always generate a Supabase signed URL** using `SupabaseStorageService.createSignedUrl(bucket, key, expiresInSeconds)`. Never return a raw stored key/path directly.
-
-Pattern to follow (used in `ProfileService` and `AuthController`):
-
-```java
-private String resolvePhotoUrl(Profile profile) {
-    if (profile == null || profile.getPhotoKey() == null) return null;
-    try {
-        String bucket = profile.getPhotoBucket();
-        String key = profile.getPhotoKey().startsWith("/") ? profile.getPhotoKey().substring(1) : profile.getPhotoKey();
-        return storage.createSignedUrl(bucket, key, 3600);
-    } catch (Exception e) {
-        log.warn("Não foi possível gerar signed URL: {}", e.getMessage());
-        return null;
-    }
-}
-```
-
-- Strip any leading `/` from the key before calling `createSignedUrl`
-- Return `null` gracefully if the profile has no photo or if the call fails
-- The reference implementation is `POST /profile/photo-url` in `ProfileController`
-
-### Infrastructure & Diagnostics
-
-Located in `infra/` package:
-- **DataSourceDiagnostics.java** — Database connection diagnostics
-- **StartupFailureLogger.java** — Logs initialization failures for debugging
+- Feature nova → skill `add-backend-feature`. Tabela nova → `add-database-table`.
+  Upload de ficheiros → `add-file-upload`. Controlo de acesso → `permissions-and-auth`.
+- **`./mvnw test` sem `-Dtest=` escreve na base de dados real** — ver [[../../docs/commands]].
+- Uma migração nova aplica-se ao primeiro `compile` se o devtools estiver a correr, não quando se
+  arranca a app. Mesmo sítio.

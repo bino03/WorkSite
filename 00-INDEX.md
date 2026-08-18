@@ -52,6 +52,10 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 
 ### 🏗️ Architecture & Design
 - **Onde está o código disto?** → [[docs/code-map.md]] ← mapa domínio → ficheiros, e "onde procurar por sintoma"
+- **Comandos** → [[docs/commands.md]] ← correr, testar, build (e as armadilhas de cada um)
+- **Variáveis de ambiente** → [[docs/environment.md]]
+- **Convenções do backend** → [[docs/backend-conventions.md]]
+- **Proveniência** → [[docs/provenance.md]] ← porque é que a tabela se chama `enterprise`
 - **System Architecture** → [[docs/architecture.md]]
 - **Database Schema** → [[docs/database.md]]
 - **Security & Auth** → [[docs/security.md]]
@@ -99,11 +103,11 @@ Add tags to notes for filtering:
 
 First time here? Complete these steps:
 
-- [ ] Read [[CLAUDE.md]] (main overview)
+- [ ] Ler [[CLAUDE.md]] e depois este índice
 - [ ] Enable the vault-sync reminder hook: `git config core.hooksPath .githooks` (ver [[docs/vault-sync-hooks.md]])
 - [ ] Create a **new Supabase project** (do not reuse Property-Management's)
-- [ ] Create `management/managementapi/.env` from `.env.example`
-- [ ] Create `management/managementfrontend/apps/backoffice/.env` (see [[management/managementfrontend/apps/backoffice/CLAUDE.md]])
+- [ ] Create `management/managementapi/.env` from `.env.example` (ver [[docs/environment.md]])
+- [ ] Create `management/managementfrontend/apps/backoffice/.env` (ver [[docs/environment.md]])
 - [ ] Start backend: `./mvnw spring-boot:run`
 - [ ] Start frontend: `npm run dev`
 - [ ] Open Obsidian: Point to `Worksite/` folder
@@ -113,8 +117,8 @@ First time here? Complete these steps:
 ## 📚 All Sections
 
 ### Root Level
-- [[CLAUDE.md]] — Main overview (you should start here)
-- [[management/CLAUDE.md]] — Backend + Backoffice overview
+- [[CLAUDE.md]] — Ponteiro para o vault + atalhos por pergunta (não contém documentação)
+- [[management/CLAUDE.md]] — Ponteiro da pasta do código
 
 ### Documentation (Centralized)
 - [[docs/README.md]] — Docs index
@@ -134,9 +138,9 @@ First time here? Complete these steps:
 - [[notes/README.md]] — Notes index (ToDo, ideas, roadmap/, bugs, refactoring, learning, whatIveDone, design-briefs/)
 
 ### Project-Specific
-- [[management/managementapi/CLAUDE.md]] — Backend guide
-- [[management/managementfrontend/CLAUDE.md]] — Frontend guide
-- [[management/managementfrontend/apps/backoffice/CLAUDE.md]] — Backoffice app
+- [[management/managementapi/CLAUDE.md]] — Ponteiro do backend → [[docs/backend-conventions.md]]
+- [[management/managementfrontend/CLAUDE.md]] — Ponteiro do frontend
+- [[management/managementfrontend/apps/backoffice/CLAUDE.md]] — Ponteiro do Backoffice → [[docs/skills/references/frontend-visual-consistency.md]]
 
 ---
 
@@ -144,7 +148,7 @@ First time here? Complete these steps:
 
 | Task | Where |
 |------|-------|
-| Work on backend | [[management/managementapi/CLAUDE.md]] |
+| Work on backend | [[docs/backend-conventions.md]] + [[docs/api.md]] |
 | Add a feature | See respective project CLAUDE.md |
 | Understand architecture | [[docs/architecture.md]] |
 | See database schema | [[docs/database.md]] |
