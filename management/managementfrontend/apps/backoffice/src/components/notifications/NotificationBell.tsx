@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FC } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Badge, Dropdown, Empty, Spin } from "antd";
 import { BellOutlined, CheckSquareOutlined, FileTextOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -31,6 +32,7 @@ const iconFor = (type: string) => {
  */
 export const NotificationBell: FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -114,11 +116,11 @@ export const NotificationBell: FC = () => {
         }}
       >
         <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, fontSize: 13 }}>
-          Notificações
+          {t("notifications.title")}
         </span>
         {unread > 0 && (
           <a href="#" style={{ fontSize: 12 }} onClick={(e) => { e.preventDefault(); handleMarkAll(); }}>
-            Marcar todas como lidas
+            {t("notifications.markAllRead")}
           </a>
         )}
       </div>
@@ -126,7 +128,7 @@ export const NotificationBell: FC = () => {
       <Spin spinning={loading}>
         {items.length === 0 && !loading ? (
           <div style={{ padding: "20.4px" }}>
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Sem notificações" />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("notifications.noNotifications")} />
           </div>
         ) : (
           items.map((item) => (
@@ -178,8 +180,8 @@ export const NotificationBell: FC = () => {
     >
       <button
         type="button"
-        title="Notificações"
-        aria-label="Notificações"
+        title={t("notifications.title")}
+        aria-label={t("notifications.title")}
         style={{
           background: "none",
           border: "none",

@@ -27,9 +27,13 @@ leads, banners, pagamentos, o portal público, e SSE/tempo real. Nada disto foi 
 projeto — são candidatos a funcionalidades futuras, não lacunas.
 
 > Cuidado ao ler código e traduções: há restos desta origem que **não** correspondem a nada neste
-> projeto — chaves i18n de `notifications.*` e de "Contactos: clientes, proprietários e leads", e
-> segmentos de rota (`edificios`, `propriedades`, `certificados`) ainda listados em skills. Não os
-> tomar como funcionalidades reais.
+> projeto — chaves i18n de "Contactos: clientes, proprietários e leads" e segmentos de rota
+> (`edificios`, `propriedades`, `certificados`) ainda listados em skills. Não os tomar como
+> funcionalidades reais.
+>
+> Mas nem todo o resto é lixo: as chaves `notifications.*` estavam por usar em pt **e** en e
+> serviam exactamente a funcionalidade construída a 2026-08-18 — o sino usa-as. Antes de descartar
+> uma chave órfã, ver se não é a que falta.
 
 ## O que nasceu aqui
 
