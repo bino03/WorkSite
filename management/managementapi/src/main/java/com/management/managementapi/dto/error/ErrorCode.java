@@ -261,6 +261,13 @@ public enum ErrorCode {
     SUPPLIER_NOT_FOUND("SUPPLIER_001", "Fornecedor não encontrado"),
     SUPPLIER_NIF_ALREADY_EXISTS("SUPPLIER_002", "Já existe um fornecedor com este NIF"),
 
+    // ========================================================================
+    // NOTIFICAÇÕES (NOTIF_xxx)
+    // ========================================================================
+    // Também é o que se devolve quando a notificação existe mas é de outra
+    // pessoa: distinguir "não é tua" de "não existe" diria a um estranho que ela
+    // existe.
+    NOTIFICATION_NOT_FOUND("NOTIF_001", "Notificação não encontrada"),
 
     // ========================================================================
     // LOCALIZAÇÕES (LOC_xxx)

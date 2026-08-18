@@ -12,6 +12,7 @@ import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.repository.ProfileRepository;
+import com.management.managementapi.notifications.service.NotificationService;
 import com.management.managementapi.security.AuthContext;
 
 import org.junit.jupiter.api.DisplayName;
@@ -54,6 +55,7 @@ class ConstructionInvoiceUpdateTest {
     @Mock private InvoiceThumbnailService thumbnailService;
     @Mock private InvoiceCompressionService compressionService;
     @Mock private AuthContext authContext;
+    @Mock private NotificationService notifications;
 
     @InjectMocks private ConstructionInvoiceService service;
 

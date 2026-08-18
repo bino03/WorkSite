@@ -23,6 +23,8 @@ import com.management.managementapi.exeption.StorageException;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.model.Profile;
+import com.management.managementapi.notifications.model.Notification;
+import com.management.managementapi.notifications.service.NotificationService;
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.security.AuthContext;
 
@@ -87,6 +89,7 @@ public class ConstructionInvoiceService {
     private final InvoiceThumbnailService thumbnailService;
     private final InvoiceCompressionService compressionService;
     private final AuthContext authContext;
+    private final NotificationService notifications;
 
     // ── carregar ──────────────────────────────────────────────
 
@@ -176,6 +179,17 @@ public class ConstructionInvoiceService {
         storeThumbnail(invoice, enterpriseId, stored.content(), stored.mimeType());
         ConstructionInvoice saved = repository.save(invoice);
 
+        // Uma fatura acabada de carregar está sempre por classificar — registar e
+        // classificar são momentos diferentes, é o princípio desta classe. Avisa-se
+        // quem carregou, para não ficar esquecida na caixa de entrada.
+        authContext.currentProfileId().ifPresent(uploader -> notifications.notify(
+                uploader,
+                Notification.TYPE_INVOICE_PENDING,
+                "Fatura por classificar",
+                descreveFatura(saved),
+                "/backoffice/empreendimentos/" + enterpriseId + "/invoices",
+                saved.getId()));
+
         return new InvoiceUploadResultDTO(
                 toResponseDTO(saved, false),
                 qr.isPresent(),
@@ -213,6 +227,24 @@ public class ConstructionInvoiceService {
                 qr.isPresent(),
                 List.of(),
                 qr.map(AtInvoiceQrService.AtInvoiceData::warnings).orElse(List.of()));
+    }
+
+    /**
+     * O que se lê na notificação. Sem QR legível não há fornecedor nem número, e
+     * nesse caso é mais honesto dizê-lo do que mostrar uma linha vazia.
+     */
+    private String descreveFatura(ConstructionInvoice invoice) {
+        String fornecedor = invoice.getSupplierName() != null ? invoice.getSupplierName()
+                : invoice.getSupplierNif() != null ? "NIF " + invoice.getSupplierNif()
+                : null;
+        String numero = invoice.getInvoiceNumber();
+
+        if (fornecedor == null && numero == null) {
+            return "Sem dados lidos do QR — é preciso preencher à mão.";
+        }
+        if (numero == null) return fornecedor;
+        if (fornecedor == null) return numero;
+        return fornecedor + " · " + numero;
     }
 
     private record StoredContent(byte[] content, String mimeType, String filename) {}

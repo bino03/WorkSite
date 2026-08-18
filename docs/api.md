@@ -457,6 +457,40 @@ Tarefas isoladas no seu próprio schema `tasks`, atribuíveis a um ou mais utili
 | PATCH | `/tasks/{id}/status` | `ADMIN` ou utilizador atribuído (validado no service) |
 | DELETE | `/tasks/{id}` | `ADMIN` |
 
+## Notificações (`NotificationController`, `/notifications`)
+
+Avisos in-app para utilizadores **internos**. O item original do backlog dizia "notificações
+para o cliente", mas não existe cliente no modelo nem papel externo (`role_enum` é
+`ADMIN`/`EMPLOYEE`) — ficou esclarecido a 2026-08-18 que o destinatário é sempre um `profile`.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/notifications` | `ADMIN` ou `EMPLOYEE` — só as próprias, mais recentes primeiro (`page`/`size`) |
+| GET | `/notifications/unread-count` | `ADMIN` ou `EMPLOYEE` — `{ "count": n }`, é o contador do sino |
+| PATCH | `/notifications/{id}/read` | `ADMIN` ou `EMPLOYEE` — só as próprias |
+| PATCH | `/notifications/read-all` | `ADMIN` ou `EMPLOYEE` — `{ "updated": n }` |
+
+**O destinatário vem sempre do token, nunca do URL** — não há rota para ver as notificações de
+outra pessoa, nem sequer para `ADMIN`. Marcar como lida uma notificação alheia devolve
+`NOTIF_001` (*não encontrada*) e **não** um 403: distinguir "não é tua" de "não existe"
+confirmaria a existência a quem não devia sequer saber disso.
+
+### Quem gera notificações
+
+| Tipo | Quando | Para quem |
+|---|---|---|
+| `task_assigned` | `POST /tasks` e `PUT /tasks/{id}` | Os atribuídos, **menos** os que já estavam atribuídos antes e **menos** quem fez a atribuição |
+| `invoice_pending` | `POST /construction-invoices` (upload) | **Só quem carregou** |
+
+> ⚠️ Consequência conhecida do `invoice_pending`: alocar uma fatura a uma rubrica é
+> `hasRole('ADMIN')`, mas carregar é `ADMIN` **ou** `EMPLOYEE`. Quando um empregado carrega uma
+> fatura, o aviso vai para ele e **nenhum admin fica a saber** que há trabalho por fazer — o
+> contador de pendentes na página do orçamento continua a ser o único sinal. Foi decisão
+> explícita a 2026-08-18; mudar é trocar o destinatário para os ADMIN.
+
+A escrita acontece **na mesma transação** da operação que a originou: se a tarefa não for
+gravada, a notificação também não existe.
+
 ## Localizações (`LocationController`, `/locations`)
 
 | Método | Rota | Acesso |

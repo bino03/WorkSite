@@ -4,6 +4,7 @@ import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import MyProfileModal from "@/components/profile/MyProfileModal";
 import { SuppliersDrawer } from "@/components/suppliers/SuppliersDrawer";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useState, useEffect } from "react";
 import api from "@/api";
 import { useTranslation } from "react-i18next";
@@ -168,6 +169,9 @@ export default function AppLayout() {
 
         <div style={{ width: 1, height: 22, background: "var(--ind-color-divider)" }} />
 
+        {/* Único ícone solto que sobrou à direita, e de propósito: um contador que
+            vive dentro de um menu não conta nada a ninguém. */}
+        <NotificationBell />
 
         {/* Um só ponto de entrada à direita. Antes eram o cartão de perfil mais três
             botões de ícone soltos (definições, idioma, sair), cada um com `title` como
