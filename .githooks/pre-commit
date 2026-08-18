@@ -82,13 +82,31 @@ fi
 if echo "$staged" | grep -qE 'managementfrontend/apps/backoffice/package\.json$'; then
   if git diff --cached -- '*apps/backoffice/package.json' 2>/dev/null \
     | grep -qE '^\+.*"(react|react-dom|typescript|vite|antd|tailwindcss)":'; then
-    warn "Frontend stack version bumped → update the stack references in the vault (docs/architecture.md, 00-INDEX.md, CLAUDE.md files)."
+    warn "Frontend stack version bumped → update the stack references in the vault (docs/architecture.md, 00-INDEX.md)."
   fi
 fi
 if echo "$staged" | grep -qE 'managementapi/pom\.xml$'; then
   if git diff --cached -- '*managementapi/pom.xml' 2>/dev/null \
     | grep -qE '^\+.*<(java\.version|spring-boot\.version)>'; then
-    warn "Backend stack version bumped → update the stack references in the vault (docs/architecture.md, 00-INDEX.md, CLAUDE.md files)."
+    warn "Backend stack version bumped → update the stack references in the vault (docs/architecture.md, 00-INDEX.md)."
+  fi
+fi
+
+# --- Documentação a crescer num CLAUDE.md → docs/ -------------------------
+# Os CLAUDE.md são ponteiros, não documentação: duas cópias do mesmo facto
+# divergem sempre — a tabela de rotas do Backoffice esteve meses errada por
+# isso. Este aviso é a única rede que estes ficheiros têm; todas as regras
+# acima vigiam apenas o docs/. Ver docs/README.md → "Onde NÃO documentar".
+claude_md=$(echo "$staged" | grep -E '(^|/)CLAUDE\.md$')
+if [ -n "$claude_md" ]; then
+  added=$(git diff --cached -- $claude_md 2>/dev/null | grep -cE '^\+[^+]')
+  # Corrigir um ponteiro ou acrescentar uma linha à tabela de atalhos não é
+  # documentação; um bloco de texto é. 10 linhas separa os dois na prática.
+  if [ "$added" -gt 10 ]; then
+    warn "CLAUDE.md cresceu ${added} linhas → a documentação vive em docs/. Um CLAUDE.md leva ponteiros e convenções de como trabalhar naquela pasta, não factos sobre o projeto."
+  fi
+  if git diff --cached -- $claude_md 2>/dev/null | grep -qE '^\+```'; then
+    warn "Bloco de código acrescentado a um CLAUDE.md → esse conteúdo pertence a docs/ (ver docs/README.md)."
   fi
 fi
 
