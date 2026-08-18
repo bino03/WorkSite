@@ -1,12 +1,14 @@
 import { Outlet, NavLink } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { Dropdown } from "antd";
+import type { MenuProps } from "antd";
 import MyProfileModal from "@/components/profile/MyProfileModal";
 import { SuppliersDrawer } from "@/components/suppliers/SuppliersDrawer";
 import { useState, useEffect } from "react";
 import api from "@/api";
 import { useTranslation } from "react-i18next";
 import { useAuthContext } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import {
   BuildOutlined,
@@ -14,8 +16,8 @@ import {
   TeamOutlined,
   LogoutOutlined,
   GlobalOutlined,
-  SettingOutlined,
   ShopOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 
 function initialsOf(name: string) {
@@ -27,6 +29,8 @@ function initialsOf(name: string) {
 
 export default function AppLayout() {
   const { user, logout } = useAuthContext();
+  // Gates de permissão passam sempre por aqui — ver backoffice-app-shell-and-auth.md §3.
+  const { isAdmin } = useAuth();
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
@@ -64,13 +68,60 @@ export default function AppLayout() {
     });
   };
 
-  const toggleLanguage = () => {
-    const lang = i18n.language === "en" ? "pt" : "en";
+  const isEnglish = i18n.language.startsWith("en");
+
+  const setLanguage = (lang: "pt" | "en") => {
     i18n.changeLanguage(lang);
     localStorage.setItem("language", lang);
   };
 
   const getBasePath = () => "/backoffice";
+
+  /**
+   * O menu único da direita. A conta e o idioma são pessoais; "Definições" fica num
+   * grupo próprio porque é transversal ao produto e vai crescer — era o que o botão
+   * de engrenagem separava antes, e sem o grupo isso perdia-se.
+   */
+  const userMenuItems: MenuProps["items"] = [
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: t("profile.myAccount"),
+      onClick: () => setIsProfileModalVisible(true),
+    },
+    { type: "divider" },
+    {
+      type: "group",
+      label: "Definições",
+      children: [
+        {
+          key: "suppliers",
+          icon: <ShopOutlined />,
+          label: "Fornecedores",
+          onClick: () => setIsSuppliersDrawerOpen(true),
+        },
+      ],
+    },
+    {
+      // Submenu em vez do antigo botão-alternador, cujo `title` mostrava o idioma de
+      // destino e não o activo — nunca se sabia em qual se estava.
+      key: "language",
+      icon: <GlobalOutlined />,
+      label: t("profile.language"),
+      children: [
+        { key: "lang-pt", label: "Português", disabled: !isEnglish, onClick: () => setLanguage("pt") },
+        { key: "lang-en", label: "English", disabled: isEnglish, onClick: () => setLanguage("en") },
+      ],
+    },
+    { type: "divider" },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: t("profile.logout"),
+      danger: true,
+      onClick: handleLogoutClick,
+    },
+  ];
 
   const linkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
     color: isActive ? "var(--ind-color-accent)" : "inherit",
@@ -107,9 +158,9 @@ export default function AppLayout() {
           <BuildOutlined />{t("nav.enterprises")}
         </NavLink>
         <NavLink to={`${getBasePath()}/tasks`} style={linkStyle}>
-          <CheckSquareOutlined />{userRole === "EMPLOYEE" ? "Minhas Tarefas" : "Tarefas"}
+          <CheckSquareOutlined />{isAdmin() ? "Tarefas" : "Minhas Tarefas"}
         </NavLink>
-        {userRole === "ADMIN" && (
+        {isAdmin() && (
           <NavLink to={`${getBasePath()}/funcionarios`} style={linkStyle}>
             <TeamOutlined />{t("nav.manageAccounts")}
           </NavLink>
@@ -117,75 +168,53 @@ export default function AppLayout() {
 
         <div style={{ width: 1, height: 22, background: "var(--ind-color-divider)" }} />
 
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}
-          onClick={() => setIsProfileModalVisible(true)}
-        >
-          <div
+
+        {/* Um só ponto de entrada à direita. Antes eram o cartão de perfil mais três
+            botões de ícone soltos (definições, idioma, sair), cada um com `title` como
+            única pista do que fazia. */}
+        <Dropdown trigger={["click"]} menu={{ items: userMenuItems }}>
+          <button
+            type="button"
+            aria-label={t("profile.myAccount")}
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              background: avatarBlobUrl ? undefined : "var(--ind-accent-100)",
-              color: "var(--ind-accent-800)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "var(--ind-font-heading)",
-              fontSize: 12,
-              backgroundImage: avatarBlobUrl ? `url(${avatarBlobUrl})` : undefined,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              flexShrink: 0,
+              gap: 8,
+              padding: 4,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "inherit",
+              fontFamily: "inherit",
+              fontSize: 13,
             }}
           >
-            {!avatarBlobUrl && initialsOf(userName)}
-          </div>
-          <span>{userName}</span>
-          <span className="ind-tag ind-tag-outline">
-            {userRole === "ADMIN" ? t("profile.roles.admin") : t("profile.roles.employee")}
-          </span>
-        </div>
-
-        {/* Definições: o sítio das coisas transversais aos projetos — hoje o
-            catálogo de fornecedores, amanhã o que mais aparecer. */}
-        <Dropdown
-          trigger={["click"]}
-          menu={{
-            items: [
-              {
-                key: "suppliers",
-                icon: <ShopOutlined />,
-                label: "Fornecedores",
-                onClick: () => setIsSuppliersDrawerOpen(true),
-              },
-            ],
-          }}
-        >
-          <button
-            title="Definições"
-            aria-label="Definições"
-            style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.7, display: "flex", padding: 4 }}
-          >
-            <SettingOutlined style={{ fontSize: 16 }} />
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: avatarBlobUrl ? undefined : "var(--ind-accent-100)",
+                color: "var(--ind-accent-800)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "var(--ind-font-heading)",
+                fontSize: 12,
+                backgroundImage: avatarBlobUrl ? `url(${avatarBlobUrl})` : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                flexShrink: 0,
+              }}
+            >
+              {!avatarBlobUrl && initialsOf(userName)}
+            </div>
+            <span>{userName}</span>
+            <span className="ind-tag ind-tag-outline">
+              {userRole === "ADMIN" ? t("profile.roles.admin") : t("profile.roles.employee")}
+            </span>
           </button>
         </Dropdown>
-
-        <button
-          title={i18n.language === "en" ? "Português" : "English"}
-          onClick={toggleLanguage}
-          style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.7, display: "flex", padding: 4 }}
-        >
-          <GlobalOutlined style={{ fontSize: 16 }} />
-        </button>
-
-        <button
-          title="Terminar sessão"
-          onClick={handleLogoutClick}
-          style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.7, display: "flex", padding: 4 }}
-        >
-          <LogoutOutlined style={{ fontSize: 16 }} />
-        </button>
       </header>
 
       <main className="container-page" style={{ padding: "27.2px 20.4px" }}>
