@@ -37,6 +37,12 @@ Já é usado em `TasksList`, `EnterprisesList`, `EmployeesList`, `AppLayout` (lo
 
 **Regra sem exceções**: qualquer ação destrutiva passa por confirmação. Nenhuma apaga direto.
 
+> ⚠️ **Os valores por omissão são de eliminação** — `title` é "Confirmar eliminação" e
+> `actionLabel` é "Eliminar" (`ConfirmDialogContext.tsx:24-27`). Numa ação **não destrutiva**
+> tens de passar os dois, senão o utilizador lê "Confirmar eliminação" ao marcar uma fatura
+> como enviada à contabilidade. Aconteceu em quatro sítios e foi corrigido a 2026-08-18
+> (`InvoiceDetailDrawer`, `EnterpriseInvoicesPage` — desassociar da rubrica e contabilidade).
+
 ## Ícone + texto vs. só ícone
 
 - **Texto visível** nas colunas de ação — o `ListActions` usa rótulos, não ícones. O utilizador não deve ter de passar o rato para descobrir o que um botão faz.

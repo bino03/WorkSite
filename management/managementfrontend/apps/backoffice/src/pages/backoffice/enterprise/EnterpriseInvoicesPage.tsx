@@ -163,9 +163,11 @@ const EnterpriseInvoicesPage: FC = () => {
 
   const handleDeallocate = (invoice: ConstructionInvoice) => {
     confirm({
+      title: "Desassociar da rubrica",
       message: `Desassociar esta fatura da rubrica "${invoice.budgetItemName}"? O lançamento de ${formatCurrency(
         invoice.totalAmount ?? 0
       )} é removido do orçamento e a fatura volta à caixa de entrada.`,
+      actionLabel: "Desassociar",
       onConfirm: async () => {
         try {
           await deallocateInvoice(invoice.id);
@@ -232,7 +234,9 @@ const EnterpriseInvoicesPage: FC = () => {
   const handleSendToAccountant = (invoice: ConstructionInvoice) => {
     const action = invoice.sentToAccountant ? "desmarcar como enviada" : "marcar como enviada";
     confirm({
+      title: "Contabilidade",
       message: `${action.charAt(0).toUpperCase() + action.slice(1)} para a contabilidade?`,
+      actionLabel: invoice.sentToAccountant ? "Desmarcar" : "Marcar como enviada",
       onConfirm: async () => {
         try {
           await setInvoiceSentToAccountant(invoice.id, !invoice.sentToAccountant);
