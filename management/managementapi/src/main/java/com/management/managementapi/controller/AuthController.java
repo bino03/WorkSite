@@ -1,5 +1,6 @@
 package com.management.managementapi.controller;
 
+import com.management.managementapi.dto.auth.AuthDTO;
 import com.management.managementapi.dto.auth.AuthResponse;
 import com.management.managementapi.dto.auth.LoginRequest;
 import com.management.managementapi.dto.auth.SupabaseAuthResponse;
@@ -7,6 +8,8 @@ import com.management.managementapi.integrations.supabase.SupabaseStorageService
 import com.management.managementapi.security.AuthContext;
 import com.management.managementapi.security.CookieUtil;
 import com.management.managementapi.service.ActivityLogger;
+import com.management.managementapi.service.InviteService;
+import com.management.managementapi.service.PasswordResetService;
 import com.management.managementapi.service.SupabaseAuthService;
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.model.Profile;
@@ -40,6 +43,8 @@ public class AuthController {
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
     private final SupabaseStorageService storage;
+    private final InviteService inviteService;
+    private final PasswordResetService passwordResetService;
 
     /**
      * Login: Frontend → Backend → Supabase → Cookies
@@ -106,6 +111,39 @@ public class AuthController {
             log.error("❌ Erro no login: {}", e.getMessage(), e);
             throw e;
         }
+    }
+
+    /**
+     * Aceitar convite: token do email → conta no Supabase + perfil na BD.
+     *
+     * Público (já estava em `permitAll` no `SecurityConfig`) — quem aceita ainda não
+     * tem conta. Não devolve sessão: a página redireciona para o login, para a
+     * password acabada de definir ser usada uma vez à entrada.
+     */
+    @PostMapping("/accept-invite")
+    public ResponseEntity<Void> acceptInvite(@Valid @RequestBody AuthDTO.AcceptInviteRequest request) {
+        inviteService.accept(request.token(), request.password(), request.name());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Pedir recuperação de password: email → link com token.
+     *
+     * Devolve sempre `204`, exista ou não conta com aquele email. Público e sem
+     * autenticação: distinguir os dois casos transformava isto num verificador de
+     * contas para quem quisesse experimentar emails à sorte.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody AuthDTO.ForgotPasswordRequest request) {
+        passwordResetService.requestReset(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Definir a password nova a partir do token do email. */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody AuthDTO.ResetPasswordRequest request) {
+        passwordResetService.reset(request.token(), request.password());
+        return ResponseEntity.noContent().build();
     }
 
     /**

@@ -274,6 +274,13 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'TASK_001': 'Tarefa não encontrada. Pode ter sido removida.',
   'TASK_002': 'Um ou mais utilizadores atribuídos não foram encontrados.',
 
+  // ── Email / SMTP ───────────────────────────────────────────────────────────
+  'EMAIL_001': 'Provedor de email não encontrado.',
+  'EMAIL_002': 'Nenhum provedor de email configurado. Configure um em Definições → Provedores de email.',
+  'EMAIL_003': 'O provedor de email predefinido está desativado.',
+  'EMAIL_004': 'Não foi possível enviar o email. Verifique as credenciais do provedor.',
+  'EMAIL_005': 'Não foi possível contactar o servidor de email com estas credenciais.',
+
   // ── Fallback ───────────────────────────────────────────────────────────────
   'DEFAULT': 'Ocorreu um erro. Por favor, tente novamente.',
 };

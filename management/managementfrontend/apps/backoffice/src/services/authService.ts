@@ -65,6 +65,19 @@ export async function login(email: string, password: string): Promise<UserInfo> 
   return userInfo;
 }
 
+/**
+ * Pede o link de recuperação. Responde sempre `204`, exista ou não conta com
+ * aquele email — não dá para distinguir os dois casos daqui, e é de propósito.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await api.post("/auth/forgot-password", { email }, { noRefreshRetry: true });
+}
+
+/** Define a password nova a partir do token que veio no link do email. */
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await api.post("/auth/reset-password", { token, password }, { noRefreshRetry: true });
+}
+
 interface MeResponse {
   user: {
     id: string;

@@ -33,11 +33,11 @@ Contagem por padrão de `catch` em chamadas à API (atualizada a 2026-08-05, ap�
 
 ## 3. Camada de serviços — bem alinhada, com um desvio de forma
 
-Estado real dos 7 serviços em `services/`:
+Estado real dos serviços em `services/` — eram 7 quando este brief foi escrito (2026-08-18) e são 11 a 2026-08-21 (`budgetService`, `invoiceService`, `notificationInboxService`, `supplierService`, `emailProviderService`). As observações abaixo continuam válidas; as contagens não:
 
 - ✅ **Uma instância Axios partilhada**: todos importam `api` de `@/api` (`adminService`, `authService`, `constructionService`, `enterpriseService`, `locationService`, `profileService`, `taskService`). Não há segunda instância.
 - ✅ **Um serviço por domínio** — não existem dois serviços a competir pelo mesmo recurso.
-- ✅ **Sem `try/catch` a engolir erros da API**. Os dois `try/catch` do `authService.ts` são legítimos e não são o anti-padrão: `:31-34` (`loadUser`) apanha `JSON.parse` de `sessionStorage`, não uma chamada HTTP; `:103-105` (`logout`) engole deliberadamente a falha para a sessão local ser sempre limpa. O erro de API sobe intacto em todo o lado, por isso o `errorCode` chega ao `ErrorHandler`.
+- ✅ **Sem `try/catch` a engolir erros da API**. Os dois `try/catch` do `authService.ts` são legítimos e não são o anti-padrão: `:31-34` (`loadUser`) apanha `JSON.parse` de `sessionStorage`, não uma chamada HTTP; `:114-120` (`logout`) engole deliberadamente a falha para a sessão local ser sempre limpa. O erro de API sobe intacto em todo o lado, por isso o `errorCode` chega ao `ErrorHandler`.
 - ⚠️ **Forma de export inconsistente**: `taskService.ts:10` exporta um **objeto único** (`export const taskService = { list, … }`), enquanto os outros seis exportam funções nomeadas — e mesmo entre esses há mistura de `export const` (`constructionService.ts`) e `export async function` (`adminService`, `authService`, `enterpriseService`, `locationService`, `profileService`).
 
 **Convenção**: funções nomeadas (`export async function getX(...)`), uma por operação, sobre a instância `api` partilhada, **sem `try/catch`** — deixar o erro subir intacto até ao `ErrorHandler` no componente. Migrar `taskService` oportunisticamente.

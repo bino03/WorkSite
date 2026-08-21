@@ -14,6 +14,7 @@ SUPABASE_ANON_KEY=<anon key>
 SUPABASE_JWT_SECRET=<jwt secret>
 COOKIE_SECURE=false
 COOKIE_DOMAIN=localhost
+APP_FRONTEND_URL=http://localhost:5173
 ```
 
 Template completo em `management/managementapi/.env.example`.
@@ -25,9 +26,12 @@ Notas que se pagam caro por não se saberem:
   statements.
 - O `SUPABASE_JWT_SECRET` é a chave HS256 com que o backend **valida** os tokens emitidos pelo
   Supabase. Sem ele, toda a autenticação falha. Ver [[security]].
-- A configuração de SMTP **não vive aqui** — está na tabela `settings.email_providers`, e não tem
-  interface nenhuma para a gerir: hoje é um `INSERT` à mão. Sem uma linha lá, o convite de
-  funcionário falha com "Nenhum provedor de email configurado".
+- O `APP_FRONTEND_URL` é a base dos links que saem nos emails (convite, recuperação de
+  password). O default é `http://localhost:5173`; em produção tem de apontar para o domínio
+  real do Backoffice, caso contrário os links chegam a apontar para localhost.
+- A configuração de SMTP **não vive aqui** — está na tabela `settings.email_providers`, gerida no
+  Backoffice em *Definições → Provedores de email* (`ADMIN`). Sem um provedor predefinido e ativo
+  lá, o convite de funcionário e a recuperação de password falham com `EMAIL_002`.
 
 ## Backoffice — `.env` em `management/managementfrontend/apps/backoffice/`
 

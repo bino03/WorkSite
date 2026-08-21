@@ -4,6 +4,7 @@ import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import MyProfileModal from "@/components/profile/MyProfileModal";
 import { SuppliersDrawer } from "@/components/suppliers/SuppliersDrawer";
+import { EmailProvidersDrawer } from "@/components/settings/EmailProvidersDrawer";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useState, useEffect } from "react";
 import api from "@/api";
@@ -17,6 +18,7 @@ import {
   TeamOutlined,
   LogoutOutlined,
   GlobalOutlined,
+  MailOutlined,
   ShopOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -36,6 +38,7 @@ export default function AppLayout() {
   const confirm = useConfirm();
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
   const [isSuppliersDrawerOpen, setIsSuppliersDrawerOpen] = useState(false);
+  const [isEmailProvidersDrawerOpen, setIsEmailProvidersDrawerOpen] = useState(false);
 
   const userPhoto = user?.photoUrl ?? null;
   const userName = user?.name ?? t("common.user");
@@ -101,6 +104,18 @@ export default function AppLayout() {
           label: "Fornecedores",
           onClick: () => setIsSuppliersDrawerOpen(true),
         },
+        // Só ADMIN: são credenciais SMTP, e o endpoint por trás recusa toda a gente
+        // o resto — mostrar a entrada a um EMPLOYEE só lhe daria um 403.
+        ...(isAdmin()
+          ? [
+              {
+                key: "email-providers",
+                icon: <MailOutlined />,
+                label: "Provedores de email",
+                onClick: () => setIsEmailProvidersDrawerOpen(true),
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -228,6 +243,11 @@ export default function AppLayout() {
       {isProfileModalVisible && (
         <MyProfileModal onClose={() => setIsProfileModalVisible(false)} />
       )}
+
+      <EmailProvidersDrawer
+        open={isEmailProvidersDrawerOpen}
+        onClose={() => setIsEmailProvidersDrawerOpen(false)}
+      />
 
       <SuppliersDrawer
         open={isSuppliersDrawerOpen}

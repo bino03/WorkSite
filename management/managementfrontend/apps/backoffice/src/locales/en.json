@@ -136,6 +136,24 @@
     "emailRequired": "Please enter your email!",
     "emailInvalid": "Please enter a valid email!"
   },
+  "resetPassword": {
+    "title": "Set a new password",
+    "instructions": "Choose the password you will use to sign in from now on.",
+    "newPassword": "New password",
+    "passwordRequired": "Password is required.",
+    "passwordMinLength": "Password must be at least 8 characters.",
+    "passwordHint": "At least 8 characters",
+    "confirmPassword": "Confirm password",
+    "confirmPasswordRequired": "Please confirm the password.",
+    "confirmPasswordPlaceholder": "Repeat the password",
+    "passwordsNoMatch": "The passwords do not match.",
+    "submit": "Save password",
+    "success": "Password changed",
+    "successDesc": "You can now sign in with the new password. Sessions open on other devices were signed out.",
+    "invalidLink": "Invalid link",
+    "invalidLinkDesc": "This recovery link has no token. Request a new one from the recovery screen.",
+    "requestNew": "Request a new link"
+  },
   "invite": {
     "invalidToken": "Invalid or missing invite token.",
     "title": "Accept Invite",

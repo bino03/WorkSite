@@ -17,6 +17,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -145,6 +146,34 @@ public class SupabaseAuthService {
                 throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS);
             }
             throw new BusinessException(ErrorCode.USER_CREATE_ERROR);
+        }
+    }
+
+    /**
+     * Define uma password nova via Supabase Admin API (requer service_role key).
+     *
+     * Usado pela recuperação de password: o utilizador prova que é dono da conta ao
+     * apresentar um token válido vindo do email, e não a password antiga — por isso
+     * não há aqui um `signIn` prévio.
+     */
+    public void updateUserPassword(UUID authUserId, String password) {
+        String url = supabaseConfig.getUrl() + "/auth/v1/admin/users/" + authUserId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("apikey", supabaseConfig.getServiceRoleKey());
+        headers.set("Authorization", "Bearer " + supabaseConfig.getServiceRoleKey());
+
+        HttpEntity<Map<String, Object>> request =
+                new HttpEntity<>(Map.of("password", password), headers);
+
+        try {
+            restTemplate.exchange(url, HttpMethod.PUT, request, Void.class);
+            log.info("Password atualizada no Supabase para o utilizador {}", authUserId);
+        } catch (HttpClientErrorException e) {
+            log.error("Supabase updateUserPassword error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BusinessException(ErrorCode.USER_UPDATE_ERROR,
+                    "Não foi possível definir a nova password.");
         }
     }
 

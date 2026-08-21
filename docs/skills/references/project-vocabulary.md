@@ -37,7 +37,7 @@ Dizer "modal" quando é um Drawer faz com que se leia o sub-ficheiro de design e
 
 | Termo | O que é | Exemplos reais |
 |---|---|---|
-| **Drawer** (ou "painel lateral") | `<Drawer>` do AntD | `InvoiceDetailDrawer`, `InvoiceUploadDrawer`, `SuppliersDrawer`, `CreateEnterpriseDrawer`, `EnterpriseViewDrawer` |
+| **Drawer** (ou "painel lateral") | `<Drawer>` do AntD | `InvoiceDetailDrawer`, `InvoiceUploadDrawer`, `SuppliersDrawer`, `EmailProvidersDrawer`, `CreateEnterpriseDrawer`, `EnterpriseViewDrawer` |
 | **Modal** | `<Modal>` do AntD | `BudgetItemPickerModal`, `BudgetImportModal`, `InvoicePreviewModal`, `MyProfileModal` |
 | **Diálogo de confirmação** | `useConfirm()`, partilhado | o "Eliminar esta fatura?" |
 | **Página** | tem rota em `main.tsx` | `EnterpriseInvoicesPage`, `ConstructionBudgetPage` |

@@ -22,8 +22,9 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 | Padrão | Acesso |
 |---|---|
 | `/actuator/health`, `/ping` | público |
-| `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/accept-invite` | público |
+| `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/accept-invite`, `/auth/forgot-password`, `/auth/reset-password` | público |
 | `POST /auth/admin/**` | `ADMIN` |
+| `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
 | `GET /employees/**` | `ADMIN` ou `EMPLOYEE` |
 | `/auth/me` | qualquer utilizador autenticado |
 | Tudo o resto | autenticado (role específica validada por `@PreAuthorize` no controller) |

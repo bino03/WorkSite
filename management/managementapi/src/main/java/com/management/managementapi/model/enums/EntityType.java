@@ -7,6 +7,7 @@ public enum EntityType {
     CONSTRUCTION_EXPENSE("construction_expense"),
     CONSTRUCTION_INVOICE("construction_invoice"),
     SUPPLIER("supplier"),
+    EMAIL_PROVIDER("email_provider"),
     TASK("task"),
 
     // Mantidos só para leitura do histórico: o activity_log ainda tem linhas

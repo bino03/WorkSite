@@ -368,7 +368,16 @@ public enum ErrorCode {
     // TAREFAS (TASK_xxx)
     // ========================================================================
     TASK_NOT_FOUND("TASK_001", "Tarefa não encontrada"),
-    TASK_ASSIGNEE_NOT_FOUND("TASK_002", "Um ou mais utilizadores atribuídos não foram encontrados");
+    TASK_ASSIGNEE_NOT_FOUND("TASK_002", "Um ou mais utilizadores atribuídos não foram encontrados"),
+
+    // ========================================================================
+    // EMAIL / SMTP (EMAIL_xxx)
+    // ========================================================================
+    EMAIL_PROVIDER_NOT_FOUND("EMAIL_001", "Provedor de email não encontrado"),
+    EMAIL_PROVIDER_NONE_CONFIGURED("EMAIL_002", "Nenhum provedor de email configurado"),
+    EMAIL_PROVIDER_INACTIVE("EMAIL_003", "O provedor de email predefinido não está ativo"),
+    EMAIL_SEND_FAILED("EMAIL_004", "Falha ao enviar o email"),
+    EMAIL_PROVIDER_TEST_FAILED("EMAIL_005", "Falha ao contactar o servidor de email com estas credenciais");
 
     private final String code;
     private final String defaultMessage;

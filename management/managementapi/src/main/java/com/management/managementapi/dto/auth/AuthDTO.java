@@ -60,6 +60,17 @@ public record AcceptInviteRequest(
     @NotBlank String name
 ) {}
 
+/** Pedido de link de recuperação. A resposta é sempre igual, exista ou não a conta. */
+public record ForgotPasswordRequest(
+    @NotBlank @Email String email
+) {}
+
+/** O `min = 8` acompanha o do convite — as duas formas definem a mesma password. */
+public record ResetPasswordRequest(
+    @NotBlank String token,
+    @NotBlank @Size(min = 8) String password
+) {}
+
 
 public record InviteListItemResponse(
     UUID id,

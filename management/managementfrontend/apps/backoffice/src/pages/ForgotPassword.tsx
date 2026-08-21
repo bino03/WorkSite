@@ -4,16 +4,32 @@ import { useState } from "react";
 import { ArrowLeftOutlined, MailOutlined, CheckCircleOutlined, BuildOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
+import { requestPasswordReset } from "@/services/authService";
+import { ErrorHandler } from "@/errors/errorHandler";
+
 export const ForgotPassword = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [submitted, setSubmitted] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const onFinish = (values: { email: string }) => {
-    // Endpoint ainda não disponível — apenas simula o estado de sucesso
-    setSubmittedEmail(values.email);
-    setSubmitted(true);
+  /**
+   * O ecrã de sucesso é o mesmo exista ou não conta com este email — o backend
+   * responde `204` nos dois casos, e o texto de `auth.emailSentDesc` já está
+   * escrito nesses termos ("se existir uma conta associada a…").
+   */
+  const onFinish = async (values: { email: string }) => {
+    setSubmitting(true);
+    try {
+      await requestPasswordReset(values.email.trim());
+      setSubmittedEmail(values.email.trim());
+      setSubmitted(true);
+    } catch (error) {
+      ErrorHandler.handle(error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -132,6 +148,7 @@ export const ForgotPassword = () => {
                   <Form.Item style={{ marginBottom: 0 }}>
                     <Button
                       htmlType="submit"
+                      loading={submitting}
                       className="w-full"
                       style={{
                         backgroundColor: "#c96442",

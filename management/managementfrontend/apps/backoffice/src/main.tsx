@@ -9,6 +9,7 @@ import { antdTheme } from "./theme";
 import { Login } from "./pages/Login";
 import { LoginLoadingPage } from "./pages/LoginLoadingPage";
 import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import AppLayout from "./layouts/AppLayout";
 import { BackofficeHome } from "./pages/backoffice/BackofficeHome";
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/loading" element={<LoginLoadingPage />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Rota pública de aceitação de convite */}
             <Route path="/accept-invite" element={<AcceptInvitePage />} />

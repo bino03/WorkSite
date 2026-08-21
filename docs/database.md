@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V19`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V22`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -81,7 +81,8 @@ atrás. O ficheiro de fatura é guardado apenas como `bucket`/`storage_key` (buc
 | `activity_log` | `worksite` | Auditoria genérica (login/logout + CRUD em `enterprises`/`construction_budget_item`/`construction_expense`) |
 | `revoked_token` | `worksite` | Lista negra de JWTs revogados (logout/invalidação) |
 | `settings.pending_invites` | `settings` | Convites de acesso pendentes (email, role, token) |
-| `settings.email_providers` | `settings` | Configuração SMTP para envio de emails de convite |
+| `settings.password_reset_tokens` | `settings` | Pedidos de recuperação de password (`V22`). Espelha `pending_invites`: token opaco + prazo (1 hora) + `used_at`. `auth_user_id` **sem FK** — o schema `auth` é do Supabase e não se referencia a partir das nossas migrações, tal como em `profile.auth_user_id`. Um pedido novo queima os anteriores por usar do mesmo utilizador |
+| `settings.email_providers` | `settings` | Configuração SMTP (`V7`), gerível pelo Backoffice desde a `V21` (`EmailProviderController`). Índice único parcial `uq_email_provider_single_default` — só uma linha pode ter `is_default`. O trigger de `updated_at` da `V11` só percorre o schema `worksite`, por isso o desta tabela foi criado à mão na `V21`. `password` em **texto simples**; a API nunca a devolve |
 | `tasks.task` | `tasks` | Tarefa standalone (nome, descrição, prazo, estado), sem ligação a nenhum ativo/imóvel |
 | `tasks.task_assignee` | `tasks` | Junção many-to-many entre `tasks.task` e `worksite.profile` — utilizadores atribuídos |
 | `notification` | `worksite` | Notificações in-app dirigidas a um `profile` (`V20`). `title`/`body` guardados **já escritos**, não tipo + parâmetros: torna a leitura um `select` simples, ao custo de o histórico ficar na língua em que nasceu. `entity_id` **sem FK** de propósito — aponta para tabelas diferentes conforme o `type`, e o aviso deve sobreviver ao desaparecimento da origem. `read_at` nulo = por ler |
@@ -92,7 +93,7 @@ atrás. O ficheiro de fatura é guardado apenas como `bucket`/`storage_key` (buc
 - Trigger genérico `worksite.tg_set_updated_at()` (definido em `V1`) mantém `updated_at` automaticamente — aplicado a todas as tabelas `worksite` com essa coluna via loop dinâmico em `V11`, e explicitamente às tabelas de construção em `V15`.
 - Enums nativos do Postgres: `role_enum` (`ADMIN`/`EMPLOYEE`), `account_status_enum` (`unlocked`/`blocked`/`deleted`), `media_type_enum`, `visibility_enum`, `activity_type`, `entity_type` (`V2`) e `budget_row_kind` (`ITEM`/`HEADING`/`NOTE`, `V15`).
 - `notification.type` é **texto e não enum** (`V20`): um tipo novo não vale uma migração, e nada no backend decide nada com base no valor — serve ao frontend para escolher o ícone.
-- `entity_type` ganhou `budget_item` em `V15`, `construction_invoice` em `V16` e `supplier` em `V19`. Os valores `construction_stage` e `construction_sub_stage` **mantêm-se de propósito**: há linhas históricas em `activity_log` que ainda os referenciam, e um valor não se remove de um enum do Postgres.
+- `entity_type` ganhou `budget_item` em `V15`, `construction_invoice` em `V16`, `supplier` em `V19` e `email_provider` em `V21`. Os valores `construction_stage` e `construction_sub_stage` **mantêm-se de propósito**: há linhas históricas em `activity_log` que ainda os referenciam, e um valor não se remove de um enum do Postgres.
 - `V8` concede permissões explícitas aos roles do Supabase (`anon`, `authenticated`, `service_role`) — necessário porque a validação de JWT é feita localmente pelo backend, mas o Supabase continua a gerir os utilizadores de autenticação (`auth.users`).
 - `V9` cria a FK condicional `profile.auth_user_id → auth.users(id)` (só se o schema `auth` existir — é o caso quando a app corre contra um projeto Supabase real).
 

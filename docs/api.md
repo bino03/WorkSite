@@ -15,7 +15,50 @@ Ver [[security.md]] para as regras de acesso (público vs `ADMIN`/`EMPLOYEE`/aut
 | POST | `/auth/login` | público |
 | POST | `/auth/refresh` | público |
 | POST | `/auth/logout` | público |
+| POST | `/auth/accept-invite` | público — token do email → conta + perfil |
+| POST | `/auth/forgot-password` | público — pede o link de recuperação |
+| POST | `/auth/reset-password` | público — define a password nova a partir do token |
 | GET | `/auth/me` | autenticado |
+
+`POST /auth/accept-invite` fecha o ciclo do `POST /auth/admin/invite`: valida o token contra
+`settings.pending_invites`, cria o utilizador no Supabase Auth com a password escolhida, cria o
+`worksite.profile` com o **role e telefone que vinham do convite** (não do que o cliente enviar) e
+marca o convite como `ACCEPTED`. Devolve `204`, sem sessão — a página manda para o login.
+
+Recusa com `USER_013` (token desconhecido, já usado ou cancelado) e `USER_012` (fora do prazo). O
+convite fora do prazo é **marcado** `EXPIRED` ao ser recusado: enquanto ficasse `PENDING`,
+continuava a bloquear um convite novo para o mesmo email (`existsByEmailAndStatus`). A mensagem
+concreta viaja no campo `message` da resposta — o `AcceptInvitePage` mostra essa, não o mapa
+genérico de `errorMessages.ts`.
+
+O utilizador do Supabase é criado antes do perfil e essa chamada não é transacional: se o perfil
+falhasse a gravar, ficaria uma conta de auth sem perfil (visível no dashboard do Supabase). A ordem
+inversa era pior — um perfil sem conta aparece nas listas do Backoffice como se fosse gente.
+
+
+### Recuperação de password
+
+Fluxo **próprio**, não o `/auth/v1/recover` do Supabase: assim o email sai pelo SMTP de
+`settings.email_providers` — o mesmo do convite — e não pelo do dashboard do Supabase, cujo
+template não se controla daqui e cujo SMTP gratuito tem limites de rate apertados.
+
+`POST /auth/forgot-password` resolve o email em `auth.users` (entidade `User`; o email **não** vive
+em `worksite.profile`), exige que exista `profile` correspondente, queima os pedidos anteriores
+ainda por usar e grava um token novo em `settings.password_reset_tokens` com **1 hora** de prazo.
+
+**Responde `204` exista ou não a conta.** É público e sem autenticação: distinguir os dois casos
+transformava-o num verificador de contas. O texto do ecrã já está escrito nesses termos ("se
+existir uma conta associada a…"). Não há limite de tentativas — vale a pena quando isto estiver
+exposto fora da rede interna.
+
+`POST /auth/reset-password` valida o token (existe, por usar, dentro do prazo), define a password
+via Supabase Admin API (`PUT /auth/v1/admin/users/{id}`), marca `used_at` e escreve
+`profile.last_token_reset_at`. Este último passo **derruba as sessões abertas**: o
+`AccountLockFilter` recusa qualquer JWT emitido antes desse instante. É o que se espera de uma
+recuperação — quem a pediu pode estar a fazê-lo por a conta lhe ter fugido.
+
+Recusa com `USER_013` (token desconhecido ou já usado) e `USER_012` (fora do prazo); a mensagem
+concreta viaja no campo `message`. A password mínima são 8 caracteres, igual à do convite.
 
 ## Administração de contas (`AdminAuthController`, `/auth/admin`)
 
@@ -515,6 +558,48 @@ gravada, a notificação também não existe.
 
 ---
 
+## Provedores de email (`EmailProviderController`, `/settings/email-providers`)
+
+A configuração SMTP em `settings.email_providers`. A tabela existe desde a `V7`, mas até à `V21`
+**só era lida**: entrava por `INSERT` à mão e, sem uma linha lá, o convite de funcionário falhava
+com `EMAIL_002` sem forma de o resolver sem acesso à base de dados.
+
+Tudo `ADMIN` — são credenciais de envio, e quem as controla controla os emails que saem em nome
+da plataforma. Reforçado em dois sítios: `@PreAuthorize` na classe e `.requestMatchers("/settings/**").hasRole("ADMIN")`
+no `SecurityConfig`.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/settings/email-providers` | `ADMIN` — todos, o predefinido primeiro |
+| GET | `/settings/email-providers/{id}` | `ADMIN` |
+| POST | `/settings/email-providers` | `ADMIN` — devolve `201` |
+| PUT | `/settings/email-providers/{id}` | `ADMIN` |
+| PATCH | `/settings/email-providers/{id}/default` | `ADMIN` — passa a ser o predefinido; desmarca o anterior |
+| PATCH | `/settings/email-providers/{id}/activate` | `ADMIN` |
+| PATCH | `/settings/email-providers/{id}/deactivate` | `ADMIN` |
+| POST | `/settings/email-providers/{id}/test` | `ADMIN` — envia email de teste; devolve `204` |
+| DELETE | `/settings/email-providers/{id}` | `ADMIN` — devolve `204` |
+
+**A password nunca sai.** O `EmailProviderResponseDTO` não a tem; traz `hasPassword: boolean` para
+o formulário saber que já existe uma. Na escrita, o campo é obrigatório ao criar e opcional ao
+editar — vir a `null`/vazio significa **manter a atual**, não apagar. Continua em texto simples na
+coluna; encriptar em repouso ficou por fazer (ver [[notes/ToDo]]).
+
+**Só um predefinido.** `EmailProviderService` desmarca os outros antes de marcar o novo; o índice
+único parcial `uq_email_provider_single_default` (`V21`) é a rede por baixo. O **primeiro** provedor
+criado nasce predefinido — sem isso configurava-se o SMTP e os emails continuavam a não sair, sem
+nada a dizer porquê.
+
+**O teste usa o provedor pedido, não o predefinido** — nem exige que esteja ativo. É o que permite
+validar credenciais antes de as promover.
+
+Códigos de erro: `EMAIL_001` (não encontrado), `EMAIL_002` (nenhum configurado), `EMAIL_003`
+(predefinido desativado), `EMAIL_004` (falha no envio), `EMAIL_005` (falha no teste).
+
+`EMAIL_002` e `EMAIL_003` são levantados **fora** do `try/catch` do envio, de propósito: falta de
+configuração não é falha de envio, e antes saíam ambos como `ERR_001` ("erro interno do servidor"),
+que não diz a ninguém que falta configurar o SMTP.
+
 ## ⚠️ Regras de segurança sem controller correspondente
 
 `SecurityConfig` ainda contém regras herdadas do projeto de origem que **não têm nenhum controller neste repo**:
@@ -522,7 +607,6 @@ gravada, a notificação também não existe.
 - `GET /open/**` e `POST /open/leads` → `permitAll()` (não existe package `client/` no Worksite)
 - `POST /assets` → `hasRole("ADMIN")` (não existe `AssetController`)
 - `POST /banners` → `hasRole("ADMIN")` (não existe `BannerController`)
-- `/auth/accept-invite` → `permitAll()` (verificar se o endpoint existe)
 
 São regras inertes hoje (nenhuma rota corresponde), mas convém limpá-las para o ficheiro refletir a superfície real da API — está registado em [[../notes/refactoring.md]]. Ver [[security.md]].
 

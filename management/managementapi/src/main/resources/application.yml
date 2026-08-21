@@ -91,8 +91,14 @@ supabase:
   jwt:
     secret: ${SUPABASE_JWT_SECRET}
 
-# Cookies (JWT tokens em cookies HttpOnly)
 app:
+  # Base dos links enviados por email (convite, recuperação de password). Em produção
+  # tem de apontar para o domínio real do Backoffice — caso contrário os links saem
+  # a apontar para localhost e são inutilizáveis.
+  frontend:
+    url: ${APP_FRONTEND_URL:http://localhost:5173}
+
+  # Cookies (JWT tokens em cookies HttpOnly)
   security:
     cookie:
       # HTTPS em produção, HTTP em desenvolvimento

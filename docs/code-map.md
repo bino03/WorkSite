@@ -40,6 +40,19 @@ Catálogo NIF → nome da empresa. Existe porque o QR da AT identifica o emitent
 | **Base de dados** | `worksite.supplier` — `V19` |
 | **Detalhe** | [[api.md]] → "Fornecedores" |
 
+## Provedores de email (SMTP)
+
+As credenciais com que a plataforma envia convites e recuperações de password. Antes da `V21` a
+tabela só era lida e a configuração entrava por `INSERT` à mão.
+
+| Camada | Ficheiros |
+|---|---|
+| **Entrada** | menu do utilizador → grupo **Definições** → "Provedores de email" (`layouts/AppLayout.tsx`, só `ADMIN`) → `components/settings/EmailProvidersDrawer.tsx` |
+| **Frontend** | `services/emailProviderService.ts` · `types/emailProvider.ts` · `components/settings/emailProviderFormSchema.ts` |
+| **Backend** | `controller/EmailProviderController` · `service/email/EmailProviderService` · `service/email/EmailService` (envio) · `repository/email/EmailProviderRepository` · `model/email/EmailProvider` · `mapper/email/EmailProviderMapper` |
+| **Base de dados** | `settings.email_providers` — `V7`, `V21` (trigger de `updated_at`, índice de predefinido único, `entity_type`) |
+| **Detalhe** | [[api.md]] → "Provedores de email" · [[environment.md]] |
+
 ## Orçamento de obra
 
 A árvore de rubricas, importada do Excel do empreiteiro, e as despesas lançadas nela.
@@ -80,7 +93,7 @@ Tarefas standalone, isoladas no seu próprio schema — sem ligação a obra nen
 |---|---|
 | **Entrada** | rotas `/backoffice/funcionarios` e `/funcionarios/:id` · convite público em `/accept-invite` |
 | **Frontend** | `pages/backoffice/EmployeesList.tsx` · `employee/EmployeeProfilePage.tsx` · `pages/AcceptInvitePage.tsx` · `components/employees/`, `components/profile/`, `components/invites/InvitesDrawer` · `services/profileService.ts` + `adminService.ts` |
-| **Backend** | `controller/EmployeesController` · `ProfileController` · `AdminAuthController` (convites) · `service/employee/` · `ProfileService` · `service/email/` |
+| **Backend** | `controller/EmployeesController` · `ProfileController` · `AdminAuthController` (envio de convites) · `AuthController` + `service/InviteService` (aceitação) · `service/employee/` · `ProfileService` · `service/email/` |
 | **Base de dados** | `worksite.profile` (`V3`) · `settings.pending_invites` + `email_providers` (`V7`) |
 
 ## Autenticação
@@ -89,10 +102,10 @@ JWT do Supabase validado localmente, cookies HttpOnly. **Sem SDK do Supabase no 
 
 | Camada | Ficheiros |
 |---|---|
-| **Entrada** | `/login` → `pages/Login.tsx` → `/loading` → `PrivateRoute.tsx` |
-| **Frontend** | `context/AuthContext.tsx` · `hooks/useAuth.ts` · `services/authService.ts` · `api.ts` (refresh automático em 401) |
-| **Backend** | `controller/AuthController` · `service/SupabaseAuthService` · `security/` (`SecurityConfig`, `AuthContext`, `AccountLockFilter`, `TokenRevocationFilter`) |
-| **Base de dados** | `worksite.revoked_token` (`V6`), `profile.role` |
+| **Entrada** | `/login` → `pages/Login.tsx` → `/loading` → `PrivateRoute.tsx` · recuperação em `/forgot-password` → `/reset-password` (`pages/ForgotPassword.tsx`, `pages/ResetPassword.tsx`) |
+| **Frontend** | `context/AuthContext.tsx` · `hooks/useAuth.ts` · `services/authService.ts` (login, `requestPasswordReset`, `resetPassword`) · `api.ts` (refresh automático em 401) |
+| **Backend** | `controller/AuthController` · `service/SupabaseAuthService` · `service/PasswordResetService` · `security/` (`SecurityConfig`, `AuthContext`, `AccountLockFilter`, `TokenRevocationFilter`) |
+| **Base de dados** | `worksite.revoked_token` (`V6`), `profile.role`, `profile.last_token_reset_at`, `settings.password_reset_tokens` (`V22`) |
 | **Detalhe** | [[security.md]] |
 
 ---
@@ -114,6 +127,10 @@ começar a olhar.
 | a cor/espaçamento está fora do sistema | tokens `--ind-*` em `index.css` (espelhados em `theme.ts`) — ver [[skills/references/design/backoffice-tokens-and-colors]] |
 | a lista não recarrega depois de gravar | o `onChanged`/`reload` da página que a contém (as drawers não recarregam nada sozinhas) |
 | a importação do Excel do orçamento falha | `BudgetExcelImportService` (procura a linha de cabeçalho "Art") |
+| o email de convite ou de recuperação não sai | falta um provedor predefinido **ativo** em *Definições → Provedores de email* — o erro é `EMAIL_002`/`EMAIL_003`, não `ERR_001` |
+| o link do email aponta para `localhost` | `APP_FRONTEND_URL` não está definido no ambiente — ver [[environment.md]] |
+| aceitar um convite dá erro | `InviteService#accept` — `USER_013` (desconhecido/usado/cancelado) ou `USER_012` (fora do prazo) |
+| recuperar a password não faz nada | `PasswordResetService` — o `204` do `forgot-password` é sempre igual, exista ou não a conta; confirmar no log se saiu email |
 | preciso de acrescentar um campo à fatura | migração → `ConstructionInvoice` → DTOs de `dto/invoice/` → `ConstructionInvoiceService` → `types/invoice.ts` → `InvoiceDetailDrawer` |
 
 ---

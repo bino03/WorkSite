@@ -136,6 +136,24 @@
     "emailRequired": "Por favor insira o email!",
     "emailInvalid": "Por favor insira um email válido!"
   },
+  "resetPassword": {
+    "title": "Definir nova palavra-passe",
+    "instructions": "Escolha a palavra-passe que vai passar a usar para entrar.",
+    "newPassword": "Nova palavra-passe",
+    "passwordRequired": "A palavra-passe é obrigatória.",
+    "passwordMinLength": "A palavra-passe deve ter pelo menos 8 caracteres.",
+    "passwordHint": "Mínimo 8 caracteres",
+    "confirmPassword": "Confirmar palavra-passe",
+    "confirmPasswordRequired": "Confirme a palavra-passe.",
+    "confirmPasswordPlaceholder": "Repita a palavra-passe",
+    "passwordsNoMatch": "As palavras-passe não coincidem.",
+    "submit": "Guardar palavra-passe",
+    "success": "Palavra-passe alterada",
+    "successDesc": "Já pode entrar com a palavra-passe nova. As sessões abertas noutros dispositivos foram terminadas.",
+    "invalidLink": "Link inválido",
+    "invalidLinkDesc": "Este link de recuperação não traz um token. Peça um novo a partir do ecrã de recuperação.",
+    "requestNew": "Pedir novo link"
+  },
   "invite": {
     "invalidToken": "Token de convite inválido ou em falta.",
     "title": "Aceitar Convite",

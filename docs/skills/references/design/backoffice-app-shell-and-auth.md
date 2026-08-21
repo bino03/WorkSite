@@ -4,7 +4,7 @@
 
 ## 1. Superfície de rotas atual
 
-`main.tsx:34-57` define tudo. Públicas: `/login`, `/loading`, `/forgot-password`, `/accept-invite`. Protegidas, todas debaixo de `/backoffice/*` com `<PrivateRoute><AppLayout /></PrivateRoute>` (`main.tsx:44`):
+`main.tsx:34-58` define tudo. Públicas: `/login`, `/loading`, `/forgot-password`, `/reset-password`, `/accept-invite`. Protegidas, todas debaixo de `/backoffice/*` com `<PrivateRoute><AppLayout /></PrivateRoute>` (`main.tsx:45`):
 
 | Rota | Página |
 |---|---|
@@ -40,6 +40,7 @@
 |---|---|
 | Minha Conta | abre o `MyProfileModal` |
 | *Definições* (grupo) → Fornecedores | abre a `SuppliersDrawer` |
+| *Definições* (grupo) → Provedores de email | abre a `EmailProvidersDrawer`; a entrada só é montada se `isAdmin()` — o endpoint por trás é `ADMIN` e mostrá-la a um `EMPLOYEE` só lhe dava um 403 |
 | Idioma ▸ Português / English | `i18n.changeLanguage` + `localStorage`; o idioma activo fica `disabled` |
 | Terminar sessão | `useConfirm()` → `logout` |
 
