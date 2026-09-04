@@ -14,6 +14,8 @@ Central documentation for the Worksite project (backend + backoffice).
 - **security.md** — Security & authorization
 - **api.md** — API endpoint reference (rotas, métodos, regras de acesso por controller)
 - **vault-sync-hooks.md** — O hook `pre-commit` que avisa quando um commit precisa de uma atualização de docs
+- **excel-parity.md** — O contrato de dados com o vault Excel da Vilatro (projeto irmão): coluna ↔ coluna, valores permitidos, decisões honradas, migração nos dois sentidos. **Única cópia** — o vault Vilatro só aponta para aqui
+- **faturas-modelo-alvo.md** — O modelo que as faturas vão ter (desenho aprovado, por implementar): 0..N documentos, pagamentos agregáveis, notas de crédito, quarentena, transferências, associação a rubricas
 - **skills/** — Everything related to invocable skills, organized by topic:
   - **[[SKILLS-INDEX]]** / **[[SKILLS-QUICK-REFERENCE]]** — Master index of all skills and references
   - **backend/** — 4 backend skills (`skill-add-backend-feature`, `skill-add-database-table`, `skill-add-file-upload`, `skill-permissions-and-auth`)

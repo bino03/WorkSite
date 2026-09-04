@@ -48,6 +48,8 @@ do mesmo facto divergem sempre, e nunca se sabe qual é a boa. O `.githooks/pre-
 | Convenções e armadilhas do backend? | [[docs/backend-conventions]] |
 | Convenções visuais do Backoffice? | [[docs/skills/references/frontend-visual-consistency]] |
 | Porque é que a tabela se chama `enterprise`? | [[docs/provenance]] |
+| Como é que isto mapeia no Excel da Vilatro? | [[docs/excel-parity]] |
+| O que vai mudar nas faturas (pagamentos, NC, quarentena)? | [[docs/faturas-modelo-alvo]] |
 | Que skills existem? | [[docs/skills/SKILLS-INDEX]] |
 | O que está por fazer? | [[notes/ToDo]] |
 | O que já foi feito, e porquê? | [[notes/whatIveDone]] |
@@ -65,6 +67,20 @@ Worksite/                     ← o vault Obsidian é a raiz do repo
 ```
 
 Não há portal público: é uma ferramenta interna. Detalhe em [[docs/architecture]].
+
+## Projeto irmão: o vault Excel da Vilatro
+
+Esta app faz parte de um **conjunto de dois**. A empresa usa hoje uma solução em Excel + pastas, com o
+seu próprio vault e as suas próprias skills:
+
+- `C:\Users\jlalv\Desktop\VILATRO\Vilatro` · `https://github.com/bino03/Vilatro` (privado)
+
+Os dois têm de continuar a poder trocar dados sem conversão. O contrato que o garante vive **só aqui**,
+em [[docs/excel-parity]]; o modelo que a app vai ter para o cumprir está em [[docs/faturas-modelo-alvo]].
+
+**Regra**: uma migração que toque `construction_*`, `supplier` ou `payment` obriga a rever
+[[docs/excel-parity]]. Se por causa disso o Excel tiver de mudar, a decisão escreve-se em
+`Vilatro\Decisões.md` e o pedido em `Vilatro\Início.md` → "Por fazer" — não aqui.
 
 ## Fluxo de trabalho
 

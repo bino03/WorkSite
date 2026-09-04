@@ -62,6 +62,11 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 - **API Reference** → [[docs/api.md]]
 - **Vault sync hooks** → [[docs/vault-sync-hooks.md]]
 
+### 🔁 Projeto irmão (Excel da Vilatro)
+- **Contrato App ↔ Excel** → [[docs/excel-parity.md]] ← coluna-a-coluna, migração nos dois sentidos
+- **Modelo alvo das faturas** → [[docs/faturas-modelo-alvo.md]] ← documentos N, pagamentos, notas de crédito, quarentena, transferências
+- **Roadmap por fases** → [[notes/roadmap/plans/2026-09-04-alinhamento-excel-app.md]]
+
 ### 🎯 Working on Specific Tasks
 - **Add Backend Feature** → [[docs/skills/backend/skill-add-backend-feature]]
 - **Add Frontend Feature** → [[docs/skills/frontend/skill-frontend-design-system]]
