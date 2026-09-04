@@ -44,7 +44,9 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                    or lower(i.supplierNif)      like lower(concat('%', :q, '%'))
                    or lower(i.invoiceNumber)    like lower(concat('%', :q, '%'))
                    or lower(i.invoiceAtcud)     like lower(concat('%', :q, '%'))
-                   or lower(i.originalFilename) like lower(concat('%', :q, '%'))
+                   or exists (select 1 from ConstructionInvoiceDocument d
+                              where d.invoice = i
+                                and lower(d.originalFilename) like lower(concat('%', :q, '%')))
                    or lower(i.notes)            like lower(concat('%', :q, '%')))
             """)
     Page<ConstructionInvoice> search(@Param("enterpriseId") UUID enterpriseId,
@@ -56,6 +58,26 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                      @Param("q") String q,
                                      Pageable pageable);
 
+    /**
+     * As faturas que não são de obra nenhuma: a quarentena ("Por identificar")
+     * e as despesas da empresa. Sem filtro de obra, porque nestes dois âmbitos
+     * o enterprise_id é nulo por construção (check da V26).
+     */
+    @Query("""
+            select i from ConstructionInvoice i
+            where i.scope = :scope
+              and (:q is null
+                   or lower(i.supplierName)  like lower(concat('%', :q, '%'))
+                   or lower(i.supplierNif)   like lower(concat('%', :q, '%'))
+                   or lower(i.invoiceNumber) like lower(concat('%', :q, '%'))
+                   or lower(i.invoiceAtcud)  like lower(concat('%', :q, '%'))
+                   or lower(i.description)   like lower(concat('%', :q, '%'))
+                   or lower(i.notes)         like lower(concat('%', :q, '%')))
+            """)
+    Page<ConstructionInvoice> searchByScope(@Param("scope") ConstructionInvoice.Scope scope,
+                                            @Param("q") String q,
+                                            Pageable pageable);
+
     /** Quantas faturas do projeto ainda estão por associar — alimenta o contador no orçamento. */
     @Query("""
             select count(i) from ConstructionInvoice i
@@ -65,40 +87,20 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
     long countPending(@Param("enterpriseId") UUID enterpriseId);
 
     /**
-     * Faturas do projeto com o mesmo ATCUD. Serve o aviso de duplicado: agora que
+     * Faturas com o mesmo ATCUD, em qualquer obra ou na quarentena (V29). Serve o aviso de duplicado: agora que
      * uma fatura vale por um único documento, um ATCUD repetido é quase sempre o
      * mesmo papel carregado duas vezes. Continua a avisar e não a bloquear —
      * quem carrega é que sabe se é engano.
      */
     @Query("""
             select i from ConstructionInvoice i
-            where i.enterprise.id = :enterpriseId
-              and i.invoiceAtcud = :atcud
+            where i.invoiceAtcud = :atcud
               and (:excludeId is null or i.id <> :excludeId)
-            order by i.uploadedAt desc
+            order by i.createdAt desc
             """)
-    List<ConstructionInvoice> findByEnterpriseAndAtcud(@Param("enterpriseId") UUID enterpriseId,
-                                                       @Param("atcud") String atcud,
-                                                       @Param("excludeId") UUID excludeId);
+    List<ConstructionInvoice> findByAtcud(@Param("atcud") String atcud,
+                                          @Param("excludeId") UUID excludeId);
 
-    /**
-     * Faturas do projeto com o mesmo checksum — o mesmo ficheiro, byte a byte.
-     *
-     * É a única chave que não depende de nada ter sido lido do QR nem escrito
-     * à mão: apanha o caso em que a mesma foto é carregada duas vezes e nenhuma
-     * das duas tem QR legível, que as outras duas chaves (ATCUD e NIF+número)
-     * deixam passar por falta de dados por onde comparar.
-     */
-    @Query("""
-            select i from ConstructionInvoice i
-            where i.enterprise.id = :enterpriseId
-              and i.checksumSha256 = :checksum
-              and (:excludeId is null or i.id <> :excludeId)
-            order by i.uploadedAt desc
-            """)
-    List<ConstructionInvoice> findByEnterpriseAndChecksum(@Param("enterpriseId") UUID enterpriseId,
-                                                           @Param("checksum") String checksum,
-                                                           @Param("excludeId") UUID excludeId);
 
     /**
      * Faturas do projeto do mesmo fornecedor, para o serviço comparar o número
@@ -117,15 +119,13 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
      */
     @Query("""
             select i from ConstructionInvoice i
-            where i.enterprise.id = :enterpriseId
-              and i.supplierNif = :supplierNif
+            where i.supplierNif = :supplierNif
               and i.invoiceNumber is not null
               and (:excludeId is null or i.id <> :excludeId)
-            order by i.uploadedAt desc
+            order by i.createdAt desc
             """)
-    List<ConstructionInvoice> findByEnterpriseAndSupplierNif(@Param("enterpriseId") UUID enterpriseId,
-                                                              @Param("supplierNif") String supplierNif,
-                                                              @Param("excludeId") UUID excludeId);
+    List<ConstructionInvoice> findBySupplierNif(@Param("supplierNif") String supplierNif,
+                                                @Param("excludeId") UUID excludeId);
 
     /**
      * Rubricas onde as faturas deste fornecedor já foram lançadas, da mais usada

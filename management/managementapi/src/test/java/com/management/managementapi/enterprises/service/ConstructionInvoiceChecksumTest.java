@@ -2,9 +2,11 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
+import com.management.managementapi.enterprises.model.ConstructionInvoiceDocument;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
+import com.management.managementapi.enterprises.repository.ConstructionInvoiceDocumentRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.exeption.BusinessException;
@@ -43,11 +45,15 @@ import static org.mockito.Mockito.when;
  * ("10.46.20.jpg" / "10.46.19.jpg" nos dados reais) passavam as duas porque,
  * sem QR legível, o ATCUD e o par (NIF, número) ficam ambos vazios e
  * {@code rejectIfDuplicate} não tinha por onde comparar.
+ *
+ * Desde a V24 o checksum vive no documento e a verificação é <b>global</b>:
+ * o mesmo ficheiro é recusado esteja a outra fatura na obra que estiver.
  */
 @ExtendWith(MockitoExtension.class)
 class ConstructionInvoiceChecksumTest {
 
     @Mock private ConstructionInvoiceRepository repository;
+    @Mock private ConstructionInvoiceDocumentRepository documentRepository;
     @Mock private ConstructionExpenseRepository expenseRepository;
     @Mock private ConstructionBudgetItemRepository budgetItemRepository;
     @Mock private EnterpriseRepository enterpriseRepository;
@@ -68,30 +74,39 @@ class ConstructionInvoiceChecksumTest {
         UUID enterpriseId = UUID.randomUUID();
         Enterprise enterprise = new Enterprise();
         enterprise.setId(enterpriseId);
+        enterprise.setName("Vila Petrus");
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "fatura.pdf", "application/pdf", "conteudo-do-ficheiro".getBytes());
 
         ConstructionInvoice existing = new ConstructionInvoice();
         existing.setId(UUID.randomUUID());
-        existing.setOriginalFilename("fatura-antiga.pdf");
+        existing.setEnterprise(enterprise);
+        existing.setSupplierName("Leroy Merlin");
+
+        ConstructionInvoiceDocument existingDocument = new ConstructionInvoiceDocument();
+        existingDocument.setInvoice(existing);
+        existingDocument.setOriginalFilename("fatura-antiga.pdf");
 
         when(enterpriseRepository.findById(enterpriseId)).thenReturn(Optional.of(enterprise));
         when(qrService.read(any(), any())).thenReturn(Optional.empty());
-        when(repository.findByEnterpriseAndChecksum(any(), any(), any()))
-                .thenReturn(List.of(existing));
+        when(documentRepository.findByChecksum(any(), any()))
+                .thenReturn(List.of(existingDocument));
 
         assertThatThrownBy(() -> service.upload(enterpriseId, file))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                        .isEqualTo(ErrorCode.INVOICE_DUPLICATE_FILE));
+                        .isEqualTo(ErrorCode.INVOICE_DUPLICATE_FILE))
+                // A mensagem tem de dizer onde está a primeira: a colisão pode
+                // agora vir de outra obra qualquer.
+                .hasMessageContaining("Vila Petrus");
 
         // A rejeição tem de acontecer antes de qualquer escrita no Storage.
         verify(storageService, never()).upload(any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("deixa passar quando o checksum é novo no projeto, e grava-o")
+    @DisplayName("deixa passar quando o checksum não existe em lado nenhum, e grava-o no documento")
     void acceptsNewChecksumAndPersistsIt() throws IOException {
         UUID enterpriseId = UUID.randomUUID();
         Enterprise enterprise = new Enterprise();
@@ -102,15 +117,19 @@ class ConstructionInvoiceChecksumTest {
 
         when(enterpriseRepository.findById(enterpriseId)).thenReturn(Optional.of(enterprise));
         when(qrService.read(any(), any())).thenReturn(Optional.empty());
-        when(repository.findByEnterpriseAndChecksum(any(), any(), any())).thenReturn(List.of());
+        when(documentRepository.findByChecksum(any(), any())).thenReturn(List.of());
         when(repository.save(any(ConstructionInvoice.class))).thenAnswer(call -> call.getArgument(0));
+        when(documentRepository.save(any(ConstructionInvoiceDocument.class)))
+                .thenAnswer(call -> call.getArgument(0));
 
         service.upload(enterpriseId, file);
 
-        ArgumentCaptor<ConstructionInvoice> captor = ArgumentCaptor.forClass(ConstructionInvoice.class);
-        verify(repository).save(captor.capture());
+        ArgumentCaptor<ConstructionInvoiceDocument> captor =
+                ArgumentCaptor.forClass(ConstructionInvoiceDocument.class);
+        verify(documentRepository).save(captor.capture());
         assertThat(captor.getValue().getChecksumSha256())
                 .isNotBlank()
                 .hasSize(64); // SHA-256 em hexadecimal
+        assertThat(captor.getValue().getInvoice()).isNotNull();
     }
 }

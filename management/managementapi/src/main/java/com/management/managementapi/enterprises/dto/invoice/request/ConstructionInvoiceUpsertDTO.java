@@ -42,5 +42,23 @@ public record ConstructionInvoiceUpsertDTO(
         BigDecimal totalAmount,
 
         @Size(max = 2000, message = "Notas demasiado longas")
-        String notes
+        String notes,
+
+        /** O "Produto/Serviço" do Excel: o que foi comprado. */
+        @Size(max = 500, message = "Descrição demasiado longa")
+        String description,
+
+        /**
+         * `ARCHIVED`, `MISSING`, `TO_PRINT` ou `TO_REQUEST`. Null deixa como
+         * está — o estado também muda sozinho ao juntar ou largar um documento.
+         */
+        String documentStatus,
+
+        /** Só faz sentido na quarentena: a coluna "Obras possíveis". */
+        @Size(max = 500, message = "Texto demasiado longo")
+        String possibleEnterprises,
+
+        /** Só faz sentido na quarentena: a coluna "Perguntar a". */
+        @Size(max = 255, message = "Texto demasiado longo")
+        String askWhom
 ) {}

@@ -1,6 +1,7 @@
 package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
@@ -100,6 +101,69 @@ public class ConstructionInvoiceController {
      * A caixa de entrada. Sem filtros devolve tudo; o cliente abre-a com
      * {@code allocated=false}, que é o trabalho por fazer.
      */
+    /**
+     * Regista uma fatura <b>sem ficheiro</b> — a que está por pedir ou por
+     * imprimir. É também por aqui que entram as despesas da empresa e as
+     * faturas por identificar, que não têm obra.
+     */
+    @PostMapping("/register")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ConstructionInvoiceResponseDTO> register(
+            @Valid @RequestBody InvoiceRegisterDTO dto,
+            HttpServletRequest request) {
+        ConstructionInvoiceResponseDTO created = service.register(dto);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, created.id(),
+                        invoiceLabel(created), request));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    /**
+     * Junta mais um ficheiro a uma fatura já registada. Ao contrário de
+     * {@code POST /{id}/file}, que substitui, este acrescenta: a foto tirada na
+     * obra e o PDF do fornecedor são o mesmo documento fiscal.
+     */
+    @PostMapping(value = "/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<InvoiceUploadResultDTO> addDocument(
+            @PathVariable UUID id,
+            @RequestPart("file") MultipartFile file,
+            HttpServletRequest request) {
+        InvoiceUploadResultDTO result = service.addDocument(id, file);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, id,
+                        invoiceLabel(result.invoice()), null, request));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    /**
+     * A quarentena: faturas que ainda não se sabe de quem são. Ordenadas da
+     * mais antiga para a mais recente por omissão — quanto mais tempo lá está,
+     * mais urgente é.
+     */
+    @GetMapping("/unidentified")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Page<ConstructionInvoiceResponseDTO> listUnidentified(
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+        return service.searchByScope(ConstructionInvoice.Scope.UNIDENTIFIED, q, pageable);
+    }
+
+    /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. */
+    @GetMapping("/company")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Page<ConstructionInvoiceResponseDTO> listCompany(
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return service.searchByScope(ConstructionInvoice.Scope.COMPANY, q, pageable);
+    }
+
     @GetMapping("/enterprise/{enterpriseId}")
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
     public Page<ConstructionInvoiceResponseDTO> listByEnterprise(
@@ -110,7 +174,7 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String q,
-            @PageableDefault(size = 20, sort = "uploadedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return service.search(enterpriseId, allocated, needsReview, sentToAccountant, from, to, q, pageable);
     }
 

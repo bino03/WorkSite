@@ -2,17 +2,21 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.DuplicateInvoiceRefDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
+import com.management.managementapi.enterprises.model.ConstructionInvoiceDocument;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.model.Supplier;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
+import com.management.managementapi.enterprises.repository.ConstructionInvoiceDocumentRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.enterprises.repository.SupplierRepository;
@@ -45,6 +49,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -78,6 +83,7 @@ public class ConstructionInvoiceService {
     private static final String BUCKET = "documents";
 
     private final ConstructionInvoiceRepository repository;
+    private final ConstructionInvoiceDocumentRepository documentRepository;
     private final ConstructionExpenseRepository expenseRepository;
     private final ConstructionBudgetItemRepository budgetItemRepository;
     private final EnterpriseRepository enterpriseRepository;
@@ -114,7 +120,7 @@ public class ConstructionInvoiceService {
         // lógica de leitura do QR e de deteção de duplicado que o upload usa.
         ConstructionInvoice draft = new ConstructionInvoice();
         draft.setEnterprise(enterprise);
-        draft.setChecksumSha256(sha256Hex(original));
+        String checksum = sha256Hex(original);
 
         Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(original, mime);
         qr.ifPresent(data -> applyQrData(draft, data));
@@ -122,7 +128,7 @@ public class ConstructionInvoiceService {
         boolean duplicate = false;
         String duplicateMessage = null;
         try {
-            rejectIfDuplicate(draft);
+            rejectIfDuplicate(draft, checksum);
         } catch (BusinessException e) {
             duplicate = true;
             duplicateMessage = e.getMessage();
@@ -165,19 +171,18 @@ public class ConstructionInvoiceService {
 
         ConstructionInvoice invoice = new ConstructionInvoice();
         invoice.setEnterprise(enterprise);
-        invoice.setOriginalSizeBytes((long) original.length);
-        invoice.setChecksumSha256(sha256Hex(original));
+        String checksum = sha256Hex(original);
         authContext.currentProfileId().ifPresent(invoice::setCreatedBy);
 
         Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(original, mime);
         qr.ifPresent(data -> applyQrData(invoice, data));
 
-        rejectIfDuplicate(invoice);
+        rejectIfDuplicate(invoice, checksum);
 
         StoredContent stored = compressIfReadable(original, mime, file.getOriginalFilename(), qr.isPresent());
-        storeDocument(invoice, enterpriseId, stored.filename(), stored.content(), stored.mimeType());
-        storeThumbnail(invoice, enterpriseId, stored.content(), stored.mimeType());
+        // A fatura grava-se primeiro: o documento precisa do id dela para a FK.
         ConstructionInvoice saved = repository.save(invoice);
+        addDocument(saved, enterpriseId, stored, checksum, (long) original.length);
 
         // Uma fatura acabada de carregar está sempre por classificar — registar e
         // classificar são momentos diferentes, é o princípio desta classe. Avisa-se
@@ -197,6 +202,167 @@ public class ConstructionInvoiceService {
                 qr.map(AtInvoiceQrService.AtInvoiceData::warnings).orElse(List.of()));
     }
 
+    /**
+     * Regista uma fatura <b>sem ficheiro</b>: a que está por pedir, por
+     * imprimir, ou que só existe em papel. Até à V24 isto não era possível — o
+     * ficheiro era obrigatório — e por isso este trabalho ficava todo no Excel.
+     *
+     * O documento junta-se depois, por {@link #addDocument}.
+     */
+    public ConstructionInvoiceResponseDTO register(InvoiceRegisterDTO dto) {
+        ConstructionInvoice.Scope scope = parseScope(dto.scope());
+
+        ConstructionInvoice invoice = new ConstructionInvoice();
+        invoice.setScope(scope);
+        invoice.setEnterprise(resolveEnterpriseFor(scope, dto.enterpriseId()));
+        invoice.setSupplierName(trimToNull(dto.supplierName()));
+        invoice.setSupplierNif(trimToNull(dto.supplierNif()));
+        invoice.setInvoiceNumber(trimToNull(dto.invoiceNumber()));
+        invoice.setInvoiceAtcud(trimToNull(dto.invoiceAtcud()));
+        invoice.setInvoiceDate(dto.invoiceDate());
+        invoice.setTotalAmount(dto.totalAmount());
+        invoice.setDescription(trimToNull(dto.description()));
+        invoice.setPossibleEnterprises(trimToNull(dto.possibleEnterprises()));
+        invoice.setAskWhom(trimToNull(dto.askWhom()));
+        invoice.setNotes(trimToNull(dto.notes()));
+        invoice.setDocumentStatus(registerStatus(dto.documentStatus()));
+        authContext.currentProfileId().ifPresent(invoice::setCreatedBy);
+
+        // Sem ficheiro não há checksum, mas o ATCUD e o par (NIF, número) podem
+        // vir escritos à mão — e são globais desde a V29.
+        rejectIfDuplicate(invoice, null);
+
+        return toResponseDTO(repository.save(invoice), false);
+    }
+
+    /**
+     * Junta mais um documento a uma fatura que já existe: a foto tirada na obra
+     * e o PDF que o fornecedor mandou depois são o mesmo documento fiscal.
+     *
+     * O QR do ficheiro novo <b>preenche o que está vazio</b> e apenas
+     * <b>avisa</b> quando diverge do que já lá está — nunca sobrepõe uma
+     * correção feita à mão.
+     */
+    public InvoiceUploadResultDTO addDocument(UUID invoiceId, MultipartFile file) {
+        ConstructionInvoice invoice = getById(invoiceId);
+
+        validateFile(file);
+        byte[] original = readBytes(file);
+        String mime = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
+        String checksum = sha256Hex(original);
+
+        // Só o ficheiro é verificado: a identidade da fatura é a que já lá está.
+        documentRepository.findByChecksum(checksum, invoiceId).stream()
+                .findFirst()
+                .ifPresent(document -> {
+                    ConstructionInvoice other = document.getInvoice();
+                    throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_FILE, String.format(
+                            "Este ficheiro já foi carregado em %s (%s, %s)",
+                            whereItIs(other), describe(other), dateOf(other)));
+                });
+
+        Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(original, mime);
+        List<String> warnings = qr.map(data -> {
+            List<String> divergences = qrDivergences(invoice, data);
+            applyQrData(invoice, data);
+            return divergences;
+        }).orElse(List.of());
+
+        StoredContent stored = compressIfReadable(original, mime, file.getOriginalFilename(), qr.isPresent());
+        addDocument(invoice, invoice.getEnterpriseId(), stored, checksum, (long) original.length);
+        ConstructionInvoice saved = repository.save(invoice);
+
+        return new InvoiceUploadResultDTO(
+                toResponseDTO(saved, true),
+                qr.isPresent(),
+                List.of(),
+                warnings);
+    }
+
+    /**
+     * O que o QR do ficheiro novo diz de diferente do que a fatura já tinha
+     * preenchido. Não altera nada — quem decide é quem está a olhar.
+     */
+    private static List<String> qrDivergences(ConstructionInvoice invoice, AtInvoiceQrService.AtInvoiceData data) {
+        List<String> divergences = new ArrayList<>();
+        if (!isBlank(invoice.getSupplierNif()) && data.issuerNif() != null
+                && !invoice.getSupplierNif().equals(data.issuerNif())) {
+            divergences.add("O QR deste ficheiro traz o NIF " + data.issuerNif()
+                    + ", mas a fatura tem " + invoice.getSupplierNif() + ".");
+        }
+        if (!isBlank(invoice.getInvoiceNumber()) && data.documentNumber() != null
+                && !normalizeDocumentNumber(invoice.getInvoiceNumber())
+                        .equals(normalizeDocumentNumber(data.documentNumber()))) {
+            divergences.add("O QR deste ficheiro traz o número " + data.documentNumber()
+                    + ", mas a fatura tem " + invoice.getInvoiceNumber() + ".");
+        }
+        if (invoice.getTotalAmount() != null && data.totalAmount() != null
+                && invoice.getTotalAmount().compareTo(data.totalAmount()) != 0) {
+            divergences.add("O QR deste ficheiro traz o total " + data.totalAmount()
+                    + ", mas a fatura tem " + invoice.getTotalAmount() + ".");
+        }
+        return divergences;
+    }
+
+    private static ConstructionInvoice.Scope parseScope(String value) {
+        try {
+            return ConstructionInvoice.Scope.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.INVOICE_SCOPE_UNKNOWN, "Âmbito desconhecido: " + value);
+        }
+    }
+
+    /**
+     * O par scope/obra é o mesmo que o check da V26 impõe na base de dados —
+     * verificado aqui para o erro sair com uma mensagem em vez de uma violação
+     * de constraint.
+     */
+    private Enterprise resolveEnterpriseFor(ConstructionInvoice.Scope scope, UUID enterpriseId) {
+        if (scope == ConstructionInvoice.Scope.PROJECT) {
+            if (enterpriseId == null) {
+                throw new BusinessException(ErrorCode.INVOICE_SCOPE_REQUIRES_ENTERPRISE);
+            }
+            return enterpriseRepository.findById(enterpriseId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_ENTERPRISE_NOT_FOUND));
+        }
+        if (enterpriseId != null) {
+            throw new BusinessException(ErrorCode.INVOICE_SCOPE_FORBIDS_ENTERPRISE);
+        }
+        return null;
+    }
+
+    private static ConstructionInvoice.DocumentStatus registerStatus(String value) {
+        if (isBlank(value)) {
+            return ConstructionInvoice.DocumentStatus.MISSING;
+        }
+        ConstructionInvoice.DocumentStatus status = parseDocumentStatus(value);
+        // ARCHIVED quer dizer "o papel está cá"; sem ficheiro seria mentira.
+        if (status == ConstructionInvoice.DocumentStatus.ARCHIVED) {
+            throw new BusinessException(ErrorCode.INVOICE_STATUS_REQUIRES_NO_DOCUMENT);
+        }
+        return status;
+    }
+
+    /**
+     * As listas que não são de obra nenhuma: a quarentena ("Por identificar") e
+     * as despesas da empresa. A quarentena vê-se da mais antiga para a mais
+     * recente — quanto mais tempo lá está, mais urgente é.
+     */
+    @Transactional(readOnly = true)
+    public Page<ConstructionInvoiceResponseDTO> searchByScope(ConstructionInvoice.Scope scope,
+                                                              String q, Pageable pageable) {
+        Page<ConstructionInvoice> page = repository.searchByScope(scope, isBlank(q) ? null : q.trim(), pageable);
+
+        List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
+        Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
+        Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
+
+        return page.map(invoice -> toResponseDTO(invoice,
+                allocations.get(invoice.getId()),
+                documents.getOrDefault(invoice.getId(), List.of()),
+                false));
+    }
+
     /** Substitui o ficheiro de uma fatura já registada, relendo o QR e a miniatura. */
     public InvoiceUploadResultDTO replaceFile(UUID id, MultipartFile file) {
         ConstructionInvoice invoice = getById(id);
@@ -205,22 +371,22 @@ public class ConstructionInvoiceService {
         byte[] original = readBytes(file);
         String mime = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
 
-        deleteStoredFiles(invoice);
-        invoice.setChecksumSha256(sha256Hex(original));
-        invoice.setOriginalSizeBytes((long) original.length);
+        // Substituir o ficheiro é largar todos os documentos e pôr um só no lugar.
+        // Acrescentar sem apagar é o que faz POST /{id}/documents.
+        deleteDocuments(invoice);
+        String checksum = sha256Hex(original);
 
         Optional<AtInvoiceQrService.AtInvoiceData> qr = qrService.read(original, mime);
         // Só preenche o que está vazio: correções feitas à mão não são deitadas
         // fora por se ter substituído a digitalização.
         qr.ifPresent(data -> applyQrData(invoice, data));
 
-        UUID enterpriseId = invoice.getEnterprise().getId();
-        rejectIfDuplicate(invoice);
+        UUID enterpriseId = invoice.getEnterpriseId();
+        rejectIfDuplicate(invoice, checksum);
 
         StoredContent stored = compressIfReadable(original, mime, file.getOriginalFilename(), qr.isPresent());
-        storeDocument(invoice, enterpriseId, stored.filename(), stored.content(), stored.mimeType());
-        storeThumbnail(invoice, enterpriseId, stored.content(), stored.mimeType());
         ConstructionInvoice saved = repository.save(invoice);
+        addDocument(saved, enterpriseId, stored, checksum, (long) original.length);
 
         return new InvoiceUploadResultDTO(
                 toResponseDTO(saved, true),
@@ -287,8 +453,10 @@ public class ConstructionInvoiceService {
     public InvoiceUploadResultDTO rescan(UUID id) {
         ConstructionInvoice invoice = getById(id);
 
-        byte[] content = downloadStoredDocument(invoice);
-        String mime = Optional.ofNullable(invoice.getMimeType()).orElse("application/octet-stream");
+        ConstructionInvoiceDocument document = primaryDocument(invoice.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_FILE_UNAVAILABLE));
+        byte[] content = downloadStoredDocument(document);
+        String mime = Optional.ofNullable(document.getMimeType()).orElse("application/octet-stream");
 
         // Sem QR legível não há nada por onde repor. Recusar é melhor do que
         // apagar o que lá está e deixar a fatura pior do que estava.
@@ -319,21 +487,30 @@ public class ConstructionInvoiceService {
         return new InvoiceUploadResultDTO(
                 toResponseDTO(saved, true),
                 true,
-                findDuplicates(saved.getEnterprise().getId(), saved.getInvoiceAtcud(), saved.getId()),
+                findDuplicates(saved.getInvoiceAtcud(), saved.getId()),
                 data.warnings());
     }
 
     /** O ficheiro que está no Storage, de volta em memória para ser relido. */
-    private byte[] downloadStoredDocument(ConstructionInvoice invoice) {
-        if (invoice.getBucket() == null || isBlank(invoice.getStorageKey())) {
+    private byte[] downloadStoredDocument(ConstructionInvoiceDocument document) {
+        if (document.getBucket() == null || isBlank(document.getStorageKey())) {
             throw new BusinessException(ErrorCode.INVOICE_FILE_UNAVAILABLE);
         }
         try {
-            return storageService.download(invoice.getBucket(), invoice.getStorageKey());
+            return storageService.download(document.getBucket(), document.getStorageKey());
         } catch (IOException e) {
-            log.warn("Não foi possível obter o ficheiro da fatura {}: {}", invoice.getId(), e.getMessage());
+            log.warn("Não foi possível obter o ficheiro do documento {}: {}", document.getId(), e.getMessage());
             throw new BusinessException(ErrorCode.INVOICE_FILE_UNAVAILABLE);
         }
+    }
+
+    /**
+     * O documento que representa a fatura quando é preciso um só: o mais antigo,
+     * que é o que foi carregado no registo. É o que a lista mostra e o que o
+     * {@link #rescan} relê.
+     */
+    private Optional<ConstructionInvoiceDocument> primaryDocument(UUID invoiceId) {
+        return documentRepository.findFirstByInvoiceIdOrderByUploadedAtAsc(invoiceId);
     }
 
     /**
@@ -393,10 +570,14 @@ public class ConstructionInvoiceService {
                 enterpriseId, allocated, needsReview, sentToAccountant, from, to, query, pageable);
 
         // Uma query para as afetações da página toda, em vez de uma por linha.
-        Map<UUID, ConstructionExpense> allocations = loadAllocations(
-                page.getContent().stream().map(ConstructionInvoice::getId).toList());
+        List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
+        Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
+        Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
 
-        return page.map(invoice -> toResponseDTO(invoice, allocations.get(invoice.getId()), false));
+        return page.map(invoice -> toResponseDTO(invoice,
+                allocations.get(invoice.getId()),
+                documents.getOrDefault(invoice.getId(), List.of()),
+                false));
     }
 
     @Transactional(readOnly = true)
@@ -446,6 +627,14 @@ public class ConstructionInvoiceService {
         invoice.setInvoiceDate(dto.invoiceDate());
         invoice.setTotalAmount(dto.totalAmount());
         invoice.setNotes(trimToNull(dto.notes()));
+        invoice.setDescription(trimToNull(dto.description()));
+        invoice.setPossibleEnterprises(trimToNull(dto.possibleEnterprises()));
+        invoice.setAskWhom(trimToNull(dto.askWhom()));
+        // Null não é "limpar": o estado do papel também é mexido por quem junta
+        // ou larga um documento, e um PUT que o omita não pode desfazer isso.
+        if (!isBlank(dto.documentStatus())) {
+            invoice.setDocumentStatus(parseDocumentStatus(dto.documentStatus()));
+        }
 
         // Agora — e não antes — é que os campos são os corrigidos. Este é o
         // único momento em que uma fatura sem QR legível ganha identidade: até
@@ -462,7 +651,9 @@ public class ConstructionInvoiceService {
                         || !Objects.equals(previousNif, invoice.getSupplierNif())
                         || !Objects.equals(previousNumber, invoice.getInvoiceNumber());
         if (identityChanged) {
-            rejectIfDuplicate(invoice);
+            // Editar campos não traz ficheiro novo: só as chaves de identidade
+            // (ATCUD e NIF+número) são reverificadas, o checksum não se aplica.
+            rejectIfDuplicate(invoice, null);
         }
 
         Optional<ConstructionExpense> allocation = findAllocation(invoice.getId());
@@ -501,7 +692,7 @@ public class ConstructionInvoiceService {
 
     public void delete(UUID id) {
         ConstructionInvoice invoice = getById(id);
-        deleteStoredFiles(invoice);
+        deleteDocuments(invoice);
         // A despesa vai atrás por FK cascade: um valor no orçamento sem
         // documento que o justifique não serviria a ninguém.
         repository.delete(invoice);
@@ -525,9 +716,15 @@ public class ConstructionInvoiceService {
             throw new BusinessException(ErrorCode.INVOICE_INCOMPLETE);
         }
 
+        // Uma rubrica pertence sempre a uma obra: uma fatura da quarentena ou da
+        // empresa não tem onde ser lançada enquanto não for identificada.
+        if (invoice.getScope() != ConstructionInvoice.Scope.PROJECT) {
+            throw new BusinessException(ErrorCode.INVOICE_SCOPE_NOT_ALLOCATABLE);
+        }
+
         ConstructionBudgetItem item = budgetItemRepository.findById(budgetItemId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
-        if (!item.getEnterprise().getId().equals(invoice.getEnterprise().getId())) {
+        if (!item.getEnterprise().getId().equals(invoice.getEnterpriseId())) {
             throw new BusinessException(ErrorCode.INVOICE_ITEM_OTHER_ENTERPRISE);
         }
         if (!item.getRowKind().acceptsExpenses()) {
@@ -563,7 +760,7 @@ public class ConstructionInvoiceService {
         expense.setName(firstNonBlank(
                 invoice.getSupplierName(),
                 invoice.getInvoiceNumber(),
-                invoice.getOriginalFilename(),
+                primaryDocument(invoice.getId()).map(ConstructionInvoiceDocument::getOriginalFilename).orElse(null),
                 "Fatura"));
         expense.setExpenseDate(invoice.getInvoiceDate());
         expense.setTotalPrice(invoice.getTotalAmount());
@@ -573,17 +770,30 @@ public class ConstructionInvoiceService {
 
     @Transactional(readOnly = true)
     public ConstructionInvoiceResponseDTO toResponseDTO(ConstructionInvoice invoice, boolean includeFileUrl) {
-        return toResponseDTO(invoice, findAllocation(invoice.getId()).orElse(null), includeFileUrl);
+        return toResponseDTO(invoice,
+                findAllocation(invoice.getId()).orElse(null),
+                documentRepository.findByInvoiceIdOrderByUploadedAtAsc(invoice.getId()),
+                includeFileUrl);
     }
 
     private ConstructionInvoiceResponseDTO toResponseDTO(ConstructionInvoice invoice,
                                                          ConstructionExpense allocation,
+                                                         List<ConstructionInvoiceDocument> documents,
                                                          boolean includeFileUrl) {
         ConstructionBudgetItem item = allocation == null ? null : allocation.getBudgetItem();
+        // Os campos soltos de ficheiro descrevem o documento principal e são o
+        // que a UI ainda lê hoje; a lista completa vem em `documents`. Uma fatura
+        // sem documento nenhum é legal desde a V24 e traz tudo isto a null.
+        ConstructionInvoiceDocument primary = documents.isEmpty() ? null : documents.get(0);
 
         return new ConstructionInvoiceResponseDTO(
                 invoice.getId(),
-                invoice.getEnterprise().getId(),
+                invoice.getEnterpriseId(),
+                invoice.getScope().name(),
+                invoice.getDocumentType().name(),
+                invoice.getRelatedInvoiceId(),
+                invoice.getDocumentStatus().name(),
+                invoice.getDescription(),
 
                 invoice.getSupplierName(),
                 invoice.getSupplierNif(),
@@ -594,6 +804,8 @@ public class ConstructionInvoiceService {
                 invoice.getTaxableAmount(),
                 invoice.getTaxAmount(),
                 invoice.getNotes(),
+                invoice.getPossibleEnterprises(),
+                invoice.getAskWhom(),
                 invoice.needsReview(),
 
                 allocation != null,
@@ -602,15 +814,17 @@ public class ConstructionInvoiceService {
                 item == null ? null : item.getCode(),
                 item == null ? null : item.getName(),
 
-                includeFileUrl ? signedUrls.resolve(invoice.getBucket(), invoice.getStorageKey()) : null,
-                signedUrls.resolve(invoice.getBucket(), invoice.getThumbnailKey()),
-                invoice.getOriginalFilename(),
-                invoice.getMimeType(),
-                invoice.getSizeBytes(),
-                invoice.getOriginalSizeBytes(),
-                invoice.getUploadedBy(),
-                resolveProfileName(invoice.getUploadedBy()),
-                invoice.getUploadedAt(),
+                includeFileUrl && primary != null
+                        ? signedUrls.resolve(primary.getBucket(), primary.getStorageKey()) : null,
+                primary == null ? null : signedUrls.resolve(primary.getBucket(), primary.getThumbnailKey()),
+                primary == null ? null : primary.getOriginalFilename(),
+                primary == null ? null : primary.getMimeType(),
+                primary == null ? null : primary.getSizeBytes(),
+                primary == null ? null : primary.getOriginalSizeBytes(),
+                primary == null ? null : primary.getUploadedBy(),
+                primary == null ? null : resolveProfileName(primary.getUploadedBy()),
+                primary == null ? null : primary.getUploadedAt(),
+                documents.stream().map(document -> toDocumentDTO(document, includeFileUrl)).toList(),
 
                 invoice.isSentToAccountant(),
                 invoice.getSentToAccountantBy(),
@@ -624,10 +838,35 @@ public class ConstructionInvoiceService {
                 invoice.getUpdatedAt());
     }
 
+    private InvoiceDocumentDTO toDocumentDTO(ConstructionInvoiceDocument document, boolean includeFileUrl) {
+        return new InvoiceDocumentDTO(
+                document.getId(),
+                includeFileUrl ? signedUrls.resolve(document.getBucket(), document.getStorageKey()) : null,
+                signedUrls.resolve(document.getBucket(), document.getThumbnailKey()),
+                document.getOriginalFilename(),
+                document.getMimeType(),
+                document.getSizeBytes(),
+                document.getOriginalSizeBytes(),
+                document.getKind().name(),
+                document.getPageNumber(),
+                document.getUploadedBy(),
+                resolveProfileName(document.getUploadedBy()),
+                document.getUploadedAt());
+    }
+
     // ── auxiliares ────────────────────────────────────────────
 
     private Optional<ConstructionExpense> findAllocation(UUID invoiceId) {
         return expenseRepository.findByInvoiceId(invoiceId);
+    }
+
+    /** Os documentos de uma página inteira de faturas numa query, em vez de uma por linha. */
+    private Map<UUID, List<ConstructionInvoiceDocument>> loadDocuments(List<UUID> invoiceIds) {
+        if (invoiceIds.isEmpty()) {
+            return Map.of();
+        }
+        return documentRepository.findByInvoiceIdInOrderByUploadedAtAsc(invoiceIds).stream()
+                .collect(Collectors.groupingBy(document -> document.getInvoice().getId()));
     }
 
     private Map<UUID, ConstructionExpense> loadAllocations(List<UUID> invoiceIds) {
@@ -666,60 +905,77 @@ public class ConstructionInvoiceService {
      * Sem nenhuma das três não há como comparar, e a fatura segue para revisão
      * manual como sempre.
      */
-    private void rejectIfDuplicate(ConstructionInvoice invoice) {
-        UUID enterpriseId = invoice.getEnterprise().getId();
+    private void rejectIfDuplicate(ConstructionInvoice invoice, String checksum) {
         // No carregamento a fatura ainda não tem id; a query trata o null.
         UUID excludeId = invoice.getId();
 
-        if (!isBlank(invoice.getChecksumSha256())) {
-            repository.findByEnterpriseAndChecksum(enterpriseId, invoice.getChecksumSha256(), excludeId).stream()
+        // O checksum é a única das três chaves que já é global (V24): o mesmo
+        // ficheiro não entra duas vezes em obra nenhuma. Por isso a mensagem tem
+        // de dizer onde está o primeiro, que pode nem ser deste projeto.
+        if (!isBlank(checksum)) {
+            documentRepository.findByChecksum(checksum, excludeId).stream()
                     .findFirst()
-                    .ifPresent(other -> {
+                    .ifPresent(document -> {
+                        ConstructionInvoice other = document.getInvoice();
                         throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_FILE, String.format(
-                                "Este ficheiro já foi carregado neste projeto (%s, %s)",
-                                describe(other), dateOf(other)));
+                                "Este ficheiro já foi carregado em %s (%s, %s)",
+                                whereItIs(other), describe(other), dateOf(other)));
                     });
         }
 
         if (!isBlank(invoice.getInvoiceAtcud())) {
-            repository.findByEnterpriseAndAtcud(enterpriseId, invoice.getInvoiceAtcud(), excludeId).stream()
+            repository.findByAtcud(invoice.getInvoiceAtcud(), excludeId).stream()
                     .findFirst()
                     .ifPresent(other -> {
                         throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_ATCUD, String.format(
-                                "Já existe uma fatura com este ATCUD neste projeto (%s, %s)",
-                                describe(other), dateOf(other)));
+                                "Já existe uma fatura com este ATCUD em %s (%s, %s)",
+                                whereItIs(other), describe(other), dateOf(other)));
                     });
         }
 
         if (!isBlank(invoice.getSupplierNif()) && !isBlank(invoice.getInvoiceNumber())) {
             String normalizedNumber = normalizeDocumentNumber(invoice.getInvoiceNumber());
-            repository.findByEnterpriseAndSupplierNif(enterpriseId, invoice.getSupplierNif(), excludeId)
+            repository.findBySupplierNif(invoice.getSupplierNif(), excludeId)
                     .stream()
                     .filter(other -> normalizedNumber.equals(normalizeDocumentNumber(other.getInvoiceNumber())))
                     .findFirst()
                     .ifPresent(other -> {
                         throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_DOCUMENT, String.format(
-                                "Já existe uma fatura deste fornecedor com o número %s neste projeto (%s, %s)",
-                                invoice.getInvoiceNumber(), describe(other), dateOf(other)));
+                                "Já existe uma fatura deste fornecedor com o número %s em %s (%s, %s)",
+                                invoice.getInvoiceNumber(), whereItIs(other), describe(other), dateOf(other)));
                     });
         }
     }
 
+    /**
+     * Onde está a fatura com que se colidiu. Só o nome do projeto por agora — a
+     * quarentena e as despesas da empresa entram aqui quando o {@code scope}
+     * existir (V26).
+     */
+    private static String whereItIs(ConstructionInvoice invoice) {
+        Enterprise enterprise = invoice.getEnterprise();
+        if (enterprise != null) {
+            return enterprise.getName();
+        }
+        return invoice.getScope() == ConstructionInvoice.Scope.COMPANY
+                ? "despesas da empresa"
+                : "faturas por identificar";
+    }
+
     /** Algo que identifique a outra fatura na mensagem, mesmo sem QR lido. */
     private static String describe(ConstructionInvoice invoice) {
-        return firstNonBlank(invoice.getSupplierName(), invoice.getInvoiceNumber(),
-                invoice.getOriginalFilename(), "sem fornecedor");
+        return firstNonBlank(invoice.getSupplierName(), invoice.getInvoiceNumber(), "sem fornecedor");
     }
 
     private static String dateOf(ConstructionInvoice invoice) {
         return invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toString() : "sem data";
     }
 
-    private List<DuplicateInvoiceRefDTO> findDuplicates(UUID enterpriseId, String atcud, UUID excludeId) {
+    private List<DuplicateInvoiceRefDTO> findDuplicates(String atcud, UUID excludeId) {
         if (isBlank(atcud)) {
             return List.of();
         }
-        List<ConstructionInvoice> found = repository.findByEnterpriseAndAtcud(enterpriseId, atcud, excludeId);
+        List<ConstructionInvoice> found = repository.findByAtcud(atcud, excludeId);
         Map<UUID, ConstructionExpense> allocations = loadAllocations(
                 found.stream().map(ConstructionInvoice::getId).toList());
 
@@ -745,7 +1001,24 @@ public class ConstructionInvoiceService {
      * mantém as faturas do mesmo projeto juntas no bucket, que é como se olha
      * para elas quando é preciso ir lá ver à mão.
      */
-    private void storeDocument(ConstructionInvoice invoice, UUID enterpriseId,
+    private ConstructionInvoiceDocument addDocument(ConstructionInvoice invoice, UUID enterpriseId,
+                                                    StoredContent stored, String checksum,
+                                                    Long originalSizeBytes) {
+        ConstructionInvoiceDocument document = new ConstructionInvoiceDocument();
+        document.setInvoice(invoice);
+        document.setChecksumSha256(checksum);
+        document.setOriginalSizeBytes(originalSizeBytes);
+
+        storeDocument(document, enterpriseId, stored.filename(), stored.content(), stored.mimeType());
+        storeThumbnail(document, enterpriseId, stored.content(), stored.mimeType());
+
+        // Ter papel é o que faz o estado ARCHIVED. "Pedir" e "imprimir" deixam
+        // de fazer sentido a partir do momento em que o documento chega.
+        invoice.setDocumentStatus(ConstructionInvoice.DocumentStatus.ARCHIVED);
+        return documentRepository.save(document);
+    }
+
+    private void storeDocument(ConstructionInvoiceDocument document, UUID enterpriseId,
                                String originalFilename, byte[] content, String mime) {
         String safeName = storageService.sanitizeFileName(originalFilename);
         String key = String.format("construction-invoices/%s/%s_%s",
@@ -757,26 +1030,26 @@ public class ConstructionInvoiceService {
             throw StorageException.uploadError(originalFilename, e);
         }
 
-        invoice.setBucket(BUCKET);
-        invoice.setStorageKey(key);
-        invoice.setOriginalFilename(originalFilename);
-        invoice.setMimeType(mime);
+        document.setBucket(BUCKET);
+        document.setStorageKey(key);
+        document.setOriginalFilename(originalFilename);
+        document.setMimeType(mime);
         // O tamanho é o do que realmente foi para o Storage — `content` pode já
         // vir comprimido por InvoiceCompressionService, diferente do upload recebido.
-        invoice.setSizeBytes((long) content.length);
-        invoice.setUploadedAt(OffsetDateTime.now());
-        authContext.currentProfileId().ifPresent(invoice::setUploadedBy);
+        document.setSizeBytes((long) content.length);
+        document.setUploadedAt(OffsetDateTime.now());
+        authContext.currentProfileId().ifPresent(document::setUploadedBy);
     }
 
     /**
      * A miniatura é um extra. Falhar aqui não pode custar a fatura, que já está
      * carregada e é o que interessa — a lista cai num ícone de ficheiro.
      */
-    private void storeThumbnail(ConstructionInvoice invoice, UUID enterpriseId, byte[] content, String mime) {
+    private void storeThumbnail(ConstructionInvoiceDocument document, UUID enterpriseId, byte[] content, String mime) {
         Optional<byte[]> thumbnail = thumbnailService.render(content, mime);
         if (thumbnail.isEmpty()) {
-            invoice.setThumbnailKey(null);
-            invoice.setThumbnailMime(null);
+            document.setThumbnailKey(null);
+            document.setThumbnailMime(null);
             return;
         }
 
@@ -784,20 +1057,38 @@ public class ConstructionInvoiceService {
                 enterpriseId, UUID.randomUUID().toString().substring(0, 8));
         try (InputStream in = new ByteArrayInputStream(thumbnail.get())) {
             storageService.upload(BUCKET, key, InvoiceThumbnailService.THUMBNAIL_MIME, in);
-            invoice.setThumbnailKey(key);
-            invoice.setThumbnailMime(InvoiceThumbnailService.THUMBNAIL_MIME);
+            document.setThumbnailKey(key);
+            document.setThumbnailMime(InvoiceThumbnailService.THUMBNAIL_MIME);
         } catch (IOException e) {
             log.warn("Não foi possível guardar a miniatura da fatura: {}", e.getMessage());
-            invoice.setThumbnailKey(null);
-            invoice.setThumbnailMime(null);
+            document.setThumbnailKey(null);
+            document.setThumbnailMime(null);
         }
     }
 
-    private void deleteStoredFiles(ConstructionInvoice invoice) {
-        deleteQuietly(invoice.getBucket(), invoice.getStorageKey());
-        deleteQuietly(invoice.getBucket(), invoice.getThumbnailKey());
-        invoice.setThumbnailKey(null);
-        invoice.setThumbnailMime(null);
+    /**
+     * Larga todos os documentos da fatura — os ficheiros no Storage e as linhas.
+     * A fatura em si fica: sem documento é um estado legal desde a V24.
+     */
+    private void deleteDocuments(ConstructionInvoice invoice) {
+        List<ConstructionInvoiceDocument> documents =
+                documentRepository.findByInvoiceIdOrderByUploadedAtAsc(invoice.getId());
+        documents.forEach(document -> {
+            deleteQuietly(document.getBucket(), document.getStorageKey());
+            deleteQuietly(document.getBucket(), document.getThumbnailKey());
+        });
+        documentRepository.deleteAll(documents);
+        invoice.setDocumentStatus(ConstructionInvoice.DocumentStatus.MISSING);
+    }
+
+    /** O estado do papel vem do cliente como texto; um valor que não exista é erro de pedido. */
+    private static ConstructionInvoice.DocumentStatus parseDocumentStatus(String value) {
+        try {
+            return ConstructionInvoice.DocumentStatus.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "Estado de documento desconhecido: " + value);
+        }
     }
 
     private void deleteQuietly(String bucket, String key) {

@@ -7,6 +7,8 @@ import com.management.managementapi.enterprises.dto.expense.response.ExpenseInvo
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
+import com.management.managementapi.enterprises.model.ConstructionInvoiceDocument;
+import com.management.managementapi.enterprises.repository.ConstructionInvoiceDocumentRepository;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.exeption.BusinessException;
@@ -44,6 +46,7 @@ import java.util.stream.Collectors;
 public class ConstructionExpenseService {
 
     private final ConstructionExpenseRepository repository;
+    private final ConstructionInvoiceDocumentRepository invoiceDocumentRepository;
     private final ConstructionBudgetItemRepository budgetItemRepository;
     private final ProfileRepository profileRepository;
     private final SignedUrlService signedUrls;
@@ -99,6 +102,12 @@ public class ConstructionExpenseService {
         if (invoice == null) {
             return null;
         }
+        // Desde a V24 o ficheiro vive em construction_invoice_document. Aqui só
+        // interessa a miniatura, e para isso basta o documento mais antigo — a
+        // fatura pode ter vários, ou nenhum.
+        ConstructionInvoiceDocument document = invoiceDocumentRepository
+                .findFirstByInvoiceIdOrderByUploadedAtAsc(invoice.getId())
+                .orElse(null);
         return new ExpenseInvoiceRefDTO(
                 invoice.getId(),
                 invoice.getSupplierName(),
@@ -106,10 +115,10 @@ public class ConstructionExpenseService {
                 invoice.getInvoiceNumber(),
                 invoice.getInvoiceAtcud(),
                 invoice.getInvoiceDate(),
-                signedUrls.resolve(invoice.getBucket(), invoice.getThumbnailKey()),
-                invoice.getOriginalFilename(),
-                invoice.getMimeType(),
-                invoice.getSizeBytes(),
+                document == null ? null : signedUrls.resolve(document.getBucket(), document.getThumbnailKey()),
+                document == null ? null : document.getOriginalFilename(),
+                document == null ? null : document.getMimeType(),
+                document == null ? null : document.getSizeBytes(),
                 invoice.isSentToAccountant(),
                 resolveProfileName(invoice.getSentToAccountantBy()),
                 resolveProfileRole(invoice.getSentToAccountantBy()),

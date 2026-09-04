@@ -44,6 +44,8 @@ public class EnterpriseDTO {
         private UUID updatedby;
     private Boolean isActive;
     private EnterprisesLocation location;
-    private String banner; // ← ADICIONAR ESTE CAMPO
+    private String banner;
+    private String slug;
+    private Boolean isTest;
 
 }

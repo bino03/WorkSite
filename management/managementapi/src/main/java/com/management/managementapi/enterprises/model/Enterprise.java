@@ -106,4 +106,13 @@ public class Enterprise {
 
     @Column(name = "banner") // ou o nome da coluna na BD
     private String banner;
+
+    /** Nome exato da pasta da obra no vault Excel da Vilatro — chave da paridade nos dois sentidos. */
+    @Column(name = "slug")
+    private String slug;
+
+    /** Obra só de teste: nunca entra numa exportação, importação ou soma da empresa. */
+    @Column(name = "is_test", nullable = false)
+    @Builder.Default
+    private Boolean isTest = false;
 }

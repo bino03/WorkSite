@@ -82,15 +82,16 @@ class ConstructionInvoiceUpdateTest {
         when(expenseRepository.findByInvoiceId(id)).thenReturn(Optional.empty());
         // Preencher o número e o ATCUD muda a identidade do documento, logo o
         // update procura colisões. Aqui não há nenhuma.
-        when(repository.findByEnterpriseAndAtcud(any(), any(), any())).thenReturn(List.of());
-        when(repository.findByEnterpriseAndSupplierNif(any(), any(), any()))
+        when(repository.findByAtcud(any(), any())).thenReturn(List.of());
+        when(repository.findBySupplierNif(any(), any()))
                 .thenReturn(List.of());
         when(repository.save(any(ConstructionInvoice.class))).thenAnswer(call -> call.getArgument(0));
 
         // só se preenche o nome do fornecedor, que o QR não traz
         ConstructionInvoice saved = service.update(id, new ConstructionInvoiceUpsertDTO(
                 "Betão Liz", "509442013", "FT 2026/114", "CSDF7T5H-0114",
-                LocalDate.of(2026, 1, 15), new BigDecimal("14760.00"), null));
+                LocalDate.of(2026, 1, 15), new BigDecimal("14760.00"), null,
+                null, null, null, null));
 
         assertThat(saved.getSupplierName()).isEqualTo("Betão Liz");
         assertThat(saved.getTaxableAmount()).isEqualByComparingTo("12000.00");
@@ -117,11 +118,12 @@ class ConstructionInvoiceUpdateTest {
         existing.setInvoiceNumber("ft2026-114");
 
         when(repository.findById(id)).thenReturn(Optional.of(invoice));
-        when(repository.findByEnterpriseAndSupplierNif(any(), any(), any()))
+        when(repository.findBySupplierNif(any(), any()))
                 .thenReturn(List.of(existing));
 
         assertThatThrownBy(() -> service.update(id, new ConstructionInvoiceUpsertDTO(
-                null, "509442013", "FT 2026/114", null, null, null, null)))
+                null, "509442013", "FT 2026/114", null, null, null, null,
+                null, null, null, null)))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                         .isEqualTo(ErrorCode.INVOICE_DUPLICATE_DOCUMENT));

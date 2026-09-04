@@ -45,6 +45,8 @@ public class EnterpriseFullResponseDTO {
     private String createdbyName;
     private Boolean isActive;
     private String banner;
+    private String slug;
+    private Boolean isTest;
 
     private LocationResponseDTO location;
     private List<MediaResponseDTO> media;

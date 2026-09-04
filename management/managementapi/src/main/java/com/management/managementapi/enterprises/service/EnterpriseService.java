@@ -212,6 +212,18 @@ public class EnterpriseService {
         return enterpriseDTO;
     }
 
+    /**
+     * O slug é o nome da pasta da obra no vault Excel: mantém espaços e acentos,
+     * mas nunca espaços à volta, e um valor em branco conta como ausente.
+     */
+    private static String normalizeSlug(String slug) {
+        if (slug == null) {
+            return null;
+        }
+        String trimmed = slug.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     // CRIAR UM NOVO PROJETO
     @Transactional
     public EnterpriseDTO create(CreateEnterpriseDTO createEnterpriseDTO) {
@@ -220,6 +232,13 @@ public class EnterpriseService {
         if (createEnterpriseDTO.getInternalReference() != null &&
                 enterpriseRepository.existsByInternalReference(createEnterpriseDTO.getInternalReference())) {
             throw new BusinessException(ErrorCode.CONFLICT, "Enterprise with internal reference already exists: " + createEnterpriseDTO.getInternalReference());
+        }
+
+        createEnterpriseDTO.setSlug(normalizeSlug(createEnterpriseDTO.getSlug()));
+        if (createEnterpriseDTO.getSlug() != null
+                && enterpriseRepository.existsBySlug(createEnterpriseDTO.getSlug())) {
+            throw new BusinessException(ErrorCode.ENTERPRISE_DUPLICATE_SLUG,
+                    "Enterprise slug already in use: " + createEnterpriseDTO.getSlug());
         }
 
         Enterprise enterprise = enterpriseMapper.toEntity(createEnterpriseDTO);
@@ -373,6 +392,13 @@ public class EnterpriseService {
 
         Enterprise existingEnterprise = enterpriseRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.enterprise(id.toString()));
+
+        enterpriseDTO.setSlug(normalizeSlug(enterpriseDTO.getSlug()));
+        if (enterpriseDTO.getSlug() != null
+                && enterpriseRepository.existsBySlugAndIdNot(enterpriseDTO.getSlug(), id)) {
+            throw new BusinessException(ErrorCode.ENTERPRISE_DUPLICATE_SLUG,
+                    "Enterprise slug already in use: " + enterpriseDTO.getSlug());
+        }
 
         enterpriseMapper.updateEntityFromDTO(enterpriseDTO, existingEnterprise);
         Enterprise updatedEnterprise = enterpriseRepository.save(

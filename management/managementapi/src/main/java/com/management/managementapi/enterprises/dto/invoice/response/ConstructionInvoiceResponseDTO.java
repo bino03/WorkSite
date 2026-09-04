@@ -3,6 +3,7 @@ package com.management.managementapi.enterprises.dto.invoice.response;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -23,7 +24,18 @@ import java.util.UUID;
  */
 public record ConstructionInvoiceResponseDTO(
         UUID id,
+        /** Nulo quando a fatura está na quarentena ou é uma despesa da empresa. */
         UUID enterpriseId,
+        /** `PROJECT`, `COMPANY` ou `UNIDENTIFIED` — o cliente traduz o rótulo. */
+        String scope,
+        /** `INVOICE` ou `CREDIT_NOTE`. */
+        String documentType,
+        /** A fatura que esta nota de crédito credita; null numa fatura. */
+        UUID relatedInvoiceId,
+        /** `ARCHIVED`, `MISSING`, `TO_PRINT` ou `TO_REQUEST`. */
+        String documentStatus,
+        /** O que foi comprado — o "Produto/Serviço" do Excel. */
+        String description,
 
         // ── identificação (QR da AT, corrigível à mão) ──
         String supplierName,
@@ -35,6 +47,10 @@ public record ConstructionInvoiceResponseDTO(
         BigDecimal taxableAmount,
         BigDecimal taxAmount,
         String notes,
+
+        // ── quarentena (só em UNIDENTIFIED) ──
+        String possibleEnterprises,
+        String askWhom,
 
         /** Falta a data ou o total — não dá para associar enquanto assim estiver. */
         boolean needsReview,
@@ -57,6 +73,13 @@ public record ConstructionInvoiceResponseDTO(
         UUID uploadedBy,
         String uploadedByName,
         OffsetDateTime uploadedAt,
+
+        /**
+         * Todos os ficheiros desta fatura, do mais antigo para o mais recente.
+         * Vazia quando a fatura ainda não tem documento — estado legal desde a
+         * V24. Os campos soltos acima descrevem o primeiro da lista.
+         */
+        List<InvoiceDocumentDTO> documents,
 
         // ── contabilidade ──
         boolean sentToAccountant,

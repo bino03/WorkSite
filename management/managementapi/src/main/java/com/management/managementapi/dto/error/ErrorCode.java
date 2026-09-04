@@ -200,6 +200,7 @@ public enum ErrorCode {
     ENTERPRISE_HAS_USERS("ENT_022", "Empresa tem utilizadores associados"),
     ENTERPRISE_DUPLICATE_NIF("ENT_030", "NIF da empresa já está registado"),
     ENTERPRISE_INACTIVE("ENT_031", "Empresa está inativa"),
+    ENTERPRISE_DUPLICATE_SLUG("ENT_032", "Já existe um projeto com esta pasta do vault"),
 
     // ========================================================================
     // ORÇAMENTO DE CONSTRUÇÃO (BUDGET_xxx)
@@ -253,7 +254,12 @@ public enum ErrorCode {
     INVOICE_FILE_UNAVAILABLE("INVOICE_009", "Não foi possível obter o ficheiro original da fatura"),
     INVOICE_DUPLICATE_ATCUD("INVOICE_010", "Já existe uma fatura com este ATCUD neste projeto"),
     INVOICE_DUPLICATE_DOCUMENT("INVOICE_011", "Já existe uma fatura deste fornecedor com este número neste projeto"),
-    INVOICE_DUPLICATE_FILE("INVOICE_012", "Este ficheiro já foi carregado neste projeto — é byte a byte igual a uma fatura existente"),
+    INVOICE_DUPLICATE_FILE("INVOICE_012", "Este ficheiro já foi carregado — é byte a byte igual a uma fatura existente"),
+    INVOICE_SCOPE_NOT_ALLOCATABLE("INVOICE_013", "Só uma fatura de obra pode ser associada a uma rubrica — identifique primeiro a obra"),
+    INVOICE_SCOPE_REQUIRES_ENTERPRISE("INVOICE_014", "Uma fatura de obra tem de indicar a obra"),
+    INVOICE_SCOPE_FORBIDS_ENTERPRISE("INVOICE_015", "Uma fatura da empresa ou por identificar não pode ter obra"),
+    INVOICE_SCOPE_UNKNOWN("INVOICE_016", "Âmbito de fatura desconhecido"),
+    INVOICE_STATUS_REQUIRES_NO_DOCUMENT("INVOICE_017", "Uma fatura registada sem ficheiro não pode ficar como arquivada"),
 
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)

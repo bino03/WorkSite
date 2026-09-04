@@ -42,6 +42,7 @@ public interface EnterpriseMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "banner", ignore = true)
     @Mapping(target = "isActive", constant = "true")
+    @Mapping(target = "isTest", defaultValue = "false")
     @Mapping(target = "status", qualifiedByName = "mapStatus")
     Enterprise toEntity(CreateEnterpriseDTO createEnterpriseDTO);
 

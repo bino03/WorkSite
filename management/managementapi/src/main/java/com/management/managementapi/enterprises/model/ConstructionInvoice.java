@@ -8,8 +8,13 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.management.managementapi.model.BaseEntity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -34,9 +39,69 @@ import jakarta.persistence.Table;
 @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 public class ConstructionInvoice extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    /**
+     * Onde é que esta fatura está. Antes da V26 só existia o primeiro caso — e a
+     * obra era obrigatória, o que deixava de fora as despesas da empresa e a
+     * quarentena do vault da Vilatro.
+     */
+    public enum Scope {
+        /** De uma obra. Exige {@code enterprise}. */
+        PROJECT,
+        /** Da empresa, sem obra. */
+        COMPANY,
+        /** Quarentena: ainda não se sabe de quem é. */
+        UNIDENTIFIED
+    }
+
+    /** Nula em {@code COMPANY} e {@code UNIDENTIFIED} — garantido por check na base de dados. */
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "enterprise_id")
     private Enterprise enterprise;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "scope", nullable = false, columnDefinition = "worksite.invoice_scope")
+    private Scope scope = Scope.PROJECT;
+
+    /** Só em {@code UNIDENTIFIED}: a coluna "Obras possíveis" da quarentena. Texto livre. */
+    @Column(name = "possible_enterprises")
+    private String possibleEnterprises;
+
+    /** Só em {@code UNIDENTIFIED}: a coluna "Perguntar a" da quarentena. Texto livre. */
+    @Column(name = "ask_whom")
+    private String askWhom;
+
+    /** Fatura ou nota de crédito. A lógica da nota de crédito é da fase 3; aqui é só o campo. */
+    public enum DocumentType {
+        INVOICE, CREDIT_NOTE
+    }
+
+    /**
+     * O estado do papel. {@code ARCHIVED} deriva de haver documento, mas
+     * {@code TO_PRINT} e {@code TO_REQUEST} são intenção — o que falta fazer,
+     * não o que existe — e por isso ficam guardados.
+     */
+    public enum DocumentStatus {
+        ARCHIVED, MISSING, TO_PRINT, TO_REQUEST
+    }
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "document_type", nullable = false, columnDefinition = "worksite.invoice_document_type")
+    private DocumentType documentType = DocumentType.INVOICE;
+
+    /** Obrigatório em {@code CREDIT_NOTE}, proibido em {@code INVOICE} — check na base de dados. */
+    @Column(name = "related_invoice_id")
+    private UUID relatedInvoiceId;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "document_status", nullable = false, columnDefinition = "worksite.invoice_document_status")
+    private DocumentStatus documentStatus = DocumentStatus.MISSING;
+
+    /** O "Produto/Serviço" do Excel. Existe sem ser preciso haver despesa. */
+    @Column(name = "description")
+    private String description;
 
     // ── dados do QR code da AT ──
 
@@ -52,14 +117,6 @@ public class ConstructionInvoice extends BaseEntity {
     @Column(name = "invoice_atcud")
     private String invoiceAtcud;
 
-    /**
-     * SHA-256 do ficheiro em hexadecimal, calculado no carregamento. Apanha o
-     * duplicado byte-a-byte mesmo quando não há QR legível — ao contrário do
-     * ATCUD e do par (NIF, número), não depende de nada ter sido lido.
-     */
-    @Column(name = "checksum_sha256", length = 64)
-    private String checksumSha256;
-
     /** Data da fatura. Null quando o QR não foi lido — ver {@link #needsReview()}. */
     @Column(name = "invoice_date")
     private LocalDate invoiceDate;
@@ -74,42 +131,6 @@ public class ConstructionInvoice extends BaseEntity {
     private BigDecimal taxAmount;
 
     private String notes;
-
-    // ── documento (bucket + chave; a URL assinada é gerada na leitura) ──
-
-    @Column(nullable = false)
-    private String bucket;
-
-    @Column(name = "storage_key", nullable = false)
-    private String storageKey;
-
-    @Column(name = "original_filename")
-    private String originalFilename;
-
-    @Column(name = "mime_type")
-    private String mimeType;
-
-    /** O que ficou no Storage — já depois da compressão feita no browser. */
-    @Column(name = "size_bytes")
-    private Long sizeBytes;
-
-    /** Tamanho antes da compressão, reportado pelo cliente. Só para mostrar a poupança. */
-    @Column(name = "original_size_bytes")
-    private Long originalSizeBytes;
-
-    // ── miniatura para as listas ──
-
-    @Column(name = "thumbnail_key")
-    private String thumbnailKey;
-
-    @Column(name = "thumbnail_mime")
-    private String thumbnailMime;
-
-    @Column(name = "uploaded_by")
-    private UUID uploadedBy;
-
-    @Column(name = "uploaded_at", nullable = false)
-    private OffsetDateTime uploadedAt = OffsetDateTime.now();
 
     // ── envio para a contabilidade ──
 
@@ -136,6 +157,32 @@ public class ConstructionInvoice extends BaseEntity {
     public Enterprise getEnterprise() { return enterprise; }
     public void setEnterprise(Enterprise enterprise) { this.enterprise = enterprise; }
 
+    public Scope getScope() { return scope; }
+    public void setScope(Scope scope) { this.scope = scope; }
+
+    public String getPossibleEnterprises() { return possibleEnterprises; }
+    public void setPossibleEnterprises(String possibleEnterprises) { this.possibleEnterprises = possibleEnterprises; }
+
+    public String getAskWhom() { return askWhom; }
+    public void setAskWhom(String askWhom) { this.askWhom = askWhom; }
+
+    public DocumentType getDocumentType() { return documentType; }
+    public void setDocumentType(DocumentType documentType) { this.documentType = documentType; }
+
+    public UUID getRelatedInvoiceId() { return relatedInvoiceId; }
+    public void setRelatedInvoiceId(UUID relatedInvoiceId) { this.relatedInvoiceId = relatedInvoiceId; }
+
+    public DocumentStatus getDocumentStatus() { return documentStatus; }
+    public void setDocumentStatus(DocumentStatus documentStatus) { this.documentStatus = documentStatus; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    /** O id da obra, ou null quando a fatura está na quarentena ou é da empresa. */
+    public UUID getEnterpriseId() {
+        return enterprise == null ? null : enterprise.getId();
+    }
+
     public String getSupplierName() { return supplierName; }
     public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
 
@@ -147,9 +194,6 @@ public class ConstructionInvoice extends BaseEntity {
 
     public String getInvoiceAtcud() { return invoiceAtcud; }
     public void setInvoiceAtcud(String invoiceAtcud) { this.invoiceAtcud = invoiceAtcud; }
-
-    public String getChecksumSha256() { return checksumSha256; }
-    public void setChecksumSha256(String checksumSha256) { this.checksumSha256 = checksumSha256; }
 
     public LocalDate getInvoiceDate() { return invoiceDate; }
     public void setInvoiceDate(LocalDate invoiceDate) { this.invoiceDate = invoiceDate; }
@@ -165,36 +209,6 @@ public class ConstructionInvoice extends BaseEntity {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
-
-    public String getBucket() { return bucket; }
-    public void setBucket(String bucket) { this.bucket = bucket; }
-
-    public String getStorageKey() { return storageKey; }
-    public void setStorageKey(String storageKey) { this.storageKey = storageKey; }
-
-    public String getOriginalFilename() { return originalFilename; }
-    public void setOriginalFilename(String originalFilename) { this.originalFilename = originalFilename; }
-
-    public String getMimeType() { return mimeType; }
-    public void setMimeType(String mimeType) { this.mimeType = mimeType; }
-
-    public Long getSizeBytes() { return sizeBytes; }
-    public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
-
-    public Long getOriginalSizeBytes() { return originalSizeBytes; }
-    public void setOriginalSizeBytes(Long originalSizeBytes) { this.originalSizeBytes = originalSizeBytes; }
-
-    public String getThumbnailKey() { return thumbnailKey; }
-    public void setThumbnailKey(String thumbnailKey) { this.thumbnailKey = thumbnailKey; }
-
-    public String getThumbnailMime() { return thumbnailMime; }
-    public void setThumbnailMime(String thumbnailMime) { this.thumbnailMime = thumbnailMime; }
-
-    public UUID getUploadedBy() { return uploadedBy; }
-    public void setUploadedBy(UUID uploadedBy) { this.uploadedBy = uploadedBy; }
-
-    public OffsetDateTime getUploadedAt() { return uploadedAt; }
-    public void setUploadedAt(OffsetDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
 
     public boolean isSentToAccountant() { return sentToAccountant; }
     public void setSentToAccountant(boolean sentToAccountant) { this.sentToAccountant = sentToAccountant; }

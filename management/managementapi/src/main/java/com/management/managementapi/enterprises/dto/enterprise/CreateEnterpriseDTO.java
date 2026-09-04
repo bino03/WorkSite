@@ -39,6 +39,8 @@ public class CreateEnterpriseDTO {
     private UUID createdBy;
     private UUID updatedby;
     private Boolean isActive;
+    private String slug;
+    private Boolean isTest;
 
     // Opção B: Dados para criar nova localização
     private LocationUpsertDTO newLocation;
