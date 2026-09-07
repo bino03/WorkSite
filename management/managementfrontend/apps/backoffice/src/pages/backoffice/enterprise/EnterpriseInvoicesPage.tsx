@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Input } from "antd";
+import { Button, Input, Space } from "antd";
 import { ArrowLeftOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 
 import {
@@ -20,6 +20,7 @@ import { formatCurrency } from "@/utils/formatters";
 import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
+import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
@@ -69,6 +70,7 @@ const EnterpriseInvoicesPage: FC = () => {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
@@ -279,9 +281,14 @@ const EnterpriseInvoicesPage: FC = () => {
           <h1 style={{ margin: 0 }}>Faturas</h1>
         </div>
         {isAdmin() && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setUploadOpen(true)}>
-            Carregar faturas
-          </Button>
+          <Space>
+            <Button icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
+              Registar sem ficheiro
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setUploadOpen(true)}>
+              Carregar faturas
+            </Button>
+          </Space>
         )}
       </div>
 
@@ -364,6 +371,14 @@ const EnterpriseInvoicesPage: FC = () => {
             enterpriseId={enterpriseId}
             onClose={() => setUploadOpen(false)}
             onUploaded={reload}
+          />
+
+          <InvoiceRegisterDrawer
+            open={registerOpen}
+            scope="PROJECT"
+            enterpriseId={enterpriseId}
+            onClose={() => setRegisterOpen(false)}
+            onCreated={reload}
           />
 
           <InvoiceDetailDrawer

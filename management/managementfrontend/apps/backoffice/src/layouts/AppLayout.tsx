@@ -13,6 +13,8 @@ import { useAuthContext } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import {
+  BankOutlined,
+  QuestionCircleOutlined,
   BuildOutlined,
   CheckSquareOutlined,
   TeamOutlined,
@@ -179,6 +181,19 @@ export default function AppLayout() {
         {isAdmin() && (
           <NavLink to={`${getBasePath()}/funcionarios`} style={linkStyle}>
             <TeamOutlined />{t("nav.manageAccounts")}
+          </NavLink>
+        )}
+        {/* Quarentena e despesas da empresa: as duas listas de faturas que não
+            pertencem a obra nenhuma. O gate real é o @PreAuthorize do backend —
+            esconder aqui só evita que um EMPLOYEE bata num 403. */}
+        {isAdmin() && (
+          <NavLink to={`${getBasePath()}/invoices/unidentified`} style={linkStyle}>
+            <QuestionCircleOutlined />Por identificar
+          </NavLink>
+        )}
+        {isAdmin() && (
+          <NavLink to={`${getBasePath()}/invoices/company`} style={linkStyle}>
+            <BankOutlined />Despesas da empresa
           </NavLink>
         )}
 

@@ -11,7 +11,18 @@ import {
 } from "@/components/common/ListActions";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import type { ConstructionInvoice } from "@/types/invoice";
+import type { ConstructionInvoice, InvoiceDocumentStatus, InvoiceScope } from "@/types/invoice";
+
+/**
+ * O selo do estado do papel. `ARCHIVED` não está aqui de propósito: é o caso
+ * normal e um selo em todas as linhas não distingue nada — o que interessa ver
+ * de relance é o que ainda falta pedir ou imprimir.
+ */
+const DOCUMENT_STATUS: Partial<Record<InvoiceDocumentStatus, { label: string; cls: string }>> = {
+  MISSING: { label: "sem ficheiro", cls: "ind-tag-outline" },
+  TO_PRINT: { label: "por imprimir", cls: "ind-tag-accent" },
+  TO_REQUEST: { label: "por pedir", cls: "ind-tag-accent" },
+};
 
 interface Props {
   invoices: ConstructionInvoice[];
@@ -26,6 +37,12 @@ interface Props {
   onDeallocate: (invoice: ConstructionInvoice) => void;
   onSendToAccountant: (invoice: ConstructionInvoice) => void;
   onDelete: (invoice: ConstructionInvoice) => void;
+  /**
+   * Onde esta lista está a ser mostrada. Muda as colunas, não os dados: a
+   * rubrica só existe numa obra, e as notas de "de quem será?" só na
+   * quarentena. Por omissão, obra — é a lista que já existia.
+   */
+  scope?: InvoiceScope;
 }
 
 /**
@@ -49,63 +66,69 @@ export const InvoicesList: FC<Props> = ({
   onDeallocate,
   onSendToAccountant,
   onDelete,
+  scope = "PROJECT",
 }) => {
   const { isAdmin } = useAuth();
+  const isProject = scope === "PROJECT";
+  const isQuarantine = scope === "UNIDENTIFIED";
 
   const columns: ColumnsType<ConstructionInvoice> = [
     {
       title: "",
       dataIndex: "thumbnailUrl",
-      width: 56,
-      render: (url: string | null, row) =>
-        url ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onImageClick(row.id);
-            }}
-            style={{
-              padding: 0,
-              border: "1px solid var(--ind-color-divider)",
-              background: "var(--ind-color-surface)",
-              cursor: "pointer",
-            }}
-          >
-            <img
-              src={url}
-              alt={row.originalFilename ?? "fatura"}
-              loading="lazy"
-              style={{
-                width: 40,
-                height: 52,
-                objectFit: "cover",
-                display: "block",
-              }}
-            />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onImageClick(row.id);
-            }}
-            style={{
-              width: 40,
-              height: 52,
-              display: "grid",
-              placeItems: "center",
-              border: "1px solid var(--ind-color-divider)",
-              color: "var(--ind-color-accent)",
-              background: "var(--ind-color-surface)",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            <FileTextOutlined />
-          </button>
-        ),
+      width: 76,
+      render: (url: string | null, row) => {
+        const extra = row.documents.length - 1;
+        const status = DOCUMENT_STATUS[row.documentStatus];
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+            <div style={{ position: "relative", lineHeight: 0 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImageClick(row.id);
+                }}
+                style={{
+                  padding: 0,
+                  width: 40,
+                  height: 52,
+                  border: "1px solid var(--ind-color-divider)",
+                  background: "var(--ind-color-surface)",
+                  cursor: "pointer",
+                  display: "grid",
+                  placeItems: "center",
+                  color: "var(--ind-color-accent)",
+                }}
+              >
+                {url ? (
+                  <img
+                    src={url}
+                    alt={row.originalFilename ?? "fatura"}
+                    loading="lazy"
+                    style={{ width: 40, height: 52, objectFit: "cover", display: "block" }}
+                  />
+                ) : (
+                  <FileTextOutlined />
+                )}
+              </button>
+              {/* A miniatura é sempre a do primeiro documento; o resto conta-se. */}
+              {extra > 0 && (
+                <Tooltip title={`${row.documents.length} documentos nesta fatura`}>
+                  <span
+                    className="ind-tag ind-tag-neutral"
+                    style={{ position: "absolute", right: -6, bottom: -6, fontSize: 10 }}
+                  >
+                    +{extra}
+                  </span>
+                </Tooltip>
+              )}
+            </div>
+            {/* Arquivada é o caso normal e não vale um selo; o resto é trabalho por fazer. */}
+            {status && <span className={`ind-tag ${status.cls}`} style={{ fontSize: 10 }}>{status.label}</span>}
+          </div>
+        );
+      },
     },
     {
       title: "Fornecedor",
@@ -139,26 +162,56 @@ export const InvoicesList: FC<Props> = ({
         </span>
       ),
     },
-    {
-      title: "Rubrica",
-      dataIndex: "budgetItemName",
-      render: (_: unknown, row) => {
-        if (!row.allocated) {
-          return (
-            <span className="ind-tag ind-tag-outline">
-              {row.needsReview ? "por rever" : "por associar"}
-            </span>
-          );
-        }
-        return (
-          <Tooltip title={row.budgetItemName}>
-            <span className="ind-tag ind-tag-accent">
-              {row.budgetItemCode ?? row.budgetItemName}
-            </span>
-          </Tooltip>
-        );
-      },
-    },
+    // A rubrica só existe numa obra: uma despesa da empresa não entra em
+    // orçamento nenhum, e a quarentena nem obra tem.
+    ...(isProject
+      ? ([
+          {
+            title: "Rubrica",
+            dataIndex: "budgetItemName",
+            render: (_: unknown, row: ConstructionInvoice) => {
+              if (!row.allocated) {
+                return (
+                  <span className="ind-tag ind-tag-outline">
+                    {row.needsReview ? "por rever" : "por associar"}
+                  </span>
+                );
+              }
+              return (
+                <Tooltip title={row.budgetItemName}>
+                  <span className="ind-tag ind-tag-accent">
+                    {row.budgetItemCode ?? row.budgetItemName}
+                  </span>
+                </Tooltip>
+              );
+            },
+          },
+        ] as ColumnsType<ConstructionInvoice>)
+      : []),
+    // As duas notas que alguém escreveu ao receber a fatura sem saber de quem
+    // era, e há quanto tempo ela está à espera — é o que torna esta lista uma
+    // fila de trabalho em vez de um arquivo.
+    ...(isQuarantine
+      ? ([
+          {
+            title: "Talvez de",
+            dataIndex: "possibleEnterprises",
+            render: (value: string | null) => value ?? "—",
+          },
+          {
+            title: "Perguntar a",
+            dataIndex: "askWhom",
+            width: 140,
+            render: (value: string | null) => value ?? "—",
+          },
+          {
+            title: "Aqui desde",
+            dataIndex: "createdAt",
+            width: 108,
+            render: (value: string) => formatDate(value),
+          },
+        ] as ColumnsType<ConstructionInvoice>)
+      : []),
     {
       title: "Contabilidade",
       dataIndex: "sentToAccountant",
@@ -176,7 +229,10 @@ export const InvoicesList: FC<Props> = ({
       render: (_: unknown, row) => (
         <ListActions>
           <ListActionPrimary onClick={() => onView(row)}>Ver detalhes</ListActionPrimary>
+          {/* Fora de uma obra não há rubrica a que associar — o backend
+              recusa com INVOICE_013, e esconder o botão poupa a viagem. */}
           {isAdmin() &&
+            isProject &&
             (row.allocated ? (
               <ListActionSecondary onClick={() => onDeallocate(row)}>
                 Desassociar

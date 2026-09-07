@@ -308,6 +308,26 @@ public class ConstructionInvoiceController {
         return ResponseEntity.ok(service.toResponseDTO(updated, false));
     }
 
+    /**
+     * Remove <b>um</b> documento da fatura. A fatura fica; se era o último
+     * documento, volta ao estado "sem ficheiro".
+     */
+    @DeleteMapping("/{id}/documents/{documentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteDocument(@PathVariable UUID id,
+                                               @PathVariable UUID documentId,
+                                               HttpServletRequest request) {
+        ConstructionInvoice invoice = service.getById(id);
+
+        service.deleteDocument(id, documentId);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, id, invoice.getInvoiceNumber(), null, request));
+
+        return ResponseEntity.noContent().build();
+    }
+
     /** Apaga a fatura, o ficheiro, a miniatura e o lançamento que dela nasceu. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")

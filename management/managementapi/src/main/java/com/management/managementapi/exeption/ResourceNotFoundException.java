@@ -60,6 +60,13 @@ public class ResourceNotFoundException extends BusinessException {
         );
     }
 
+    public static ResourceNotFoundException invoiceDocument(String documentId) {
+        return new ResourceNotFoundException(
+            ErrorCode.INVOICE_DOCUMENT_NOT_FOUND,
+            "Documento com ID " + documentId + " não encontrado nesta fatura"
+        );
+    }
+
     public static ResourceNotFoundException supplier(String supplierId) {
         return new ResourceNotFoundException(
             ErrorCode.SUPPLIER_NOT_FOUND,

@@ -113,6 +113,14 @@ admin a eliminar-se ficava de fora sem ninguém que lhe repusesse a conta. `USER
 
 O domínio "projeto" do Worksite — os nomes `enterprise`/`enterprises` foram mantidos do projeto de origem para minimizar risco de migração.
 
+Desde a `V23`, o projeto tem dois campos que existem **só para a paridade com o Excel da
+Vilatro**: `slug` (o nome exato da pasta `Empreendimentos\<Obra>\` no vault, com espaços e
+acentos — `"Vila Petrus"`) e `isTest` (`false` por omissão; marca as obras que existem só para
+experimentar). Ambos entram no `POST`/`PUT` e saem em todas as respostas. O `slug` é **único
+quando preenchido** — o segundo projeto com o mesmo slug é recusado com `ENT_032`, porque dois
+projetos a apontar para a mesma pasta tornariam ambígua qualquer importação ou exportação. Ver
+[[excel-parity.md]] §2.
+
 | Método | Rota | Acesso |
 |---|---|---|
 | GET | `/enterprises` | autenticado |
@@ -220,15 +228,21 @@ opcionais e cumuláveis, `Page` com 20 por omissão ordenada por `expenseDate` d
 
 ## Faturas de obra (`ConstructionInvoiceController`, `/construction-invoices`)
 
-A fatura é o **documento**; a despesa é a sua afetação a uma rubrica. Estão separados porque
-**registar e classificar são momentos diferentes**: quem chega da obra com quinze faturas
-carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa associada
-(`allocated: false`) é o que está por classificar — é essa a caixa de entrada.
+A fatura é o **registo**; os ficheiros são 0..N documentos seus e a despesa é a sua afetação a
+uma rubrica. Registo e classificação estão separados porque **são momentos diferentes**: quem
+chega da obra com quinze faturas carrega-as todas sem decidir nada, e classifica depois. Uma
+fatura sem despesa associada (`allocated: false`) é o que está por classificar — é essa a caixa
+de entrada.
 
 | Método | Rota | Acesso |
 |---|---|---|
 | POST | `/construction-invoices/preview?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — lê o QR e verifica duplicados, não grava nada |
 | POST | `/construction-invoices?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — multipart `file`; devolve `201` |
+| POST | `/construction-invoices/register` | `ADMIN` — regista uma fatura **sem ficheiro** (JSON, não multipart); devolve `201` |
+| POST | `/construction-invoices/{id}/documents` | `ADMIN` ou `EMPLOYEE` — multipart `file`, **junta** mais um documento; devolve `201` |
+| DELETE | `/construction-invoices/{id}/documents/{documentId}` | `ADMIN` — remove **um** documento; devolve `204` |
+| GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro |
+| GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/pending-count` | `ADMIN` ou `EMPLOYEE` — quantas por associar |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida; `204` sem histórico |
@@ -264,7 +278,7 @@ aparece no `allocate` (`INVOICE_006`), porque é a despesa que os exige.
 `needsReview` e `allocated` são **derivados**, não colunas: com uma fatura por rubrica, um
 estado guardado só arriscava ficar dessincronizado.
 
-`thumbnailUrl` vem em todas as respostas; `fileUrl` só no detalhe (`GET /{id}`). Assinar o
+`thumbnailUrl` vem em todas as respostas; `fileUrl` e o `documents[]` completo só no detalhe (`GET /{id}`). Os campos soltos de ficheiro (`fileUrl`, `thumbnailUrl`, `originalFilename`, `mimeType`, `sizeBytes`, `uploadedBy/Name/At`) **continuam a existir** na resposta e descrevem o **primeiro** documento — é o que mantém o Backoffice a funcionar sem reescrita. Assinar o
 documento completo de cada linha de uma lista de 20 seria trabalho deitado fora — quase
 nenhum é aberto. Ambas são signed URLs geradas na leitura; a chave de storage nunca sai daqui.
 
@@ -283,6 +297,41 @@ Resposta do upload e do `PUT /{id}/file`:
 }
 ```
 
+### A fatura é o registo, não o ficheiro
+
+Desde a fase 1 da paridade com o Excel (`V23`–`V29`), a fatura **é** o registo e os ficheiros
+são 0..N documentos seus (`documents[]` na resposta). Isto desbloqueia os dois casos que o
+vault da Vilatro tem todos os dias e que eram impossíveis enquanto a fatura *era* um ficheiro:
+a fatura que ainda não tem documento nenhum, e a que tem mais do que um (a foto tirada na obra
+**e** o PDF do fornecedor). Ver [[database.md]] e [[faturas-modelo-alvo.md]] §2.2.
+
+Três campos novos comandam o comportamento:
+
+| Campo | Valores | O que decide |
+|---|---|---|
+| `scope` | `PROJECT` · `COMPANY` · `UNIDENTIFIED` | Onde a fatura vive. `PROJECT` **exige** `enterpriseId`; os outros dois **proíbem-no** (daí `enterpriseId` ser agora nullable). Uma fatura fora de `PROJECT` não pode ser associada a uma rubrica (`INVOICE_013`) |
+| `documentStatus` | `ARCHIVED` · `MISSING` · `TO_PRINT` · `TO_REQUEST` | O que se passa com o papel. **Segue o papel**: passa a `ARCHIVED` ao juntar um documento, volta a `MISSING` ao largar todos — por isso `POST /register` recusa `ARCHIVED` (`INVOICE_017`) |
+| `documentType` | `INVOICE` · `CREDIT_NOTE` | Uma nota de crédito tem de apontar (`relatedInvoiceId`) para a fatura que corrige. A `V28` abre a coluna; **as regras da NC são a fase 3** |
+
+`POST /register` é a única entrada de fatura que **não é multipart**: recebe JSON
+(`InvoiceRegisterDTO` — `scope` obrigatório, `enterpriseId`, campos fiscais, `description`,
+`documentStatus`, `possibleEnterprises`, `askWhom`, `notes`) e devolve o
+`ConstructionInvoiceResponseDTO`. O par `scope`/`enterpriseId` é validado **no serviço** e não
+só pelo check da base de dados, para o erro sair com mensagem legível (`INVOICE_014`,
+`INVOICE_015`, `INVOICE_016`) em vez de uma violação de constraint.
+
+`POST /{id}/documents` acrescenta e `DELETE /{id}/documents/{documentId}` (só `ADMIN`) tira **um** —
+apaga o ficheiro e a miniatura do Storage, e se era o último documento a fatura volta a
+`documentStatus = MISSING`. `POST /{id}/file` **substitui** (larga todos os documentos e
+põe um só no lugar — comportamento antigo, mantido). No `documents`, se o QR do ficheiro novo
+trouxer dados que divergem dos que a fatura já tem, o resultado traz `qrDivergences` e **nada é
+sobreposto**: só os campos vazios são preenchidos.
+
+`GET /unidentified` e `GET /company` são **só `ADMIN`** (o `NavLink` do Backoffice também tem
+gate, mas o gate real é este). A quarentena ordena por `createdAt` **ascendente** por omissão —
+quanto mais tempo lá está, mais urgente é — e mostra `possibleEnterprises` e `askWhom`, as duas
+notas em texto livre de quem recebeu a fatura sem saber de quem era.
+
 ### Duplicados — bloqueio, em três chaves
 
 Um duplicado é **recusado**, não avisado. `duplicates` vem vazio no upload e no
@@ -297,6 +346,14 @@ porque servem momentos e falhas diferentes:
 | `checksumSha256` | o ficheiro é byte-a-byte igual a um já carregado — não depende de nada ter sido lido | `INVOICE_012` |
 | `invoiceAtcud` | o QR foi lido — é o identificador que a AT atribui ao documento | `INVOICE_010` |
 | (`supplierNif`, `invoiceNumber`) | o QR falhou e alguém completou os campos à mão | `INVOICE_011` |
+
+**A unicidade é global desde a `V29`** — não por projeto, como era até à fase 1. Os índices
+`uq_invoice_atcud`, `uq_invoice_nif_number` e `uq_invoice_document_checksum` cobrem toda a base
+de dados, por isso um documento já carregado numa obra é recusado noutra, na quarentena e nas
+despesas da empresa. A mensagem de erro **nomeia onde está a primeira** ("já existe na obra
+Vila Petrus", "nas despesas da empresa", "nas faturas por identificar") — sem isso, o bloqueio
+seria um beco sem saída para quem não tem acesso à obra onde a fatura ficou. Ver
+[[excel-parity.md]] §5.
 
 O checksum existe para o caso em que **nenhuma das outras duas serve**: a mesma foto
 carregada duas vezes, sem QR legível em nenhuma das cópias — sem ATCUD nem NIF/número por
@@ -445,9 +502,17 @@ associada acompanha os novos valores.
 | `INVOICE_007` | A rubrica indicada pertence a outro projeto |
 | `INVOICE_008` | `rescan` não encontrou QR da AT legível no documento |
 | `INVOICE_009` | `rescan` não conseguiu obter o ficheiro original do Storage |
-| `INVOICE_010` | já existe uma fatura com este ATCUD no projeto (upload, `/file` ou `PUT`) |
+| `INVOICE_010` | já existe uma fatura com este ATCUD (upload, `/file` ou `PUT`) — global desde a `V29`, a mensagem diz onde |
 | `INVOICE_011` | já existe uma fatura deste fornecedor com este número (sobretudo no `PUT`) |
-| `INVOICE_012` | este ficheiro já foi carregado no projeto — igual, byte a byte (upload ou `/file`) |
+| `INVOICE_012` | este ficheiro já foi carregado — igual, byte a byte (upload, `/file` ou `/documents`); global desde a `V24` |
+| `INVOICE_013` | fatura da empresa ou por identificar não pode ser associada a uma rubrica |
+| `INVOICE_014` | `scope = PROJECT` sem `enterpriseId` |
+| `INVOICE_015` | `scope = COMPANY` ou `UNIDENTIFIED` com `enterpriseId` |
+| `INVOICE_016` | `scope` desconhecido |
+| `INVOICE_017` | `POST /register` com `documentStatus = ARCHIVED` — uma fatura sem ficheiro não está arquivada |
+| `INVOICE_018` | o documento indicado não pertence a esta fatura (`DELETE /{id}/documents/{documentId}`) |
+
+(`ENT_032` — slug de projeto duplicado — sai do `EnterpriseController`, não daqui; ver [[excel-parity.md]] §2.)
 
 Ficheiro: PDF, JPEG ou PNG, até 25 MB, bucket `documents`, chave
 `construction-invoices/{enterpriseId}/…`. A miniatura é um extra — falhar a gerá-la não custa

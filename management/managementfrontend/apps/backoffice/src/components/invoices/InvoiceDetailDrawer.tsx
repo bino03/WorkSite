@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, FC, ReactNode } from "react";
 import { Button, DatePicker, Drawer, Input, InputNumber, Select, Space, Spin, Tooltip } from "antd";
-import { FileTextOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
-import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
+import InvoiceDocumentGallery from "@/components/invoices/InvoiceDocumentGallery";
 import {
   DEFAULT_INVOICE_TYPE,
   INVOICE_TYPES,
@@ -24,7 +23,7 @@ import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { parseApiError } from "@/utils/apiError";
-import { formatBytes, formatCurrency, formatDate, savingsPercent } from "@/utils/formatters";
+import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { ConstructionInvoice } from "@/types/invoice";
 
 const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrador", EMPLOYEE: "Funcionário" };
@@ -86,7 +85,6 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const [values, setValues] = useState<Values | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   /**
    * Numa ref e não nas dependências do `fetchInvoice`: a sugestão vem da lista
    * do lado, que recarrega a cada gravação — dependê-la traria a fatura outra
@@ -103,12 +101,11 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     setLoading(true);
     // Limpa já a fatura anterior: trocar de linha na lista sem fechar a
     // drawer muda só o `invoiceId`, não desmonta o componente — sem isto, o
-    // `needsReview` (e o `fileUrl`) da fatura antiga ficavam a decidir a
+    // `needsReview` da fatura antiga ficava a decidir a
     // pré-visualização até a resposta chegar, abrindo/fechando o painel
     // sozinho e pedindo um ficheiro que já não interessa.
     setInvoice(null);
     setValues(null);
-    setPreviewOpen(false);
     try {
       const data = await getInvoice(invoiceId);
       setInvoice(data);
@@ -244,7 +241,6 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     });
   };
 
-  const savings = savingsPercent(invoice?.originalSizeBytes ?? null, invoice?.sizeBytes ?? null);
   // Falta o essencial para associar — mostra o documento ao lado dos campos
   // logo de início, para preencher a olhar para ele sem andar a abrir e
   // fechar o modal de pré-visualização a cada campo.
@@ -326,63 +322,16 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                   gap: "13.6px",
                 }}
               >
-              {/* Documento ------------------------------------------------ */}
-              <div className="ind-card ind-blueprint ind-elev-sm" style={{ padding: "13.6px" }}>
-                <i className="ind-corner tl" />
-                <i className="ind-corner tr" />
-                <i className="ind-corner bl" />
-                <i className="ind-corner br" />
-                <span className="ind-card-kicker">Documento</span>
-                <div style={{ display: "flex", gap: "13.6px", alignItems: "flex-start" }}>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewOpen(true)}
-                    style={{
-                      padding: 0,
-                      border: "1px solid var(--ind-color-divider)",
-                      background: "var(--ind-color-surface)",
-                      cursor: "pointer",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {invoice.thumbnailUrl ? (
-                      <img
-                        src={invoice.thumbnailUrl}
-                        alt={invoice.originalFilename ?? "fatura"}
-                        style={{ width: 96, height: 128, objectFit: "cover", display: "block" }}
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          width: 96,
-                          height: 128,
-                          display: "grid",
-                          placeItems: "center",
-                          color: "var(--ind-color-accent)",
-                        }}
-                      >
-                        <FileTextOutlined style={{ fontSize: 28 }} />
-                      </span>
-                    )}
-                  </button>
-
-                  <div style={{ fontSize: 13, minWidth: 0 }}>
-                    <div style={{ wordBreak: "break-all" }}>{invoice.originalFilename ?? "—"}</div>
-                    <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-                      {formatBytes(invoice.sizeBytes)}
-                      {savings != null && (
-                        <> · comprimido de {formatBytes(invoice.originalSizeBytes)} (−{savings}%)</>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 11, opacity: 0.6 }}>
-                      Carregada por {invoice.uploadedByName ?? "—"} · {formatDate(invoice.uploadedAt)}
-                    </div>
-                    <Button size="small" style={{ marginTop: 8 }} onClick={() => setPreviewOpen(true)}>
-                      Ver documento
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              {/* Documentos ----------------------------------------------- */}
+              <InvoiceDocumentGallery
+                invoiceId={invoice.id}
+                documents={invoice.documents}
+                canManage={isAdmin()}
+                onChanged={() => {
+                  void fetchInvoice();
+                  onChanged();
+                }}
+              />
 
               {/* Estado --------------------------------------------------- */}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -459,14 +408,6 @@ export const InvoiceDetailDrawer: FC<Props> = ({
           )}
         </Spin>
       </Drawer>
-
-      <InvoicePreviewModal
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        invoiceUrl={invoice?.fileUrl ?? null}
-        mimeType={invoice?.mimeType ?? null}
-        filename={invoice?.originalFilename ?? null}
-      />
     </>
   );
 };

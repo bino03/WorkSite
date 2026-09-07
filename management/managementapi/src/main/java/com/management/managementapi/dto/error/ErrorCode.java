@@ -260,6 +260,7 @@ public enum ErrorCode {
     INVOICE_SCOPE_FORBIDS_ENTERPRISE("INVOICE_015", "Uma fatura da empresa ou por identificar não pode ter obra"),
     INVOICE_SCOPE_UNKNOWN("INVOICE_016", "Âmbito de fatura desconhecido"),
     INVOICE_STATUS_REQUIRES_NO_DOCUMENT("INVOICE_017", "Uma fatura registada sem ficheiro não pode ficar como arquivada"),
+    INVOICE_DOCUMENT_NOT_FOUND("INVOICE_018", "Documento não encontrado nesta fatura"),
 
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)

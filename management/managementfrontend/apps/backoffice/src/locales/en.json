@@ -3451,6 +3451,20 @@
       "invoiceTooLarge": "File exceeds the maximum size of 25 MB."
     }
   },
+  "invoices": {
+    "formErrors": {
+      "supplierNameTooLong": "Supplier name is too long.",
+      "nifInvalid": "The tax number only takes digits.",
+      "numberTooLong": "Invoice number is too long.",
+      "atcudTooLong": "ATCUD is too long.",
+      "dateInFuture": "The invoice date cannot be in the future.",
+      "totalNegative": "The total cannot be negative.",
+      "descriptionTooLong": "Description is too long.",
+      "notesTooLong": "Notes are too long.",
+      "textTooLong": "Text is too long.",
+      "enterpriseRequired": "A project invoice must name the project."
+    }
+  },
   "budget": {
     "formErrors": {
       "nameRequired": "Name is required.",

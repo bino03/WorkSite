@@ -690,6 +690,29 @@ public class ConstructionInvoiceService {
         return repository.save(invoice);
     }
 
+
+    /**
+     * Remove <b>um</b> documento da fatura — o ficheiro e a miniatura no Storage,
+     * e a linha. A fatura fica; se este era o último documento, o estado do papel
+     * volta a {@code MISSING}, porque {@code ARCHIVED} sem ficheiro seria mentira.
+     *
+     * <p>Distinto de {@code POST /{id}/file}, que substitui e larga todos.
+     */
+    public void deleteDocument(UUID invoiceId, UUID documentId) {
+        ConstructionInvoice invoice = getById(invoiceId);
+        ConstructionInvoiceDocument document = documentRepository
+                .findByIdAndInvoiceId(documentId, invoiceId)
+                .orElseThrow(() -> ResourceNotFoundException.invoiceDocument(documentId.toString()));
+
+        deleteQuietly(document.getBucket(), document.getStorageKey());
+        deleteQuietly(document.getBucket(), document.getThumbnailKey());
+        documentRepository.delete(document);
+        documentRepository.flush();
+
+        if (documentRepository.countByInvoiceId(invoiceId) == 0) {
+            invoice.setDocumentStatus(ConstructionInvoice.DocumentStatus.MISSING);
+        }
+    }
     public void delete(UUID id) {
         ConstructionInvoice invoice = getById(id);
         deleteDocuments(invoice);

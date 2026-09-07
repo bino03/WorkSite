@@ -5,6 +5,7 @@ import type {
   ConstructionInvoiceUpsert,
   InvoiceFilters,
   InvoicePreviewResult,
+  InvoiceRegisterPayload,
   InvoiceUploadResult,
 } from "@/types/invoice";
 
@@ -84,6 +85,69 @@ export async function uploadInvoice(
     skipErrorNotification: true,
   });
   return response.data;
+}
+
+/**
+ * Regista uma fatura **sem ficheiro** — a que ainda está por pedir ou por
+ * imprimir. Única entrada de fatura que é JSON e não multipart.
+ */
+export async function registerInvoice(
+  payload: InvoiceRegisterPayload
+): Promise<ConstructionInvoice> {
+  const response = await api.post(`/construction-invoices/register`, payload);
+  return response.data;
+}
+
+/**
+ * Junta mais um documento a uma fatura já registada. Ao contrário de
+ * {@link replaceInvoiceFile}, que substitui, este acrescenta — a foto tirada na
+ * obra e o PDF do fornecedor são o mesmo documento fiscal.
+ *
+ * Se o QR do ficheiro novo divergir do que a fatura já tem, o backend avisa em
+ * `warnings` e **não sobrepõe** nada: só preenche os campos vazios.
+ */
+export async function addInvoiceDocument(
+  invoiceId: string,
+  file: File
+): Promise<InvoiceUploadResult> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await api.post(`/construction-invoices/${invoiceId}/documents`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+}
+
+/**
+ * Tira **um** documento da fatura. Se era o último, a fatura volta ao estado
+ * "sem ficheiro" — quem o decide é o backend.
+ */
+export async function deleteInvoiceDocument(
+  invoiceId: string,
+  documentId: string
+): Promise<void> {
+  await api.delete(`/construction-invoices/${invoiceId}/documents/${documentId}`);
+}
+
+/**
+ * A quarentena: faturas que chegaram e ainda não se sabe de quem são. Vêm da
+ * mais antiga para a mais recente — quanto mais tempo lá está, mais urgente é.
+ * Só `ADMIN`.
+ */
+export async function listUnidentifiedInvoices(
+  params: { q?: string; page: number; size: number }
+): Promise<InvoicePage> {
+  const response = await api.get(`/construction-invoices/unidentified`, { params });
+  return normalizePage(response.data);
+}
+
+/** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. Só `ADMIN`. */
+export async function listCompanyInvoices(
+  params: { q?: string; page: number; size: number }
+): Promise<InvoicePage> {
+  const response = await api.get(`/construction-invoices/company`, { params });
+  return normalizePage(response.data);
 }
 
 export async function listInvoices(

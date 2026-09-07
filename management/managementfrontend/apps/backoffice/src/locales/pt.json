@@ -3482,6 +3482,20 @@
       "invoiceTooLarge": "O ficheiro excede o tamanho máximo de 25 MB."
     }
   },
+  "invoices": {
+    "formErrors": {
+      "supplierNameTooLong": "Nome do fornecedor demasiado longo.",
+      "nifInvalid": "O NIF só leva dígitos.",
+      "numberTooLong": "Número da fatura demasiado longo.",
+      "atcudTooLong": "ATCUD demasiado longo.",
+      "dateInFuture": "A data da fatura não pode ser no futuro.",
+      "totalNegative": "O total não pode ser negativo.",
+      "descriptionTooLong": "Descrição demasiado longa.",
+      "notesTooLong": "Notas demasiado longas.",
+      "textTooLong": "Texto demasiado longo.",
+      "enterpriseRequired": "Uma fatura de obra tem de indicar a obra."
+    }
+  },
   "budget": {
     "formErrors": {
       "nameRequired": "O nome é obrigatório.",

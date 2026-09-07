@@ -142,6 +142,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'ENT_022': 'Não é possível eliminar: a empresa tem utilizadores associados.',
   'ENT_030': 'Este NIF já está registado noutra empresa.',
   'ENT_031': 'Esta empresa está inativa.',
+  'ENT_032': 'Já existe um projeto com esta pasta do vault.',
 
   // ── Localização ────────────────────────────────────────────────────────────
   'LOC_030': 'Nome da localização inválido.',
@@ -264,7 +265,13 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_009': 'Não foi possível obter o ficheiro original da fatura.',
   'INVOICE_010': 'Já existe uma fatura com este ATCUD neste projeto.',
   'INVOICE_011': 'Já existe uma fatura deste fornecedor com este número neste projeto.',
-  'INVOICE_012': 'Este ficheiro já foi carregado neste projeto — é igual, byte a byte, a uma fatura existente.',
+  'INVOICE_012': 'Este ficheiro já foi carregado — é igual, byte a byte, a uma fatura existente.',
+  'INVOICE_013': 'Só uma fatura de obra pode ser associada a uma rubrica — identifique primeiro a obra.',
+  'INVOICE_014': 'Uma fatura de obra tem de indicar a obra.',
+  'INVOICE_015': 'Uma fatura da empresa ou por identificar não pode ter obra.',
+  'INVOICE_016': 'Âmbito de fatura desconhecido.',
+  'INVOICE_017': 'Uma fatura registada sem ficheiro não pode ficar como arquivada.',
+  'INVOICE_018': 'Documento não encontrado nesta fatura.',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

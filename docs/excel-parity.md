@@ -104,6 +104,13 @@ despesas (repartição por rubrica). A migração agrupa por `Nº Fatura`; o `to
 | Um nº repetido entre obras é sempre erro: **parar e perguntar**, nunca apagar sozinho | a app recusa o segundo com o erro a dizer **onde** está o primeiro (obra, quarentena ou empresa). Nunca apaga |
 | "Uma linha sem número é um documento por chegar" (regra 12) | ao carregar um documento cujo nº/valor/data bate com uma fatura `MISSING`, a app propõe **completar essa** em vez de criar outra |
 
+> **Estado a 2026-09-06** (fase 1 feita): as três primeiras linhas estão **em produção** —
+> `uq_invoice_atcud`, `uq_invoice_nif_number` (`V29`) e `uq_invoice_document_checksum` (`V24`)
+> são globais e parciais, e o erro nomeia onde está o primeiro (`whereItIs()`, erros
+> `INVOICE_010`/`011`/`012`). As duas últimas linhas — o **aviso** para faturas sem número e a
+> proposta de **completar** uma fatura `MISSING` em vez de criar outra — ainda **não estão
+> implementadas**: a coluna `document_status` já existe, a heurística de emparelhamento não.
+
 ## 6. Rubricas
 
 | | App | Excel |

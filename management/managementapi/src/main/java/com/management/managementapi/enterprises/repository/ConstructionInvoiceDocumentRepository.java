@@ -26,6 +26,8 @@ public interface ConstructionInvoiceDocumentRepository extends JpaRepository<Con
     /** Uma query para os documentos de uma página inteira de faturas, em vez de uma por linha. */
     List<ConstructionInvoiceDocument> findByInvoiceIdInOrderByUploadedAtAsc(Collection<UUID> invoiceIds);
 
+    Optional<ConstructionInvoiceDocument> findByIdAndInvoiceId(UUID id, UUID invoiceId);
+
     long countByInvoiceId(UUID invoiceId);
 
     /**
