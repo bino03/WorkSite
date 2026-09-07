@@ -23,8 +23,8 @@ Os dois têm de continuar a poder trocar dados **sem conversão à mão**. É is
 
 ## 2. Identidade das obras
 
-| App | Excel |
-|---|---|
+| App                | Excel                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
 | `enterprises.slug` | nome da pasta `Empreendimentos\<Obra>\` — e do Excel `Despesas - <Obra>.xlsx` e da nota `<Obra>.md` (decisão 2) |
 
 - O `slug` é **exatamente** o nome da pasta, com espaços e acentos (`Vila Petrus`, `Vila Aleu`, `Villa Atrium`).
@@ -39,17 +39,17 @@ Os dois têm de continuar a poder trocar dados **sem conversão à mão**. É is
 A folha `Despesas` de cada obra é uma tabela Excel chamada `TabelaDespesas`, com linha de totais.
 **As colunas mapeiam-se pelo nome do cabeçalho, nunca pela letra** (decisão 5) — a ordem já mudou uma vez.
 
-| Cabeçalho Excel | BD (modelo alvo) | Regras de conversão |
-|---|---|---|
-| `Nº Fatura` | `construction_invoice.invoice_number` | texto tal como está (`FT FA.2026S/3047`). Vazio, "Imprimir fatura" ou "Pedir fatura" → nº nulo + `document_status` (`TO_PRINT` / `TO_REQUEST`); vazio sem indicação → `MISSING` |
-| `Data` | `invoice_date` | `dd/mm/aaaa`. Vazia → nula |
-| `Produto/Serviço` | `description` | texto. O nome do fornecedor costuma vir no início ("Casa Dolores - …"): **não** se extrai daí — ver §3.1 |
-| `Valor` | `total_amount` | `numeric(14,2)`. Aceitar `11 643,33 €`, `11.643,33 €`, `11643,33` — as três formas existem. Sempre positivo; uma linha negativa é uma nota de crédito (§3.2) |
-| `Liquidada` | derivado de `payment` (§4) | `x`, `X`, `Sim` → paga; vazio → não paga. Na exportação escreve-se sempre `Sim` |
-| `Metodo Pagamento` | `payment.method` | mapa em §4 |
-| `Bizdocs` | `sent_to_accountant` | `x`/`X` → `true`; vazio → `false`. Na exportação escreve-se `X` |
-| `Observações` | `notes` | texto. A prova de pagamento que hoje vive aqui ("Pago por transferência em 28-08-2026 (extrato ABANCA)") vai para `payment.reference` quando for possível separar; caso contrário fica em `notes` |
-| `Rubrica` | `construction_expense.budget_item_id` via `construction_budget_item.code` | ver §6 |
+| Cabeçalho Excel    | BD (modelo alvo)                                                          | Regras de conversão                                                                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Nº Fatura`        | `construction_invoice.invoice_number`                                     | texto tal como está (`FT FA.2026S/3047`). Vazio, "Imprimir fatura" ou "Pedir fatura" → nº nulo + `document_status` (`TO_PRINT` / `TO_REQUEST`); vazio sem indicação → `MISSING`                   |
+| `Data`             | `invoice_date`                                                            | `dd/mm/aaaa`. Vazia → nula                                                                                                                                                                        |
+| `Produto/Serviço`  | `description`                                                             | texto. O nome do fornecedor costuma vir no início ("Casa Dolores - …"): **não** se extrai daí — ver §3.1                                                                                          |
+| `Valor`            | `total_amount`                                                            | `numeric(14,2)`. Aceitar `11 643,33 €`, `11.643,33 €`, `11643,33` — as três formas existem. Sempre positivo; uma linha negativa é uma nota de crédito (§3.2)                                      |
+| `Liquidada`        | derivado de `payment` (§4)                                                | `x`, `X`, `Sim` → paga; vazio → não paga. Na exportação escreve-se sempre `Sim`                                                                                                                   |
+| `Metodo Pagamento` | `payment.method`                                                          | mapa em §4                                                                                                                                                                                        |
+| `Bizdocs`          | `sent_to_accountant`                                                      | `x`/`X` → `true`; vazio → `false`. Na exportação escreve-se `X`                                                                                                                                   |
+| `Observações`      | `notes`                                                                   | texto. A prova de pagamento que hoje vive aqui ("Pago por transferência em 28-08-2026 (extrato ABANCA)") vai para `payment.reference` quando for possível separar; caso contrário fica em `notes` |
+| `Rubrica`          | `construction_expense.budget_item_id` via `construction_budget_item.code` | ver §6                                                                                                                                                                                            |
 
 ### 3.1 O que falta no Excel para a migração ser limpa
 
@@ -93,6 +93,15 @@ despesas (repartição por rubrica). A migração agrupa por `Nº Fatura`; o `to
   "pagas juntas": a app sabe-o pelas ligações.
 - `Liquidada` só se marca com prova (decisão 22). A app honra isto pedindo data + método + referência,
   e registando `registered_by`. **Não** exige ficheiro de prova — o Excel também não.
+
+> **Estado a 2026-09-07** (fase 2 feita — `V31`): `payment` + `invoice_payment` existem, com o
+> estado da fatura (`UNPAID`/`PARTIAL`/`PAID`) **derivado**; endpoints de marcar / agregado /
+> anular (`PaymentController`, tudo `ADMIN`); o agregado recusa faturas de obras diferentes e,
+> quando o valor não bate por baixo, devolve as que ficam de fora sem gravar nada. **Ainda não
+> implementado**: a interpretação da coluna `Metodo Pagamento` e da data em `Observações` na
+> importação, e a **geração** da observação `Pago por … junto com …` na exportação — isso é a
+> fase 6 (`DespesasExcelImportService` / exportador). A verificação no browser desta fase está
+> em [[verificacao-browser-pendente]] §1c, a fazer na passagem única do fim da linha.
 
 ## 5. Unicidade e duplicados
 

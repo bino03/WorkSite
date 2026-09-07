@@ -256,6 +256,13 @@ de entrada.
 | DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz, devolve à caixa de entrada |
 | PATCH | `/construction-invoices/{id}/accountant?sent=` | `ADMIN` — marca/desmarca enviada ao contabilista |
 | DELETE | `/construction-invoices/{id}` | `ADMIN` — apaga fatura, ficheiro, miniatura e lançamento |
+| POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
+| POST | `/construction-invoices/payments` | `ADMIN` — pagamento **agregado** de N faturas (multipart: `payment` JSON com `invoiceIds[]` + `proof` opcional); `201` se bater, `200` (nada gravado) se o valor não bater |
+| DELETE | `/construction-invoices/payments/{paymentId}` | `ADMIN` — anula um pagamento, repõe as faturas; `204` |
+
+As três listas (`/unidentified`, `/company`, `/enterprise/{id}`) aceitam `?outstanding=true`
+para filtrar só as **por liquidar** — o filtro é aplicado por subquery no servidor, para a
+paginação continuar certa. Ver "Pagamentos".
 
 Não há endpoint de lote **de propósito**: o cliente chama o `POST` uma vez por ficheiro
 largado, para que cada um tenha o seu resultado e um QR ilegível não estrague os restantes.
@@ -513,12 +520,51 @@ associada acompanha os novos valores.
 | `INVOICE_016` | `scope` desconhecido |
 | `INVOICE_017` | `POST /register` com `documentStatus = ARCHIVED` — uma fatura sem ficheiro não está arquivada |
 | `INVOICE_018` | o documento indicado não pertence a esta fatura (`DELETE /{id}/documents/{documentId}`) |
+| `INVOICE_019` | a fatura já está totalmente paga (`POST /{id}/payments`) |
+| `INVOICE_020` | o valor a pagar é superior ao que falta liquidar nesta fatura |
+| `INVOICE_021` | pagamento agregado — o valor do movimento é **superior** à soma do que falta pagar. (O caso **inferior** não é erro: resposta `200`, `created=false`, com a lista das faturas a tirar da seleção.) |
+| `INVOICE_022` | pagamento agregado com faturas de obras diferentes |
+| `INVOICE_023` | pagamento não encontrado (`DELETE /payments/{paymentId}`) |
+| `INVOICE_024` | pagamento agregado sem faturas |
+| `INVOICE_025` | a prova de pagamento tem de ser PDF ou imagem |
 
 (`ENT_032` — slug de projeto duplicado — sai do `EnterpriseController`, não daqui; ver [[excel-parity.md]] §2.)
 
 Ficheiro: PDF, JPEG ou PNG, até 25 MB, bucket `documents`, chave
 `construction-invoices/{enterpriseId}/…`. A miniatura é um extra — falhar a gerá-la não custa
 a fatura, a lista cai num ícone de ficheiro.
+
+## Pagamentos (`PaymentController`)
+
+Fase 2 da paridade com o Excel. "Dar como pago" e "método de pagamento" são **um só gesto**,
+e regista-se quem o fez. Um pagamento é uma entidade própria (`payment`) ligada às faturas
+por uma junção (`invoice_payment`) — é o que faz o caso normal (1 fatura, 1 movimento) e o
+caso raro (N faturas, 1 transferência) serem o **mesmo modelo**. Tudo `ADMIN`. Ver
+[[database.md]] → `payment` e [[faturas-modelo-alvo.md]] §2.3.
+
+| Método | Rota | Notas |
+|---|---|---|
+| POST | `/construction-invoices/{id}/payments` | multipart `payment` (JSON) + `proof` opcional. `paidOn`, `method`, `amount?` (por omissão o que falta liquidar), `reference?`, `notes?`. `201` → `PaymentResponseDTO` |
+| POST | `/construction-invoices/payments` | agregado. `payment` JSON com `invoiceIds[]` + `amount` do movimento + `proof` opcional. `201` `AggregatePaymentResultDTO` com `created=true` se o valor bater com a soma; `200` `created=false` + `leftOut[]` se for **menor** |
+| DELETE | `/construction-invoices/payments/{paymentId}` | anula: apaga as ligações e o movimento, as faturas voltam a `UNPAID`/`PARTIAL`. Fica em `activity_log`. `204` |
+
+**Estado de pagamento da fatura** sai em todos os DTOs de fatura, derivado (nunca coluna):
+`paymentStatus` (`UNPAID` / `PARTIAL` / `PAID`), `paidAmount`, `netAmount` (= `totalAmount`
+até à fase 3) e `payments[]` (cada movimento já do ponto de vista da fatura: quanto lhe
+tocou, e "junto com" que outras faturas). O selo de estado e o filtro `?outstanding=true` nas
+listas vêm daqui.
+
+| `method` | Valor do Excel `Metodo Pagamento` |
+|---|---|
+| `NUMERARIO` | `Numerário` |
+| `MULTIBANCO` | `Pagamento MB`, `MB`, `TPA` |
+| `TRANSFERENCIA` | `Transferência` |
+| `OUTRO` | outro texto (o original vai para `notes`) |
+
+Regras: uma fatura fora de `PROJECT` também pode ser paga (a quarentena e as despesas da
+empresa têm pagamentos); o agregado **bloqueia** faturas de obras diferentes (`INVOICE_022`);
+um valor abaixo do líquido numa fatura deixa-a `PARTIAL` (a única via de parcial na fase 2 —
+não há repartição fina por linha); a prova de pagamento **não é obrigatória**.
 
 ## Fornecedores (`SupplierController`, `/suppliers`)
 

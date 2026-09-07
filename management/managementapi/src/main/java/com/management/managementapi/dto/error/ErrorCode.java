@@ -262,6 +262,15 @@ public enum ErrorCode {
     INVOICE_STATUS_REQUIRES_NO_DOCUMENT("INVOICE_017", "Uma fatura registada sem ficheiro não pode ficar como arquivada"),
     INVOICE_DOCUMENT_NOT_FOUND("INVOICE_018", "Documento não encontrado nesta fatura"),
 
+    // Pagamentos (fase 2) — o estado da fatura é derivado; estes erros guardam as invariantes
+    INVOICE_ALREADY_PAID("INVOICE_019", "Esta fatura já está totalmente paga"),
+    INVOICE_PAYMENT_EXCEEDS_NET("INVOICE_020", "O valor a pagar é superior ao que falta liquidar nesta fatura"),
+    INVOICE_PAYMENT_SUM_MISMATCH("INVOICE_021", "O valor do movimento não chega para as faturas selecionadas — tire as que ficam de fora"),
+    INVOICE_PAYMENT_CROSS_ENTERPRISE("INVOICE_022", "Um pagamento agregado só pode juntar faturas da mesma obra"),
+    INVOICE_PAYMENT_NOT_FOUND("INVOICE_023", "Pagamento não encontrado"),
+    INVOICE_PAYMENT_NO_INVOICES("INVOICE_024", "Indique pelo menos uma fatura para o pagamento"),
+    INVOICE_PAYMENT_PROOF_TYPE("INVOICE_025", "A prova de pagamento tem de ser PDF ou imagem"),
+
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================

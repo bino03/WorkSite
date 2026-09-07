@@ -58,6 +58,7 @@ class ConstructionInvoiceDocumentDeleteTest {
     @Mock private InvoiceCompressionService compressionService;
     @Mock private AuthContext authContext;
     @Mock private NotificationService notifications;
+    @Mock private PaymentService paymentService;
 
     @InjectMocks private ConstructionInvoiceService service;
 

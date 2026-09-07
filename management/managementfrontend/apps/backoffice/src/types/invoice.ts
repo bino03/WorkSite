@@ -22,6 +22,38 @@ export type InvoiceDocumentType = "INVOICE" | "CREDIT_NOTE";
 export type InvoiceDocumentKind = "ORIGINAL" | "PAGE" | "PHOTO" | "OTHER";
 
 /**
+ * Estado de pagamento de uma fatura — **derivado** de Σ(ligações) vs. líquido,
+ * nunca guardado. `PARTIAL` só nasce de marcar uma fatura com um valor abaixo
+ * do líquido.
+ */
+export type PaymentStatus = "UNPAID" | "PARTIAL" | "PAID";
+
+/** Método do movimento. Mapa dos valores do Excel em docs/excel-parity §4. */
+export type PaymentMethod = "NUMERARIO" | "MULTIBANCO" | "TRANSFERENCIA" | "OUTRO";
+
+/**
+ * Um pagamento visto do lado de uma fatura: quanto deste movimento lhe tocou
+ * (`amountOnThisInvoice`), o total do movimento (`paymentAmount`) e, num
+ * agregado, os números das outras faturas que ele liquidou (`alsoCovers`).
+ */
+export interface InvoicePaymentSummary {
+  paymentId: string;
+  paidOn: string;
+  method: PaymentMethod;
+  amountOnThisInvoice: number;
+  paymentAmount: number;
+  reference: string | null;
+  notes: string | null;
+  /** Signed URL — só vem no detalhe. */
+  proofUrl: string | null;
+  proofFilename: string | null;
+  registeredBy: string | null;
+  registeredByName: string | null;
+  registeredAt: string;
+  alsoCovers: string[];
+}
+
+/**
  * Um ficheiro da fatura. Desde a V24 são 0..N por fatura: a foto tirada na obra
  * e o PDF que o fornecedor mandou depois são o mesmo documento fiscal.
  */
@@ -83,6 +115,14 @@ export interface ConstructionInvoice {
    * propósito — é o que evita reescrever tudo o que já os lê.
    */
   documents: InvoiceDocument[];
+
+  // ── pagamento (fase 2) — estado derivado, nunca coluna ──
+  paymentStatus: PaymentStatus;
+  paidAmount: number;
+  /** O que há a pagar: total menos notas de crédito. Na fase 2 é igual ao total. */
+  netAmount: number | null;
+  /** Os movimentos que tocaram esta fatura, do mais antigo ao mais recente. */
+  payments: InvoicePaymentSummary[];
 
   /** Só vem no detalhe (`getInvoice`) — nas listas é sempre null. */
   fileUrl: string | null;
@@ -155,6 +195,67 @@ export interface InvoiceRegisterPayload {
   notes?: string | null;
 }
 
+// ── pagamentos (fase 2) ──
+
+/** Corpo (parte `payment`) de `POST /construction-invoices/{id}/payments`. */
+export interface MarkPaidPayload {
+  paidOn: string;
+  method: PaymentMethod;
+  /** Por omissão paga o que falta liquidar. Abaixo disso → `PARTIAL`. */
+  amount?: number | null;
+  reference?: string | null;
+  notes?: string | null;
+}
+
+/** Corpo (parte `payment`) de `POST /construction-invoices/payments` (agregado). */
+export interface AggregatePaymentPayload extends MarkPaidPayload {
+  invoiceIds: string[];
+  /** Obrigatório no agregado: o valor do movimento. */
+  amount: number;
+}
+
+export interface PaymentAllocation {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  supplierName: string | null;
+  amount: number;
+}
+
+export interface PaymentResponse {
+  id: string;
+  paidOn: string;
+  method: PaymentMethod;
+  amount: number;
+  reference: string | null;
+  notes: string | null;
+  proofUrl: string | null;
+  proofFilename: string | null;
+  registeredBy: string | null;
+  registeredByName: string | null;
+  registeredAt: string;
+  allocations: PaymentAllocation[];
+}
+
+/** Uma fatura que não coube num agregado porque o movimento não chegou. */
+export interface LeftOutInvoice {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  supplierName: string | null;
+  remaining: number;
+}
+
+/**
+ * `created: false` → nada foi gravado. Se o movimento foi **menor** que a soma,
+ * `leftOut` diz que faturas tirar da seleção.
+ */
+export interface AggregatePaymentResult {
+  created: boolean;
+  payment: PaymentResponse | null;
+  leftOut: LeftOutInvoice[];
+  selectedTotal: number;
+  movementAmount: number;
+}
+
 /** Fatura já registada com o mesmo ATCUD. Aviso, não bloqueio. */
 export interface DuplicateInvoiceRef {
   invoiceId: string;
@@ -208,6 +309,8 @@ export interface InvoiceFilters {
   /** `false` = a caixa de entrada (o que está por classificar). */
   allocated: boolean | null;
   needsReview: boolean | null;
+  /** `true` = só as por liquidar (pago < líquido, ou ainda sem total). */
+  outstanding: boolean | null;
   sentToAccountant: boolean | null;
   from: string | null;
   to: string | null;

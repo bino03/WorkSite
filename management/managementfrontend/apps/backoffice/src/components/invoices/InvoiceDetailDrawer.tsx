@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, FC, ReactNode } from "react";
 import { Button, DatePicker, Drawer, Input, InputNumber, Select, Space, Spin, Tooltip } from "antd";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 import InvoiceDocumentGallery from "@/components/invoices/InvoiceDocumentGallery";
+import MarkPaidDrawer from "@/components/invoices/MarkPaidDrawer";
+import { deletePayment } from "@/services/paymentService";
 import {
   DEFAULT_INVOICE_TYPE,
   INVOICE_TYPES,
@@ -80,11 +83,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
 }) => {
   const { isAdmin } = useAuth();
   const confirm = useConfirm();
+  const { t } = useTranslation();
 
   const [invoice, setInvoice] = useState<ConstructionInvoice | null>(null);
   const [values, setValues] = useState<Values | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [markPaidOpen, setMarkPaidOpen] = useState(false);
   /**
    * Numa ref e não nas dependências do `fetchInvoice`: a sugestão vem da lista
    * do lado, que recarrega a cada gravação — dependê-la traria a fatura outra
@@ -241,6 +246,24 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     });
   };
 
+  const handleDeletePayment = (paymentId: string) => {
+    confirm({
+      title: t("invoices.payment.cancelConfirmTitle"),
+      message: t("invoices.payment.cancelConfirmBody"),
+      actionLabel: t("invoices.payment.cancelConfirmAction"),
+      onConfirm: async () => {
+        try {
+          await deletePayment(paymentId);
+          notificationService.success(t("invoices.payment.cancelSuccess"));
+          await fetchInvoice();
+          onChanged();
+        } catch (error) {
+          ErrorHandler.handle(error);
+        }
+      },
+    });
+  };
+
   // Falta o essencial para associar — mostra o documento ao lado dos campos
   // logo de início, para preencher a olhar para ele sem andar a abrir e
   // fechar o modal de pré-visualização a cada campo.
@@ -350,6 +373,18 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                   </Tooltip>
                 )}
 
+                <span
+                  className={`ind-tag ${
+                    invoice.paymentStatus === "PAID"
+                      ? "ind-tag-accent-2"
+                      : invoice.paymentStatus === "PARTIAL"
+                        ? "ind-tag-accent"
+                        : "ind-tag-outline"
+                  }`}
+                >
+                  {t(`invoices.payment.status.${invoice.paymentStatus}`)}
+                </span>
+
                 {isAdmin() && (
                   <span
                     className={`ind-tag ${invoice.sentToAccountant ? "ind-tag-accent-2" : "ind-tag-neutral"}`}
@@ -395,6 +430,14 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                 </div>
               )}
 
+              {/* Pagamento ---------------------------------------------- */}
+              <InvoicePaymentSection
+                invoice={invoice}
+                canManage={isAdmin()}
+                onMarkPaid={() => setMarkPaidOpen(true)}
+                onDeletePayment={handleDeletePayment}
+              />
+
               {/* Campos --------------------------------------------------- */}
               <InvoiceFields
                 invoice={invoice}
@@ -408,7 +451,107 @@ export const InvoiceDetailDrawer: FC<Props> = ({
           )}
         </Spin>
       </Drawer>
+
+      <MarkPaidDrawer
+        open={markPaidOpen}
+        invoice={invoice}
+        onClose={() => setMarkPaidOpen(false)}
+        onPaid={() => {
+          void fetchInvoice();
+          onChanged();
+        }}
+      />
     </>
+  );
+};
+
+/**
+ * O bloco de pagamento da fatura: estado derivado, os movimentos que a tocaram,
+ * e o botão de marcar como paga. `PARTIAL` só aparece quando alguém marcou a
+ * fatura com um valor abaixo do líquido.
+ */
+const InvoicePaymentSection: FC<{
+  invoice: ConstructionInvoice;
+  canManage: boolean;
+  onMarkPaid: () => void;
+  onDeletePayment: (paymentId: string) => void;
+}> = ({ invoice, canManage, onMarkPaid, onDeletePayment }) => {
+  const { t } = useTranslation();
+  const net = invoice.netAmount;
+  const canPay = canManage && invoice.paymentStatus !== "PAID" && net != null;
+
+  return (
+    <div className="ind-card" style={{ padding: "13.6px", gap: "10.2px" }}>
+      <span className="ind-card-kicker">Pagamento</span>
+
+      <div style={{ fontSize: 13 }}>
+        <strong>{t(`invoices.payment.status.${invoice.paymentStatus}`)}</strong>
+        {net != null && (
+          <>
+            {" "}· {formatCurrency(invoice.paidAmount)} / {formatCurrency(net)}
+          </>
+        )}
+      </div>
+
+      {invoice.payments.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {invoice.payments.map((p) => (
+            <div
+              key={p.paymentId}
+              style={{
+                border: "1px solid var(--ind-color-divider)",
+                borderRadius: 2,
+                padding: "8px 10px",
+                fontSize: 12,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <span>
+                  <strong>{formatCurrency(p.amountOnThisInvoice)}</strong>{" "}
+                  {t(`invoices.payment.method.${p.method}`)} · {formatDate(p.paidOn)}
+                  {p.alsoCovers.length > 0 && (
+                    <>
+                      {" "}
+                      · {t("invoices.payment.alsoCovers", { list: p.alsoCovers.join(", ") })}
+                    </>
+                  )}
+                </span>
+                {canManage && (
+                  <Button size="small" type="link" danger onClick={() => onDeletePayment(p.paymentId)}>
+                    {t("invoices.payment.cancel")}
+                  </Button>
+                )}
+              </div>
+              <div style={{ opacity: 0.6, marginTop: 2 }}>
+                {p.registeredByName &&
+                  t("invoices.payment.registeredBy", {
+                    name: p.registeredByName,
+                    date: formatDate(p.registeredAt),
+                  })}
+                {p.reference ? ` · ${p.reference}` : ""}
+                {p.proofUrl && (
+                  <>
+                    {" · "}
+                    <a href={p.proofUrl} target="_blank" rel="noreferrer">
+                      {p.proofFilename ?? "prova"}
+                    </a>
+                  </>
+                )}
+              </div>
+              {p.notes && <div style={{ marginTop: 2 }}>{p.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canPay && (
+        <div>
+          <Button type="primary" onClick={onMarkPaid}>
+            {t("invoices.payment.markPaid")}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
 

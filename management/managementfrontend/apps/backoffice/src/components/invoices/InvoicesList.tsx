@@ -11,7 +11,12 @@ import {
 } from "@/components/common/ListActions";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import type { ConstructionInvoice, InvoiceDocumentStatus, InvoiceScope } from "@/types/invoice";
+import type {
+  ConstructionInvoice,
+  InvoiceDocumentStatus,
+  InvoiceScope,
+  PaymentStatus,
+} from "@/types/invoice";
 
 /**
  * O selo do estado do papel. `ARCHIVED` não está aqui de propósito: é o caso
@@ -22,6 +27,13 @@ const DOCUMENT_STATUS: Partial<Record<InvoiceDocumentStatus, { label: string; cl
   MISSING: { label: "sem ficheiro", cls: "ind-tag-outline" },
   TO_PRINT: { label: "por imprimir", cls: "ind-tag-accent" },
   TO_REQUEST: { label: "por pedir", cls: "ind-tag-accent" },
+};
+
+/** Estado de pagamento (derivado no backend). */
+const PAYMENT_STATUS: Record<PaymentStatus, { label: string; cls: string }> = {
+  UNPAID: { label: "por liquidar", cls: "ind-tag-outline" },
+  PARTIAL: { label: "parcial", cls: "ind-tag-accent" },
+  PAID: { label: "paga", cls: "ind-tag-accent-2" },
 };
 
 interface Props {
@@ -160,6 +172,14 @@ export const InvoicesList: FC<Props> = ({
         <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600 }}>
           {value != null ? formatCurrency(value) : "—"}
         </span>
+      ),
+    },
+    {
+      title: "Pagamento",
+      dataIndex: "paymentStatus",
+      width: 116,
+      render: (status: PaymentStatus) => (
+        <span className={`ind-tag ${PAYMENT_STATUS[status].cls}`}>{PAYMENT_STATUS[status].label}</span>
       ),
     },
     // A rubrica só existe numa obra: uma despesa da empresa não entra em

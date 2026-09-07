@@ -136,7 +136,7 @@ export async function deleteInvoiceDocument(
  * Só `ADMIN`.
  */
 export async function listUnidentifiedInvoices(
-  params: { q?: string; page: number; size: number }
+  params: { q?: string; outstanding?: boolean; page: number; size: number }
 ): Promise<InvoicePage> {
   const response = await api.get(`/construction-invoices/unidentified`, { params });
   return normalizePage(response.data);
@@ -144,7 +144,7 @@ export async function listUnidentifiedInvoices(
 
 /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. Só `ADMIN`. */
 export async function listCompanyInvoices(
-  params: { q?: string; page: number; size: number }
+  params: { q?: string; outstanding?: boolean; page: number; size: number }
 ): Promise<InvoicePage> {
   const response = await api.get(`/construction-invoices/company`, { params });
   return normalizePage(response.data);
@@ -157,6 +157,7 @@ export async function listInvoices(
   const params = new URLSearchParams();
   if (filters.allocated !== null) params.set("allocated", String(filters.allocated));
   if (filters.needsReview !== null) params.set("needsReview", String(filters.needsReview));
+  if (filters.outstanding !== null) params.set("outstanding", String(filters.outstanding));
   if (filters.sentToAccountant !== null)
     params.set("sentToAccountant", String(filters.sentToAccountant));
   if (filters.from) params.set("from", filters.from);

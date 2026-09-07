@@ -9,6 +9,7 @@ public enum EntityType {
     SUPPLIER("supplier"),
     EMAIL_PROVIDER("email_provider"),
     TASK("task"),
+    PAYMENT("payment"),
 
     // Mantidos só para leitura do histórico: o activity_log ainda tem linhas
     // destes tipos, das etapas/sub-etapas que a V15 substituiu pela árvore.

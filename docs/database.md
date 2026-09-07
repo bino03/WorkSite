@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V30`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V31`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -10,7 +10,8 @@ Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[arc
 enterprises (projeto — nome de tabela/pacote mantido do Property-Management)
  ├── enterprises_location / enterprises_media (1:1 / 1:N)
  ├── construction_invoice (o registo da fatura — dados do QR da AT + scope, N:1 → enterprises, nullable)
- │    └── construction_invoice_document (o ficheiro, 0..N por fatura — V24)
+ │    ├── construction_invoice_document (o ficheiro, 0..N por fatura — V24)
+ │    └── invoice_payment (junção N:N → payment — V31; estado UNPAID/PARTIAL/PAID é derivado)
  └── construction_budget_item (rubrica do orçamento, N:1 → enterprises)
       └── construction_budget_item (parent_id — árvore de profundidade livre)
            └── construction_expense (a afetação, N:1 → construction_budget_item)
@@ -72,6 +73,22 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
   distinta do `created_at`/data de registo — sem esta separação, lançar faturas atrasadas em
   bloco atirava-as todas para o mês em que foram escritas na app) e `total_price`.
   `uq_expense_invoice` garante 1 fatura → no máximo 1 despesa.
+- **`payment`** (`V31`) — um **movimento** de dinheiro: `paid_on`, `method` (enum
+  `payment_method`: `NUMERARIO`/`MULTIBANCO`/`TRANSFERENCIA`/`OUTRO` — mapa dos valores do
+  Excel em [[excel-parity.md]] §4), `amount`, `reference`, `notes`, `proof_*` (recibo ou
+  página do extrato — um ficheiro, opcional, `bucket`+`key` no bucket `documents`) e
+  `registered_by`/`registered_at` (quem deu como pago; FK → `profile` `ON DELETE SET NULL`).
+- **`invoice_payment`** (`V31`) — junção `payment` ↔ `construction_invoice`, PK composta
+  `(payment_id, invoice_id)`, `amount` = quanto **deste** movimento cobre **esta** fatura.
+  Caso normal: uma linha com `amount = payment.amount`. O caso raro (uma transferência paga N
+  faturas — decisão 23 do Vilatro) é o mesmo modelo com N linhas. `ON DELETE CASCADE` dos dois
+  lados. As invariantes (`Σ ligações = payment.amount`; por fatura `Σ ≤ líquido`) são do
+  serviço (`PaymentService`), não constraints. **O estado de pagamento da fatura — `UNPAID` /
+  `PARTIAL` / `PAID` — é derivado, nunca coluna**: `PaymentService.deriveStatus` compara
+  `Σ(invoice_payment.amount)` com o líquido (`total_amount` na fase 2; `total_amount − Σ notas
+  de crédito` a partir da fase 3). As listas de faturas aceitam o filtro `outstanding` (por
+  liquidar), aplicado por subquery no JPQL de `search`/`searchByScope`. Ver
+  [[api.md]] → "Pagamentos".
 
 A árvore substituiu (em `V15`) a hierarquia rígida de dois níveis
 `construction_stage` → `construction_sub_stage`, que não comportava os orçamentos reais:
@@ -127,9 +144,9 @@ atrás. O ficheiro de fatura é guardado apenas como `bucket`/`storage_key` **na
 
 - Todas as PKs são `UUID DEFAULT gen_random_uuid()`, exceto `revoked_token` (BIGSERIAL).
 - Trigger genérico `worksite.tg_set_updated_at()` (definido em `V1`) mantém `updated_at` automaticamente — aplicado a todas as tabelas `worksite` com essa coluna via loop dinâmico em `V11`, e explicitamente às tabelas de construção em `V15`.
-- Enums nativos do Postgres: `role_enum` (`ADMIN`/`EMPLOYEE`), `account_status_enum` (`unlocked`/`blocked`/`deleted`), `media_type_enum`, `visibility_enum`, `activity_type`, `entity_type` (`V2`) e `budget_row_kind` (`ITEM`/`HEADING`/`NOTE`, `V15`). A fase 1 da paridade com o Excel acrescentou quatro: `invoice_document_kind` (`V24`), `invoice_scope` (`V26`), `invoice_document_status` (`V27`) e `invoice_document_type` (`V28`).
+- Enums nativos do Postgres: `role_enum` (`ADMIN`/`EMPLOYEE`), `account_status_enum` (`unlocked`/`blocked`/`deleted`), `media_type_enum`, `visibility_enum`, `activity_type`, `entity_type` (`V2`) e `budget_row_kind` (`ITEM`/`HEADING`/`NOTE`, `V15`). A fase 1 da paridade com o Excel acrescentou quatro: `invoice_document_kind` (`V24`), `invoice_scope` (`V26`), `invoice_document_status` (`V27`) e `invoice_document_type` (`V28`). A fase 2 acrescentou `payment_method` (`V31`).
 - `notification.type` é **texto e não enum** (`V20`): um tipo novo não vale uma migração, e nada no backend decide nada com base no valor — serve ao frontend para escolher o ícone.
-- `entity_type` ganhou `budget_item` em `V15`, `construction_invoice` em `V16`, `supplier` em `V19` e `email_provider` em `V21`. Os valores `construction_stage` e `construction_sub_stage` **mantêm-se de propósito**: há linhas históricas em `activity_log` que ainda os referenciam, e um valor não se remove de um enum do Postgres.
+- `entity_type` ganhou `budget_item` em `V15`, `construction_invoice` em `V16`, `supplier` em `V19`, `email_provider` em `V21` e `payment` em `V31`. Os valores `construction_stage` e `construction_sub_stage` **mantêm-se de propósito**: há linhas históricas em `activity_log` que ainda os referenciam, e um valor não se remove de um enum do Postgres.
 - `enterprises` tem `slug` e `is_test` desde a `V23`: o `slug` é o nome da pasta desta obra no vault Excel da Vilatro (`Vila Petrus`), único quando preenchido (`ENT_032`), e é ele que faz a ponte entre os dois sistemas — ver [[excel-parity.md]] §2; `is_test` (NOT NULL, `false`) marca as obras que existem só para experimentar, para os relatórios as poderem excluir.
 - `V8` concede permissões explícitas aos roles do Supabase (`anon`, `authenticated`, `service_role`) — necessário porque a validação de JWT é feita localmente pelo backend, mas o Supabase continua a gerir os utilizadores de autenticação (`auth.users`). A `V30` acrescenta o role de leitura `worksite_expenses_ro` (criado à mão fora do Flyway; a migração cria-o `NOLOGIN` se faltar) e dá-lhe `SELECT` também na `construction_invoice_document`. **Está lá por inércia**: servia um frontend de consulta que foi descartado a 2026-09-06.
 - `V9` cria a FK condicional `profile.auth_user_id → auth.users(id)` (só se o schema `auth` existir — é o caso quando a app corre contra um projeto Supabase real).

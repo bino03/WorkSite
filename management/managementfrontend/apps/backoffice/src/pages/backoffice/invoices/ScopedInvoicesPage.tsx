@@ -53,19 +53,26 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [query, setQuery] = useState("");
+  const [outstanding, setOutstanding] = useState(false);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
 
   const fetch = useCallback(
-    async (nextPage: number, nextSize: number, q: string) => {
+    async (nextPage: number, nextSize: number, q: string, onlyOutstanding: boolean) => {
       setLoading(true);
       try {
+        const params = {
+          q: q.trim() || undefined,
+          outstanding: onlyOutstanding || undefined,
+          page: nextPage,
+          size: nextSize,
+        };
         const list: InvoicePage =
           scope === "UNIDENTIFIED"
-            ? await listUnidentifiedInvoices({ q: q.trim() || undefined, page: nextPage, size: nextSize })
-            : await listCompanyInvoices({ q: q.trim() || undefined, page: nextPage, size: nextSize });
+            ? await listUnidentifiedInvoices(params)
+            : await listCompanyInvoices(params);
         setInvoices(list.content);
         setTotalElements(list.totalElements);
       } catch (error) {
@@ -78,19 +85,27 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   );
 
   useEffect(() => {
-    void fetch(0, pageSize, "");
+    void fetch(0, pageSize, "", false);
     setPage(0);
     setQuery("");
+    setOutstanding(false);
     // Trocar de lista pelo nav mantém o componente montado: sem isto ficava-se
     // a olhar para a lista anterior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope]);
 
-  const reload = () => void fetch(page, pageSize, query);
+  const reload = () => void fetch(page, pageSize, query, outstanding);
 
   const search = () => {
     setPage(0);
-    void fetch(0, pageSize, query);
+    void fetch(0, pageSize, query, outstanding);
+  };
+
+  const toggleOutstanding = () => {
+    const next = !outstanding;
+    setOutstanding(next);
+    setPage(0);
+    void fetch(0, pageSize, query, next);
   };
 
   const handleOpenPreview = async (invoiceId: string) => {
@@ -176,11 +191,14 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
           onClear={() => {
             setQuery("");
             setPage(0);
-            void fetch(0, pageSize, "");
+            void fetch(0, pageSize, "", outstanding);
           }}
           style={{ maxWidth: 320 }}
         />
         <Button onClick={search}>Pesquisar</Button>
+        <Button size="small" type={outstanding ? "primary" : "default"} onClick={toggleOutstanding}>
+          Por liquidar
+        </Button>
       </div>
 
       {!loading && invoices.length === 0 && (
@@ -197,7 +215,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);
           setPageSize(nextSize);
-          void fetch(nextPage, nextSize, query);
+          void fetch(nextPage, nextSize, query, outstanding);
         }}
         onView={(invoice) => setDetailId(invoice.id)}
         onImageClick={(invoiceId) => void handleOpenPreview(invoiceId)}

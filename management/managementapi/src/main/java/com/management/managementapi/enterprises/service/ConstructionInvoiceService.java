@@ -8,6 +8,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.DuplicateIn
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -96,6 +97,7 @@ public class ConstructionInvoiceService {
     private final InvoiceCompressionService compressionService;
     private final AuthContext authContext;
     private final NotificationService notifications;
+    private final PaymentService paymentService;
 
     // ── carregar ──────────────────────────────────────────────
 
@@ -350,16 +352,19 @@ public class ConstructionInvoiceService {
      */
     @Transactional(readOnly = true)
     public Page<ConstructionInvoiceResponseDTO> searchByScope(ConstructionInvoice.Scope scope,
-                                                              String q, Pageable pageable) {
-        Page<ConstructionInvoice> page = repository.searchByScope(scope, isBlank(q) ? null : q.trim(), pageable);
+                                                              Boolean outstanding, String q, Pageable pageable) {
+        Page<ConstructionInvoice> page = repository.searchByScope(
+                scope, outstanding, isBlank(q) ? null : q.trim(), pageable);
 
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
         Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
         Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
 
         return page.map(invoice -> toResponseDTO(invoice,
                 allocations.get(invoice.getId()),
                 documents.getOrDefault(invoice.getId(), List.of()),
+                payments.getOrDefault(invoice.getId(), List.of()),
                 false));
     }
 
@@ -563,20 +568,23 @@ public class ConstructionInvoiceService {
      */
     @Transactional(readOnly = true)
     public Page<ConstructionInvoiceResponseDTO> search(UUID enterpriseId, Boolean allocated, Boolean needsReview,
-                                                       Boolean sentToAccountant, LocalDate from, LocalDate to,
+                                                       Boolean outstanding, Boolean sentToAccountant,
+                                                       LocalDate from, LocalDate to,
                                                        String q, Pageable pageable) {
         String query = isBlank(q) ? null : q.trim();
         Page<ConstructionInvoice> page = repository.search(
-                enterpriseId, allocated, needsReview, sentToAccountant, from, to, query, pageable);
+                enterpriseId, allocated, needsReview, outstanding, sentToAccountant, from, to, query, pageable);
 
         // Uma query para as afetações da página toda, em vez de uma por linha.
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
         Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
         Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
 
         return page.map(invoice -> toResponseDTO(invoice,
                 allocations.get(invoice.getId()),
                 documents.getOrDefault(invoice.getId(), List.of()),
+                payments.getOrDefault(invoice.getId(), List.of()),
                 false));
     }
 
@@ -796,18 +804,27 @@ public class ConstructionInvoiceService {
         return toResponseDTO(invoice,
                 findAllocation(invoice.getId()).orElse(null),
                 documentRepository.findByInvoiceIdOrderByUploadedAtAsc(invoice.getId()),
+                paymentService.paymentsForInvoice(invoice.getId(), includeFileUrl),
                 includeFileUrl);
     }
 
     private ConstructionInvoiceResponseDTO toResponseDTO(ConstructionInvoice invoice,
                                                          ConstructionExpense allocation,
                                                          List<ConstructionInvoiceDocument> documents,
+                                                         List<InvoicePaymentSummaryDTO> payments,
                                                          boolean includeFileUrl) {
         ConstructionBudgetItem item = allocation == null ? null : allocation.getBudgetItem();
         // Os campos soltos de ficheiro descrevem o documento principal e são o
         // que a UI ainda lê hoje; a lista completa vem em `documents`. Uma fatura
         // sem documento nenhum é legal desde a V24 e traz tudo isto a null.
         ConstructionInvoiceDocument primary = documents.isEmpty() ? null : documents.get(0);
+
+        // Estado de pagamento é derivado: soma das ligações vs. líquido da fatura.
+        java.math.BigDecimal netAmount = paymentService.netAmount(invoice);
+        java.math.BigDecimal paidAmount = payments.stream()
+                .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        String paymentStatus = PaymentService.deriveStatus(netAmount, paidAmount).name();
 
         return new ConstructionInvoiceResponseDTO(
                 invoice.getId(),
@@ -848,6 +865,11 @@ public class ConstructionInvoiceService {
                 primary == null ? null : resolveProfileName(primary.getUploadedBy()),
                 primary == null ? null : primary.getUploadedAt(),
                 documents.stream().map(document -> toDocumentDTO(document, includeFileUrl)).toList(),
+
+                paymentStatus,
+                paidAmount,
+                netAmount,
+                payments,
 
                 invoice.isSentToAccountant(),
                 invoice.getSentToAccountantBy(),

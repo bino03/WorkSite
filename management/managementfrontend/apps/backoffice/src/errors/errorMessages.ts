@@ -272,6 +272,13 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_016': 'Âmbito de fatura desconhecido.',
   'INVOICE_017': 'Uma fatura registada sem ficheiro não pode ficar como arquivada.',
   'INVOICE_018': 'Documento não encontrado nesta fatura.',
+  'INVOICE_019': 'Esta fatura já está totalmente paga.',
+  'INVOICE_020': 'O valor a pagar é superior ao que falta liquidar nesta fatura.',
+  'INVOICE_021': 'O valor do movimento não chega para as faturas selecionadas — tire as que ficam de fora.',
+  'INVOICE_022': 'Um pagamento agregado só pode juntar faturas da mesma obra.',
+  'INVOICE_023': 'Pagamento não encontrado.',
+  'INVOICE_024': 'Indique pelo menos uma fatura para o pagamento.',
+  'INVOICE_025': 'A prova de pagamento tem de ser PDF ou imagem.',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

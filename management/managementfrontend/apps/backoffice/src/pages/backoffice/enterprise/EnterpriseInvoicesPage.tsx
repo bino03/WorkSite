@@ -22,6 +22,7 @@ import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
+import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
 import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
@@ -41,6 +42,7 @@ type ViewKey = (typeof VIEWS)[number]["key"];
 const initialFilters: InvoiceFilters = {
   allocated: false,
   needsReview: null,
+  outstanding: null,
   sentToAccountant: null,
   from: null,
   to: null,
@@ -71,6 +73,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
@@ -329,9 +332,22 @@ const EnterpriseInvoicesPage: FC = () => {
         />
         <Button onClick={() => applyFilters({})}>Pesquisar</Button>
 
+        <Button
+          size="small"
+          type={filters.outstanding ? "primary" : "default"}
+          onClick={() => applyFilters({ outstanding: filters.outstanding ? null : true })}
+        >
+          Por liquidar
+        </Button>
+
         {selectedIds.length > 0 && (
           <Button type="primary" onClick={() => setAllocating(selectedInvoices)}>
             Associar {selectedIds.length} à mesma rubrica
+          </Button>
+        )}
+        {selectedIds.length > 0 && isAdmin() && (
+          <Button onClick={() => setAggregatePayOpen(true)}>
+            Registar pagamento de {selectedIds.length}
           </Button>
         )}
         {selectedIds.length > 0 && isAdmin() && (
@@ -393,6 +409,13 @@ const EnterpriseInvoicesPage: FC = () => {
               setDetailId(null);
               setAllocating([invoice]);
             }}
+          />
+
+          <AggregatePaymentDrawer
+            open={aggregatePayOpen}
+            invoices={selectedInvoices}
+            onClose={() => setAggregatePayOpen(false)}
+            onDone={reload}
           />
 
           <BudgetItemPickerModal

@@ -26,6 +26,9 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
      *
      * @param allocated      true = só as já ligadas a uma rubrica, false = só as pendentes, null = todas
      * @param needsReview    true = só as que ficaram sem data ou sem total (QR ilegível)
+     * @param outstanding    true = só as por liquidar (pago &lt; total, ou ainda sem total),
+     *                       false = só as pagas por inteiro, null = todas. O pago é a soma das
+     *                       ligações em {@code invoice_payment} — estado derivado, não coluna.
      */
     @Query("""
             select i from ConstructionInvoice i
@@ -36,6 +39,11 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
               and (:needsReview is null
                    or (:needsReview = true  and (i.invoiceDate is null or i.totalAmount is null))
                    or (:needsReview = false and  i.invoiceDate is not null and i.totalAmount is not null))
+              and (:outstanding is null
+                   or (:outstanding = true  and (i.totalAmount is null
+                        or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) < i.totalAmount))
+                   or (:outstanding = false and i.totalAmount is not null
+                        and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) >= i.totalAmount))
               and (:sentToAccountant is null or i.sentToAccountant = :sentToAccountant)
               and (:from is null or i.invoiceDate >= :from)
               and (:to   is null or i.invoiceDate <= :to)
@@ -52,6 +60,7 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
     Page<ConstructionInvoice> search(@Param("enterpriseId") UUID enterpriseId,
                                      @Param("allocated") Boolean allocated,
                                      @Param("needsReview") Boolean needsReview,
+                                     @Param("outstanding") Boolean outstanding,
                                      @Param("sentToAccountant") Boolean sentToAccountant,
                                      @Param("from") LocalDate from,
                                      @Param("to") LocalDate to,
@@ -66,6 +75,11 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
     @Query("""
             select i from ConstructionInvoice i
             where i.scope = :scope
+              and (:outstanding is null
+                   or (:outstanding = true  and (i.totalAmount is null
+                        or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) < i.totalAmount))
+                   or (:outstanding = false and i.totalAmount is not null
+                        and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) >= i.totalAmount))
               and (:q is null
                    or lower(i.supplierName)  like lower(concat('%', :q, '%'))
                    or lower(i.supplierNif)   like lower(concat('%', :q, '%'))
@@ -75,6 +89,7 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                    or lower(i.notes)         like lower(concat('%', :q, '%')))
             """)
     Page<ConstructionInvoice> searchByScope(@Param("scope") ConstructionInvoice.Scope scope,
+                                            @Param("outstanding") Boolean outstanding,
                                             @Param("q") String q,
                                             Pageable pageable);
 

@@ -150,18 +150,20 @@ public class ConstructionInvoiceController {
     @GetMapping("/unidentified")
     @PreAuthorize("hasRole('ADMIN')")
     public Page<ConstructionInvoiceResponseDTO> listUnidentified(
+            @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) String q,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
-        return service.searchByScope(ConstructionInvoice.Scope.UNIDENTIFIED, q, pageable);
+        return service.searchByScope(ConstructionInvoice.Scope.UNIDENTIFIED, outstanding, q, pageable);
     }
 
     /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. */
     @GetMapping("/company")
     @PreAuthorize("hasRole('ADMIN')")
     public Page<ConstructionInvoiceResponseDTO> listCompany(
+            @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) String q,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return service.searchByScope(ConstructionInvoice.Scope.COMPANY, q, pageable);
+        return service.searchByScope(ConstructionInvoice.Scope.COMPANY, outstanding, q, pageable);
     }
 
     @GetMapping("/enterprise/{enterpriseId}")
@@ -170,12 +172,13 @@ public class ConstructionInvoiceController {
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) Boolean allocated,
             @RequestParam(required = false) Boolean needsReview,
+            @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) Boolean sentToAccountant,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String q,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return service.search(enterpriseId, allocated, needsReview, sentToAccountant, from, to, q, pageable);
+        return service.search(enterpriseId, allocated, needsReview, outstanding, sentToAccountant, from, to, q, pageable);
     }
 
     /** Quantas faturas estão por associar — alimenta o aviso no ecrã do orçamento. */

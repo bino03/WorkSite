@@ -6,6 +6,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
+
 /**
  * Fatura devolvida ao cliente.
  *
@@ -80,6 +82,16 @@ public record ConstructionInvoiceResponseDTO(
          * V24. Os campos soltos acima descrevem o primeiro da lista.
          */
         List<InvoiceDocumentDTO> documents,
+
+        // ── pagamento (fase 2) ──
+        /** `UNPAID`, `PARTIAL` ou `PAID` — derivado, nunca coluna. O cliente traduz o rótulo. */
+        String paymentStatus,
+        /** Quanto já foi pago desta fatura. */
+        BigDecimal paidAmount,
+        /** O que há a pagar: total menos notas de crédito. Na fase 2 é igual ao total. */
+        BigDecimal netAmount,
+        /** Os movimentos que tocaram esta fatura, do mais antigo ao mais recente. */
+        List<InvoicePaymentSummaryDTO> payments,
 
         // ── contabilidade ──
         boolean sentToAccountant,
