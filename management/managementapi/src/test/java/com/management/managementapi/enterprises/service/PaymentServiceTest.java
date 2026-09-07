@@ -171,6 +171,38 @@ class PaymentServiceTest {
     }
 
     @Test
+    @DisplayName("líquido = total − Σ NC: fatura de 1000 com NC de 100 → o pagamento cobre 900 (PAID)")
+    void liquidoComNotaDeCredito() {
+        when(invoiceRepository.findById(INVOICE_ID))
+                .thenReturn(Optional.of(invoice(INVOICE_ID, ENTERPRISE_A, new BigDecimal("1000"))));
+        when(invoiceRepository.sumCreditNotesFor(INVOICE_ID)).thenReturn(new BigDecimal("100"));
+        when(invoicePaymentRepository.sumPaidByInvoice(INVOICE_ID)).thenReturn(BigDecimal.ZERO);
+
+        service().markAsPaid(INVOICE_ID, markDto(null), null);
+
+        ArgumentCaptor<InvoicePayment> link = ArgumentCaptor.forClass(InvoicePayment.class);
+        verify(invoicePaymentRepository).save(link.capture());
+        assertThat(link.getValue().getAmount()).isEqualByComparingTo("900");
+        assertThat(PaymentService.deriveStatus(new BigDecimal("900"), new BigDecimal("900")))
+                .isEqualTo(PaymentStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("uma nota de crédito não se paga → INVOICE_027")
+    void notaDeCreditoNaoSePaga() {
+        ConstructionInvoice nc = invoice(INVOICE_ID, ENTERPRISE_A, new BigDecimal("100"));
+        nc.setDocumentType(ConstructionInvoice.DocumentType.CREDIT_NOTE);
+        when(invoiceRepository.findById(INVOICE_ID)).thenReturn(Optional.of(nc));
+
+        assertThatThrownBy(() -> service().markAsPaid(INVOICE_ID, markDto(null), null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVOICE_IS_CREDIT_NOTE);
+
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("marcar com um valor acima do que falta → INVOICE_020")
     void marcarAcimaDoQueFalta() {
         when(invoiceRepository.findById(INVOICE_ID))

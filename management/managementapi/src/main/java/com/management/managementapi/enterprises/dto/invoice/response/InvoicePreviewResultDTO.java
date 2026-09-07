@@ -33,5 +33,11 @@ public record InvoicePreviewResultDTO(
         LocalDate invoiceDate,
         BigDecimal totalAmount,
         boolean needsReview,
+        /**
+         * O que o campo `D` do QR diz que o documento é: `"FT"`, `"FS"`, …, ou
+         * `"NC"` (nota de crédito). Null quando não houve QR. Uma NC não se
+         * regista por aqui — o cliente encaminha para o fluxo de nota de crédito.
+         */
+        String documentType,
         List<String> warnings
 ) {}

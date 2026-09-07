@@ -67,6 +67,11 @@ No Excel são duas linhas (uma positiva, uma negativa, ou com a nota "devolvido"
 (`INVOICE`) e uma nota de crédito (`CREDIT_NOTE`, `related_invoice_id` → a fatura). A migração
 **pergunta** que linha negativa pertence a que fatura — não adivinha.
 
+> **Estado a 2026-09-07** (fase 3 feita, sem migração): a app já regista notas de crédito a
+> partir de uma fatura lançada, com a despesa negativa proposta na proporção da origem
+> (`POST /construction-invoices/{id}/credit-notes`, ver [[api.md]] → "Notas de crédito"). A
+> **importação** da folha `Despesas` que emparelha as duas linhas do Excel é a fase 6.
+
 ### 3.3 Uma fatura em várias linhas
 
 Acontece (`FRA4 2026V2/1608` no Vila Aleu: 142,57 € + 3,26 €). Na app é **uma** fatura com **duas**

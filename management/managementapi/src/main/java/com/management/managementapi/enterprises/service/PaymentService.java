@@ -84,11 +84,15 @@ public class PaymentService {
     // ── líquido e estado ─────────────────────────────────────────
 
     /**
-     * O líquido de uma fatura — o que há a pagar. Hoje é o total; a fase 3
-     * passa a {@code total − Σ notas de crédito}. É o único ponto a mudar.
+     * O líquido de uma fatura — o que há a pagar: {@code total − Σ notas de
+     * crédito}. É o único ponto onde "líquido" se calcula.
      */
     public BigDecimal netAmount(ConstructionInvoice invoice) {
-        return invoice.getTotalAmount();
+        if (invoice.getTotalAmount() == null) {
+            return null;
+        }
+        BigDecimal credited = invoiceRepository.sumCreditNotesFor(invoice.getId());
+        return invoice.getTotalAmount().subtract(credited == null ? BigDecimal.ZERO : credited);
     }
 
     /**
@@ -130,6 +134,7 @@ public class PaymentService {
     public PaymentResponseDTO markAsPaid(UUID invoiceId, MarkPaidRequestDTO dto, MultipartFile proof) {
         ConstructionInvoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> ResourceNotFoundException.constructionInvoice(invoiceId.toString()));
+        rejectIfCreditNote(invoice);
 
         BigDecimal net = requireNet(invoice);
         BigDecimal remaining = net.subtract(paidAmount(invoiceId));
@@ -170,6 +175,7 @@ public class PaymentService {
             if (invoice == null) {
                 throw ResourceNotFoundException.constructionInvoice(id.toString());
             }
+            rejectIfCreditNote(invoice);
             invoices.add(invoice);
         }
 
@@ -296,6 +302,13 @@ public class PaymentService {
     }
 
     // ── auxiliares ──────────────────────────────────────────────
+
+    /** As notas de crédito não se pagam — reduzem a fatura a que pertencem (§6). */
+    private static void rejectIfCreditNote(ConstructionInvoice invoice) {
+        if (invoice.getDocumentType() == ConstructionInvoice.DocumentType.CREDIT_NOTE) {
+            throw new BusinessException(ErrorCode.INVOICE_IS_CREDIT_NOTE);
+        }
+    }
 
     private BigDecimal requireNet(ConstructionInvoice invoice) {
         BigDecimal net = netAmount(invoice);

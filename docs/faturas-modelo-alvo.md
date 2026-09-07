@@ -226,6 +226,16 @@ Desenho **[proposto]**:
 - Casos do Excel que isto resolve: Civica (1 537,50 € lançados e devolvidos — hoje são duas linhas que se
   anulam), caução do Manitou (1 000 € reembolsados na entrega).
 
+> **Estado a 2026-09-07** (fase 3 feita — **sem migração**, a `V28` já tinha a coluna e o
+> check): `createCreditNote` (`POST /construction-invoices/{origem}/credit-notes`, `ADMIN`) +
+> `split-preview`; a NC herda `scope`/obra/NIF da origem, `total_amount` positivo, sem NC de NC
+> (`INVOICE_026`), não se paga (`INVOICE_027`). O líquido (`total − Σ NC`) sai em todos os DTOs
+> de fatura (`netAmount`/`creditNoteTotal`/`creditNotes[]`), e é o que os pagamentos cobrem e o
+> filtro "por liquidar" usa. **Ainda 1→1**: a NC gera **≤1** despesa negativa (a origem só tem
+> uma rubrica hoje, por `uq_expense_invoice`); a proposta é calculada proporcionalmente e o
+> caso "−70/−30" fica coberto quando a fase 4 largar esse índice. Verificação no browser:
+> [[verificacao-browser-pendente]] §1d.
+
 ## 7. Associar a rubricas — "o mais completa e eficaz possível"
 
 **[decidido]** É prioridade. O que "eficaz" quer dizer aqui, e como se consegue:

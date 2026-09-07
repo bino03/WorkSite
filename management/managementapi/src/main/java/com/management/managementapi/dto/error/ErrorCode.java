@@ -271,6 +271,11 @@ public enum ErrorCode {
     INVOICE_PAYMENT_NO_INVOICES("INVOICE_024", "Indique pelo menos uma fatura para o pagamento"),
     INVOICE_PAYMENT_PROOF_TYPE("INVOICE_025", "A prova de pagamento tem de ser PDF ou imagem"),
 
+    // Notas de crédito (fase 3)
+    INVOICE_CREDIT_NOTE_TARGET_NOT_INVOICE("INVOICE_026", "Uma nota de crédito tem de apontar para uma fatura, não para outra nota de crédito"),
+    INVOICE_IS_CREDIT_NOTE("INVOICE_027", "As notas de crédito não se pagam — reduzem a fatura a que pertencem"),
+    INVOICE_CREDIT_NOTE_SPLIT_INVALID("INVOICE_028", "A repartição de uma nota de crédito por várias rubricas fica para a fase 4"),
+
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================

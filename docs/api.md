@@ -259,6 +259,8 @@ de entrada.
 | POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
 | POST | `/construction-invoices/payments` | `ADMIN` — pagamento **agregado** de N faturas (multipart: `payment` JSON com `invoiceIds[]` + `proof` opcional); `201` se bater, `200` (nada gravado) se o valor não bater |
 | DELETE | `/construction-invoices/payments/{paymentId}` | `ADMIN` — anula um pagamento, repõe as faturas; `204` |
+| GET | `/construction-invoices/{id}/credit-notes/split-preview?amount=` | `ADMIN` — proposta de repartição negativa de uma NC sobre esta fatura, na proporção das despesas dela; nada gravado |
+| POST | `/construction-invoices/{id}/credit-notes` | `ADMIN` — regista uma **nota de crédito** a partir desta fatura (JSON: valor, nº, data, NIF, `expenses[]` confirmadas); `201` |
 
 As três listas (`/unidentified`, `/company`, `/enterprise/{id}`) aceitam `?outstanding=true`
 para filtrar só as **por liquidar** — o filtro é aplicado por subquery no servidor, para a
@@ -320,7 +322,7 @@ Três campos novos comandam o comportamento:
 |---|---|---|
 | `scope` | `PROJECT` · `COMPANY` · `UNIDENTIFIED` | Onde a fatura vive. `PROJECT` **exige** `enterpriseId`; os outros dois **proíbem-no** (daí `enterpriseId` ser agora nullable). Uma fatura fora de `PROJECT` não pode ser associada a uma rubrica (`INVOICE_013`) |
 | `documentStatus` | `ARCHIVED` · `MISSING` · `TO_PRINT` · `TO_REQUEST` | O que se passa com o papel. **Segue o papel**: passa a `ARCHIVED` ao juntar um documento, volta a `MISSING` ao largar todos — por isso `POST /register` recusa `ARCHIVED` (`INVOICE_017`) |
-| `documentType` | `INVOICE` · `CREDIT_NOTE` | Uma nota de crédito tem de apontar (`relatedInvoiceId`) para a fatura que corrige. A `V28` abre a coluna; **as regras da NC são a fase 3** |
+| `documentType` | `INVOICE` · `CREDIT_NOTE` | Uma nota de crédito tem de apontar (`relatedInvoiceId`) para a fatura que corrige. A lógica entrou na fase 3: NC ligada a uma fatura lançada, líquido = total − Σ NC, despesas negativas (ver "Notas de crédito") |
 
 `POST /register` é a única entrada de fatura que **não é multipart**: recebe JSON
 (`InvoiceRegisterDTO` — `scope` obrigatório, `enterpriseId`, campos fiscais, `description`,
@@ -527,6 +529,9 @@ associada acompanha os novos valores.
 | `INVOICE_023` | pagamento não encontrado (`DELETE /payments/{paymentId}`) |
 | `INVOICE_024` | pagamento agregado sem faturas |
 | `INVOICE_025` | a prova de pagamento tem de ser PDF ou imagem |
+| `INVOICE_026` | uma nota de crédito tem de apontar para uma **fatura**, não para outra NC (sem NC de NC) |
+| `INVOICE_027` | as notas de crédito **não se pagam** — reduzem a fatura a que pertencem |
+| `INVOICE_028` | repartição de uma NC por **várias** rubricas (fica para a fase 4 — hoje é 1→1) |
 
 (`ENT_032` — slug de projeto duplicado — sai do `EnterpriseController`, não daqui; ver [[excel-parity.md]] §2.)
 
@@ -565,6 +570,30 @@ Regras: uma fatura fora de `PROJECT` também pode ser paga (a quarentena e as de
 empresa têm pagamentos); o agregado **bloqueia** faturas de obras diferentes (`INVOICE_022`);
 um valor abaixo do líquido numa fatura deixa-a `PARTIAL` (a única via de parcial na fase 2 —
 não há repartição fina por linha); a prova de pagamento **não é obrigatória**.
+
+## Notas de crédito
+
+Fase 3 da paridade com o Excel. Uma NC só existe **agarrada a uma fatura já lançada** — o seu
+único significado é "esta fatura vale menos X". Vive na mesma tabela
+(`document_type = CREDIT_NOTE`, `related_invoice_id` = a origem). Tudo `ADMIN`. Ver
+[[faturas-modelo-alvo.md]] §6 e [[database.md]] → `construction_invoice`.
+
+- `GET /construction-invoices/{id}/credit-notes/split-preview?amount=100` → proposta de
+  repartição negativa (`{ originAllocated, total, lines: [{budgetItemId, budgetItemCode,
+  budgetItemName, amount<0}] }`), na proporção das despesas da fatura. Nada gravado. Origem
+  sem despesa → `lines` vazio (a NC também não gera despesas).
+- `POST /construction-invoices/{id}/credit-notes` → cria a NC. Corpo: `{ totalAmount (positivo),
+  invoiceNumber?, invoiceAtcud?, invoiceDate?, supplierNif?, description?, notes?,
+  documentStatus?, expenses?: [{budgetItemId, amount}] }`. A NC **herda** `scope`/obra da
+  origem e o NIF por omissão (NIF diferente → grava com aviso). `expenses` são as linhas
+  confirmadas (0 ou 1 na fase 3); o serviço grava-as sempre com `total_price` negativo.
+
+**Líquido da fatura** = `totalAmount − Σ (totalAmount das suas NC)`, exposto em todos os DTOs
+de fatura como `netAmount`, com `creditNoteTotal` e `creditNotes[]` (refs). É o `netAmount`
+que os pagamentos cobrem e o filtro `?outstanding=` usa; as linhas `CREDIT_NOTE` nunca contam
+como "por liquidar" nem entram no `pending-count`. `POST .../{id}/payments` recusa uma NC
+(`INVOICE_027`). O `preview` do upload passa a devolver `documentType` (campo `D` do QR): um
+`"NC"` encaminha o utilizador para este fluxo em vez do registo normal.
 
 ## Fornecedores (`SupplierController`, `/suppliers`)
 

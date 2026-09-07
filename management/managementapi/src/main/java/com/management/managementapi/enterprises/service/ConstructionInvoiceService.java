@@ -2,12 +2,17 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteExpenseLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteRefDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.DuplicateInvoiceRefDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
@@ -48,6 +53,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -146,6 +153,7 @@ public class ConstructionInvoiceService {
                 draft.getInvoiceDate(),
                 draft.getTotalAmount(),
                 draft.needsReview(),
+                qr.map(AtInvoiceQrService.AtInvoiceData::documentType).orElse(null),
                 qr.map(AtInvoiceQrService.AtInvoiceData::warnings).orElse(List.of()));
     }
 
@@ -235,6 +243,126 @@ public class ConstructionInvoiceService {
         rejectIfDuplicate(invoice, null);
 
         return toResponseDTO(repository.save(invoice), false);
+    }
+
+    // ── notas de crédito (fase 3) ─────────────────────────────
+
+    /**
+     * Regista uma nota de crédito a partir de uma fatura já lançada.
+     *
+     * A NC vive na mesma tabela ({@code document_type = CREDIT_NOTE},
+     * {@code related_invoice_id} = a origem). Herda o âmbito e a obra da origem;
+     * o NIF herda por omissão e um NIF diferente grava com aviso, não bloqueia
+     * (há grupos que faturam com NIFs diferentes). Sem NC de NC: a origem tem
+     * de ser um {@code INVOICE}.
+     *
+     * As despesas negativas — na proporção da fatura de origem — vêm já
+     * confirmadas em {@code dto.expenses()} (0 ou 1 linha na fase 3); a proposta
+     * calcula-se em {@link #previewCreditNoteSplit(UUID, java.math.BigDecimal)}.
+     */
+    public ConstructionInvoiceResponseDTO createCreditNote(UUID originId, CreditNoteCreateDTO dto) {
+        ConstructionInvoice origin = getById(originId);
+        if (origin.getDocumentType() != ConstructionInvoice.DocumentType.INVOICE) {
+            throw new BusinessException(ErrorCode.INVOICE_CREDIT_NOTE_TARGET_NOT_INVOICE);
+        }
+
+        ConstructionInvoice creditNote = new ConstructionInvoice();
+        creditNote.setDocumentType(ConstructionInvoice.DocumentType.CREDIT_NOTE);
+        creditNote.setRelatedInvoiceId(originId);
+        creditNote.setScope(origin.getScope());
+        creditNote.setEnterprise(origin.getEnterprise());
+
+        String nif = trimToNull(dto.supplierNif());
+        creditNote.setSupplierNif(nif != null ? nif : origin.getSupplierNif());
+        creditNote.setSupplierName(origin.getSupplierName());
+        creditNote.setInvoiceNumber(trimToNull(dto.invoiceNumber()));
+        creditNote.setInvoiceAtcud(trimToNull(dto.invoiceAtcud()));
+        creditNote.setInvoiceDate(dto.invoiceDate());
+        creditNote.setTotalAmount(dto.totalAmount());
+        creditNote.setDescription(trimToNull(dto.description()));
+        creditNote.setNotes(trimToNull(dto.notes()));
+        creditNote.setDocumentStatus(registerStatus(dto.documentStatus()));
+        authContext.currentProfileId().ifPresent(creditNote::setCreatedBy);
+
+        if (nif != null && origin.getSupplierNif() != null && !nif.equals(origin.getSupplierNif())) {
+            log.info("Nota de crédito com NIF {} diferente do da fatura de origem {} ({}) — gravada na mesma",
+                    nif, originId, origin.getSupplierNif());
+        }
+
+        rejectIfDuplicate(creditNote, null);
+        ConstructionInvoice saved = repository.save(creditNote);
+
+        applyCreditNoteExpenses(saved, origin, dto.expenses());
+
+        return toResponseDTO(saved, false);
+    }
+
+    /**
+     * A proposta de repartição negativa: uma linha por despesa da fatura de
+     * origem, {@code amount = -(valor da NC × despesa / total da origem)}, com a
+     * última a absorver o arredondamento. Na fase 3 a origem tem no máximo uma
+     * despesa, logo a proposta tem 0 ou 1 linha. Nada é gravado.
+     */
+    @Transactional(readOnly = true)
+    public CreditNoteSplitPreviewDTO previewCreditNoteSplit(UUID originId, BigDecimal creditNoteTotal) {
+        ConstructionInvoice origin = getById(originId);
+        if (origin.getDocumentType() != ConstructionInvoice.DocumentType.INVOICE) {
+            throw new BusinessException(ErrorCode.INVOICE_CREDIT_NOTE_TARGET_NOT_INVOICE);
+        }
+
+        List<ConstructionExpense> originExpenses = expenseRepository.findByInvoiceId(originId)
+                .map(List::of).orElseGet(List::of);
+        BigDecimal ncTotal = creditNoteTotal == null ? BigDecimal.ZERO : creditNoteTotal.abs();
+
+        if (originExpenses.isEmpty() || ncTotal.signum() == 0
+                || origin.getTotalAmount() == null || origin.getTotalAmount().signum() == 0) {
+            return new CreditNoteSplitPreviewDTO(!originExpenses.isEmpty(), BigDecimal.ZERO, List.of());
+        }
+
+        List<ProposedExpenseDTO> lines = new ArrayList<>();
+        BigDecimal allocated = BigDecimal.ZERO;
+        for (int i = 0; i < originExpenses.size(); i++) {
+            ConstructionExpense origExpense = originExpenses.get(i);
+            ConstructionBudgetItem item = origExpense.getBudgetItem();
+            BigDecimal share = i == originExpenses.size() - 1
+                    ? ncTotal.subtract(allocated)
+                    : ncTotal.multiply(origExpense.getTotalPrice())
+                            .divide(origin.getTotalAmount(), 2, RoundingMode.HALF_UP);
+            allocated = allocated.add(share);
+            lines.add(new ProposedExpenseDTO(item.getId(), item.getCode(), item.getName(), share.negate()));
+        }
+        return new CreditNoteSplitPreviewDTO(true, ncTotal.negate(), lines);
+    }
+
+    private void applyCreditNoteExpenses(ConstructionInvoice creditNote, ConstructionInvoice origin,
+                                         List<CreditNoteExpenseLineDTO> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        // uq_expense_invoice: 1 fatura → 1 despesa. A repartição por N rubricas é a fase 4.
+        if (lines.size() > 1) {
+            throw new BusinessException(ErrorCode.INVOICE_CREDIT_NOTE_SPLIT_INVALID);
+        }
+        CreditNoteExpenseLineDTO line = lines.get(0);
+        ConstructionBudgetItem item = budgetItemRepository.findById(line.budgetItemId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
+        if (origin.getEnterpriseId() == null
+                || !item.getEnterprise().getId().equals(origin.getEnterpriseId())) {
+            throw new BusinessException(ErrorCode.INVOICE_ITEM_OTHER_ENTERPRISE);
+        }
+
+        ConstructionExpense expense = new ConstructionExpense();
+        expense.setInvoice(creditNote);
+        expense.setBudgetItem(item);
+        expense.setName(firstNonBlank(creditNote.getInvoiceNumber(), "Nota de crédito"));
+        expense.setExpenseDate(creditNote.getInvoiceDate() != null ? creditNote.getInvoiceDate()
+                : origin.getInvoiceDate() != null ? origin.getInvoiceDate()
+                : LocalDate.now());
+        // Sempre negativo: uma NC abate, não acrescenta.
+        expense.setTotalPrice(line.amount().abs().negate());
+        expense.setDescription(creditNote.getNotes());
+        authContext.currentProfileId().ifPresent(expense::setCreatedBy);
+        expenseRepository.save(expense);
     }
 
     /**
@@ -360,11 +488,13 @@ public class ConstructionInvoiceService {
         Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
         Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
         Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
+        Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
 
         return page.map(invoice -> toResponseDTO(invoice,
                 allocations.get(invoice.getId()),
                 documents.getOrDefault(invoice.getId(), List.of()),
                 payments.getOrDefault(invoice.getId(), List.of()),
+                creditNotes.getOrDefault(invoice.getId(), List.of()),
                 false));
     }
 
@@ -580,11 +710,13 @@ public class ConstructionInvoiceService {
         Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
         Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
         Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
+        Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
 
         return page.map(invoice -> toResponseDTO(invoice,
                 allocations.get(invoice.getId()),
                 documents.getOrDefault(invoice.getId(), List.of()),
                 payments.getOrDefault(invoice.getId(), List.of()),
+                creditNotes.getOrDefault(invoice.getId(), List.of()),
                 false));
     }
 
@@ -805,6 +937,7 @@ public class ConstructionInvoiceService {
                 findAllocation(invoice.getId()).orElse(null),
                 documentRepository.findByInvoiceIdOrderByUploadedAtAsc(invoice.getId()),
                 paymentService.paymentsForInvoice(invoice.getId(), includeFileUrl),
+                repository.findCreditNotesFor(invoice.getId()),
                 includeFileUrl);
     }
 
@@ -812,6 +945,7 @@ public class ConstructionInvoiceService {
                                                          ConstructionExpense allocation,
                                                          List<ConstructionInvoiceDocument> documents,
                                                          List<InvoicePaymentSummaryDTO> payments,
+                                                         List<ConstructionInvoice> creditNotes,
                                                          boolean includeFileUrl) {
         ConstructionBudgetItem item = allocation == null ? null : allocation.getBudgetItem();
         // Os campos soltos de ficheiro descrevem o documento principal e são o
@@ -819,11 +953,20 @@ public class ConstructionInvoiceService {
         // sem documento nenhum é legal desde a V24 e traz tudo isto a null.
         ConstructionInvoiceDocument primary = documents.isEmpty() ? null : documents.get(0);
 
+        // Líquido = total − Σ notas de crédito. É o que os pagamentos cobrem e o
+        // que a comparação orçamento vs. gasto usa.
+        BigDecimal creditNoteTotal = creditNotes.stream()
+                .map(ConstructionInvoice::getTotalAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal netAmount = invoice.getTotalAmount() == null
+                ? null
+                : invoice.getTotalAmount().subtract(creditNoteTotal);
+
         // Estado de pagamento é derivado: soma das ligações vs. líquido da fatura.
-        java.math.BigDecimal netAmount = paymentService.netAmount(invoice);
-        java.math.BigDecimal paidAmount = payments.stream()
+        BigDecimal paidAmount = payments.stream()
                 .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
-                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         String paymentStatus = PaymentService.deriveStatus(netAmount, paidAmount).name();
 
         return new ConstructionInvoiceResponseDTO(
@@ -871,6 +1014,9 @@ public class ConstructionInvoiceService {
                 netAmount,
                 payments,
 
+                creditNoteTotal,
+                creditNotes.stream().map(this::toCreditNoteRef).toList(),
+
                 invoice.isSentToAccountant(),
                 invoice.getSentToAccountantBy(),
                 resolveProfileName(invoice.getSentToAccountantBy()),
@@ -899,10 +1045,28 @@ public class ConstructionInvoiceService {
                 document.getUploadedAt());
     }
 
+    private CreditNoteRefDTO toCreditNoteRef(ConstructionInvoice creditNote) {
+        return new CreditNoteRefDTO(
+                creditNote.getId(),
+                creditNote.getInvoiceNumber(),
+                creditNote.getInvoiceDate(),
+                creditNote.getTotalAmount(),
+                creditNote.getDocumentStatus().name());
+    }
+
     // ── auxiliares ────────────────────────────────────────────
 
     private Optional<ConstructionExpense> findAllocation(UUID invoiceId) {
         return expenseRepository.findByInvoiceId(invoiceId);
+    }
+
+    /** As notas de crédito de uma página inteira de faturas numa query. */
+    private Map<UUID, List<ConstructionInvoice>> loadCreditNotes(List<UUID> invoiceIds) {
+        if (invoiceIds.isEmpty()) {
+            return Map.of();
+        }
+        return repository.findCreditNotesForAll(invoiceIds).stream()
+                .collect(Collectors.groupingBy(ConstructionInvoice::getRelatedInvoiceId));
     }
 
     /** Os documentos de uma página inteira de faturas numa query, em vez de uma por linha. */

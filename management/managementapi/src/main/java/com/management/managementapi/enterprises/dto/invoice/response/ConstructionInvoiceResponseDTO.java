@@ -93,6 +93,12 @@ public record ConstructionInvoiceResponseDTO(
         /** Os movimentos que tocaram esta fatura, do mais antigo ao mais recente. */
         List<InvoicePaymentSummaryDTO> payments,
 
+        // ── notas de crédito (fase 3) ──
+        /** Σ do valor das notas de crédito ligadas a esta fatura (0 se não tiver). */
+        BigDecimal creditNoteTotal,
+        /** As notas de crédito ligadas a esta fatura, da mais recente para a mais antiga. */
+        List<CreditNoteRefDTO> creditNotes,
+
         // ── contabilidade ──
         boolean sentToAccountant,
         UUID sentToAccountantBy,

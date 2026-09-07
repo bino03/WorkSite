@@ -47,8 +47,15 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
     check `ck_invoice_credit_note_target` obriga uma nota de crédito a apontar
     (`related_invoice_id`) para a fatura que corrige, e proíbe uma fatura normal de o fazer.
     O auto-FK é `ON DELETE RESTRICT`: apagar uma fatura com nota de crédito pendurada tem de
-    ser um ato deliberado. **As regras de negócio da NC são a fase 3** — a `V28` só abre a
-    coluna.
+    ser um ato deliberado. **A lógica da NC entrou na fase 3** (sem migração): a NC vive nesta
+    mesma linha (`document_type = CREDIT_NOTE`, `related_invoice_id` = a origem, que tem de ser
+    um `INVOICE` — "sem NC de NC", validado no serviço), `total_amount` **positivo** (o valor da
+    NC), herda `scope`/`enterprise`/NIF da origem. **Líquido de uma fatura = `total_amount − Σ
+    total_amount das suas NC`** — não é coluna, calcula-se no serviço; é o que os pagamentos
+    cobrem e o que o filtro "por liquidar" usa. A NC gera as suas próprias `construction_expense`
+    com `total_price` **negativo** (na proporção da origem; ≤1 hoje, por causa de
+    `uq_expense_invoice` — a repartição por N rubricas é a fase 4). Ver [[api.md]] → "Notas de
+    crédito".
   - **Unicidade global desde a `V29`.** Os três índices de duplicado deixaram de ser por
     projeto: `uq_invoice_atcud` (substitui `uq_invoice_enterprise_atcud` da `V17`),
     `uq_invoice_nif_number` (o par, que antes não tinha índice nenhum) e

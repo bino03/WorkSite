@@ -1,9 +1,11 @@
 package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
@@ -40,6 +42,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -140,6 +143,38 @@ public class ConstructionInvoiceController {
                         invoiceLabel(result.invoice()), null, request));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    /**
+     * A proposta de repartição negativa de uma nota de crédito sobre esta
+     * fatura, na proporção das suas despesas. Nada é gravado — o utilizador
+     * confirma ou altera as linhas e só depois é que cria a NC com elas.
+     */
+    @GetMapping("/{originId}/credit-notes/split-preview")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CreditNoteSplitPreviewDTO> creditNoteSplitPreview(
+            @PathVariable UUID originId,
+            @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(service.previewCreditNoteSplit(originId, amount));
+    }
+
+    /**
+     * Regista uma nota de crédito a partir desta fatura. A NC herda o âmbito e a
+     * obra da origem; as despesas negativas vêm já confirmadas no corpo.
+     */
+    @PostMapping("/{originId}/credit-notes")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ConstructionInvoiceResponseDTO> createCreditNote(
+            @PathVariable UUID originId,
+            @Valid @RequestBody CreditNoteCreateDTO dto,
+            HttpServletRequest request) {
+        ConstructionInvoiceResponseDTO created = service.createCreditNote(originId, dto);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, created.id(), invoiceLabel(created), request));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     /**

@@ -40,10 +40,16 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                    or (:needsReview = true  and (i.invoiceDate is null or i.totalAmount is null))
                    or (:needsReview = false and  i.invoiceDate is not null and i.totalAmount is not null))
               and (:outstanding is null
-                   or (:outstanding = true  and (i.totalAmount is null
-                        or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) < i.totalAmount))
-                   or (:outstanding = false and i.totalAmount is not null
-                        and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) >= i.totalAmount))
+                   or (i.relatedInvoiceId is null and (
+                        (:outstanding = true  and (i.totalAmount is null
+                             or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                < i.totalAmount))
+                     or (:outstanding = false and i.totalAmount is not null
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                >= i.totalAmount)
+                   )))
               and (:sentToAccountant is null or i.sentToAccountant = :sentToAccountant)
               and (:from is null or i.invoiceDate >= :from)
               and (:to   is null or i.invoiceDate <= :to)
@@ -76,10 +82,16 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
             select i from ConstructionInvoice i
             where i.scope = :scope
               and (:outstanding is null
-                   or (:outstanding = true  and (i.totalAmount is null
-                        or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) < i.totalAmount))
-                   or (:outstanding = false and i.totalAmount is not null
-                        and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) >= i.totalAmount))
+                   or (i.relatedInvoiceId is null and (
+                        (:outstanding = true  and (i.totalAmount is null
+                             or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                < i.totalAmount))
+                     or (:outstanding = false and i.totalAmount is not null
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                >= i.totalAmount)
+                   )))
               and (:q is null
                    or lower(i.supplierName)  like lower(concat('%', :q, '%'))
                    or lower(i.supplierNif)   like lower(concat('%', :q, '%'))
@@ -97,9 +109,30 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
     @Query("""
             select count(i) from ConstructionInvoice i
             where i.enterprise.id = :enterpriseId
+              and i.relatedInvoiceId is null
               and not exists (select 1 from ConstructionExpense e where e.invoice = i)
             """)
     long countPending(@Param("enterpriseId") UUID enterpriseId);
+
+    // ── notas de crédito (fase 3) ─────────────────────────────
+    // Uma linha com `related_invoice_id` preenchido É uma nota de crédito
+    // (garantido pelo check `ck_invoice_credit_note_target` da V28).
+
+    /** As notas de crédito de uma fatura, da mais recente para a mais antiga. */
+    @Query("""
+            select i from ConstructionInvoice i
+            where i.relatedInvoiceId = :invoiceId
+            order by i.invoiceDate desc nulls last, i.createdAt desc
+            """)
+    List<ConstructionInvoice> findCreditNotesFor(@Param("invoiceId") UUID invoiceId);
+
+    /** As notas de crédito de uma página inteira de faturas, numa query. */
+    @Query("select i from ConstructionInvoice i where i.relatedInvoiceId in :invoiceIds")
+    List<ConstructionInvoice> findCreditNotesForAll(@Param("invoiceIds") Collection<UUID> invoiceIds);
+
+    /** Σ do valor das notas de crédito de uma fatura (0 se não tiver). */
+    @Query("select coalesce(sum(i.totalAmount), 0) from ConstructionInvoice i where i.relatedInvoiceId = :invoiceId")
+    java.math.BigDecimal sumCreditNotesFor(@Param("invoiceId") UUID invoiceId);
 
     /**
      * Faturas com o mesmo ATCUD, em qualquer obra ou na quarentena (V29). Serve o aviso de duplicado: agora que
