@@ -192,6 +192,19 @@ private EnterpriseLocationDTO convertToEnterpriseLocationDTO(EnterprisesLocation
 
     // EDITOVERVIEW CARD
     @SuppressWarnings("null")
+/**
+ * O slug é o nome da pasta da obra no vault Excel: mantém espaços e acentos, mas nunca
+ * espaços à volta, e um valor em branco conta como ausente (limpa a coluna).
+ * Espelha {@code EnterpriseService.normalizeSlug}.
+ */
+private static String normalizeSlug(String slug) {
+    if (slug == null) {
+        return null;
+    }
+    String trimmed = slug.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+}
+
 public EditOverViewCardDTO updateOverview(@NonNull UUID id, EditOverViewCardDTO dto) {
         // Buscar a empresa pelo ID
         Enterprise enterprise = enterpriseRepository.findById(id)
@@ -210,6 +223,18 @@ public EditOverViewCardDTO updateOverview(@NonNull UUID id, EditOverViewCardDTO 
         if (dto.getStatus() != null) {
             enterprise.setStatus(dto.getStatus());
         }
+        // slug: "" (ou só espaços) limpa; qualquer outro valor tem de ser único (paridade com o vault).
+        if (dto.getSlug() != null) {
+            String slug = normalizeSlug(dto.getSlug());
+            if (slug != null && enterpriseRepository.existsBySlugAndIdNot(slug, id)) {
+                throw new BusinessException(ErrorCode.ENTERPRISE_DUPLICATE_SLUG,
+                        "Enterprise slug already in use: " + slug);
+            }
+            enterprise.setSlug(slug);
+        }
+        if (dto.getIsTest() != null) {
+            enterprise.setIsTest(dto.getIsTest());
+        }
 
         // Salvar a entidade atualizada
         Enterprise updatedEnterprise = Objects.requireNonNull(enterpriseRepository.save(enterprise), "saved enterprise");
@@ -225,6 +250,8 @@ public EditOverViewCardDTO updateOverview(@NonNull UUID id, EditOverViewCardDTO 
         dto.setInternalReference(enterprise.getInternalReference());
         dto.setType(enterprise.getType());
         dto.setStatus(enterprise.getStatus());
+        dto.setSlug(enterprise.getSlug());
+        dto.setIsTest(enterprise.getIsTest());
         return dto;
     }
 

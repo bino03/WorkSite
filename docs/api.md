@@ -116,10 +116,12 @@ O domínio "projeto" do Worksite — os nomes `enterprise`/`enterprises` foram m
 Desde a `V23`, o projeto tem dois campos que existem **só para a paridade com o Excel da
 Vilatro**: `slug` (o nome exato da pasta `Empreendimentos\<Obra>\` no vault, com espaços e
 acentos — `"Vila Petrus"`) e `isTest` (`false` por omissão; marca as obras que existem só para
-experimentar). Ambos entram no `POST`/`PUT` e saem em todas as respostas. O `slug` é **único
-quando preenchido** — o segundo projeto com o mesmo slug é recusado com `ENT_032`, porque dois
-projetos a apontar para a mesma pasta tornariam ambígua qualquer importação ou exportação. Ver
-[[excel-parity.md]] §2.
+experimentar). Entram no `POST`/`PUT` e no `PATCH /enterprise-relations/{id}/overview`
+(desde 2026-09-07 — antes o overview só editava nome/referência/tipo/estado), e saem em todas
+as respostas, incluindo a do próprio overview. No `PATCH`, enviar `slug: ""` limpa a coluna; um
+`slug` ausente do corpo não lhe toca. O `slug` é **único quando preenchido** — o segundo
+projeto com o mesmo slug é recusado com `ENT_032`, porque dois projetos a apontar para a mesma
+pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-parity.md]] §2.
 
 | Método | Rota | Acesso |
 |---|---|---|

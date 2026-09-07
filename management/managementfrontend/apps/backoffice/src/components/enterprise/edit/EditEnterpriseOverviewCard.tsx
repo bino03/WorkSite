@@ -10,6 +10,7 @@ import {
   Button,
   message,
   Form,
+  Switch,
   Typography,
 } from "antd";
 import {
@@ -19,10 +20,10 @@ import {
   CheckCircleOutlined,
 } from "@ant-design/icons";
 import api from "@/api";
+import { ErrorHandler } from "@/errors/errorHandler";
 import type { EnterpriseFullResponseDTO } from "@/services/enterpriseService";
 
 const { Text } = Typography;
-const { TextArea } = Input;
 
 // Enums e opções (usando i18n keys)
 const ENTERPRISE_TYPE_OPTIONS = [
@@ -71,6 +72,8 @@ const EditEnterpriseOverviewCard: React.FC<Props> = ({ data, onSave, onCancel })
         type: data.type ?? "residential",
         status: data.status ?? "planning",
         description: data.description ?? "",
+        slug: data.slug ?? "",
+        isTest: data.isTest ?? false,
       });
     }
   }, [data, form]);
@@ -94,6 +97,8 @@ const EditEnterpriseOverviewCard: React.FC<Props> = ({ data, onSave, onCancel })
         type: values.type,
         status: values.status,
         description: values.description,
+        slug: (values.slug ?? "").trim(),
+        isTest: values.isTest ?? false,
       };
 
       // Fazer a requisição de update
@@ -108,8 +113,12 @@ const EditEnterpriseOverviewCard: React.FC<Props> = ({ data, onSave, onCancel })
       onSave(updatedData);
       message.success(t('enterprises.updated'));
     } catch (error) {
+      // validateFields rejeita com { errorFields } — aí não há nada para o ErrorHandler.
+      if (error && typeof error === "object" && "errorFields" in error) {
+        return;
+      }
       console.error("Erro ao atualizar empreendimento:", error);
-      message.error(t('enterprises.loadError'));
+      ErrorHandler.handle(error);
     } finally {
       setSaving(false);
     }
@@ -321,6 +330,60 @@ const EditEnterpriseOverviewCard: React.FC<Props> = ({ data, onSave, onCancel })
               <Form.Item name="internalReference" style={{ margin: 0 }}>
                 <Input placeholder={t('enterpriseEdit.internalRefExPlaceholder')} />
               </Form.Item>
+            </div>
+          </Col>
+        </Row>
+
+        {/* Paridade com o vault Excel da Vilatro */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
+          <Col xs={24} sm={16}>
+            <div style={{
+              padding: '20px',
+              backgroundColor: '#fafafa',
+              borderRadius: '12px',
+              border: '1px solid #e8e8e8',
+              height: '100%',
+            }}>
+              <Text strong style={{ color: '#595959', fontSize: '12px', textTransform: 'uppercase' }}>
+                Pasta no vault (Vilatro)
+              </Text>
+              <Form.Item
+                name="slug"
+                style={{ margin: '12px 0 0' }}
+                rules={[
+                  {
+                    pattern: /^[\p{L}\p{N} .\-_]*$/u,
+                    message: 'Só letras, números, espaços, ponto, hífen e underscore',
+                  },
+                  { max: 120, message: 'No máximo 120 caracteres' },
+                ]}
+              >
+                <Input placeholder="Ex.: Vila Petrus" />
+              </Form.Item>
+              <div style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '6px' }}>
+                Nome exato da pasta Empreendimentos\&lt;Obra&gt;\ no vault Excel. Renomear de um lado
+                obriga a renomear do outro.
+              </div>
+            </div>
+          </Col>
+
+          <Col xs={24} sm={8}>
+            <div style={{
+              padding: '20px',
+              backgroundColor: '#fafafa',
+              borderRadius: '12px',
+              border: '1px solid #e8e8e8',
+              height: '100%',
+            }}>
+              <Text strong style={{ color: '#595959', fontSize: '12px', textTransform: 'uppercase' }}>
+                Obra de teste
+              </Text>
+              <Form.Item name="isTest" valuePropName="checked" style={{ margin: '12px 0 0' }}>
+                <Switch />
+              </Form.Item>
+              <div style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '6px' }}>
+                Marca obras que existem só para experimentar; os relatórios excluem-nas.
+              </div>
             </div>
           </Col>
         </Row>

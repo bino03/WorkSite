@@ -19,6 +19,7 @@ import MediaSection from "@/components/enterprise/create/EnterpriseMediaSection"
 
 // API
 import api from "@/api";
+import { ErrorHandler } from "@/errors/errorHandler";
 
 interface CreateEnterpriseDrawerProps {
     open: boolean;
@@ -203,6 +204,8 @@ export default function CreateEnterpriseDrawer({ open, onClose, onCreated }: Cre
             ownerId: data.owner_id || null,
             createdBy: data.created_by || null,
             isActive: data.is_active,
+            slug: data.slug?.trim() || null,
+            isTest: data.is_test,
 
             // Localização EM CAMELCASE
             ...(existingLocationId && { existingLocationId }),
@@ -265,9 +268,7 @@ export default function CreateEnterpriseDrawer({ open, onClose, onCreated }: Cre
         
     } catch (e: unknown) {
         console.error("Erro detalhado:", e);
-        const err = e as Record<string, unknown>;
-        const resp = (err.response as Record<string, unknown>)?.data as Record<string, unknown>;
-        message.error(t('enterprises.loadError'));
+        ErrorHandler.handle(e);
     } finally {
         setIsSubmitting(false);
     }

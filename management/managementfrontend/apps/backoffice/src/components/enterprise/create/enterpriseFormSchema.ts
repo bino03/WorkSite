@@ -47,6 +47,18 @@ export const EnterpriseFormSchema = z.object({
   status: EnterpriseStatusEnum.optional(),
   is_active: z.boolean().default(true),
 
+  // Paridade com o vault Excel da Vilatro:
+  // slug = nome exato da pasta Empreendimentos\<Obra>\ (com espaços e acentos), não um slug de URL.
+  slug: z
+    .string()
+    .max(120, "A pasta do vault não pode ter mais de 120 caracteres")
+    .regex(
+      /^[\p{L}\p{N} .\-_]*$/u,
+      "A pasta do vault só pode ter letras, números, espaços, ponto, hífen e underscore",
+    )
+    .optional(),
+  is_test: z.boolean().default(false),
+
   // TimelineMetricsSection
   start_date: z.string().optional(),
   completion_date: z.string().optional(),
@@ -85,6 +97,8 @@ export const defaultValues: EnterpriseFormValues = {
   type: undefined,
   status: undefined,
   is_active: true,
+  slug: "",
+  is_test: false,
   start_date: "",
   completion_date: "",
   total_area: undefined,

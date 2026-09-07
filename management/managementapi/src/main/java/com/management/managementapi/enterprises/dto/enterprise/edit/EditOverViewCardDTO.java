@@ -23,5 +23,11 @@ public class EditOverViewCardDTO {
     private String internalReference;
     private EnterPriseType type;
     private EnterPriseStatus status;
-   
+
+    /** Nome da pasta da obra no vault Excel da Vilatro. Enviar "" limpa-o. */
+    private String slug;
+
+    /** Obra só de teste — excluída de exportações, importações e somas da empresa. */
+    private Boolean isTest;
+
 }

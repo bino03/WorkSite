@@ -82,6 +82,30 @@ export default function BasicInfoSection() {
             )}
           />
         </div>
+
+        <div className="field">
+          <label>Pasta no vault (Vilatro)</label>
+          <Controller
+            control={control}
+            name="slug"
+            render={({ field }) => (
+              <Input
+                {...field}
+                size={FIELD_SIZE}
+                placeholder="Ex.: Vila Petrus"
+              />
+            )}
+          />
+          <p style={{ color: "var(--ind-neutral-600)", fontSize: 12, marginTop: 4 }}>
+            Nome exato da pasta <code>Empreendimentos\&lt;Obra&gt;\</code> no vault Excel. Renomear
+            de um lado obriga a renomear do outro.
+          </p>
+          {errors.slug && (
+            <p style={{ color: "var(--ind-neutral-700)", fontSize: 12, marginTop: 4 }}>
+              {String(errors.slug.message)}
+            </p>
+          )}
+        </div>
       </BlueprintCard>
 
       <BlueprintCard kicker="Classificação & Estado" style={{ padding: "13.6px", gap: "10.2px" }}>
@@ -131,6 +155,21 @@ export default function BasicInfoSection() {
               <Switch checked={field.value} onChange={field.onChange} />
               <span style={{ fontSize: 13 }}>
                 {field.value ? "Ativo — visível no sistema" : "Inativo — oculto no sistema"}
+              </span>
+            </div>
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="is_test"
+          render={({ field }) => (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Switch checked={field.value} onChange={field.onChange} />
+              <span style={{ fontSize: 13 }}>
+                {field.value
+                  ? "Obra de teste — excluída dos relatórios"
+                  : "Obra real"}
               </span>
             </div>
           )}

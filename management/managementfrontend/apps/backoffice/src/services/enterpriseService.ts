@@ -75,6 +75,8 @@ export interface EnterpriseFullResponseDTO {
   createdbyName?: string | null;
   updatedBy?: string | null;
   isActive: boolean;
+  slug?: string | null;
+  isTest?: boolean;
   banner?: string | null;
   location?: LocationResponseDTO | null;
   media?: MediaResponseDTO[];
@@ -105,6 +107,8 @@ export const updateEnterpriseOverview = async (enterpriseId: string, data: {
   type: string;
   status: string;
   description?: string;
+  slug?: string | null;
+  isTest?: boolean;
 }) => {
   const response = await api.patch(`/enterprise-relations/${enterpriseId}/overview`, data);
   return response.data;
