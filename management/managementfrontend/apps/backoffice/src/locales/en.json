@@ -3535,6 +3535,43 @@
       "isCreditNoteTitle": "This is a credit note",
       "isCreditNoteBody": "A credit note is not registered here: open the invoice it corrects and use \"Register credit note\".",
       "success": "Credit note registered."
+    },
+    "classify": {
+      "title": "Classify invoices",
+      "open": "Classify",
+      "empty": "No invoices left to classify on this project.",
+      "queue": "{{done}} of {{total}}",
+      "skip": "Skip",
+      "confirm": "Confirm",
+      "sameAsPrevious": "Same as previous",
+      "sameAsPreviousHint": "Uses the budget item from the last invoice you confirmed here.",
+      "searchPlaceholder": "Code (4.2) or text (concrete)",
+      "searchEmpty": "No budget item found.",
+      "chapterTag": "chapter",
+      "chapterHint": "Still has items beneath it — classifying here means classifying at chapter level.",
+      "budgetVsSpent": "{{spent}} of {{budget}}",
+      "overBudget": "over budget",
+      "suggestion": "Suggestion",
+      "sourceHISTORY_PROJECT": "history on this project",
+      "sourceHISTORY_GLOBAL": "history from another project",
+      "noSuggestion": "No history for this supplier — search for the budget item.",
+      "split": "Split across budget items",
+      "splitSingle": "Back to a single budget item",
+      "splitRemaining": "Left to split: {{amount}}",
+      "splitFillRest": "Put the rest here",
+      "splitMustMatch": "The split must add up to {{total}}.",
+      "provisional": "Invoice has no total yet — the expenses start at zero.",
+      "confirmed": "Invoice classified.",
+      "batchTitle": "Classify {{count}} invoices under the same budget item",
+      "batchSuccess": "{{count}} invoice(s) classified.",
+      "batchPartial": "{{ok}} classified, {{failed}} not:",
+      "status": {
+        "NONE": "unclassified",
+        "PROVISIONAL": "provisional",
+        "PARTIAL": "partly split",
+        "COMPLETE": "classified"
+      },
+      "splitBadge": "{{count}} items"
     }
   },
   "budget": {

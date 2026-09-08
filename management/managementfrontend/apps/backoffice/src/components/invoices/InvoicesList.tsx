@@ -204,6 +204,22 @@ export const InvoicesList: FC<Props> = ({
                   </span>
                 );
               }
+              // Repartida: os campos singulares vêm a null de propósito (o
+              // backend recusa-se a apontar para a primeira e mentir sobre as
+              // outras). Mostra-se a contagem, e a lista completa no tooltip.
+              if (row.allocations.length > 1) {
+                return (
+                  <Tooltip
+                    title={row.allocations
+                      .map((a) => `${a.budgetItemCode ?? a.budgetItemName} · ${formatCurrency(a.amount ?? 0)}`)
+                      .join("\n")}
+                  >
+                    <span className="ind-tag ind-tag-accent-2">
+                      {row.allocations.length} rubricas
+                    </span>
+                  </Tooltip>
+                );
+              }
               return (
                 <Tooltip title={row.budgetItemName}>
                   <span className="ind-tag ind-tag-accent">

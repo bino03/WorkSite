@@ -3,6 +3,7 @@ import type {
   BudgetImportResult,
   BudgetItemNode,
   BudgetItemSaveResponse,
+  BudgetItemSearchResult,
   BudgetItemUpsert,
   BudgetTree,
   ConstructionExpense,
@@ -14,6 +15,28 @@ import type {
 /** Devolve a árvore completa (~200 nós) numa só chamada — não há paginação por nível. */
 export async function getBudgetTree(enterpriseId: string): Promise<BudgetTree> {
   const response = await api.get(`/construction-budget/enterprise/${enterpriseId}`);
+  return response.data;
+}
+
+/**
+ * Procura uma rubrica por código (`4.2`) ou por texto (`betão`) — o campo único
+ * do ecrã de classificação.
+ *
+ * Vem do servidor e não de um filtro sobre a {@link getBudgetTree} porque o
+ * resultado traz o **caminho completo** e o orçamentado vs. gasto já calculados,
+ * que é o que permite escolher a rubrica sem sair do campo. Sem notificação de
+ * erro: recalcula-se a cada tecla, e um toast por letra escrita não serve a
+ * ninguém.
+ */
+export async function searchBudgetItems(
+  enterpriseId: string,
+  query: string,
+  limit = 20
+): Promise<BudgetItemSearchResult[]> {
+  const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/search`, {
+    params: { q: query, limit },
+    skipErrorNotification: true,
+  });
   return response.data;
 }
 

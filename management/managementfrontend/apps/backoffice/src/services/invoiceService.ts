@@ -1,5 +1,6 @@
 import api from "@/api";
 import type {
+  BatchAllocateResult,
   BudgetItemSuggestion,
   ConstructionInvoice,
   ConstructionInvoiceUpsert,
@@ -8,7 +9,9 @@ import type {
   InvoiceFilters,
   InvoicePreviewResult,
   InvoiceRegisterPayload,
+  InvoiceSplitLine,
   InvoiceUploadResult,
+  RubricSuggestion,
 } from "@/types/invoice";
 
 export interface InvoicePage {
@@ -249,7 +252,55 @@ export async function allocateInvoice(
   return response.data;
 }
 
-/** Devolve a fatura à caixa de entrada, apagando o lançamento. */
+/**
+ * Reparte a fatura por N rubricas, **substituindo** a repartição atual.
+ *
+ * Não acrescenta: editar uma repartição é redesenhá-la, e um "junta esta linha"
+ * deixaria a soma a divergir do total sem ninguém dar por isso. A soma tem de
+ * esgotar o total da fatura (`INVOICE_028`) — exceto numa fatura ainda sem
+ * total, onde as linhas nascem a zero.
+ */
+export async function splitInvoice(
+  id: string,
+  lines: InvoiceSplitLine[]
+): Promise<ConstructionInvoice> {
+  const response = await api.post(`/construction-invoices/${id}/expenses/split`, { lines });
+  return response.data;
+}
+
+/**
+ * A rubrica que esta fatura provavelmente merece, com o porquê declarado.
+ * `null` quando não há nada a sugerir (o backend responde 204).
+ *
+ * Sem notificação de erro: falhar a sugestão não é motivo para interromper quem
+ * está a classificar — o ecrã continua a funcionar com a pesquisa à mão.
+ */
+export async function getRubricSuggestion(id: string): Promise<RubricSuggestion | null> {
+  const response = await api.get(`/construction-invoices/${id}/rubric-suggestion`, {
+    skipErrorNotification: true,
+  });
+  return response.status === 204 ? null : response.data;
+}
+
+/**
+ * Classifica N faturas para a mesma rubrica.
+ *
+ * Melhor esforço: devolve o que passou e o que falhou. Uma fatura que outro
+ * separador entretanto classificou não faz perder as restantes — por isso o
+ * chamador tem de **ler `failures`**, e não assumir que correu tudo bem.
+ */
+export async function batchAllocateInvoices(
+  invoiceIds: string[],
+  budgetItemId: string
+): Promise<BatchAllocateResult> {
+  const response = await api.post(`/construction-invoices/batch-allocate`, {
+    invoiceIds,
+    budgetItemId,
+  });
+  return response.data;
+}
+
+/** Devolve a fatura à caixa de entrada, apagando **todas** as linhas da repartição. */
 export async function deallocateInvoice(id: string): Promise<ConstructionInvoice> {
   const response = await api.delete(`/construction-invoices/${id}/allocate`);
   return response.data;

@@ -219,12 +219,17 @@ export const InvoiceDetailDrawer: FC<Props> = ({
 
   const handleDeallocate = () => {
     if (!invoice) return;
+    // Repartida, não há "a" rubrica — e prometer que se remove um lançamento
+    // quando são três seria mentir sobre o que o botão faz.
+    const split = invoice.allocations.length > 1;
     confirm({
-      title: "Desassociar da rubrica",
-      message: `Desassociar esta fatura da rubrica "${invoice.budgetItemName}"? O lançamento de ${formatCurrency(
-        invoice.totalAmount ?? 0
-      )} é removido do orçamento e a fatura volta à caixa de entrada.`,
-      actionLabel: "Desassociar",
+      title: split ? "Desfazer a repartição" : "Desassociar da rubrica",
+      message: split
+        ? `Esta fatura está repartida por ${invoice.allocations.length} rubricas. Desfazer apaga os ${invoice.allocations.length} lançamentos do orçamento e devolve a fatura à caixa de entrada.`
+        : `Desassociar esta fatura da rubrica "${invoice.budgetItemName}"? O lançamento de ${formatCurrency(
+            invoice.totalAmount ?? 0
+          )} é removido do orçamento e a fatura volta à caixa de entrada.`,
+      actionLabel: split ? "Desfazer" : "Desassociar",
       onConfirm: async () => {
         try {
           await deallocateInvoice(invoice.id);
@@ -378,13 +383,34 @@ export const InvoiceDetailDrawer: FC<Props> = ({
 
               {/* Estado --------------------------------------------------- */}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {/* Repartida por N rubricas: uma tag por linha, com o valor de
+                    cada uma. Os campos singulares vêm a null nesse caso. */}
                 {invoice.allocated ? (
-                  <span className="ind-tag ind-tag-accent">
-                    {invoice.budgetItemCode ? `${invoice.budgetItemCode} · ` : ""}
-                    {invoice.budgetItemName}
-                  </span>
+                  invoice.allocations.map((allocation) => (
+                    <span key={allocation.expenseId} className="ind-tag ind-tag-accent">
+                      {allocation.budgetItemCode ? `${allocation.budgetItemCode} · ` : ""}
+                      {allocation.budgetItemName}
+                      {invoice.allocations.length > 1 && (
+                        <> · {formatCurrency(allocation.amount ?? 0)}</>
+                      )}
+                    </span>
+                  ))
                 ) : (
                   <span className="ind-tag ind-tag-outline">por associar</span>
+                )}
+
+                {invoice.allocationStatus === "PARTIAL" && invoice.unallocatedAmount != null && (
+                  <Tooltip title="A repartição não esgota o total da fatura.">
+                    <span className="ind-tag ind-tag-outline">
+                      por repartir: {formatCurrency(invoice.unallocatedAmount)}
+                    </span>
+                  </Tooltip>
+                )}
+
+                {invoice.allocationStatus === "PROVISIONAL" && (
+                  <Tooltip title="A fatura ainda não tem total — as despesas estão a zero.">
+                    <span className="ind-tag ind-tag-neutral">provisória</span>
+                  </Tooltip>
                 )}
 
                 {invoice.needsReview && (

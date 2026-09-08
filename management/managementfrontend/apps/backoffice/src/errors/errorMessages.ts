@@ -281,7 +281,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_025': 'A prova de pagamento tem de ser PDF ou imagem.',
   'INVOICE_026': 'Uma nota de crédito tem de partir de uma fatura, não de outra nota de crédito.',
   'INVOICE_027': 'As notas de crédito não se pagam — reduzem a fatura a que pertencem.',
-  'INVOICE_028': 'Uma nota de crédito só pode abater a uma rubrica de cada vez, por agora.',
+  'INVOICE_028': 'A repartição por rubricas tem de somar o total da fatura.',
+  'INVOICE_029': 'Indique pelo menos uma rubrica para repartir a fatura.',
+  'INVOICE_030': 'A mesma rubrica aparece duas vezes na repartição.',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

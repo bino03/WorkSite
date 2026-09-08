@@ -3566,6 +3566,43 @@
       "isCreditNoteTitle": "Isto é uma nota de crédito",
       "isCreditNoteBody": "Uma nota de crédito não se regista por aqui: abra a fatura que ela corrige e use «Registar nota de crédito».",
       "success": "Nota de crédito registada."
+    },
+    "classify": {
+      "title": "Classificar faturas",
+      "open": "Classificar",
+      "empty": "Não há faturas por classificar nesta obra.",
+      "queue": "{{done}} de {{total}}",
+      "skip": "Saltar",
+      "confirm": "Confirmar",
+      "sameAsPrevious": "Igual à anterior",
+      "sameAsPreviousHint": "Usa a rubrica da última fatura que confirmaste aqui.",
+      "searchPlaceholder": "Código (4.2) ou texto (betão)",
+      "searchEmpty": "Nenhuma rubrica encontrada.",
+      "chapterTag": "capítulo",
+      "chapterHint": "Ainda tem sub-rubricas por baixo — classificar aqui é classificar ao capítulo.",
+      "budgetVsSpent": "{{spent}} de {{budget}}",
+      "overBudget": "acima do orçamento",
+      "suggestion": "Sugestão",
+      "sourceHISTORY_PROJECT": "histórico desta obra",
+      "sourceHISTORY_GLOBAL": "histórico de outra obra",
+      "noSuggestion": "Sem histórico deste fornecedor — procure a rubrica.",
+      "split": "Dividir por rubricas",
+      "splitSingle": "Voltar a uma só rubrica",
+      "splitRemaining": "Por repartir: {{amount}}",
+      "splitFillRest": "Pôr o resto aqui",
+      "splitMustMatch": "A repartição tem de somar {{total}}.",
+      "provisional": "Fatura ainda sem total — as despesas nascem a zero.",
+      "confirmed": "Fatura classificada.",
+      "batchTitle": "Classificar {{count}} faturas na mesma rubrica",
+      "batchSuccess": "{{count}} fatura(s) classificadas.",
+      "batchPartial": "{{ok}} classificadas, {{failed}} não:",
+      "status": {
+        "NONE": "por classificar",
+        "PROVISIONAL": "provisória",
+        "PARTIAL": "repartida em parte",
+        "COMPLETE": "classificada"
+      },
+      "splitBadge": "{{count}} rubricas"
     }
   },
   "budget": {

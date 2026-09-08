@@ -19,6 +19,7 @@ import EmployeeProfilePage from "./pages/backoffice/employee/EmployeeProfilePage
 import EnterprisesList from "./pages/enterprises/EnterprisesList";
 import ConstructionBudgetPage from "./pages/backoffice/enterprise/ConstructionBudgetPage";
 import EnterpriseInvoicesPage from "./pages/backoffice/enterprise/EnterpriseInvoicesPage";
+import ClassifyInvoicesPage from "./pages/backoffice/enterprise/ClassifyInvoicesPage";
 import UnidentifiedInvoicesPage from "./pages/backoffice/invoices/UnidentifiedInvoicesPage";
 import CompanyInvoicesPage from "./pages/backoffice/invoices/CompanyInvoicesPage";
 import TasksPage from "./pages/backoffice/TasksPage";
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="empreendimentos" element={<EnterprisesList />} />
               <Route path="empreendimentos/:enterpriseId/budget" element={<ConstructionBudgetPage />} />
               <Route path="empreendimentos/:enterpriseId/invoices" element={<EnterpriseInvoicesPage />} />
+              <Route path="empreendimentos/:enterpriseId/classify" element={<ClassifyInvoicesPage />} />
               <Route path="invoices/unidentified" element={<UnidentifiedInvoicesPage />} />
               <Route path="invoices/company" element={<CompanyInvoicesPage />} />
               <Route path="tasks" element={<TasksPage />} />

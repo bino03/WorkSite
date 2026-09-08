@@ -54,6 +54,72 @@ export interface InvoicePaymentSummary {
 }
 
 /**
+ * Quanto da fatura já está posto em rubricas.
+ *
+ * `PROVISIONAL` não é "incompleta": é a fatura que foi pedida ao fornecedor e
+ * ainda não chegou, classificada na mesma com as despesas a zero, para a
+ * rubrica já saber que ela vem aí. Distingue-se de `PARTIAL` (tem total, falta
+ * repartir) porque só assim se conseguem contar.
+ */
+export type AllocationStatus = "NONE" | "PROVISIONAL" | "PARTIAL" | "COMPLETE";
+
+/**
+ * Uma rubrica por onde a fatura está repartida, e quanto lhe toca.
+ *
+ * Desde a `V32` podem ser várias: a folha do armazém que traz cimento e
+ * ferragens deixa de ter de ir toda para o mesmo sítio. `amount` é zero numa
+ * fatura ainda sem total, e negativo numa nota de crédito.
+ */
+export interface InvoiceAllocation {
+  expenseId: string;
+  budgetItemId: string | null;
+  budgetItemCode: string | null;
+  budgetItemName: string | null;
+  amount: number | null;
+}
+
+/** Uma linha da repartição, do lado de quem a envia. */
+export interface InvoiceSplitLine {
+  budgetItemId: string;
+  amount: number | null;
+}
+
+/**
+ * De onde veio a sugestão de rubrica. Não há níveis de regras declaradas: as
+ * `supplier_rubric_rule` ficaram de fora da fase 4 (o histórico chega, e
+ * corrige-se sozinho).
+ */
+export type RubricSuggestionSource = "HISTORY_PROJECT" | "HISTORY_GLOBAL";
+
+/**
+ * A rubrica que esta fatura provavelmente merece, e **porquê**.
+ *
+ * O porquê não é decoração: uma sugestão sem origem aceita-se sem pensar, e
+ * classificar mal vai direto ao gasto por rubrica. A frase vem pronta do
+ * backend.
+ */
+export interface RubricSuggestion {
+  budgetItemId: string;
+  code: string | null;
+  name: string;
+  source: RubricSuggestionSource;
+  explanation: string;
+  /** A obra de onde veio o palpite — só em `HISTORY_GLOBAL`. */
+  referenceEnterprise: string | null;
+}
+
+/** O que aconteceu a cada fatura de um lote — melhor esforço, não tudo-ou-nada. */
+export interface BatchAllocateResult {
+  succeeded: number;
+  failures: {
+    invoiceId: string;
+    invoiceNumber: string | null;
+    errorCode: string;
+    message: string;
+  }[];
+}
+
+/**
  * Uma nota de crédito vista do lado da fatura que ela credita. `totalAmount` é
  * o valor da NC (**positivo**); o líquido da fatura é `total − Σ desses valores`.
  */
@@ -115,11 +181,23 @@ export interface ConstructionInvoice {
   /** Falta a data ou o total; não dá para associar enquanto assim estiver. */
   needsReview: boolean;
 
+  /** Tem pelo menos uma despesa. Não diz se está repartida a 100% — isso é o `allocationStatus`. */
   allocated: boolean;
+  /**
+   * Os quatro campos seguintes descrevem a afetação **quando há exatamente
+   * uma** — o caso normal, e o que quase toda a UI lê. Numa fatura repartida
+   * vêm a `null` de propósito: apontar para a primeira mentiria sobre as
+   * outras. A verdade completa é `allocations`.
+   */
   expenseId: string | null;
   budgetItemId: string | null;
   budgetItemCode: string | null;
   budgetItemName: string | null;
+  /** Todas as rubricas por onde a fatura está repartida (fase 4). */
+  allocations: InvoiceAllocation[];
+  allocationStatus: AllocationStatus;
+  /** `total − Σ despesas`. Null quando a fatura ainda não tem total. */
+  unallocatedAmount: number | null;
 
   /**
    * Os documentos da fatura, do mais antigo para o mais recente. Os campos

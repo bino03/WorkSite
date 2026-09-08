@@ -5,7 +5,7 @@ import { Button, Input, Space } from "antd";
 import { ArrowLeftOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 
 import {
-  allocateInvoice,
+  batchAllocateInvoices,
   deallocateInvoice,
   deleteInvoice,
   listInvoices,
@@ -145,17 +145,32 @@ const EnterpriseInvoicesPage: FC = () => {
   const handleAllocate = async (budgetItemId: string) => {
     setSaving(true);
     try {
-      // Sequencial e não em paralelo: são poucas, e um erro a meio deixa as
-      // anteriores gravadas em vez de um estado indefinido.
-      for (const invoice of allocating) {
-        await allocateInvoice(invoice.id, budgetItemId);
-      }
-      notificationService.success(
-        "Faturas",
-        allocating.length === 1
-          ? "Fatura associada à rubrica."
-          : `${allocating.length} faturas associadas à rubrica.`
+      // Uma chamada só, e melhor esforço do lado do servidor: era um `for` com
+      // um `await` por fatura, que rebentava no primeiro erro e deixava quem
+      // estava a ver sem saber quais tinham passado.
+      const result = await batchAllocateInvoices(
+        allocating.map((invoice) => invoice.id),
+        budgetItemId
       );
+
+      if (result.failures.length === 0) {
+        notificationService.success(
+          "Faturas",
+          result.succeeded === 1
+            ? "Fatura associada à rubrica."
+            : `${result.succeeded} faturas associadas à rubrica.`
+        );
+      } else {
+        // Nem sucesso nem erro: parte passou. Dizer qual falhou e porquê é a
+        // única resposta útil — um toast verde esconderia o problema.
+        notificationService.warning(
+          "Faturas",
+          `${result.succeeded} associada(s), ${result.failures.length} não: ` +
+            result.failures
+              .map((f) => `${f.invoiceNumber ?? "sem número"} (${f.message})`)
+              .join("; ")
+        );
+      }
       setAllocating([]);
       reload();
     } catch (error) {
@@ -285,6 +300,13 @@ const EnterpriseInvoicesPage: FC = () => {
         </div>
         {isAdmin() && (
           <Space>
+            {/* A fila de despachar. Fica aqui e não escondida no orçamento
+                porque é daqui que se vê quantas estão à espera. */}
+            <Button
+              onClick={() => navigate(`/backoffice/empreendimentos/${enterpriseId}/classify`)}
+            >
+              Classificar
+            </Button>
             <Button icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
               Registar sem ficheiro
             </Button>

@@ -63,6 +63,30 @@ export interface BudgetTree {
   roots: BudgetItemNode[];
 }
 
+/**
+ * Uma rubrica encontrada na pesquisa, achatada e já com contexto.
+ *
+ * O `path` é o que faz a diferença num orçamento real: "Betão" aparece em três
+ * capítulos diferentes e o nome sozinho não os distingue. O orçamentado e o
+ * gasto vêm juntos porque a pergunta de quem classifica é "ainda cabe aqui?" —
+ * e ir vê-la a outro ecrã é o que faz as pessoas desistirem e atirarem tudo
+ * para o capítulo.
+ */
+export interface BudgetItemSearchResult {
+  id: string;
+  code: string | null;
+  name: string;
+  /** `4. Estrutura › 4.2 Lajes › 4.2.1 Betão` */
+  path: string;
+  depth: number;
+  /** Ainda tem sub-rubricas por baixo — classificar aqui é "ao capítulo". */
+  chapter: boolean;
+  rolledUpBudget: number;
+  spentTotal: number;
+  remaining: number;
+  overBudget: boolean;
+}
+
 export interface BudgetItemUpsert {
   enterpriseId: string;
   parentId?: string | null;
