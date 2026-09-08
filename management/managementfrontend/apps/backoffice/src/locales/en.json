@@ -3546,6 +3546,7 @@
       "sameAsPrevious": "Same as previous",
       "sameAsPreviousHint": "Uses the budget item from the last invoice you confirmed here.",
       "searchPlaceholder": "Code (4.2) or text (concrete)",
+      "pickRubric": "Pick a budget item…",
       "searchEmpty": "No budget item found.",
       "chapterTag": "chapter",
       "chapterHint": "Still has items beneath it — classifying here means classifying at chapter level.",

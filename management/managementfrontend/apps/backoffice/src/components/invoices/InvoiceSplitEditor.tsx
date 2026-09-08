@@ -57,19 +57,29 @@ export const InvoiceSplitEditor: FC<Props> = ({
           key={index}
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr minmax(130px, auto) auto",
+            gridTemplateColumns: "minmax(0, 1fr) 130px auto",
             gap: 6,
             alignItems: "center",
           }}
         >
+          {/* `minWidth: 0` é o que impede o rótulo de empurrar a grelha: sem
+              ele, um nome de rubrica do orçamento real (um parágrafo inteiro)
+              alargava a página em mais de 1300 px. */}
           <Button
             block
-            style={{ textAlign: "left" }}
+            style={{
+              textAlign: "left",
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={line.label ?? undefined}
             type={editingIndex === index ? "primary" : "default"}
             ghost={editingIndex === index}
             onClick={() => onEditLine(index)}
           >
-            {line.label ?? t("invoices.classify.searchPlaceholder")}
+            {line.label ?? t("invoices.classify.pickRubric")}
           </Button>
 
           <InputNumber

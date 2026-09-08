@@ -238,6 +238,33 @@ class CreditNoteServiceTest {
                 .containsExactly(new BigDecimal("-70"), new BigDecimal("-30"));
     }
 
+    @Test
+    @DisplayName("NC totalmente repartida → allocationStatus COMPLETE, nada por repartir")
+    void repartiçãoDaNcNaoFicaPendente() {
+        ConstructionInvoice nc = origin(new BigDecimal("100"));
+        nc.setDocumentType(ConstructionInvoice.DocumentType.CREDIT_NOTE);
+        nc.setRelatedInvoiceId(UUID.randomUUID());
+
+        // As despesas de uma NC são negativas: −100 reparte 100 por inteiro.
+        ConstructionExpense negativa = new ConstructionExpense();
+        negativa.setId(UUID.randomUUID());
+        negativa.setTotalPrice(new BigDecimal("-100"));
+        negativa.setBudgetItem(itemOfEnterprise(BUDGET_ITEM_ID));
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(ORIGIN_ID))
+                .thenReturn(List.of(negativa));
+        when(repository.findCreditNotesFor(any())).thenReturn(List.of());
+        when(documentRepository.findByInvoiceIdOrderByUploadedAtAsc(any())).thenReturn(List.of());
+        when(paymentService.paymentsForInvoice(any(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(List.of());
+
+        var dto = service.toResponseDTO(nc, false);
+
+        // `100 − (−100) = 200` era o que dava antes: a NC ficava eternamente
+        // "por repartir 200,00 €" no ecrã, já estando completa.
+        assertThat(dto.unallocatedAmount()).isEqualByComparingTo("0");
+        assertThat(dto.allocationStatus()).isEqualTo("COMPLETE");
+    }
+
     /** Uma rubrica qualquer da obra da fatura de origem — o serviço só valida a obra. */
     private ConstructionBudgetItem itemOfEnterprise(UUID itemId) {
         ConstructionBudgetItem item = new ConstructionBudgetItem();

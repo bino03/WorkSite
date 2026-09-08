@@ -3577,6 +3577,7 @@
       "sameAsPrevious": "Igual à anterior",
       "sameAsPreviousHint": "Usa a rubrica da última fatura que confirmaste aqui.",
       "searchPlaceholder": "Código (4.2) ou texto (betão)",
+      "pickRubric": "Escolher rubrica…",
       "searchEmpty": "Nenhuma rubrica encontrada.",
       "chapterTag": "capítulo",
       "chapterHint": "Ainda tem sub-rubricas por baixo — classificar aqui é classificar ao capítulo.",

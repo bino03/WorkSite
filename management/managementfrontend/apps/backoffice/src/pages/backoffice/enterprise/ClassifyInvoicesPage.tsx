@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import RubricSearchField from "@/components/invoices/RubricSearchField";
 import InvoiceSplitEditor from "@/components/invoices/InvoiceSplitEditor";
-import { splitIsValid } from "@/components/invoices/invoiceSplit";
+import { rubricLabel, splitIsValid } from "@/components/invoices/invoiceSplit";
 import type { DraftSplitLine } from "@/components/invoices/invoiceSplit";
 import {
   allocateInvoice,
@@ -27,8 +27,7 @@ const QUEUE_SIZE = 50;
 
 const emptyLine: DraftSplitLine = { budgetItemId: null, label: null, amount: null };
 
-const labelOf = (item: BudgetItemSearchResult) =>
-  item.code ? `${item.code} · ${item.name}` : item.name;
+const labelOf = (item: BudgetItemSearchResult) => rubricLabel(item.code, item.name);
 
 /**
  * O ecrã de despachar faturas por classificar, uma obra de cada vez.
@@ -104,6 +103,13 @@ const ClassifyInvoicesPage: FC = () => {
       return;
     }
     let cancelled = false;
+    // Limpa já a fatura anterior. Sem isto há um instante — entre trocar de
+    // fatura e o `getInvoice` responder — em que o `total` ainda é o da fatura
+    // de trás e as linhas já são as da nova: o aviso dizia "a repartição tem de
+    // somar 150 €" numa fatura de 300 €. É a mesma armadilha que o
+    // `InvoiceDetailDrawer` já documentava.
+    setInvoice(null);
+    setSuggestion(null);
     setLines([{ ...emptyLine, amount: current.totalAmount }]);
     setEditingIndex(0);
 
@@ -122,7 +128,7 @@ const ClassifyInvoicesPage: FC = () => {
           setLines([
             {
               budgetItemId: hint.budgetItemId,
-              label: hint.code ? `${hint.code} · ${hint.name}` : hint.name,
+              label: rubricLabel(hint.code, hint.name),
               amount: detail.totalAmount,
             },
           ]);
@@ -222,7 +228,9 @@ const ClassifyInvoicesPage: FC = () => {
         </div>
       </div>
 
-      <Spin spinning={loading}>
+      {/* Também gira entre faturas: a fatura foi limpa e a seguinte ainda não
+          chegou, e um ecrã em branco a meio da fila parece uma avaria. */}
+      <Spin spinning={loading || (!done && queue.length > 0 && invoice === null)}>
         {!loading && queue.length === 0 && (
           <Empty description={t("invoices.classify.empty")} />
         )}
@@ -294,8 +302,13 @@ const ClassifyInvoicesPage: FC = () => {
                   message={
                     <span>
                       <strong>{t("invoices.classify.suggestion")}</strong>{" "}
-                      {suggestion.code ? `${suggestion.code} · ` : ""}
-                      {suggestion.name}{" "}
+                      {/* Cortado como os botões: a descrição da rubrica no
+                          orçamento real é um parágrafo de especificação, e em
+                          bruto enchia o painel todo. O nome completo fica no
+                          `title`, e o caminho aparece na lista de pesquisa. */}
+                      <span title={suggestion.name}>
+                        {rubricLabel(suggestion.code, suggestion.name, 70)}
+                      </span>{" "}
                       <span className="ind-tag ind-tag-neutral" style={{ fontSize: 10 }}>
                         {t(`invoices.classify.source${suggestion.source}`)}
                       </span>

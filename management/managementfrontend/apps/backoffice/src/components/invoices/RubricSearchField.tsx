@@ -109,8 +109,21 @@ export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick,
                 }`,
               }}
             >
+              {/* Duas linhas para o nome, uma para o caminho. As descrições do
+                  orçamento real são parágrafos de especificação inteiros — sem
+                  corte, um só resultado enchia o ecrã e a lista era impossível
+                  de percorrer. O `title` guarda o texto completo. */}
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
-                <span style={{ fontWeight: 600 }}>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    minWidth: 0,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
                   {item.code ? `${item.code} · ` : ""}
                   {item.name}
                 </span>
@@ -122,7 +135,18 @@ export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick,
                 </span>
               </div>
 
-              <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{item.path}</div>
+              <div
+                style={{
+                  fontSize: 11,
+                  opacity: 0.55,
+                  marginTop: 2,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {item.path}
+              </div>
 
               <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                 {item.chapter && (

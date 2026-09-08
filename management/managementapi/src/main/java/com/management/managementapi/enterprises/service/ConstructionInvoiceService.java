@@ -1182,9 +1182,18 @@ public class ConstructionInvoiceService {
                 .map(ConstructionExpense::getTotalPrice)
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal unallocatedAmount = invoice.getTotalAmount() == null
+        // Numa nota de crédito as despesas são negativas por desenho, logo o que
+        // se espera repartir é `−total`. Sem isto, uma NC de 100 repartida a
+        // −100 dava `100 − (−100) = 200` por repartir e ficava `PARTIAL` para
+        // sempre — o ecrã dizia "por repartir: 200,00 €" numa NC já completa.
+        BigDecimal expectedAllocation = invoice.getTotalAmount() == null
                 ? null
-                : invoice.getTotalAmount().subtract(allocatedTotal);
+                : invoice.getDocumentType() == ConstructionInvoice.DocumentType.CREDIT_NOTE
+                        ? invoice.getTotalAmount().negate()
+                        : invoice.getTotalAmount();
+        BigDecimal unallocatedAmount = expectedAllocation == null
+                ? null
+                : expectedAllocation.subtract(allocatedTotal);
         String allocationStatus = allocationStatus(invoice, allocations, unallocatedAmount);
         // Os campos soltos de ficheiro descrevem o documento principal e são o
         // que a UI ainda lê hoje; a lista completa vem em `documents`. Uma fatura

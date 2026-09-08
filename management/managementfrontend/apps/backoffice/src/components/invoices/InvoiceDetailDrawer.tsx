@@ -455,7 +455,11 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               {isAdmin() && (
                 <div style={{ display: "flex", gap: 8 }}>
                   {invoice.allocated ? (
-                    <Button onClick={handleDeallocate}>Desassociar da rubrica</Button>
+                    <Button onClick={handleDeallocate}>
+                      {invoice.allocations.length > 1
+                        ? "Desfazer a repartição"
+                        : "Desassociar da rubrica"}
+                    </Button>
                   ) : (
                     <Tooltip
                       title={
@@ -487,13 +491,17 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               {/* Notas de crédito --------------------------------------- */}
               <InvoiceCreditNoteSection invoice={invoice} onOpenInvoice={setViewingId} />
 
-              {/* Pagamento ---------------------------------------------- */}
+              {/* Pagamento — não existe numa NC, que não se paga. Mostrar-lhe
+                  "Por liquidar · 0,00 / 100,00" era prometer um gesto que o
+                  backend recusa (INVOICE_027). */}
+              {invoice.documentType === "INVOICE" && (
               <InvoicePaymentSection
                 invoice={invoice}
                 canManage={isAdmin()}
                 onMarkPaid={() => setMarkPaidOpen(true)}
                 onDeletePayment={handleDeletePayment}
               />
+              )}
 
               {/* Campos --------------------------------------------------- */}
               <InvoiceFields
