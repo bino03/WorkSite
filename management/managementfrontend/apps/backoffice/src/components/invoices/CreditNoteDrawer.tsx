@@ -17,7 +17,7 @@ import {
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
-import BudgetItemPickerModal from "@/components/invoices/BudgetItemPickerModal";
+import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { CreditNoteSchema } from "@/components/invoices/creditNoteFormSchema";
 import type { CreditNoteForm } from "@/components/invoices/creditNoteFormSchema";
 import { INVOICE_TYPES, joinInvoiceNumber } from "@/components/invoices/invoiceNumber";
