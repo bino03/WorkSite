@@ -3,6 +3,7 @@ package com.management.managementapi.enterprises.service;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSearchResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSaveResponseDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.DatePropagationHintDTO;
@@ -55,6 +56,65 @@ public class ConstructionBudgetItemService {
     private final AuthContext authContext;
 
     // ── leitura ───────────────────────────────────────────────
+
+    /**
+     * Procura uma rubrica por código ou por texto — o campo único do ecrã de
+     * classificação.
+     *
+     * Assenta no {@link #getTree} em vez de numa query própria, de propósito:
+     * um orçamento são ~200 nós, e é assim que os números da pesquisa
+     * (orçamentado, gasto, acima do orçamento) são <b>os mesmos</b> que a página
+     * do orçamento mostra. Uma query paralela divergia à primeira mudança na
+     * fórmula dos rollups.
+     *
+     * `HEADING` e `NOTE` ficam de fora: não aceitam despesas, logo não são
+     * escolhas possíveis. Um capítulo que seja `ITEM` entra — classificar ao
+     * capítulo é legítimo (§7), e o resultado di-lo em {@code chapter}.
+     */
+    @Transactional(readOnly = true)
+    public List<BudgetItemSearchResultDTO> search(UUID enterpriseId, String query, int limit) {
+        String needle = query == null ? "" : query.trim().toLowerCase();
+        if (needle.isEmpty()) {
+            return List.of();
+        }
+
+        List<BudgetItemSearchResultDTO> results = new ArrayList<>();
+        for (BudgetItemNodeDTO root : getTree(enterpriseId).roots()) {
+            collectMatches(root, "", needle, results);
+        }
+        // O código é uma resposta mais precisa do que o nome: quem escreve "4.2"
+        // quer a 4.2, não a primeira rubrica cujo nome por acaso a contenha.
+        results.sort(Comparator
+                .comparing((BudgetItemSearchResultDTO r) -> !startsWithCode(r.code(), needle))
+                .thenComparing(BudgetItemSearchResultDTO::depth)
+                .thenComparing(r -> r.code() == null ? "" : r.code()));
+        return results.size() > limit ? results.subList(0, limit) : results;
+    }
+
+    private void collectMatches(BudgetItemNodeDTO node, String parentPath, String needle,
+                                List<BudgetItemSearchResultDTO> out) {
+        String label = node.code() == null ? node.name() : node.code() + " " + node.name();
+        String path = parentPath.isEmpty() ? label : parentPath + " › " + label;
+
+        if (node.acceptsExpenses() && matches(node, needle)) {
+            boolean chapter = node.children().stream().anyMatch(BudgetItemNodeDTO::acceptsExpenses);
+            out.add(new BudgetItemSearchResultDTO(
+                    node.id(), node.code(), node.name(), path, node.depth(), chapter,
+                    node.rolledUpBudget(), node.spentTotal(), node.remaining(), node.overBudget()));
+        }
+        // Continua a descer mesmo quando o pai não deu match: a sub-rubrica pode
+        // dar, e é ela que interessa.
+        node.children().forEach(child -> collectMatches(child, path, needle, out));
+    }
+
+    private static boolean matches(BudgetItemNodeDTO node, String needle) {
+        return (node.code() != null && node.code().toLowerCase().contains(needle))
+                || node.name().toLowerCase().contains(needle);
+    }
+
+    private static boolean startsWithCode(String code, String needle) {
+        return code != null && code.toLowerCase().startsWith(needle);
+    }
 
     @Transactional(readOnly = true)
     public BudgetTreeDTO getTree(UUID enterpriseId) {

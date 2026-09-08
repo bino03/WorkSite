@@ -77,6 +77,12 @@ No Excel são duas linhas (uma positiva, uma negativa, ou com a nota "devolvido"
 Acontece (`FRA4 2026V2/1608` no Vila Aleu: 142,57 € + 3,26 €). Na app é **uma** fatura com **duas**
 despesas (repartição por rubrica). A migração agrupa por `Nº Fatura`; o `total_amount` é a soma das linhas.
 
+**Possível desde a `V32`** (fase 4), que largou o `uq_expense_invoice`. Até aí a app tinha de
+forçar a fatura toda para uma rubrica só, e era esse o principal motivo para o gasto por rubrica
+não bater certo com o Excel. O endpoint é `POST /construction-invoices/{id}/expenses/split` e a
+soma das linhas tem de esgotar o total da fatura — ver [[api.md]] → "Classificar faturas em
+rubricas".
+
 ## 4. Pagamento
 
 | Excel `Metodo Pagamento` | `payment.method` |

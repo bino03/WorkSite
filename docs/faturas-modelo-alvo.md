@@ -147,11 +147,24 @@ na obra. Mínimo viável na app: `occurred_on`, `title`, `body` (markdown), `res
 junção `invoice_incident_invoice` para as faturas envolvidas. Sem isto, as transferências e correções
 ficam só no `activity_log`, que não é legível por quem não é da app.
 
-### 2.7 `supplier_rubric_rule` — nova (fase 4)
+### 2.7 `supplier_rubric_rule` — **adiada** (não entrou na fase 4)
 
-"As faturas do fornecedor X nesta obra vão sempre para a rubrica Y." Colunas: `enterprise_id`
-(nullable — regra global se nulo), `supplier_nif`, `budget_item_id`, `created_by`. A regra **sugere**,
-nunca aplica sozinha (decisão 8 do Vilatro: rubrica só com confirmação). Ver §7.
+> ⚠️ **Decidido a 2026-09-08: esta tabela não foi criada.** A fase 4 fez-se só com histórico.
+
+O desenho era: "as faturas do fornecedor X nesta obra vão sempre para a rubrica Y", com
+`enterprise_id` (nullable — regra global se nulo), `supplier_nif`, `budget_item_id`, `created_by`.
+
+**Porque ficou de fora.** O que uma regra dá além do histórico é uma linha só — "declarar antes de
+existir qualquer fatura". Os outros três casos já estão cobertos pelos níveis 3-4 da cascata do §7:
+a 2ª fatura na obra, a 1ª fatura numa obra nova (pelo `code`), e corrigir uma classificação má —
+esta última corrige-se sozinha porque a query é "a rubrica **mais usada**", não "a última". Contra
+isso, uma regra envelhece: reimportar um orçamento dá ids novos, e num fornecedor que vende de tudo
+(um Leroy Merlin) uma regra fixa está *ativamente errada*, porque a rubrica certa muda de fatura
+para fatura. O que decidiu: **no vault da Vilatro nunca houve tabela de regras** — este passo era o
+`associar-rubricas` com o Claude a ler histórico —, portanto cortá-la não parte a paridade.
+
+Reversível: acrescentar a tabela mais tarde só põe dois degraus por cima da cascata, sem invalidar
+nada do que foi feito. Ver §7 e `notes/roadmap/plans/2026-09-08-fase4-rubricas.md`.
 
 ## 3. Âmbito da fatura: obra, empresa, ou ainda não se sabe
 
@@ -246,16 +259,21 @@ Vilatro, mas com o Claude substituído pela app.
 
 **Sugestão com origem declarada**, por esta ordem, e a primeira que existir vem pré-selecionada:
 
-1. `supplier_rubric_rule` desta obra para este NIF (§2.7);
-2. regra global para este NIF;
-3. a rubrica da última fatura deste NIF **nesta obra** (índice `idx_invoice_supplier_nif` já existe para isto);
-4. a rubrica da última fatura deste NIF **em qualquer obra**, traduzida por `code` para a árvore desta obra
-   (o código `4.2.1` é o mesmo em orçamentos do mesmo empreiteiro);
+1. ~~`supplier_rubric_rule` desta obra para este NIF~~ — **adiada**, ver §2.7;
+2. ~~regra global para este NIF~~ — **adiada**;
+3. `HISTORY_PROJECT` — a rubrica onde as faturas deste NIF **costumam** ser lançadas nesta obra
+   (índice `idx_invoice_supplier_nif` já existe para isto). Implementado como "a mais usada", não
+   "a última": assim uma classificação errada isolada não passa a mandar na sugestão;
+4. `HISTORY_GLOBAL` — a rubrica onde este NIF foi lançado **noutra obra**, traduzida por `code`
+   para a árvore desta (o código `4.2.1` é o mesmo em orçamentos do mesmo empreiteiro). Se esta
+   obra não tiver esse código, não há sugestão — que é a resposta à pergunta em aberto sobre
+   empreiteiros diferentes;
 5. nada — o utilizador procura.
 
-A UI diz **porquê** sugere ("última fatura da Casa Dolores nesta obra foi para 5.1.2"). Sugestão nunca
-grava sozinha (decisão 8): o utilizador confirma, e a confirmação de uma sugestão de nível 3–5 oferece
-"criar regra para este fornecedor nesta obra?".
+A UI diz **porquê** sugere ("4 das 5 faturas da Casa Dolores nesta obra foram para 5.1.2") — a frase
+vem pronta do backend em `explanation`. Sugestão nunca grava sozinha (decisão 8): o utilizador
+confirma. ~~A confirmação oferece "criar regra para este fornecedor nesta obra?"~~ — sem regras, não
+há oferta nenhuma; o histórico aprende sozinho da confirmação.
 
 **Procurar na árvore**: um só campo que aceita código (`4.2`) ou texto (`betão`), mostra o caminho
 completo (`4. Estrutura › 4.2 Lajes › 4.2.1 …`) e o orçamentado vs. gasto de cada resultado. Rubricas

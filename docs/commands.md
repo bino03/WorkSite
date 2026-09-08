@@ -37,10 +37,17 @@ npm run lint      # ESLint
 > 5173 estiver ocupada, o Vite salta para a 5175 e **todas as chamadas à API são bloqueadas** —
 > com sintomas que parecem de autenticação. Libertar a porta em vez de mudar de origem.
 
-> ℹ️ `npm run build` falha hoje com 35 erros pré-existentes (`erasableSyntaxOnly` em
-> `errors/error.types.ts`, e tipagens em `api.ts`, `AuthContext.tsx`, `ErrorBoundary.tsx` e dois
-> ficheiros de `components/enterprise/`). Não são regressões — usar `npx tsc -b` e comparar o
-> total antes de assumir que uma alteração partiu alguma coisa.
+> ℹ️ `npm run build` falha hoje com **26** erros pré-existentes (20 de `erasableSyntaxOnly` em
+> `errors/error.types.ts`, e tipagens em `api.ts`, `AuthContext.tsx`, `ErrorBoundary.tsx` e
+> `components/enterprise/CreateEnterpriseDrawer.tsx`). Não são regressões — usar `npx tsc -b` e
+> comparar o total antes de assumir que uma alteração partiu alguma coisa.
+>
+> 🚨 **`npx tsc --noEmit` neste projeto não verifica nada.** O `tsconfig.json` da raiz do
+> Backoffice é só um stub de referências (`tsconfig.app.json` + `tsconfig.node.json`), por isso o
+> comando sai com 0 erros e 0 ficheiros analisados — parece limpo e não é. **O único type-check
+> real é `npx tsc -b`.** Já deixou passar um import partido para o `master` (commit `162ae87`:
+> `CreditNoteDrawer` a importar o `BudgetItemPickerModal` como default quando ele só tem named
+> export — só rebentava em runtime, ao abrir a repartição de uma nota de crédito).
 
 ## Relacionado
 

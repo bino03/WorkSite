@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,7 +55,9 @@ import static org.mockito.Mockito.when;
  *   <li>a origem tem de ser uma <b>fatura</b>, nunca outra NC (sem NC de NC);</li>
  *   <li>a NC herda o âmbito, a obra e o NIF da origem (NIF diferente → aviso, não bloqueio);</li>
  *   <li>a repartição negativa é <b>proposta</b> na proporção da origem e confirmada — nunca gravada sozinha;</li>
- *   <li>na fase 3 é 1→1: mais do que uma linha de repartição é recusado (fica para a fase 4).</li>
+ *   <li>desde a {@code V32} (fase 4) a repartição pode ter N linhas: uma NC sobre uma fatura
+ *       repartida 70/30 propõe −70/−30. A soma continua a não ser imposta — a fase 3 decidiu
+ *       que uma repartição desalinhada avisa e grava.</li>
  * </ol>
  */
 @ExtendWith(MockitoExtension.class)
@@ -109,7 +112,7 @@ class CreditNoteServiceTest {
         });
         when(repository.findCreditNotesFor(any())).thenReturn(List.of());
         when(documentRepository.findByInvoiceIdOrderByUploadedAtAsc(any())).thenReturn(List.of());
-        when(expenseRepository.findByInvoiceId(any())).thenReturn(Optional.empty());
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(any())).thenReturn(List.of());
         when(paymentService.paymentsForInvoice(any(), org.mockito.ArgumentMatchers.anyBoolean()))
                 .thenReturn(List.of());
         return service;
@@ -188,7 +191,7 @@ class CreditNoteServiceTest {
         ConstructionExpense expense = new ConstructionExpense();
         expense.setBudgetItem(item);
         expense.setTotalPrice(new BigDecimal("1000"));
-        when(expenseRepository.findByInvoiceId(ORIGIN_ID)).thenReturn(Optional.of(expense));
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(ORIGIN_ID)).thenReturn(List.of(expense));
 
         CreditNoteSplitPreviewDTO preview = service.previewCreditNoteSplit(ORIGIN_ID, new BigDecimal("100"));
 
@@ -203,7 +206,7 @@ class CreditNoteServiceTest {
     @DisplayName("proposta: origem sem despesa → originAllocated=false e nenhuma linha")
     void propostaSemDespesa() {
         when(repository.findById(ORIGIN_ID)).thenReturn(Optional.of(origin(new BigDecimal("1000"))));
-        when(expenseRepository.findByInvoiceId(ORIGIN_ID)).thenReturn(Optional.empty());
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(ORIGIN_ID)).thenReturn(List.of());
 
         CreditNoteSplitPreviewDTO preview = service.previewCreditNoteSplit(ORIGIN_ID, new BigDecimal("100"));
 
@@ -212,18 +215,37 @@ class CreditNoteServiceTest {
     }
 
     @Test
-    @DisplayName("criar com 2 linhas de repartição → INVOICE_028 (a repartição por N rubricas é a fase 4)")
-    void repartiçãoNRecusada() {
+    @DisplayName("criar com 2 linhas de repartição → grava as duas despesas negativas (V32)")
+    void repartiçãoPorDuasRubricas() {
         when(repository.findById(ORIGIN_ID)).thenReturn(Optional.of(origin(new BigDecimal("1000"))));
+
+        UUID secondItemId = UUID.randomUUID();
+        when(budgetItemRepository.findById(BUDGET_ITEM_ID))
+                .thenReturn(Optional.of(itemOfEnterprise(BUDGET_ITEM_ID)));
+        when(budgetItemRepository.findById(secondItemId))
+                .thenReturn(Optional.of(itemOfEnterprise(secondItemId)));
 
         List<CreditNoteExpenseLineDTO> lines = List.of(
                 new CreditNoteExpenseLineDTO(BUDGET_ITEM_ID, new BigDecimal("70")),
-                new CreditNoteExpenseLineDTO(UUID.randomUUID(), new BigDecimal("30")));
+                new CreditNoteExpenseLineDTO(secondItemId, new BigDecimal("30")));
 
-        assertThatThrownBy(() -> serviceWithSave().createCreditNote(ORIGIN_ID, dto(new BigDecimal("100"), null, lines)))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INVOICE_CREDIT_NOTE_SPLIT_INVALID);
+        serviceWithSave().createCreditNote(ORIGIN_ID, dto(new BigDecimal("100"), null, lines));
+
+        ArgumentCaptor<ConstructionExpense> saved = ArgumentCaptor.forClass(ConstructionExpense.class);
+        verify(expenseRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues())
+                .extracting(ConstructionExpense::getTotalPrice)
+                .containsExactly(new BigDecimal("-70"), new BigDecimal("-30"));
+    }
+
+    /** Uma rubrica qualquer da obra da fatura de origem — o serviço só valida a obra. */
+    private ConstructionBudgetItem itemOfEnterprise(UUID itemId) {
+        ConstructionBudgetItem item = new ConstructionBudgetItem();
+        item.setId(itemId);
+        Enterprise enterprise = new Enterprise();
+        enterprise.setId(ENTERPRISE_ID);
+        item.setEnterprise(enterprise);
+        return item;
     }
 
     @Test

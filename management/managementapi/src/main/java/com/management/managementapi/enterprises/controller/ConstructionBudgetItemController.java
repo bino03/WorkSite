@@ -3,6 +3,7 @@ package com.management.managementapi.enterprises.controller;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSearchResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSaveResponseDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -55,6 +57,22 @@ public class ConstructionBudgetItemController {
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
     public ResponseEntity<BudgetTreeDTO> getTree(@PathVariable UUID enterpriseId) {
         return ResponseEntity.ok(service.getTree(enterpriseId));
+    }
+
+    /**
+     * Procura uma rubrica por código ({@code 4.2}) ou por texto ({@code betão}).
+     *
+     * Devolve o caminho completo e o orçamentado vs. gasto de cada resultado —
+     * é o campo único do ecrã de classificação, desenhado para se escolher a
+     * rubrica sem sair dele. Rubricas que não aceitam despesas não aparecem.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/search")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<List<BudgetItemSearchResultDTO>> search(
+            @PathVariable UUID enterpriseId,
+            @RequestParam String q,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(service.search(enterpriseId, q, limit));
     }
 
     @GetMapping("/items/{id}")

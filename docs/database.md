@@ -53,9 +53,10 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
     NC), herda `scope`/`enterprise`/NIF da origem. **Líquido de uma fatura = `total_amount − Σ
     total_amount das suas NC`** — não é coluna, calcula-se no serviço; é o que os pagamentos
     cobrem e o que o filtro "por liquidar" usa. A NC gera as suas próprias `construction_expense`
-    com `total_price` **negativo** (na proporção da origem; ≤1 hoje, por causa de
-    `uq_expense_invoice` — a repartição por N rubricas é a fase 4). Ver [[api.md]] → "Notas de
-    crédito".
+    com `total_price` **negativo**, na proporção da origem — desde a `V32` são N, portanto uma NC
+    sobre uma fatura repartida 70/30 propõe −70/−30. A soma da repartição de uma NC **não** é
+    imposta (avisa e grava): a NC corrige uma fatura que já pode estar torta. Ver [[api.md]] →
+    "Notas de crédito".
   - **Unicidade global desde a `V29`.** Os três índices de duplicado deixaram de ser por
     projeto: `uq_invoice_atcud` (substitui `uq_invoice_enterprise_atcud` da `V17`),
     `uq_invoice_nif_number` (o par, que antes não tinha índice nenhum) e
@@ -79,7 +80,17 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
   sem documento, continua possível), `expense_date` (a data da **fatura**, deliberadamente
   distinta do `created_at`/data de registo — sem esta separação, lançar faturas atrasadas em
   bloco atirava-as todas para o mês em que foram escritas na app) e `total_price`.
-  `uq_expense_invoice` garante 1 fatura → no máximo 1 despesa.
+  - **Uma fatura pode ser repartida por N rubricas desde a `V32`**, que largou o
+    `uq_expense_invoice` (a `V16` já escrevia que bastaria largá-lo) e o substituiu pelo índice
+    não-único `idx_expense_invoice`. O que forçava a folha do armazém — cimento e ferragens no
+    mesmo papel — a ir toda para uma rubrica era esse índice, e era o principal motivo para o
+    gasto por rubrica não bater certo com o Excel da Vilatro.
+  - **`name` é nullable desde a `V32`**: uma linha de repartição não tem nome próprio, herda o da
+    fatura. Continua obrigatório numa despesa lançada à mão, onde não há de onde herdar — isso
+    valida-se no `ConstructionExpenseUpsertDTO`, não na coluna.
+  - Repartir **substitui** a repartição inteira, nunca acrescenta a ela, e a soma tem de esgotar
+    o `total_amount` da fatura (`INVOICE_028`). A exceção é a fatura ainda sem total: classifica-se
+    na mesma e as linhas nascem a zero — é o `allocationStatus = PROVISIONAL` da API.
 - **`payment`** (`V31`) — um **movimento** de dinheiro: `paid_on`, `method` (enum
   `payment_method`: `NUMERARIO`/`MULTIBANCO`/`TRANSFERENCIA`/`OUTRO` — mapa dos valores do
   Excel em [[excel-parity.md]] §4), `amount`, `reference`, `notes`, `proof_*` (recibo ou

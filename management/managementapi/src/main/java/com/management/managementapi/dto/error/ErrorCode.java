@@ -274,7 +274,16 @@ public enum ErrorCode {
     // Notas de crédito (fase 3)
     INVOICE_CREDIT_NOTE_TARGET_NOT_INVOICE("INVOICE_026", "Uma nota de crédito tem de apontar para uma fatura, não para outra nota de crédito"),
     INVOICE_IS_CREDIT_NOTE("INVOICE_027", "As notas de crédito não se pagam — reduzem a fatura a que pertencem"),
-    INVOICE_CREDIT_NOTE_SPLIT_INVALID("INVOICE_028", "A repartição de uma nota de crédito por várias rubricas fica para a fase 4"),
+    /**
+     * Era "a repartição por várias rubricas fica para a fase 4"; a {@code V32}
+     * tornou-a possível, e o código passou a significar o que sobrou: a soma das
+     * linhas não bate certo com o total do documento.
+     */
+    INVOICE_SPLIT_SUM_MISMATCH("INVOICE_028", "A repartição por rubricas tem de somar o total da fatura"),
+
+    // Repartição e classificação (fase 4)
+    INVOICE_SPLIT_EMPTY("INVOICE_029", "Indique pelo menos uma rubrica para repartir a fatura"),
+    INVOICE_SPLIT_DUPLICATE_ITEM("INVOICE_030", "A mesma rubrica aparece duas vezes na repartição"),
 
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)

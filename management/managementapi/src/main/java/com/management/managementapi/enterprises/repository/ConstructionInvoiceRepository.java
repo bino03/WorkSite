@@ -191,6 +191,64 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                                @Param("supplierNif") String supplierNif,
                                                Pageable pageable);
 
+    interface SupplierRubricUse {
+        UUID getBudgetItemId();
+        long getUses();
+        long getTotalUses();
+    }
+
+    /**
+     * O mesmo que {@link #findBudgetItemIdsUsedBySupplier}, mas a trazer as
+     * contagens: são elas que permitem à sugestão dizer <b>porquê</b> — "4 das 5
+     * faturas deste fornecedor nesta obra foram para aqui" —, que é a diferença
+     * entre um palpite e uma sugestão em que se confia.
+     */
+    @Query("""
+            select e.budgetItem.id as budgetItemId, count(e) as uses,
+                   (select count(e2) from ConstructionExpense e2
+                     where e2.invoice.enterprise.id = :enterpriseId
+                       and e2.invoice.supplierNif = :supplierNif) as totalUses
+            from ConstructionExpense e
+            where e.invoice.enterprise.id = :enterpriseId
+              and e.invoice.supplierNif = :supplierNif
+            group by e.budgetItem.id
+            order by count(e) desc, max(e.createdAt) desc
+            """)
+    List<SupplierRubricUse> findRubricUsesBySupplier(@Param("enterpriseId") UUID enterpriseId,
+                                                     @Param("supplierNif") String supplierNif,
+                                                     Pageable pageable);
+
+    interface SupplierRubricCodeUse {
+        String getCode();
+        long getUses();
+        String getEnterpriseName();
+    }
+
+    /**
+     * As rubricas onde este fornecedor foi lançado <b>noutras obras</b>, por
+     * código.
+     *
+     * O código (`4.2.1`) é o que atravessa orçamentos: dois orçamentos do mesmo
+     * empreiteiro repetem a numeração, e é isso que permite sugerir alguma coisa
+     * na primeira fatura de um fornecedor numa obra nova. Quando os orçamentos
+     * são de empreiteiros diferentes o código não bate certo e a sugestão
+     * simplesmente não aparece — é a UI que diz de onde veio, e quem decide é
+     * quem está a classificar.
+     */
+    @Query("""
+            select e.budgetItem.code as code, count(e) as uses,
+                   max(e.invoice.enterprise.name) as enterpriseName
+            from ConstructionExpense e
+            where e.invoice.supplierNif = :supplierNif
+              and e.invoice.enterprise.id <> :enterpriseId
+              and e.budgetItem.code is not null
+            group by e.budgetItem.code
+            order by count(e) desc, max(e.createdAt) desc
+            """)
+    List<SupplierRubricCodeUse> findRubricCodesUsedElsewhere(@Param("enterpriseId") UUID enterpriseId,
+                                                             @Param("supplierNif") String supplierNif,
+                                                             Pageable pageable);
+
     // ── catálogo de fornecedores (ver Supplier) ───────────────
 
     /** Um NIF que aparece nas faturas e ainda não tem empresa associada. */

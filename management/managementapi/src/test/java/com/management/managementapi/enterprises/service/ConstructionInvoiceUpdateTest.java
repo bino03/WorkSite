@@ -80,7 +80,7 @@ class ConstructionInvoiceUpdateTest {
         invoice.setTaxAmount(new BigDecimal("2760.00"));
 
         when(repository.findById(id)).thenReturn(Optional.of(invoice));
-        when(expenseRepository.findByInvoiceId(id)).thenReturn(Optional.empty());
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(id)).thenReturn(List.of());
         // Preencher o número e o ATCUD muda a identidade do documento, logo o
         // update procura colisões. Aqui não há nenhuma.
         when(repository.findByAtcud(any(), any())).thenReturn(List.of());

@@ -247,13 +247,16 @@ de entrada.
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/pending-count` | `ADMIN` ou `EMPLOYEE` — quantas por associar |
-| GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida; `204` sem histórico |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida por NIF, sem o porquê (o `rubric-suggestion` por fatura veio substituí-lo); `204` sem histórico |
 | GET | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — única resposta com `fileUrl` |
 | PUT | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — correção manual |
 | POST | `/construction-invoices/{id}/file` | `ADMIN` ou `EMPLOYEE` — substitui o ficheiro, relê o QR |
 | POST | `/construction-invoices/{id}/rescan` | `ADMIN` ou `EMPLOYEE` — relê o QR do ficheiro arquivado e repõe os campos fiscais |
-| PATCH | `/construction-invoices/{id}/allocate?budgetItemId=` | `ADMIN` — liga a uma rubrica, cria o lançamento |
-| DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz, devolve à caixa de entrada |
+| GET | `/construction-invoices/{id}/rubric-suggestion` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida **com o porquê**; `204` sem histórico |
+| PATCH | `/construction-invoices/{id}/allocate?budgetItemId=` | `ADMIN` — liga a **uma** rubrica, cria o lançamento |
+| POST | `/construction-invoices/{id}/expenses/split` | `ADMIN` — reparte por N rubricas, substituindo a repartição atual |
+| POST | `/construction-invoices/batch-allocate` | `ADMIN` — N faturas → 1 rubrica, melhor esforço (resultado por fatura) |
+| DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz **todas** as linhas, devolve à caixa de entrada |
 | PATCH | `/construction-invoices/{id}/accountant?sent=` | `ADMIN` — marca/desmarca enviada ao contabilista |
 | DELETE | `/construction-invoices/{id}` | `ADMIN` — apaga fatura, ficheiro, miniatura e lançamento |
 | POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
@@ -531,7 +534,9 @@ associada acompanha os novos valores.
 | `INVOICE_025` | a prova de pagamento tem de ser PDF ou imagem |
 | `INVOICE_026` | uma nota de crédito tem de apontar para uma **fatura**, não para outra NC (sem NC de NC) |
 | `INVOICE_027` | as notas de crédito **não se pagam** — reduzem a fatura a que pertencem |
-| `INVOICE_028` | repartição de uma NC por **várias** rubricas (fica para a fase 4 — hoje é 1→1) |
+| `INVOICE_028` | a repartição por rubricas não soma o total da fatura (era "NC por várias rubricas fica para a fase 4"; a `V32` tornou-a possível e o código passou a significar o que sobrou) |
+| `INVOICE_029` | repartição sem nenhuma rubrica |
+| `INVOICE_030` | a mesma rubrica repetida na repartição |
 
 (`ENT_032` — slug de projeto duplicado — sai do `EnterpriseController`, não daqui; ver [[excel-parity.md]] §2.)
 
@@ -586,7 +591,9 @@ Fase 3 da paridade com o Excel. Uma NC só existe **agarrada a uma fatura já la
   invoiceNumber?, invoiceAtcud?, invoiceDate?, supplierNif?, description?, notes?,
   documentStatus?, expenses?: [{budgetItemId, amount}] }`. A NC **herda** `scope`/obra da
   origem e o NIF por omissão (NIF diferente → grava com aviso). `expenses` são as linhas
-  confirmadas (0 ou 1 na fase 3); o serviço grava-as sempre com `total_price` negativo.
+  confirmadas (N desde a `V32`); o serviço grava-as sempre com `total_price` negativo. A soma
+  das linhas **não** é imposta aqui — ao contrário do `split` de uma fatura: a NC corrige uma
+  fatura que já pode estar torta, e prender quem a regista não ajudava.
 
 **Líquido da fatura** = `totalAmount − Σ (totalAmount das suas NC)`, exposto em todos os DTOs
 de fatura como `netAmount`, com `creditNoteTotal` e `creditNotes[]` (refs). É o `netAmount`
@@ -594,6 +601,55 @@ que os pagamentos cobrem e o filtro `?outstanding=` usa; as linhas `CREDIT_NOTE`
 como "por liquidar" nem entram no `pending-count`. `POST .../{id}/payments` recusa uma NC
 (`INVOICE_027`). O `preview` do upload passa a devolver `documentType` (campo `D` do QR): um
 `"NC"` encaminha o utilizador para este fluxo em vez do registo normal.
+
+## Classificar faturas em rubricas
+
+Fase 4 da paridade com o Excel. Ver [[faturas-modelo-alvo.md]] §7 e
+[[database.md]] → `construction_expense`.
+
+**Repartir por N rubricas** — `POST /construction-invoices/{id}/expenses/split` (`ADMIN`).
+Corpo `{ lines: [{budgetItemId, amount}] }`. **Substitui** a repartição atual por inteiro, nunca
+acrescenta: editar uma repartição é redesenhá-la, e um "acrescenta esta linha" deixaria a soma a
+divergir do total sem ninguém dar por isso. A soma **tem** de esgotar o `totalAmount`
+(`INVOICE_028`); rubricas repetidas → `INVOICE_030`; lista vazia → `INVOICE_029`. Uma fatura
+ainda **sem total** classifica-se na mesma e as linhas nascem a zero (§7). O
+`PATCH .../allocate` continua a servir o caso normal de uma rubrica.
+
+**A fatura na resposta** ganhou:
+
+| Campo | O que diz |
+|---|---|
+| `allocations[]` | `{expenseId, budgetItemId, budgetItemCode, budgetItemName, amount}` — a verdade completa |
+| `allocationStatus` | `NONE` · `COMPLETE` · `PARTIAL` · `PROVISIONAL` (fatura sem total, linhas a zero) |
+| `unallocatedAmount` | `total − Σ despesas`; null quando a fatura não tem total |
+| `expenseId`, `budgetItemId`, `budgetItemCode`, `budgetItemName` | **só preenchidos com exatamente uma** afetação; null quando repartida — apontar para a primeira mentiria sobre as outras |
+| `allocated` | continua a ser "tem ≥1 despesa" (semântica inalterada) |
+
+**Sugestão com o porquê** — `GET /construction-invoices/{id}/rubric-suggestion` (`ADMIN` ou
+`EMPLOYEE`) → `{ budgetItemId, code, name, source, explanation, referenceEnterprise }`, ou `204`.
+Dois níveis, o primeiro que existir ganha:
+
+1. `HISTORY_PROJECT` — a rubrica onde as faturas deste NIF **costumam** ser lançadas nesta obra.
+   É "a mais usada", não "a última", de propósito: uma classificação errada isolada não passa a
+   mandar na sugestão. `explanation`: "4 das 5 faturas de Casa Dolores nesta obra foram para 5.1.2."
+2. `HISTORY_GLOBAL` — sem histórico aqui, procura noutras obras e atravessa pelo **código**
+   (`4.2.1` é o mesmo em orçamentos do mesmo empreiteiro). Só vale se esta obra tiver esse código.
+
+Não há nível de **regras** declaradas (`supplier_rubric_rule`): ficaram de fora por decisão de
+2026-09-08 — o histórico já cobre os casos que interessam, as regras envelhecem, e no vault da
+Vilatro nunca existiram. A sugestão **nunca grava sozinha**.
+
+**Lote** — `POST /construction-invoices/batch-allocate` (`ADMIN`), corpo
+`{ invoiceIds: [], budgetItemId }` → `{ succeeded, failures: [{invoiceId, invoiceNumber,
+errorCode, message}] }`. **Melhor esforço**, à imagem do upload que já é por-ficheiro: uma
+fatura que outro separador entretanto classificou não faz perder as outras quatro.
+
+**Procurar rubrica** — `GET /construction-budget/enterprise/{enterpriseId}/search?q=&limit=20`
+(`ADMIN` ou `EMPLOYEE`) → `[{id, code, name, path, depth, chapter, rolledUpBudget, spentTotal,
+remaining, overBudget}]`. Aceita código (`4.2`) ou texto (`betão`); o `path` completo
+(`4. Estrutura › 4.2 Lajes › 4.2.1 Betão`) é o que distingue os três "Betão" de um orçamento
+real. Rubricas que não aceitam despesas não aparecem; `chapter: true` assinala que ainda tem
+sub-rubricas por baixo — classificar ao capítulo é legítimo, mas fica assinalado.
 
 ## Fornecedores (`SupplierController`, `/suppliers`)
 

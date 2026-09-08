@@ -6,7 +6,11 @@ import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCr
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteExpenseLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitLineDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteRefDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceAllocationDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.RubricSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.DuplicateInvoiceRefDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
@@ -300,8 +304,11 @@ public class ConstructionInvoiceService {
     /**
      * A proposta de repartição negativa: uma linha por despesa da fatura de
      * origem, {@code amount = -(valor da NC × despesa / total da origem)}, com a
-     * última a absorver o arredondamento. Na fase 3 a origem tem no máximo uma
-     * despesa, logo a proposta tem 0 ou 1 linha. Nada é gravado.
+     * última a absorver o arredondamento. Nada é gravado.
+     *
+     * Foi escrito na fase 3 já a iterar sobre uma lista, para o dia em que a
+     * origem pudesse ter várias despesas. A {@code V32} é esse dia: uma NC de 100
+     * sobre uma fatura de 1000 repartida 70/30 propõe agora −70/−30 sozinha.
      */
     @Transactional(readOnly = true)
     public CreditNoteSplitPreviewDTO previewCreditNoteSplit(UUID originId, BigDecimal creditNoteTotal) {
@@ -310,8 +317,8 @@ public class ConstructionInvoiceService {
             throw new BusinessException(ErrorCode.INVOICE_CREDIT_NOTE_TARGET_NOT_INVOICE);
         }
 
-        List<ConstructionExpense> originExpenses = expenseRepository.findByInvoiceId(originId)
-                .map(List::of).orElseGet(List::of);
+        List<ConstructionExpense> originExpenses =
+                expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(originId);
         BigDecimal ncTotal = creditNoteTotal == null ? BigDecimal.ZERO : creditNoteTotal.abs();
 
         if (originExpenses.isEmpty() || ncTotal.signum() == 0
@@ -339,30 +346,34 @@ public class ConstructionInvoiceService {
         if (lines == null || lines.isEmpty()) {
             return;
         }
-        // uq_expense_invoice: 1 fatura → 1 despesa. A repartição por N rubricas é a fase 4.
-        if (lines.size() > 1) {
-            throw new BusinessException(ErrorCode.INVOICE_CREDIT_NOTE_SPLIT_INVALID);
-        }
-        CreditNoteExpenseLineDTO line = lines.get(0);
-        ConstructionBudgetItem item = budgetItemRepository.findById(line.budgetItemId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
-        if (origin.getEnterpriseId() == null
-                || !item.getEnterprise().getId().equals(origin.getEnterpriseId())) {
-            throw new BusinessException(ErrorCode.INVOICE_ITEM_OTHER_ENTERPRISE);
-        }
-
-        ConstructionExpense expense = new ConstructionExpense();
-        expense.setInvoice(creditNote);
-        expense.setBudgetItem(item);
-        expense.setName(firstNonBlank(creditNote.getInvoiceNumber(), "Nota de crédito"));
-        expense.setExpenseDate(creditNote.getInvoiceDate() != null ? creditNote.getInvoiceDate()
+        // Repartir uma NC por N rubricas é legítimo desde a V32 (antes disto era
+        // um INVOICE_028). A soma continua a **não** ser imposta aqui: a fase 3
+        // decidiu que uma repartição desalinhada avisa e grava, porque a NC
+        // corrige uma fatura que já pode estar torta e ninguém ganha em ficar
+        // preso. O `split` de uma fatura, esse, recusa — ver `splitInvoice`.
+        LocalDate expenseDate = creditNote.getInvoiceDate() != null ? creditNote.getInvoiceDate()
                 : origin.getInvoiceDate() != null ? origin.getInvoiceDate()
-                : LocalDate.now());
-        // Sempre negativo: uma NC abate, não acrescenta.
-        expense.setTotalPrice(line.amount().abs().negate());
-        expense.setDescription(creditNote.getNotes());
-        authContext.currentProfileId().ifPresent(expense::setCreatedBy);
-        expenseRepository.save(expense);
+                : LocalDate.now();
+
+        for (CreditNoteExpenseLineDTO line : lines) {
+            ConstructionBudgetItem item = budgetItemRepository.findById(line.budgetItemId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
+            if (origin.getEnterpriseId() == null
+                    || !item.getEnterprise().getId().equals(origin.getEnterpriseId())) {
+                throw new BusinessException(ErrorCode.INVOICE_ITEM_OTHER_ENTERPRISE);
+            }
+
+            ConstructionExpense expense = new ConstructionExpense();
+            expense.setInvoice(creditNote);
+            expense.setBudgetItem(item);
+            expense.setName(firstNonBlank(creditNote.getInvoiceNumber(), "Nota de crédito"));
+            expense.setExpenseDate(expenseDate);
+            // Sempre negativo: uma NC abate, não acrescenta.
+            expense.setTotalPrice(line.amount().abs().negate());
+            expense.setDescription(creditNote.getNotes());
+            authContext.currentProfileId().ifPresent(expense::setCreatedBy);
+            expenseRepository.save(expense);
+        }
     }
 
     /**
@@ -485,13 +496,13 @@ public class ConstructionInvoiceService {
                 scope, outstanding, isBlank(q) ? null : q.trim(), pageable);
 
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
-        Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
+        Map<UUID, List<ConstructionExpense>> allocations = loadAllocations(ids);
         Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
         Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
         Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
 
         return page.map(invoice -> toResponseDTO(invoice,
-                allocations.get(invoice.getId()),
+                allocations.getOrDefault(invoice.getId(), List.of()),
                 documents.getOrDefault(invoice.getId(), List.of()),
                 payments.getOrDefault(invoice.getId(), List.of()),
                 creditNotes.getOrDefault(invoice.getId(), List.of()),
@@ -606,18 +617,18 @@ public class ConstructionInvoiceService {
         invoice.setTaxableAmount(data.taxableAmount());
         invoice.setTaxAmount(data.taxAmount());
 
-        Optional<ConstructionExpense> allocation = findAllocation(invoice.getId());
+        List<ConstructionExpense> allocations = findAllocations(invoice.getId());
 
         // Mesma regra do update(): um lançamento não pode ficar sem data ou
         // total. Acontece quando o QR traz esses campos ilegíveis (ver os
         // warnings de AtInvoiceQrService) — a transação reverte e a fatura fica
         // como estava.
-        if (allocation.isPresent() && invoice.needsReview()) {
+        if (!allocations.isEmpty() && invoice.needsReview()) {
             throw new BusinessException(ErrorCode.INVOICE_INCOMPLETE);
         }
 
         ConstructionInvoice saved = repository.save(invoice);
-        allocation.ifPresent(expense -> syncExpenseFromInvoice(expense, saved));
+        resyncAllocations(allocations, saved);
 
         return new InvoiceUploadResultDTO(
                 toResponseDTO(saved, true),
@@ -707,13 +718,13 @@ public class ConstructionInvoiceService {
 
         // Uma query para as afetações da página toda, em vez de uma por linha.
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
-        Map<UUID, ConstructionExpense> allocations = loadAllocations(ids);
+        Map<UUID, List<ConstructionExpense>> allocations = loadAllocations(ids);
         Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
         Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
         Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
 
         return page.map(invoice -> toResponseDTO(invoice,
-                allocations.get(invoice.getId()),
+                allocations.getOrDefault(invoice.getId(), List.of()),
                 documents.getOrDefault(invoice.getId(), List.of()),
                 payments.getOrDefault(invoice.getId(), List.of()),
                 creditNotes.getOrDefault(invoice.getId(), List.of()),
@@ -743,6 +754,86 @@ public class ConstructionInvoiceService {
                 .stream()
                 .findFirst()
                 .flatMap(budgetItemRepository::findById);
+    }
+
+    /**
+     * A rubrica que esta fatura provavelmente merece, com a origem declarada.
+     *
+     * Dois níveis, e o primeiro que existir ganha:
+     *
+     * <ol>
+     *   <li><b>histórico nesta obra</b> — a rubrica onde as faturas deste NIF
+     *       costumam ser lançadas aqui. É "a mais usada", não "a última", de
+     *       propósito: uma classificação errada isolada não passa a mandar na
+     *       sugestão, corrige-se sozinha à medida que as certas se acumulam;</li>
+     *   <li><b>histórico noutra obra, por código</b> — na primeira fatura de um
+     *       fornecedor nesta obra não há nada acima; se ele foi lançado no
+     *       {@code 4.2.1} de outra obra e esta também tem um {@code 4.2.1}, vale
+     *       como palpite. Orçamentos de empreiteiros diferentes não partilham a
+     *       numeração e aí simplesmente não há sugestão.</li>
+     * </ol>
+     *
+     * Não há nível de regras declaradas: ficaram de fora da fase 4 (2026-09-08).
+     *
+     * @return vazio quando não há histórico, quando a fatura não é de obra, ou
+     *         quando a rubrica sugerida entretanto desapareceu
+     */
+    @Transactional(readOnly = true)
+    public Optional<RubricSuggestionDTO> suggestRubric(UUID invoiceId) {
+        ConstructionInvoice invoice = getById(invoiceId);
+        UUID enterpriseId = invoice.getEnterpriseId();
+        String nif = invoice.getSupplierNif();
+
+        if (enterpriseId == null || isBlank(nif)) {
+            return Optional.empty();
+        }
+        String supplierNif = nif.trim();
+
+        Optional<RubricSuggestionDTO> fromThisProject =
+                repository.findRubricUsesBySupplier(enterpriseId, supplierNif, PageRequest.of(0, 1))
+                        .stream()
+                        .findFirst()
+                        .flatMap(use -> budgetItemRepository.findById(use.getBudgetItemId())
+                                .map(item -> new RubricSuggestionDTO(
+                                        item.getId(), item.getCode(), item.getName(),
+                                        "HISTORY_PROJECT",
+                                        historyProjectExplanation(invoice, item, use),
+                                        null)));
+        if (fromThisProject.isPresent()) {
+            return fromThisProject;
+        }
+
+        return repository.findRubricCodesUsedElsewhere(enterpriseId, supplierNif, PageRequest.of(0, 3))
+                .stream()
+                // A obra-alvo pode não ter o código; nesse caso passa-se ao
+                // seguinte em vez de desistir — daí pedir 3 e não 1.
+                .flatMap(use -> budgetItemRepository
+                        .findByEnterpriseIdAndCode(enterpriseId, use.getCode())
+                        .filter(item -> item.getRowKind().acceptsExpenses())
+                        .map(item -> new RubricSuggestionDTO(
+                                item.getId(), item.getCode(), item.getName(),
+                                "HISTORY_GLOBAL",
+                                historyGlobalExplanation(invoice, item, use),
+                                use.getEnterpriseName()))
+                        .stream())
+                .findFirst();
+    }
+
+    private String historyProjectExplanation(ConstructionInvoice invoice, ConstructionBudgetItem item,
+                                             ConstructionInvoiceRepository.SupplierRubricUse use) {
+        String supplier = firstNonBlank(invoice.getSupplierName(), invoice.getSupplierNif(), "este fornecedor");
+        String rubric = firstNonBlank(item.getCode(), item.getName());
+        return use.getTotalUses() == use.getUses()
+                ? "Todas as faturas de %s nesta obra foram para %s.".formatted(supplier, rubric)
+                : "%d das %d faturas de %s nesta obra foram para %s."
+                        .formatted(use.getUses(), use.getTotalUses(), supplier, rubric);
+    }
+
+    private String historyGlobalExplanation(ConstructionInvoice invoice, ConstructionBudgetItem item,
+                                            ConstructionInvoiceRepository.SupplierRubricCodeUse use) {
+        String supplier = firstNonBlank(invoice.getSupplierName(), invoice.getSupplierNif(), "este fornecedor");
+        return "Primeira fatura de %s nesta obra. Em %s foi lançada em %s, e esta obra também tem essa rubrica."
+                .formatted(supplier, firstNonBlank(use.getEnterpriseName(), "outra obra"), item.getCode());
     }
 
     // ── edição ────────────────────────────────────────────────
@@ -796,20 +887,20 @@ public class ConstructionInvoiceService {
             rejectIfDuplicate(invoice, null);
         }
 
-        Optional<ConstructionExpense> allocation = findAllocation(invoice.getId());
+        List<ConstructionExpense> allocations = findAllocations(invoice.getId());
 
         // Apagar a data ou o total de uma fatura já lançada deixaria o
         // lançamento sem os campos que a despesa exige. Vale mais recusar aqui,
         // com uma mensagem que se percebe, do que rebentar na constraint.
-        if (allocation.isPresent() && invoice.needsReview()) {
+        if (!allocations.isEmpty() && invoice.needsReview()) {
             throw new BusinessException(ErrorCode.INVOICE_INCOMPLETE);
         }
 
         ConstructionInvoice saved = repository.save(invoice);
 
-        // A despesa que nasceu desta fatura tem de acompanhar a correção, senão
-        // o orçamento continua a somar o valor errado.
-        allocation.ifPresent(expense -> syncExpenseFromInvoice(expense, saved));
+        // As despesas que nasceram desta fatura têm de acompanhar a correção,
+        // senão o orçamento continua a somar o valor errado.
+        resyncAllocations(allocations, saved);
 
         return saved;
     }
@@ -872,11 +963,8 @@ public class ConstructionInvoiceService {
     public ConstructionExpense allocate(UUID invoiceId, UUID budgetItemId) {
         ConstructionInvoice invoice = getById(invoiceId);
 
-        if (findAllocation(invoiceId).isPresent()) {
+        if (!findAllocations(invoiceId).isEmpty()) {
             throw new BusinessException(ErrorCode.INVOICE_ALREADY_ALLOCATED);
-        }
-        if (invoice.needsReview()) {
-            throw new BusinessException(ErrorCode.INVOICE_INCOMPLETE);
         }
 
         // Uma rubrica pertence sempre a uma obra: uma fatura da quarentena ou da
@@ -885,6 +973,123 @@ public class ConstructionInvoiceService {
             throw new BusinessException(ErrorCode.INVOICE_SCOPE_NOT_ALLOCATABLE);
         }
 
+        return expenseRepository.save(
+                newAllocation(invoice, requireItemOf(invoice, budgetItemId), invoice.getTotalAmount()));
+    }
+
+    /**
+     * Uma linha de afetação nova.
+     *
+     * O valor pode ser null — é o caso da fatura que foi pedida ao fornecedor e
+     * ainda não chegou (§7): classifica-se na mesma e a despesa nasce a zero,
+     * para a rubrica já saber que ela vem aí. O {@code allocationStatus} da
+     * fatura fica {@code PROVISIONAL}, que é o que permite contá-las depois.
+     */
+    private ConstructionExpense newAllocation(ConstructionInvoice invoice,
+                                              ConstructionBudgetItem item,
+                                              BigDecimal amount) {
+        ConstructionExpense expense = new ConstructionExpense();
+        expense.setInvoice(invoice);
+        expense.setBudgetItem(item);
+        expense.setDescription(invoice.getNotes());
+        authContext.currentProfileId().ifPresent(expense::setCreatedBy);
+        syncExpenseLabels(expense, invoice);
+        expense.setTotalPrice(amount == null ? BigDecimal.ZERO : amount);
+        // Uma despesa exige data; sem QR legível ainda não há uma da fatura.
+        if (expense.getExpenseDate() == null) {
+            expense.setExpenseDate(LocalDate.now());
+        }
+        return expense;
+    }
+
+    /**
+     * Reparte a fatura por N rubricas, substituindo a repartição que lá estiver.
+     *
+     * É o {@code allocate} sem o pressuposto de que uma folha pertence toda ao
+     * mesmo sítio: a fatura do armazém que traz cimento e ferragens deixa de ter
+     * de ir toda para uma rubrica só — que era o principal motivo para o gasto
+     * por rubrica não bater certo com o Excel da Vilatro.
+     *
+     * A soma <b>é</b> imposta aqui, ao contrário da repartição de uma nota de
+     * crédito: a NC corrige uma fatura que já pode estar torta e prender o
+     * utilizador não ajudava, mas uma fatura repartida a menos deixa dinheiro
+     * fora do orçamento sem ninguém dar por isso.
+     */
+    public List<ConstructionExpense> split(UUID invoiceId, List<InvoiceSplitLineDTO> lines) {
+        ConstructionInvoice invoice = getById(invoiceId);
+
+        if (lines == null || lines.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVOICE_SPLIT_EMPTY);
+        }
+        if (invoice.getScope() != ConstructionInvoice.Scope.PROJECT) {
+            throw new BusinessException(ErrorCode.INVOICE_SCOPE_NOT_ALLOCATABLE);
+        }
+        if (lines.stream().map(InvoiceSplitLineDTO::budgetItemId).distinct().count() != lines.size()) {
+            throw new BusinessException(ErrorCode.INVOICE_SPLIT_DUPLICATE_ITEM);
+        }
+
+        // Uma fatura ainda sem total classifica-se na mesma, com as linhas a
+        // zero (§7) — é o que permite à rubrica saber que ela vem aí. Com total,
+        // a repartição tem de o esgotar.
+        boolean provisional = invoice.getTotalAmount() == null;
+        if (!provisional) {
+            BigDecimal sum = lines.stream()
+                    .map(line -> line.amount() == null ? BigDecimal.ZERO : line.amount())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (sum.compareTo(invoice.getTotalAmount()) != 0) {
+                throw new BusinessException(ErrorCode.INVOICE_SPLIT_SUM_MISMATCH);
+            }
+        }
+
+        List<ConstructionExpense> replacement = lines.stream()
+                .map(line -> newAllocation(invoice, requireItemOf(invoice, line.budgetItemId()),
+                        provisional ? BigDecimal.ZERO : line.amount()))
+                .toList();
+
+        // Substituir, não acrescentar: a repartição antiga sai inteira, senão a
+        // soma passava a contar duas vezes.
+        expenseRepository.deleteAll(findAllocations(invoiceId));
+        return expenseRepository.saveAll(replacement);
+    }
+
+    /**
+     * Classifica várias faturas para a mesma rubrica, à melhor esforço.
+     *
+     * Uma falha não derruba as outras — é o mesmo princípio do carregamento de
+     * ficheiros, que já é deliberadamente por-ficheiro. O caso real que isto
+     * evita: das cinco faturas selecionadas, uma foi classificada há um minuto
+     * noutro separador; tudo-ou-nada faria perder as outras quatro por causa
+     * dela, e a pessoa não saberia qual foi.
+     *
+     * Apanhar a exceção aqui é seguro porque o {@code allocate} valida <b>antes</b>
+     * de gravar seja o que for: nenhuma falha deixa a transação meio escrita.
+     */
+    public BatchAllocateResultDTO batchAllocate(List<UUID> invoiceIds, UUID budgetItemId) {
+        int succeeded = 0;
+        List<BatchAllocateResultDTO.Failure> failures = new ArrayList<>();
+
+        for (UUID invoiceId : invoiceIds) {
+            try {
+                allocate(invoiceId, budgetItemId);
+                succeeded++;
+            } catch (BusinessException e) {
+                // Apanha também a ResourceNotFoundException, que dela deriva —
+                // a fatura pode ter sido apagada entre a seleção e o envio.
+                failures.add(failure(invoiceId, e.getErrorCode().getCode(), e.getMessage()));
+            }
+        }
+        return new BatchAllocateResultDTO(succeeded, failures);
+    }
+
+    private BatchAllocateResultDTO.Failure failure(UUID invoiceId, String errorCode, String message) {
+        String number = repository.findById(invoiceId)
+                .map(ConstructionInvoice::getInvoiceNumber)
+                .orElse(null);
+        return new BatchAllocateResultDTO.Failure(invoiceId, number, errorCode, message);
+    }
+
+    /** A rubrica tem de existir, ser desta obra e aceitar despesas. */
+    private ConstructionBudgetItem requireItemOf(ConstructionInvoice invoice, UUID budgetItemId) {
         ConstructionBudgetItem item = budgetItemRepository.findById(budgetItemId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
         if (!item.getEnterprise().getId().equals(invoice.getEnterpriseId())) {
@@ -893,24 +1098,18 @@ public class ConstructionInvoiceService {
         if (!item.getRowKind().acceptsExpenses()) {
             throw new BusinessException(ErrorCode.EXPENSE_ITEM_NOT_EXPENSABLE);
         }
-
-        ConstructionExpense expense = new ConstructionExpense();
-        expense.setInvoice(invoice);
-        expense.setBudgetItem(item);
-        expense.setDescription(invoice.getNotes());
-        authContext.currentProfileId().ifPresent(expense::setCreatedBy);
-        syncExpenseFromInvoice(expense, invoice);
-
-        return expenseRepository.save(expense);
+        return item;
     }
 
-    /** Desfaz a associação: apaga o lançamento e devolve a fatura à caixa de entrada. */
+    /** Desfaz a associação: apaga <b>todas</b> as linhas e devolve a fatura à caixa de entrada. */
     public ConstructionInvoice deallocate(UUID invoiceId) {
         ConstructionInvoice invoice = getById(invoiceId);
-        ConstructionExpense expense = findAllocation(invoiceId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_NOT_ALLOCATED));
+        List<ConstructionExpense> allocations = findAllocations(invoiceId);
+        if (allocations.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVOICE_NOT_ALLOCATED);
+        }
 
-        expenseRepository.delete(expense);
+        expenseRepository.deleteAll(allocations);
         return invoice;
     }
 
@@ -918,15 +1117,42 @@ public class ConstructionInvoiceService {
      * Nome e valores do lançamento saem da fatura. O nome tenta o fornecedor, o
      * número do documento e por fim o ficheiro — a despesa tem de aparecer na
      * lista da rubrica com alguma coisa que se reconheça.
+     *
+     * Copia o total <b>inteiro</b> da fatura, por isso só serve o caso de uma
+     * despesa. Numa fatura repartida, quem manda é {@link #resyncAllocations}.
      */
     private void syncExpenseFromInvoice(ConstructionExpense expense, ConstructionInvoice invoice) {
+        syncExpenseLabels(expense, invoice);
+        expense.setTotalPrice(invoice.getTotalAmount());
+    }
+
+    /** Só o que identifica a despesa; o valor fica de fora de propósito. */
+    private void syncExpenseLabels(ConstructionExpense expense, ConstructionInvoice invoice) {
         expense.setName(firstNonBlank(
                 invoice.getSupplierName(),
                 invoice.getInvoiceNumber(),
                 primaryDocument(invoice.getId()).map(ConstructionInvoiceDocument::getOriginalFilename).orElse(null),
                 "Fatura"));
         expense.setExpenseDate(invoice.getInvoiceDate());
-        expense.setTotalPrice(invoice.getTotalAmount());
+    }
+
+    /**
+     * Faz as despesas acompanharem uma correção da fatura.
+     *
+     * Com <b>uma</b> despesa, ela vale a fatura toda e o total copia-se — é o que
+     * sempre se fez. Com a fatura <b>repartida</b>, copiar o total para cada
+     * linha multiplicaria o gasto por N: as proporções foram escolhidas por
+     * alguém e só essa pessoa as pode voltar a decidir, por isso aqui só se
+     * atualiza o que identifica a despesa. Se o total mudou, a repartição fica
+     * desalinhada de propósito — e é o {@code allocationStatus} que passa a
+     * dizer {@code PARTIAL}, em vez de a app inventar uma divisão nova.
+     */
+    private void resyncAllocations(List<ConstructionExpense> allocations, ConstructionInvoice invoice) {
+        if (allocations.size() == 1) {
+            syncExpenseFromInvoice(allocations.get(0), invoice);
+            return;
+        }
+        allocations.forEach(expense -> syncExpenseLabels(expense, invoice));
     }
 
     // ── DTOs ──────────────────────────────────────────────────
@@ -934,7 +1160,7 @@ public class ConstructionInvoiceService {
     @Transactional(readOnly = true)
     public ConstructionInvoiceResponseDTO toResponseDTO(ConstructionInvoice invoice, boolean includeFileUrl) {
         return toResponseDTO(invoice,
-                findAllocation(invoice.getId()).orElse(null),
+                findAllocations(invoice.getId()),
                 documentRepository.findByInvoiceIdOrderByUploadedAtAsc(invoice.getId()),
                 paymentService.paymentsForInvoice(invoice.getId(), includeFileUrl),
                 repository.findCreditNotesFor(invoice.getId()),
@@ -942,12 +1168,24 @@ public class ConstructionInvoiceService {
     }
 
     private ConstructionInvoiceResponseDTO toResponseDTO(ConstructionInvoice invoice,
-                                                         ConstructionExpense allocation,
+                                                         List<ConstructionExpense> allocations,
                                                          List<ConstructionInvoiceDocument> documents,
                                                          List<InvoicePaymentSummaryDTO> payments,
                                                          List<ConstructionInvoice> creditNotes,
                                                          boolean includeFileUrl) {
-        ConstructionBudgetItem item = allocation == null ? null : allocation.getBudgetItem();
+        // Os campos singulares só se preenchem quando não há ambiguidade. Com a
+        // fatura repartida ficam a null: quem precisa da verdade lê a lista.
+        ConstructionExpense soleAllocation = allocations.size() == 1 ? allocations.get(0) : null;
+        ConstructionBudgetItem item = soleAllocation == null ? null : soleAllocation.getBudgetItem();
+
+        BigDecimal allocatedTotal = allocations.stream()
+                .map(ConstructionExpense::getTotalPrice)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal unallocatedAmount = invoice.getTotalAmount() == null
+                ? null
+                : invoice.getTotalAmount().subtract(allocatedTotal);
+        String allocationStatus = allocationStatus(invoice, allocations, unallocatedAmount);
         // Os campos soltos de ficheiro descrevem o documento principal e são o
         // que a UI ainda lê hoje; a lista completa vem em `documents`. Uma fatura
         // sem documento nenhum é legal desde a V24 e traz tudo isto a null.
@@ -991,11 +1229,14 @@ public class ConstructionInvoiceService {
                 invoice.getAskWhom(),
                 invoice.needsReview(),
 
-                allocation != null,
-                allocation == null ? null : allocation.getId(),
+                !allocations.isEmpty(),
+                soleAllocation == null ? null : soleAllocation.getId(),
                 item == null ? null : item.getId(),
                 item == null ? null : item.getCode(),
                 item == null ? null : item.getName(),
+                allocations.stream().map(this::toAllocationDTO).toList(),
+                allocationStatus,
+                unallocatedAmount,
 
                 includeFileUrl && primary != null
                         ? signedUrls.resolve(primary.getBucket(), primary.getStorageKey()) : null,
@@ -1056,8 +1297,40 @@ public class ConstructionInvoiceService {
 
     // ── auxiliares ────────────────────────────────────────────
 
-    private Optional<ConstructionExpense> findAllocation(UUID invoiceId) {
-        return expenseRepository.findByInvoiceId(invoiceId);
+    /** As rubricas por onde esta fatura está repartida. Vazio = por classificar. */
+    private List<ConstructionExpense> findAllocations(UUID invoiceId) {
+        return expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(invoiceId);
+    }
+
+    private InvoiceAllocationDTO toAllocationDTO(ConstructionExpense expense) {
+        ConstructionBudgetItem item = expense.getBudgetItem();
+        return new InvoiceAllocationDTO(
+                expense.getId(),
+                item == null ? null : item.getId(),
+                item == null ? null : item.getCode(),
+                item == null ? null : item.getName(),
+                expense.getTotalPrice());
+    }
+
+    /**
+     * Quanto da fatura já está posto em rubricas.
+     *
+     * {@code PROVISIONAL} é o caso do §7: uma fatura que ainda não tem total (foi
+     * pedida ao fornecedor e não chegou) pode na mesma ser classificada, e as
+     * despesas nascem a zero. Não é "incompleta" — é o que se sabe hoje, e tem de
+     * se distinguir de uma fatura com total por repartir, senão a comparação
+     * orçamento vs. gasto não consegue avisar quantas destas existem.
+     */
+    private String allocationStatus(ConstructionInvoice invoice,
+                                    List<ConstructionExpense> allocations,
+                                    BigDecimal unallocatedAmount) {
+        if (allocations.isEmpty()) {
+            return "NONE";
+        }
+        if (invoice.getTotalAmount() == null) {
+            return "PROVISIONAL";
+        }
+        return unallocatedAmount.signum() == 0 ? "COMPLETE" : "PARTIAL";
     }
 
     /** As notas de crédito de uma página inteira de faturas numa query. */
@@ -1078,13 +1351,22 @@ public class ConstructionInvoiceService {
                 .collect(Collectors.groupingBy(document -> document.getInvoice().getId()));
     }
 
-    private Map<UUID, ConstructionExpense> loadAllocations(List<UUID> invoiceIds) {
+    /**
+     * As afetações de uma página inteira de faturas numa query.
+     *
+     * Era um {@code Map<UUID, ConstructionExpense>} construído com
+     * {@code toMap(..., (a, b) -> a)} — que **deitava fora em silêncio** a
+     * segunda despesa de uma fatura. Não se notava enquanto o
+     * {@code uq_expense_invoice} garantia que ela não existia; a {@code V32}
+     * largou-o, e a partir daí uma fatura repartida aparecia na lista como se
+     * estivesse só na primeira rubrica.
+     */
+    private Map<UUID, List<ConstructionExpense>> loadAllocations(List<UUID> invoiceIds) {
         if (invoiceIds.isEmpty()) {
             return Map.of();
         }
         return expenseRepository.findByInvoiceIdIn(invoiceIds).stream()
-                .collect(Collectors.toMap(e -> e.getInvoice().getId(), Function.identity(),
-                        (a, b) -> a, HashMap::new));
+                .collect(Collectors.groupingBy(e -> e.getInvoice().getId()));
     }
 
     /**
@@ -1185,13 +1467,18 @@ public class ConstructionInvoiceService {
             return List.of();
         }
         List<ConstructionInvoice> found = repository.findByAtcud(atcud, excludeId);
-        Map<UUID, ConstructionExpense> allocations = loadAllocations(
+        Map<UUID, List<ConstructionExpense>> allocations = loadAllocations(
                 found.stream().map(ConstructionInvoice::getId).toList());
 
         return found.stream()
                 .map(other -> {
-                    ConstructionExpense expense = allocations.get(other.getId());
-                    ConstructionBudgetItem item = expense == null ? null : expense.getBudgetItem();
+                    // O aviso de duplicado identifica a outra fatura por uma
+                    // rubrica. Repartida, não há "a" rubrica — a primeira chega
+                    // para a reconhecer, e o detalhe mostra a repartição toda.
+                    List<ConstructionExpense> expenses =
+                            allocations.getOrDefault(other.getId(), List.of());
+                    ConstructionBudgetItem item = expenses.isEmpty()
+                            ? null : expenses.get(0).getBudgetItem();
                     return new DuplicateInvoiceRefDTO(
                             other.getId(),
                             other.getSupplierName(),

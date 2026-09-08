@@ -58,11 +58,30 @@ public record ConstructionInvoiceResponseDTO(
         boolean needsReview,
 
         // ── afetação à rubrica ──
+        /** Tem pelo menos uma despesa. Não diz se está repartida a 100% — isso é o {@code allocationStatus}. */
         boolean allocated,
+        /**
+         * Os quatro campos seguintes descrevem a afetação <b>quando há
+         * exatamente uma</b>, que é o caso normal e o que toda a UI já lê. Numa
+         * fatura repartida por várias rubricas vêm a {@code null} de propósito:
+         * mais vale a lista dizer "não sei em singular" do que apontar para a
+         * primeira e mentir sobre as outras. A verdade completa é
+         * {@code allocations}.
+         */
         UUID expenseId,
         UUID budgetItemId,
         String budgetItemCode,
         String budgetItemName,
+        /** Todas as rubricas por onde a fatura está repartida, da mais antiga para a mais recente. */
+        List<InvoiceAllocationDTO> allocations,
+        /**
+         * {@code NONE} sem despesas · {@code COMPLETE} quando a soma bate certo
+         * com o total · {@code PARTIAL} quando falta repartir · {@code PROVISIONAL}
+         * numa fatura ainda sem total, cujas despesas nascem a zero (§7).
+         */
+        String allocationStatus,
+        /** {@code total − Σ despesas}. Null quando a fatura ainda não tem total. */
+        BigDecimal unallocatedAmount,
 
         // ── documento ──
         String fileUrl,

@@ -46,7 +46,12 @@ public class ConstructionExpense extends BaseEntity {
     @JoinColumn(name = "invoice_id")
     private ConstructionInvoice invoice;
 
-    @Column(nullable = false)
+    /**
+     * Nullable desde a {@code V32}: uma linha de repartição de fatura não tem
+     * nome próprio — herda a descrição da fatura. Continua obrigatório para uma
+     * despesa lançada à mão, onde não há nada de onde herdar; isso é validado no
+     * {@code ConstructionExpenseUpsertDTO}, que tem o contexto para o exigir.
+     */
     private String name;
 
     private String description;

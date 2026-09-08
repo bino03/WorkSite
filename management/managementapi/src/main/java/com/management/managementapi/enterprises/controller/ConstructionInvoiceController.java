@@ -2,6 +2,10 @@ package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.BatchAllocateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.RubricSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
@@ -313,6 +317,66 @@ public class ConstructionInvoiceController {
                         EntityType.CONSTRUCTION_EXPENSE, expense.getId(), expense.getName(), request));
 
         return ResponseEntity.ok(service.getDetail(id));
+    }
+
+    /**
+     * A rubrica que esta fatura provavelmente merece, com a origem declarada —
+     * histórico nesta obra, ou histórico noutra obra traduzido por código.
+     *
+     * {@code 204} quando não há nada a sugerir: sem histórico, sem NIF, ou a
+     * fatura não é de obra. Nunca grava nada — quem decide é quem classifica.
+     */
+    @GetMapping("/{id}/rubric-suggestion")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<RubricSuggestionDTO> rubricSuggestion(@PathVariable UUID id) {
+        return service.suggestRubric(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /**
+     * Reparte a fatura por várias rubricas, substituindo a repartição atual.
+     *
+     * O {@code allocate} acima continua a servir o caso normal (uma rubrica);
+     * este é o caso da folha que traz coisas de sítios diferentes. A soma das
+     * linhas tem de esgotar o total da fatura — {@code INVOICE_028}.
+     */
+    @PostMapping("/{id}/expenses/split")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ConstructionInvoiceResponseDTO> split(
+            @PathVariable UUID id,
+            @Valid @RequestBody InvoiceSplitDTO dto,
+            HttpServletRequest request) {
+        int lineCount = service.split(id, dto.lines()).size();
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, id,
+                        "repartida por " + lineCount + " rubrica(s)", null, request));
+
+        return ResponseEntity.ok(service.getDetail(id));
+    }
+
+    /**
+     * Classifica várias faturas para a mesma rubrica.
+     *
+     * Melhor esforço: devolve {@code 200} com o que passou e o que falhou, em
+     * vez de derrubar o lote inteiro por causa de uma fatura. Ver
+     * {@link BatchAllocateResultDTO}.
+     */
+    @PostMapping("/batch-allocate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BatchAllocateResultDTO> batchAllocate(
+            @Valid @RequestBody BatchAllocateDTO dto,
+            HttpServletRequest request) {
+        BatchAllocateResultDTO result = service.batchAllocate(dto.invoiceIds(), dto.budgetItemId());
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_EXPENSE, dto.budgetItemId(),
+                        result.succeeded() + " fatura(s) classificadas em lote", null, request));
+
+        return ResponseEntity.ok(result);
     }
 
     /** Devolve a fatura à caixa de entrada, apagando o lançamento. */

@@ -19,8 +19,15 @@ public interface ConstructionExpenseRepository extends JpaRepository<Constructio
 
     List<ConstructionExpense> findByBudgetItemIdOrderByCreatedAtDesc(UUID budgetItemId);
 
-    /** O lançamento que saiu desta fatura — no máximo um ({@code uq_expense_invoice}). */
-    Optional<ConstructionExpense> findByInvoiceId(UUID invoiceId);
+    /**
+     * Os lançamentos que saíram desta fatura, do mais antigo para o mais recente.
+     *
+     * Eram no máximo um até à {@code V32}, que largou o {@code uq_expense_invoice}
+     * para uma fatura se poder repartir por várias rubricas. A ordem é estável de
+     * propósito: é ela que decide qual é a "última linha" que absorve o
+     * arredondamento numa repartição proporcional.
+     */
+    List<ConstructionExpense> findByInvoiceIdOrderByCreatedAtAsc(UUID invoiceId);
 
     /**
      * As afetações de várias faturas de uma vez. É o que permite listar a caixa
