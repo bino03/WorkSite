@@ -279,6 +279,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_023': 'Pagamento não encontrado.',
   'INVOICE_024': 'Indique pelo menos uma fatura para o pagamento.',
   'INVOICE_025': 'A prova de pagamento tem de ser PDF ou imagem.',
+  'INVOICE_026': 'Uma nota de crédito tem de partir de uma fatura, não de outra nota de crédito.',
+  'INVOICE_027': 'As notas de crédito não se pagam — reduzem a fatura a que pertencem.',
+  'INVOICE_028': 'Uma nota de crédito só pode abater a uma rubrica de cada vez, por agora.',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

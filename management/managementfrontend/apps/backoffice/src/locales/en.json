@@ -3468,7 +3468,8 @@
       "methodRequired": "Choose a payment method.",
       "amountPositive": "The amount must be positive.",
       "referenceTooLong": "Reference is too long.",
-      "movementRequired": "Enter the movement amount."
+      "movementRequired": "Enter the movement amount.",
+      "creditNoteAmountRequired": "Enter the credit note amount."
     },
     "payment": {
       "status": { "UNPAID": "Unpaid", "PARTIAL": "Partial", "PAID": "Paid" },
@@ -3505,6 +3506,35 @@
       "alsoCovers": "together with {{list}}",
       "success": "Payment registered.",
       "cancelSuccess": "Payment undone."
+    },
+    "creditNote": {
+      "badge": "CN",
+      "register": "Register credit note",
+      "drawerTitle": "Register credit note",
+      "ofInvoice": "Credit note for invoice {{number}}",
+      "openOrigin": "Open the source invoice",
+      "fieldAmount": "Credit note amount",
+      "fieldAmountHint": "Positive amount — this is what gets deducted from the invoice.",
+      "fieldNumber": "Number",
+      "fieldAtcud": "ATCUD",
+      "fieldDate": "Date",
+      "fieldNif": "Supplier tax ID",
+      "fieldNifHint": "Defaults to the source invoice's; a different one saves with a warning.",
+      "fieldDescription": "Description",
+      "fieldNotes": "Notes",
+      "fieldDocumentStatus": "Document status",
+      "splitTitle": "Split",
+      "splitHint": "Proposed in proportion to the source invoice's expenses. Confirm or adjust before saving.",
+      "splitNotAllocated": "The source invoice is not linked to any budget item yet — this credit note will not create expenses.",
+      "splitSum": "Split total",
+      "splitMismatch": "The split does not add up to the credit note amount — it still saves, but stays misaligned.",
+      "exceedsNet": "This credit note is larger than the amount left to credit ({{amount}}) — check the value.",
+      "netTitle": "Net",
+      "netHint": "Total minus credit notes. This is what is due.",
+      "listTitle": "Credit notes",
+      "isCreditNoteTitle": "This is a credit note",
+      "isCreditNoteBody": "A credit note is not registered here: open the invoice it corrects and use \"Register credit note\".",
+      "success": "Credit note registered."
     }
   },
   "budget": {

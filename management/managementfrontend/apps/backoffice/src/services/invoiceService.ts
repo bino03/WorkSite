@@ -3,6 +3,8 @@ import type {
   BudgetItemSuggestion,
   ConstructionInvoice,
   ConstructionInvoiceUpsert,
+  CreditNoteCreatePayload,
+  CreditNoteSplitPreview,
   InvoiceFilters,
   InvoicePreviewResult,
   InvoiceRegisterPayload,
@@ -128,6 +130,40 @@ export async function deleteInvoiceDocument(
   documentId: string
 ): Promise<void> {
   await api.delete(`/construction-invoices/${invoiceId}/documents/${documentId}`);
+}
+
+/**
+ * A repartição negativa que uma NC deste valor proporia sobre esta fatura,
+ * na proporção das despesas dela. Nada é gravado — é a proposta que o
+ * utilizador confirma ou altera antes de chamar {@link createCreditNote}.
+ *
+ * Recalcula-se a cada mudança do valor, por isso o erro fica para a drawer
+ * mostrar inline: um toast por dígito escrito não serve a ninguém.
+ */
+export async function previewCreditNoteSplit(
+  originId: string,
+  amount: number
+): Promise<CreditNoteSplitPreview> {
+  const response = await api.get(`/construction-invoices/${originId}/credit-notes/split-preview`, {
+    params: { amount },
+    skipErrorNotification: true,
+  });
+  return response.data;
+}
+
+/**
+ * Regista uma nota de crédito a partir de uma fatura já lançada. O âmbito, a
+ * obra e (por omissão) o NIF herdam da origem — não se enviam.
+ *
+ * Devolve a **NC criada**, não a fatura de origem: quem precisar do líquido
+ * atualizado tem de voltar a ler a origem com {@link getInvoice}.
+ */
+export async function createCreditNote(
+  originId: string,
+  payload: CreditNoteCreatePayload
+): Promise<ConstructionInvoice> {
+  const response = await api.post(`/construction-invoices/${originId}/credit-notes`, payload);
+  return response.data;
 }
 
 /**

@@ -4,6 +4,7 @@ import { Button, DatePicker, Drawer, Input, InputNumber, Select, Space, Spin, To
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
+import CreditNoteDrawer from "@/components/invoices/CreditNoteDrawer";
 import InvoiceDocumentGallery from "@/components/invoices/InvoiceDocumentGallery";
 import MarkPaidDrawer from "@/components/invoices/MarkPaidDrawer";
 import { deletePayment } from "@/services/paymentService";
@@ -90,6 +91,15 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
+  const [creditNoteOpen, setCreditNoteOpen] = useState(false);
+  /**
+   * Fatura que a drawer está mesmo a mostrar, quando não é a que o pai pediu:
+   * saltar de uma fatura para uma nota de crédito sua (e de volta) acontece
+   * aqui dentro, sem obrigar cada página que usa a drawer a saber navegar.
+   * Volta a `null` sempre que o pai muda de fatura.
+   */
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const shownId = viewingId ?? invoiceId;
   /**
    * Numa ref e não nas dependências do `fetchInvoice`: a sugestão vem da lista
    * do lado, que recarrega a cada gravação — dependê-la traria a fatura outra
@@ -101,8 +111,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     suggestedTypeRef.current = suggestedInvoiceType;
   }, [suggestedInvoiceType]);
 
+  // Trocar de linha na lista tem de desfazer qualquer salto interno para uma NC.
+  useEffect(() => {
+    setViewingId(null);
+  }, [invoiceId]);
+
   const fetchInvoice = useCallback(async () => {
-    if (!invoiceId) return;
+    if (!shownId) return;
     setLoading(true);
     // Limpa já a fatura anterior: trocar de linha na lista sem fechar a
     // drawer muda só o `invoiceId`, não desmonta o componente — sem isto, o
@@ -112,7 +127,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     setInvoice(null);
     setValues(null);
     try {
-      const data = await getInvoice(invoiceId);
+      const data = await getInvoice(shownId);
       setInvoice(data);
       // O tipo ("FR", "FT", …) é a única parte do número que se consegue
       // adivinhar — e só quando não há número nenhum, ou seja quando o QR
@@ -134,7 +149,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     } finally {
       setLoading(false);
     }
-  }, [invoiceId]);
+  }, [shownId]);
 
   useEffect(() => {
     if (open) fetchInvoice();
@@ -279,9 +294,14 @@ export const InvoiceDetailDrawer: FC<Props> = ({
         destroyOnClose
         title={
           <div>
-            <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Fatura</h6>
-            <h2 style={{ margin: 0 }}>
+            <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>
+              {invoice?.documentType === "CREDIT_NOTE" ? t("invoices.creditNote.listTitle") : "Fatura"}
+            </h6>
+            <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
               {invoice?.invoiceNumber ?? invoice?.originalFilename ?? "—"}
+              {invoice?.documentType === "CREDIT_NOTE" && (
+                <span className="ind-tag ind-tag-neutral">{t("invoices.creditNote.badge")}</span>
+              )}
             </h2>
           </div>
         }
@@ -427,8 +447,19 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                       </Button>
                     </Tooltip>
                   )}
+
+                  {/* Uma NC não se credita a si própria — o backend recusa com
+                      INVOICE_026, mas o botão nem chega a aparecer. */}
+                  {invoice.documentType === "INVOICE" && (
+                    <Button onClick={() => setCreditNoteOpen(true)}>
+                      {t("invoices.creditNote.register")}
+                    </Button>
+                  )}
                 </div>
               )}
+
+              {/* Notas de crédito --------------------------------------- */}
+              <InvoiceCreditNoteSection invoice={invoice} onOpenInvoice={setViewingId} />
 
               {/* Pagamento ---------------------------------------------- */}
               <InvoicePaymentSection
@@ -461,7 +492,79 @@ export const InvoiceDetailDrawer: FC<Props> = ({
           onChanged();
         }}
       />
+
+      <CreditNoteDrawer
+        open={creditNoteOpen}
+        invoice={invoice}
+        onClose={() => setCreditNoteOpen(false)}
+        onCreated={() => {
+          void fetchInvoice();
+          onChanged();
+        }}
+      />
     </>
+  );
+};
+
+/**
+ * O que as notas de crédito fazem a esta fatura — e nada mais: o bloco só
+ * aparece quando há alguma coisa para dizer.
+ *
+ * Numa fatura com NC mostra a conta que o backend fez (`total − Σ NC = líquido`)
+ * e as NC ligadas, clicáveis. Numa NC mostra a fatura de onde veio. Numa fatura
+ * sem NC nenhuma não aparece de todo — o líquido é o total, e repeti-lo só
+ * acrescentava ruído a todas as faturas normais.
+ */
+const InvoiceCreditNoteSection: FC<{
+  invoice: ConstructionInvoice;
+  onOpenInvoice: (id: string) => void;
+}> = ({ invoice, onOpenInvoice }) => {
+  const { t } = useTranslation();
+
+  const originId = invoice.relatedInvoiceId;
+
+  if (invoice.documentType === "CREDIT_NOTE") {
+    return (
+      <div className="ind-card" style={{ padding: "13.6px", gap: "10.2px" }}>
+        <span className="ind-card-kicker">{t("invoices.creditNote.listTitle")}</span>
+        {originId && (
+          <div>
+            <Button type="link" style={{ padding: 0 }} onClick={() => onOpenInvoice(originId)}>
+              {t("invoices.creditNote.openOrigin")}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (invoice.creditNotes.length === 0) return null;
+
+  return (
+    <div className="ind-card" style={{ padding: "13.6px", gap: "10.2px" }}>
+      <span className="ind-card-kicker">{t("invoices.creditNote.netTitle")}</span>
+
+      <div style={{ fontSize: 13 }}>
+        {formatCurrency(invoice.totalAmount ?? 0)} − {formatCurrency(invoice.creditNoteTotal)} ={" "}
+        <strong>{formatCurrency(invoice.netAmount ?? 0)}</strong>
+      </div>
+      <div style={{ fontSize: 11, opacity: 0.55 }}>{t("invoices.creditNote.netHint")}</div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {invoice.creditNotes.map((note) => (
+          <Button
+            key={note.id}
+            block
+            style={{ textAlign: "left" }}
+            onClick={() => onOpenInvoice(note.id)}
+          >
+            <span className="ind-tag ind-tag-neutral">{t("invoices.creditNote.badge")}</span>{" "}
+            {note.invoiceNumber ?? "—"} · {formatCurrency(note.totalAmount ?? 0)}
+            {note.invoiceDate ? ` · ${formatDate(note.invoiceDate)}` : ""}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 };
 
@@ -478,7 +581,12 @@ const InvoicePaymentSection: FC<{
 }> = ({ invoice, canManage, onMarkPaid, onDeletePayment }) => {
   const { t } = useTranslation();
   const net = invoice.netAmount;
-  const canPay = canManage && invoice.paymentStatus !== "PAID" && net != null;
+  // Uma NC não se paga — reduz a fatura a que pertence (INVOICE_027).
+  const canPay =
+    canManage &&
+    invoice.documentType === "INVOICE" &&
+    invoice.paymentStatus !== "PAID" &&
+    net != null;
 
   return (
     <div className="ind-card" style={{ padding: "13.6px", gap: "10.2px" }}>

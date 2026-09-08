@@ -23,7 +23,7 @@ O documento que vem da obra: carregar, ler o QR da AT, corrigir à mão, associa
 | Camada | Ficheiros |
 |---|---|
 | **Entrada** | rota `/backoffice/empreendimentos/:enterpriseId/invoices` → `pages/backoffice/enterprise/EnterpriseInvoicesPage.tsx` |
-| **Frontend** | `components/invoices/` — `InvoicesList`, `InvoiceUploadDrawer` (2 fases), `InvoiceDetailDrawer` (correção manual), `BudgetItemPickerModal`, `invoiceNumber.ts` (tipo + série) · `components/construction/InvoicePreviewModal.tsx` · `services/invoiceService.ts` · `types/invoice.ts` |
+| **Frontend** | `components/invoices/` — `InvoicesList`, `InvoiceUploadDrawer` (2 fases), `InvoiceRegisterDrawer` (sem ficheiro), `InvoiceDetailDrawer` (correção manual, líquido e NC ligadas), `InvoiceDocumentGallery`, `MarkPaidDrawer` + `AggregatePaymentDrawer` (fase 2), `CreditNoteDrawer` (fase 3), `BudgetItemPickerModal`, `invoiceNumber.ts` (tipo + série), `invoiceFormSchema.ts`/`paymentFormSchema.ts`/`creditNoteFormSchema.ts` · `components/construction/InvoicePreviewModal.tsx` · `services/invoiceService.ts` + `services/paymentService.ts` · `types/invoice.ts` |
 | **Backend** | `enterprises/controller/ConstructionInvoiceController` · `service/ConstructionInvoiceService` (o núcleo — upload, duplicados, correção) · `AtInvoiceQrService` + `WeChatQrCodeService` (leitura do QR) · `InvoiceThumbnailService` · `InvoiceCompressionService` · `repository/ConstructionInvoiceRepository` |
 | **Base de dados** | `worksite.construction_invoice` — `V16`, `V17` (ATCUD único), `V18` (checksum) |
 | **Detalhe** | [[api.md]] → "Faturas de obra" · [[database.md]] |

@@ -52,6 +52,8 @@ type Status =
   | "previewing"
   | "ready"
   | "duplicate"
+  /** O QR diz `D = NC`: regista-se a partir da fatura de origem, não por aqui. */
+  | "credit-note"
   | "preview-failed"
   | "saving"
   | "done"
@@ -285,6 +287,20 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
               continue;
             }
 
+            // Uma NC não se regista como fatura: precisa da fatura de origem,
+            // e o backend não a aceita por esta via. Fica visível para se
+            // perceber porque não entrou, mas nunca chega a "Guardar".
+            if (result.documentType === "NC") {
+              releaseChecksum(row.key);
+              filesRef.current.delete(row.key);
+              patch(row.key, {
+                status: "credit-note",
+                error: t("invoices.creditNote.isCreditNoteBody"),
+                summary: buildSummary(result),
+              });
+              continue;
+            }
+
             patch(row.key, {
               status: "ready",
               needsReview: result.needsReview,
@@ -362,6 +378,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
   const queued = rows.filter((r) => r.status === "queued").length;
   const ready = rows.filter((r) => r.status === "ready").length;
   const duplicate = rows.filter((r) => r.status === "duplicate").length;
+  const creditNote = rows.filter((r) => r.status === "credit-note").length;
   const previewFailed = rows.filter((r) => r.status === "preview-failed").length;
   const done = rows.filter((r) => r.status === "done").length;
   const failed = rows.filter((r) => r.status === "failed").length;
@@ -404,6 +421,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
                   queued ? `${queued} por enviar` : null,
                   ready ? `${ready} pronta${ready > 1 ? "s" : ""}` : null,
                   duplicate ? `${duplicate} duplicada${duplicate > 1 ? "s" : ""} (descartada${duplicate > 1 ? "s" : ""})` : null,
+                  creditNote ? `${creditNote} nota${creditNote > 1 ? "s" : ""} de crédito (descartada${creditNote > 1 ? "s" : ""})` : null,
                   previewFailed ? `${previewFailed} com erro na leitura` : null,
                   done ? `${done} guardada${done > 1 ? "s" : ""}` : null,
                   failed ? `${failed} com erro ao guardar` : null,
@@ -493,7 +511,18 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
               </div>
             )}
 
-            {row.error && <div style={{ fontSize: 11, color: "#b53333" }}>{row.error}</div>}
+            {/* Uma NC não entrou, mas não é um erro de ninguém — é encaminhamento. */}
+            {row.error && (
+              <div
+                style={
+                  row.status === "credit-note"
+                    ? { fontSize: 11, opacity: 0.75 }
+                    : { fontSize: 11, color: "#b53333" }
+                }
+              >
+                {row.error}
+              </div>
+            )}
 
             {row.warnings?.map((warning) => (
               <div key={warning} style={{ fontSize: 11, opacity: 0.7 }}>
@@ -513,6 +542,7 @@ const STATUS_LABEL: Record<Status, string> = {
   previewing: "a ler QR",
   ready: "pronta",
   duplicate: "duplicada",
+  "credit-note": "nota de crédito",
   "preview-failed": "erro na leitura",
   saving: "a guardar",
   done: "guardada",

@@ -15,7 +15,7 @@ export type InvoiceScope = "PROJECT" | "COMPANY" | "UNIDENTIFIED";
  */
 export type InvoiceDocumentStatus = "ARCHIVED" | "MISSING" | "TO_PRINT" | "TO_REQUEST";
 
-/** `CREDIT_NOTE` obriga a `relatedInvoiceId`. As regras da NC são a fase 3. */
+/** `CREDIT_NOTE` obriga a `relatedInvoiceId` e nasce sempre de uma fatura lançada. */
 export type InvoiceDocumentType = "INVOICE" | "CREDIT_NOTE";
 
 /** Só serve à UI para agrupar; nenhuma regra de negócio decide com base nisto. */
@@ -51,6 +51,18 @@ export interface InvoicePaymentSummary {
   registeredByName: string | null;
   registeredAt: string;
   alsoCovers: string[];
+}
+
+/**
+ * Uma nota de crédito vista do lado da fatura que ela credita. `totalAmount` é
+ * o valor da NC (**positivo**); o líquido da fatura é `total − Σ desses valores`.
+ */
+export interface CreditNoteRef {
+  id: string;
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  totalAmount: number | null;
+  documentStatus: InvoiceDocumentStatus;
 }
 
 /**
@@ -119,10 +131,16 @@ export interface ConstructionInvoice {
   // ── pagamento (fase 2) — estado derivado, nunca coluna ──
   paymentStatus: PaymentStatus;
   paidAmount: number;
-  /** O que há a pagar: total menos notas de crédito. Na fase 2 é igual ao total. */
+  /** O que há a pagar: `totalAmount − creditNoteTotal`. */
   netAmount: number | null;
   /** Os movimentos que tocaram esta fatura, do mais antigo ao mais recente. */
   payments: InvoicePaymentSummary[];
+
+  // ── notas de crédito (fase 3) ──
+  /** Σ do valor das NC ligadas a esta fatura. Zero quando não tem nenhuma. */
+  creditNoteTotal: number;
+  /** As NC ligadas a esta fatura, da mais recente para a mais antiga. */
+  creditNotes: CreditNoteRef[];
 
   /** Só vem no detalhe (`getInvoice`) — nas listas é sempre null. */
   fileUrl: string | null;
@@ -256,6 +274,57 @@ export interface AggregatePaymentResult {
   movementAmount: number;
 }
 
+// ── notas de crédito (fase 3) ──
+
+/**
+ * Uma linha da repartição negativa proposta pelo backend, na proporção das
+ * despesas da fatura de origem. `amount` já vem negativo.
+ */
+export interface ProposedExpense {
+  budgetItemId: string;
+  budgetItemCode: string | null;
+  budgetItemName: string | null;
+  amount: number;
+}
+
+/**
+ * A proposta de repartição de uma NC. `originAllocated: false` = a fatura de
+ * origem não tem despesa nenhuma, logo a NC também não gera nenhuma.
+ */
+export interface CreditNoteSplitPreview {
+  originAllocated: boolean;
+  /** Soma das linhas propostas — deve ser `-totalAmount` da NC. */
+  total: number;
+  lines: ProposedExpense[];
+}
+
+/** Uma linha confirmada da repartição. O sinal é indiferente: o backend grava negativo. */
+export interface CreditNoteExpenseLine {
+  budgetItemId: string;
+  amount: number;
+}
+
+/**
+ * Corpo de `POST /construction-invoices/{originId}/credit-notes`.
+ *
+ * `totalAmount` é **positivo** — o valor da NC; o sinal negativo só aparece nas
+ * despesas que ela gera. O âmbito e a obra herdam-se da origem e não se enviam.
+ * Na fase 3, `expenses` tem 0 ou 1 linha (a origem só tem uma rubrica).
+ */
+export interface CreditNoteCreatePayload {
+  totalAmount: number;
+  invoiceNumber?: string | null;
+  invoiceAtcud?: string | null;
+  invoiceDate?: string | null;
+  /** Por omissão herda o da origem. Diferente → grava com aviso, não bloqueia. */
+  supplierNif?: string | null;
+  description?: string | null;
+  notes?: string | null;
+  /** `ARCHIVED` é recusado: uma NC registada à mão não tem ficheiro. */
+  documentStatus?: Exclude<InvoiceDocumentStatus, "ARCHIVED"> | null;
+  expenses?: CreditNoteExpenseLine[];
+}
+
 /** Fatura já registada com o mesmo ATCUD. Aviso, não bloqueio. */
 export interface DuplicateInvoiceRef {
   invoiceId: string;
@@ -296,6 +365,12 @@ export interface InvoicePreviewResult {
   invoiceDate: string | null;
   totalAmount: number | null;
   needsReview: boolean;
+  /**
+   * O campo `D` do QR da AT, em bruto: `"FT"`, `"FS"`, …, ou `"NC"`. Null quando
+   * não houve QR. Uma `"NC"` não se regista por aqui — é o fluxo de nota de
+   * crédito, a partir da fatura de origem.
+   */
+  documentType: string | null;
   warnings: string[];
 }
 

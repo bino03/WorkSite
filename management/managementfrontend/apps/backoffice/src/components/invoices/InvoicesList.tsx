@@ -148,6 +148,13 @@ export const InvoicesList: FC<Props> = ({
       render: (name: string | null, row) => (
         <span>
           <span style={{ display: "block", fontFamily: "var(--ind-font-heading)", fontWeight: 600 }}>
+            {/* Uma NC tem o valor gravado em positivo como qualquer fatura; sem
+                este selo lia-se como mais uma despesa em vez de um abatimento. */}
+            {row.documentType === "CREDIT_NOTE" && (
+              <span className="ind-tag ind-tag-neutral" style={{ fontSize: 10, marginRight: 6 }}>
+                NC
+              </span>
+            )}
             {name ?? row.supplierNif ?? row.originalFilename ?? "—"}
           </span>
           <span style={{ display: "block", fontSize: 11, opacity: 0.55 }}>

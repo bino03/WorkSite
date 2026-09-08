@@ -3499,7 +3499,8 @@
       "methodRequired": "Indique o método de pagamento.",
       "amountPositive": "O valor tem de ser positivo.",
       "referenceTooLong": "Referência demasiado longa.",
-      "movementRequired": "Indique o valor do movimento."
+      "movementRequired": "Indique o valor do movimento.",
+      "creditNoteAmountRequired": "Indique o valor da nota de crédito."
     },
     "payment": {
       "status": { "UNPAID": "Por liquidar", "PARTIAL": "Parcial", "PAID": "Paga" },
@@ -3536,6 +3537,35 @@
       "alsoCovers": "junto com {{list}}",
       "success": "Pagamento registado.",
       "cancelSuccess": "Pagamento anulado."
+    },
+    "creditNote": {
+      "badge": "NC",
+      "register": "Registar nota de crédito",
+      "drawerTitle": "Registar nota de crédito",
+      "ofInvoice": "Nota de crédito da fatura {{number}}",
+      "openOrigin": "Ver a fatura de origem",
+      "fieldAmount": "Valor da nota de crédito",
+      "fieldAmountHint": "Valor positivo — é o que vai ser abatido à fatura.",
+      "fieldNumber": "Número",
+      "fieldAtcud": "ATCUD",
+      "fieldDate": "Data",
+      "fieldNif": "NIF do fornecedor",
+      "fieldNifHint": "Por omissão é o mesmo da fatura de origem; um NIF diferente grava com aviso.",
+      "fieldDescription": "Descrição",
+      "fieldNotes": "Notas",
+      "fieldDocumentStatus": "Estado do documento",
+      "splitTitle": "Repartição",
+      "splitHint": "Proposta na proporção das despesas da fatura de origem. Confirme ou ajuste antes de gravar.",
+      "splitNotAllocated": "A fatura de origem ainda não está associada a nenhuma rubrica — a nota de crédito não vai gerar despesas.",
+      "splitSum": "Soma da repartição",
+      "splitMismatch": "A soma da repartição não bate certo com o valor da nota de crédito — grava na mesma, mas fica desalinhada.",
+      "exceedsNet": "Esta nota de crédito é maior do que o líquido por creditar ({{amount}}) — confirme o valor.",
+      "netTitle": "Líquido",
+      "netHint": "Total menos as notas de crédito. É este o valor a pagar.",
+      "listTitle": "Notas de crédito",
+      "isCreditNoteTitle": "Isto é uma nota de crédito",
+      "isCreditNoteBody": "Uma nota de crédito não se regista por aqui: abra a fatura que ela corrige e use «Registar nota de crédito».",
+      "success": "Nota de crédito registada."
     }
   },
   "budget": {
