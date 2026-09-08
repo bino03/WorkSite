@@ -1,6 +1,8 @@
 // src/api.ts
 import axios from "axios";
 import { notificationService } from "@/services/general/notificationService";
+import { wasErrorHandled } from "@/errors/errorHandler";
+import { getUserFriendlyMessage } from "@/errors/errorMessages";
 import type { ApiErrorResponse } from "@/errors/error.types";
 
 declare module "axios" {
@@ -181,17 +183,31 @@ api.interceptors.response.use(
 
     const apiError = error?.response?.data as ApiErrorResponse | undefined;
 
-    if (apiError?.errorCode === 'ERR_002' && apiError.fieldErrors?.length) {
-      // Erros de validação com campos específicos
-      notificationService.validationError(apiError.fieldErrors);
-    } else if (apiError?.message) {
-      notificationService.error('Erro', apiError.message);
-    } else if (error.request && !error.response) {
-      // Sem resposta do servidor (rede)
-      notificationService.error('Sem ligação', 'Não foi possível contactar o servidor. Verifique a sua ligação.');
-    } else {
-      notificationService.error('Erro', 'Ocorreu um erro inesperado. Tente novamente.');
+    // Rede não tem dono: nenhum `errorCode` chega ao componente e a causa é a
+    // mesma para toda a app. Notifica-se já, sem esperar por ninguém.
+    if (error.request && !error.response) {
+      notificationService.error(
+        'Sem ligação',
+        'Não foi possível contactar o servidor. Verifique a sua ligação.'
+      );
+      return Promise.reject(error);
     }
+
+    // Rede de segurança, não a via normal. O `catch` do componente corre depois
+    // deste interceptor (é uma microtask), por isso a decisão adia-se um tick:
+    // se lá tiver passado pelo `ErrorHandler`, o erro fica marcado e aqui
+    // cala-se. Sem isto o utilizador via duas notificações por erro.
+    setTimeout(() => {
+      if (wasErrorHandled(error)) return;
+
+      if (apiError?.fieldErrors?.length) {
+        notificationService.validationError(apiError.fieldErrors);
+        return;
+      }
+      // A fonte de verdade das mensagens é o mapa PT indexado pelo
+      // `errorCode` — nunca o `message` cru do backend, que vem em inglês.
+      notificationService.error('Erro', getUserFriendlyMessage(apiError?.errorCode));
+    }, 0);
 
     return Promise.reject(error);
   }

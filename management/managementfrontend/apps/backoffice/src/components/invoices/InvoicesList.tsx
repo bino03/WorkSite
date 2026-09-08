@@ -185,9 +185,18 @@ export const InvoicesList: FC<Props> = ({
       title: "Pagamento",
       dataIndex: "paymentStatus",
       width: 116,
-      render: (status: PaymentStatus) => (
-        <span className={`ind-tag ${PAYMENT_STATUS[status].cls}`}>{PAYMENT_STATUS[status].label}</span>
-      ),
+      render: (status: PaymentStatus, row: ConstructionInvoice) => {
+        // Uma NC não se paga — reduz a fatura a que pertence. O estado derivado
+        // continua a existir no DTO, mas mostrá-lo aqui punha "por liquidar"
+        // numa linha que nunca há de ser liquidada (e que o filtro "por
+        // liquidar", esse, já exclui).
+        if (row.documentType === "CREDIT_NOTE") {
+          return <span style={{ opacity: 0.4 }}>—</span>;
+        }
+        return (
+          <span className={`ind-tag ${PAYMENT_STATUS[status].cls}`}>{PAYMENT_STATUS[status].label}</span>
+        );
+      },
     },
     // A rubrica só existe numa obra: uma despesa da empresa não entra em
     // orçamento nenhum, e a quarentena nem obra tem.
@@ -316,9 +325,15 @@ export const InvoicesList: FC<Props> = ({
             ? {
                 selectedRowKeys: selectedIds,
                 onChange: (keys) => onSelectionChange(keys as string[]),
-                // Só faz sentido associar em bloco o que está por associar e
-                // tem dados suficientes para virar lançamento.
-                getCheckboxProps: (row) => ({ disabled: row.allocated || row.needsReview }),
+                // Sem `getCheckboxProps`: o checkbox está solto de propósito.
+                // Esteve desativado por `allocated || needsReview` — regra de
+                // "associar em bloco". Só que o mesmo checkbox passou a servir
+                // "registar pagamento" e "marcar como enviadas à
+                // contabilidade", que só fazem sentido em faturas **já**
+                // classificadas: com a regra de uma ação a mandar nas três, na
+                // vista "Associadas" estava tudo desativado e as outras duas
+                // eram inalcançáveis. Cada ação filtra o que lhe serve — ver
+                // `EnterpriseInvoicesPage`.
               }
             : undefined
         }

@@ -29,6 +29,28 @@ Contagem por padrão de `catch` em chamadas à API (atualizada a 2026-08-05, ap�
 
 `api.ts` e `errors/errorHandler.ts` chamam `notificationService` diretamente, o que é correto — são a própria infraestrutura de notificação, não código de feature.
 
+### 2.1 Quem notifica: o `ErrorHandler` primeiro, o interceptor só se ninguém o fizer (2026-09-08)
+
+Durante muito tempo **os dois** notificavam, e o utilizador via cada erro a dobrar: a mensagem PT
+do componente e, por cima, a mensagem crua do backend em inglês. Visto no `ENT_032`: "Já existe um
+projeto com esta pasta do vault." **e** "Enterprise slug already in use: Vila Teste Claude".
+
+A regra passou a ser:
+
+- **O interceptor global nunca mostra `apiError.message`.** Passa sempre pelo mapa PT
+  (`getUserFriendlyMessage(errorCode)`), que é a fonte de verdade — o `message` do backend é
+  contexto para logs, não texto de UI.
+- **`ErrorHandler.handle()` reclama o erro**: marca-o com `Symbol.for("worksite.errorHandled")`,
+  mesmo quando `showNotification: false` (chamar o handler é assumir o erro, incluindo a decisão de
+  o calar).
+- **O interceptor adia a decisão um tick** (`setTimeout(…, 0)`) e cala-se se o erro já tiver dono.
+  O `catch` do componente corre numa microtask, portanto já passou quando o timeout dispara.
+- **Erros de rede** (sem `response`) notificam de imediato: não têm `errorCode` nem dono possível.
+
+O interceptor não foi simplesmente calado porque ~41 dos 99 `catch` da app ainda não chamam o
+`ErrorHandler` (ponto 2 acima) — ficariam mudos. É rede de segurança, não a via normal; à medida
+que o ponto 2 for migrando, vai deixando de disparar sozinho.
+
 **Convenção**: `ErrorHandler.handle()` em todo o `catch` de chamada à API — não é opcional nem "só para casos complexos". Tarefas e Construção são os exemplos a copiar; `message.error` com string fixa continua a ser o padrão numericamente dominante mas **não** é o padrão a seguir em código novo, porque ignora o `errorCode` que o backend envia.
 
 ## 3. Camada de serviços — bem alinhada, com um desvio de forma

@@ -274,7 +274,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_018': 'Documento não encontrado nesta fatura.',
   'INVOICE_019': 'Esta fatura já está totalmente paga.',
   'INVOICE_020': 'O valor a pagar é superior ao que falta liquidar nesta fatura.',
-  'INVOICE_021': 'O valor do movimento não chega para as faturas selecionadas — tire as que ficam de fora.',
+  'INVOICE_021': 'O valor do movimento é superior à soma do que falta pagar nas faturas selecionadas — baixe o valor.',
   'INVOICE_022': 'Um pagamento agregado só pode juntar faturas da mesma obra.',
   'INVOICE_023': 'Pagamento não encontrado.',
   'INVOICE_024': 'Indique pelo menos uma fatura para o pagamento.',

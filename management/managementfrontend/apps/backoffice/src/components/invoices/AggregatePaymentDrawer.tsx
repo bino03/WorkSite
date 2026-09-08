@@ -88,6 +88,10 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
   const diff = Math.round(((amount ?? 0) - selectedTotal) * 100) / 100;
 
   const onSubmit = handleSubmit(async (values) => {
+    // A lista das que ficam de fora é a resposta a **este** envio. Sem a
+    // limpar, um envio seguinte que falhe por outro motivo deixava no ecrã o
+    // aviso do envio anterior a contradizer o erro novo.
+    setLeftOut([]);
     try {
       const result = await registerAggregatePayment(
         {

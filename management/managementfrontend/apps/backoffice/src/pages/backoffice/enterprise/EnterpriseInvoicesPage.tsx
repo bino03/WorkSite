@@ -222,7 +222,7 @@ const EnterpriseInvoicesPage: FC = () => {
 
   /** Marca todas as selecionadas de uma vez — só marca, nunca desmarca em bloco. */
   const handleBulkSendToAccountant = () => {
-    const targets = selectedInvoices;
+    const targets = sendableSelected;
     confirm({
       title: "Contabilidade",
       message: `Marcar ${targets.length} fatura${targets.length > 1 ? "s" : ""} como enviada${
@@ -274,6 +274,19 @@ const EnterpriseInvoicesPage: FC = () => {
 
   const selectedInvoices = invoices.filter((i) => selectedIds.includes(i.id));
   const suggestedInvoiceType = useMemo(() => suggestInvoiceType(invoices), [invoices]);
+
+  /**
+   * O checkbox da lista está solto (ver `InvoicesList`): serve três ações com
+   * regras opostas — associar só faz sentido no que está **por** associar,
+   * pagar e enviar à contabilidade só no que **já** está classificado. Cada
+   * botão fica com o seu próprio filtro e mostra a contagem do que lhe serve;
+   * quem ficar de fora da seleção simplesmente não conta para esse botão.
+   */
+  const allocatableSelected = selectedInvoices.filter((i) => !i.allocated && !i.needsReview);
+  const payableSelected = selectedInvoices.filter(
+    (i) => i.documentType !== "CREDIT_NOTE" && i.netAmount != null && i.paidAmount < i.netAmount
+  );
+  const sendableSelected = selectedInvoices.filter((i) => !i.sentToAccountant);
 
   return (
     <div>
@@ -362,19 +375,20 @@ const EnterpriseInvoicesPage: FC = () => {
           Por liquidar
         </Button>
 
-        {selectedIds.length > 0 && (
-          <Button type="primary" onClick={() => setAllocating(selectedInvoices)}>
-            Associar {selectedIds.length} à mesma rubrica
+        {allocatableSelected.length > 0 && (
+          <Button type="primary" onClick={() => setAllocating(allocatableSelected)}>
+            Associar {allocatableSelected.length} à mesma rubrica
           </Button>
         )}
-        {selectedIds.length > 0 && isAdmin() && (
+        {payableSelected.length > 0 && isAdmin() && (
           <Button onClick={() => setAggregatePayOpen(true)}>
-            Registar pagamento de {selectedIds.length}
+            Registar pagamento de {payableSelected.length}
           </Button>
         )}
-        {selectedIds.length > 0 && isAdmin() && (
+        {sendableSelected.length > 0 && isAdmin() && (
           <Button onClick={handleBulkSendToAccountant}>
-            Marcar {selectedIds.length} como enviada{selectedIds.length > 1 ? "s" : ""} à contabilidade
+            Marcar {sendableSelected.length} como enviada{sendableSelected.length > 1 ? "s" : ""} à
+            contabilidade
           </Button>
         )}
       </div>
@@ -435,7 +449,7 @@ const EnterpriseInvoicesPage: FC = () => {
 
           <AggregatePaymentDrawer
             open={aggregatePayOpen}
-            invoices={selectedInvoices}
+            invoices={payableSelected}
             onClose={() => setAggregatePayOpen(false)}
             onDone={reload}
           />

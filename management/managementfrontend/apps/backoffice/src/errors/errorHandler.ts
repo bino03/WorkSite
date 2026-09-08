@@ -4,8 +4,36 @@ import type { ErrorResponse, ErrorConfig } from '@/errors/error.types';
 import { getUserFriendlyMessage } from '@/errors/errorMessages';
 import { notificationService } from '../services/general/notificationService';
 
+/**
+ * Marca posta no próprio objeto de erro por quem o tratou.
+ *
+ * O interceptor global do `api.ts` corre **antes** do `catch` do componente, e
+ * durante muito tempo notificou sempre — resultado: cada erro aparecia a
+ * dobrar, a mensagem PT do componente e a mensagem crua (em inglês) do
+ * backend. Agora o interceptor adia a sua notificação um tick e só a mostra se
+ * ninguém tiver reclamado o erro entretanto. Continua a servir de rede de
+ * segurança para os `catch` que não chamam o `ErrorHandler`, sem duplicar os
+ * que chamam.
+ */
+const NOTIFIED = Symbol.for("worksite.errorHandled");
+
+/** Diz que este erro já tem dono — o interceptor global não lhe toca. */
+export function markErrorHandled(error: unknown): void {
+  if (error && typeof error === "object") {
+    (error as Record<symbol, unknown>)[NOTIFIED] = true;
+  }
+}
+
+export function wasErrorHandled(error: unknown): boolean {
+  return !!(error && typeof error === "object" && (error as Record<symbol, unknown>)[NOTIFIED]);
+}
+
 export class ErrorHandler {
   static handle(error: unknown, config: ErrorConfig = {}) {
+    // Marca-se sempre, mesmo com `showNotification: false`: chamar o handler é
+    // assumir a responsabilidade pelo erro, incluindo a de o calar.
+    markErrorHandled(error);
+
     const {
       showNotification = true,
       notificationType = 'error',
