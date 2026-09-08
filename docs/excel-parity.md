@@ -137,16 +137,39 @@ rubricas".
 |---|---|---|
 | Fonte | `construction_budget_item`, árvore importada da folha "Orçamento inicial" (colunas `Art`, `Descrição`, `Un.`, `Quant`, `Preço Un`, `Preço total`, `Obs.` — mapa em [[database.md]]) | a mesma folha "Orçamento inicial", no mesmo Excel |
 | Identificador | `code` = coluna `Art` (`4`, `4.2`, `4.2.1`) | coluna `Rubrica` da folha `Despesas` |
-| Nível | qualquer `ITEM`, a qualquer profundidade | hoje só o capítulo (`4.` ou `4. Estrutura de Betão Armado`) |
+| Nível | qualquer `ITEM`, a qualquer profundidade | qualquer `ITEM`, a qualquer profundidade (desde 2026-09-08) |
 
 **Contrato para a coluna `Rubrica`**: o valor é o `Art` da rubrica, e só ele. Ao **ler**, normaliza-se:
 tira-se o ponto final (`4.` → `4`) e tudo a partir do primeiro espaço (`4. Estrutura…` → `4`). Ao
 **escrever** (exportação), escreve-se `code` seguido de ` — ` e `name`, para se ler no Excel
 (`4.2.1 — Lajes maciças`); a leitura tolera as duas formas.
 
-**Pedido ao vault Vilatro** (decisão 26): a skill `associar-rubricas` passa a escrever o `Art` completo
-da rubrica escolhida, e a oferecer sub-rubricas, não só capítulos. Classificar ao capítulo continua a
-ser válido (a app aceita), mas o formato fica fixo.
+> ✅ **Pedido 2 da decisão 26 cumprido do lado do Excel a 2026-09-08.** A coluna `Rubrica` tem agora
+> **dropdown** com as rubricas válidas da obra (capítulos + artigos com preço — 151 no Vila Petrus) e
+> escreve sempre `<Art> — <Descrição>`, exatamente a forma que a exportação da app produz. A coluna passou
+> a estar formatada como **Texto**, por isso `4.` deixou de virar `4` e `9.10` deixou de colidir com `9.1`.
+> A normalização na leitura continua a ser precisa: há linhas por classificar e a escrita por COM passa à
+> frente da validação.
+
+**Folhas novas no `.xlsx` de cada obra**, geradas por `Scripts\gerar-orcamento-vs-gasto.ps1` (apagadas e
+refeitas a cada corrida). O importador tem de as ignorar — e, sobretudo, **não as tomar pelo orçamento**: a
+regra "a folha que não é a `Despesas` é o orçamento" deixou de servir, agora exclui-se pelo nome.
+
+| Folha | Tabela | O que é |
+|---|---|---|
+| `Rubricas` | `TabelaRubricas` | a árvore do orçamento achatada: `Art` (normalizado, sem ponto final), `Descrição`, `Cap`, `Nível`, `Tipo` (`CAPÍTULO`/`ITEM`/`TÍTULO`), `Orçamentado`, `Gasto`/`Saldo`/`% consumido`/`Nº faturas` por fórmula, e `Etiqueta` (o `<Art> — <Descrição>` da dropdown) |
+| `Orçamento vs Gasto` | — | painel: totais e uma linha por capítulo, tudo `SUMIF` sobre a `TabelaDespesas` |
+
+A `TabelaRubricas` é, na prática, **a `construction_budget_item` do lado do Excel** — mesma árvore, mesmos
+`code`, mesmo conceito de `ITEM`/`HEADING`. Vale a pena importar por ela em vez de reparsear a folha
+"Orçamento inicial", que é uma proposta comercial: preços a níveis diferentes, títulos sem preço, e **linhas
+com preço mas sem `Art`** (as "Alternativa em…" — 4 casos, 43 265,39 €, no Vila Petrus) cujo valor pertence
+ao artigo acima. O gerador já resolve isso e lista cada caso como aviso.
+
+**Duas anomalias reais no orçamento do Vila Petrus**, que a importação da árvore vai encontrar: o `Art`
+**`8.2` aparece em duas linhas** (falta o `8.3`) e o **`13.2.1` noutras duas** (falta o `13.1.1`). Como
+`code` é único em `construction_budget_item`, a importação tem de as **listar como erro**, nunca resolver
+sozinha.
 
 Rubricas `HEADING` e `NOTE` (sem `Art`) não aceitam despesas em nenhum dos lados. Uma `Rubrica` no
 Excel que não exista na árvore da obra é erro de migração, listado, nunca criado automaticamente.

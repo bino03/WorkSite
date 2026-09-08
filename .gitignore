@@ -50,3 +50,6 @@ Thumbs.db
 # Coverage
 coverage/
 .nyc_output/
+
+# Definições pessoais do Claude Code (as skills em .claude/skills/ vão para o git)
+.claude/settings.local.json
