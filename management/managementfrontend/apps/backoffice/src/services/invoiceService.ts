@@ -1,4 +1,5 @@
 import api from "@/api";
+import { normalizeSpringPage, type SpringPage } from "@/utils/springPage";
 import type {
   BatchAllocateResult,
   BudgetItemSuggestion,
@@ -14,32 +15,11 @@ import type {
   RubricSuggestion,
 } from "@/types/invoice";
 
-export interface InvoicePage {
-  content: ConstructionInvoice[];
-  size: number;
-  number: number;
-  totalElements: number;
-  totalPages: number;
-}
+export type InvoicePage = SpringPage<ConstructionInvoice>;
 
-/**
- * Normaliza a página do Spring.
- *
- * Coexistem duas formas nas respostas desta API — a plana
- * (`{content, number, totalElements}`, lida por `EnterprisesList`) e a
- * embrulhada (`{content, page: {...}}`, lida por `useTasks`). Aceitar as duas
- * custa cinco linhas e poupa um bug que só aparece em produção.
- */
+/** Ver `normalizeSpringPage` — o Spring devolve a página em duas formas. */
 function normalizePage(data: unknown): InvoicePage {
-  const raw = data as Record<string, unknown>;
-  const meta = (raw.page ?? raw) as Record<string, unknown>;
-  return {
-    content: (raw.content as ConstructionInvoice[]) ?? [],
-    size: Number(meta.size ?? 0),
-    number: Number(meta.number ?? 0),
-    totalElements: Number(meta.totalElements ?? 0),
-    totalPages: Number(meta.totalPages ?? 0),
-  };
+  return normalizeSpringPage<ConstructionInvoice>(data);
 }
 
 /**

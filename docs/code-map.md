@@ -126,6 +126,7 @@ começar a olhar.
 | o ficheiro não abre / a imagem não aparece | signed URLs — `integrations/supabase/SignedUrlService`, `components/image/AuthenticatedImage` |
 | a cor/espaçamento está fora do sistema | tokens `--ind-*` em `index.css` (espelhados em `theme.ts`) — ver [[skills/references/design/backoffice-tokens-and-colors]] |
 | a lista não recarrega depois de gravar | o `onChanged`/`reload` da página que a contém (as drawers não recarregam nada sozinhas) |
+| a lista diz "0 resultado(s)" com linhas, ou um cartão diz "undefined" | a página do Spring vem `{content, page:{…}}` (`VIA_DTO`) e o código lê `totalElements` no topo — usar `utils/springPage.ts` `normalizeSpringPage` |
 | a importação do Excel do orçamento falha | `BudgetExcelImportService` (procura a linha de cabeçalho "Art") |
 | o email de convite ou de recuperação não sai | falta um provedor predefinido **ativo** em *Definições → Provedores de email* — o erro é `EMAIL_002`/`EMAIL_003`, não `ERR_001` |
 | o link do email aponta para `localhost` | `APP_FRONTEND_URL` não está definido no ambiente — ver [[environment.md]] |

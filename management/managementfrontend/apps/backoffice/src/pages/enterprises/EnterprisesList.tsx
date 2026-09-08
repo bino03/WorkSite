@@ -9,6 +9,7 @@ import { deleteEnterprise } from "@/services/enterpriseService";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/config/pagination";
 import CreateEnterpriseDrawer from "@/components/enterprise/CreateEnterpriseDrawer";
 import EnterpriseViewDrawer from "@/components/enterprise/EnterpriseViewDrawer";
+import { normalizeSpringPage, type SpringPage } from "@/utils/springPage";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { ListActions, ListActionPrimary, ListActionDanger } from "@/components/common/ListActions";
 
@@ -46,14 +47,6 @@ export interface Enterprise {
   }
 }
 
-export interface PageResponse<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  size: number;
-  number: number;
-}
-
 const STATUS_MAP: Record<EnterpriseStatus, { label: string; cls: string }> = {
   planning: { label: "Planeamento", cls: "ind-tag-outline" },
   under_construction: { label: "Em construção", cls: "ind-tag-accent" },
@@ -75,9 +68,11 @@ export const fetchEnterprises = async (params?: {
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   q?: string;
-}): Promise<PageResponse<Enterprise>> => {
+}): Promise<SpringPage<Enterprise>> => {
   const response = await api.get('/enterprises', { params });
-  return response.data;
+  // O backend serializa a página em `VIA_DTO` (`{content, page: {...}}`); ler
+  // `totalElements` no topo dava `undefined` → "0 resultado(s)" com linhas.
+  return normalizeSpringPage<Enterprise>(response.data);
 };
 
 const formatCurrency = (value: number | null | undefined, currency: string = "EUR") => {
@@ -147,7 +142,9 @@ export default function EnterprisesList() {
   };
 
   const handleEnterpriseCreated = () => {
-    message.success(t('enterprises.created'));
+    // O toast de sucesso é do `CreateEnterpriseDrawer` (o componente que faz o
+    // submit e já trata sucesso e erro). Aqui só se atualiza a lista — dois
+    // `message.success` iguais davam dois toasts por criação.
     setRefreshKey(prev => prev + 1);
     setIsCreateDrawerOpen(false);
   };

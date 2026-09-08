@@ -66,21 +66,31 @@ Estado real dos serviços em `services/` — eram 7 quando este brief foi escrit
 
 ## 3.1 Forma das respostas paginadas (Spring)
 
-Tudo o que o backend pagina chega no formato do Spring `Page`, e o frontend tem de o desembrulhar
-sempre da mesma maneira:
+O backend liga `@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)` (em
+`ManagementApiApplication`), portanto tudo o que pagina chega **embrulhado**:
 
 ```ts
 type SpringPageMeta = { size: number; number: number; totalElements: number; totalPages: number };
 type WrappedPageResponse<T> = { content: T[]; page: SpringPageMeta };
 ```
 
+Ler `res.totalElements` no topo (a forma **plana**, anterior ao `VIA_DTO`) devolve `undefined` — o
+sintoma é "0 resultado(s)" com linhas na tabela, ou um cartão a dizer "undefined". Usar sempre o
+normalizador partilhado, que aceita as duas formas:
+
+```ts
+import { normalizeSpringPage, type SpringPage } from "@/utils/springPage";
+const { content, number, totalElements } = normalizeSpringPage<Enterprise>(response.data);
+```
+
 Atenção ao `number`: é **0-based** do lado do Spring e 1-based na paginação do Ant Design — a
 conversão é feita à mão em cada lista (ver `EmployeesList.tsx`), e é uma fonte recorrente de
 listas que abrem na página errada.
 
-> Este tipo esteve declarado três vezes no código (`EmployeesList.tsx`, `EnterprisesList.tsx`,
-> `locationService.ts`) com nomes diferentes para a mesma coisa. Se for preciso mexer, unificar
-> em vez de acrescentar uma quarta.
+> `utils/springPage.ts` (`normalizeSpringPage` + `SpringPage<T>`) é a fonte única desde 2026-09-08.
+> `invoiceService.normalizePage` delega-lhe; `useTasks` e o `EnterprisesList`/`BackofficeHome` (que
+> liam a forma plana) foram passados para lá. **Ainda por migrar** (mesmo defeito latente):
+> `EmployeesList.tsx` e `services/locationService.ts`. Não acrescentar uma quarta cópia do tipo.
 ## 4. Toasts: `message.*` (antd) vs `notificationService`
 
 `services/general/notificationService.tsx` é o wrapper próprio à volta do `notification` do antd, e é o que o `ErrorHandler` usa internamente. Fora da infraestrutura, é chamado pelo domínio de tarefas e pelas três páginas de Construção (que trocaram `message.success` por `notificationService.success` na migração de 2026-08-05). Os restantes 20 ficheiros usam `message.*` do antd diretamente para o mesmo tipo de evento ("guardado com sucesso", "erro ao guardar") — a escolha correlaciona com o domínio, não com o tipo de evento.

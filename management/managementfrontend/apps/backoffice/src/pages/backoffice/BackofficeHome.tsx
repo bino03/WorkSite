@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { taskService } from "@/services/taskService";
 import api from "@/api";
 import BlueprintCard from "@/components/common/BlueprintCard";
+import { normalizeSpringPage } from "@/utils/springPage";
 
 interface Metric {
   label: string;
@@ -58,13 +59,17 @@ export const BackofficeHome = () => {
 
         if (admin) {
           const [teamRes, adminRes] = await Promise.all([
-            api.get<{ totalElements: number }>("/employees", { params: { page: 0, size: 1 } }),
-            api.get<{ totalElements: number }>("/employees", { params: { page: 0, size: 1, role: "ADMIN" } }),
+            api.get("/employees", { params: { page: 0, size: 1 } }),
+            api.get("/employees", { params: { page: 0, size: 1, role: "ADMIN" } }),
           ]);
+          // `/employees` serializa a página em `VIA_DTO` — `totalElements` vem
+          // dentro de `page`, não no topo. Ler no topo dava "undefined".
+          const teamTotal = normalizeSpringPage(teamRes.data).totalElements;
+          const adminTotal = normalizeSpringPage(adminRes.data).totalElements;
           nextMetrics.push({
             label: "Membros da equipa",
-            value: String(teamRes.data.totalElements),
-            meta: `${adminRes.data.totalElements} administradores`,
+            value: String(teamTotal),
+            meta: `${adminTotal} administradores`,
           });
         }
 

@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.management.managementapi.dto.error.ErrorResponseDTO;
 import com.management.managementapi.dto.error.FieldErrorDTO;
 import com.management.managementapi.dto.error.ErrorCode;
@@ -311,6 +312,28 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNoResourceFound(
+            NoResourceFoundException ex,
+            HttpServletRequest request) {
+
+        // URL que não casa com nenhum handler nem recurso estático. Sem este
+        // ramo, o Spring propaga a exceção até ao `handleGenericException`
+        // abaixo, que responde 500 `ERR_001` — uma rota errada não é um erro
+        // do servidor, e o 500 engana quem está a depurar.
+        log.warn("No resource for '{}'", request.getRequestURI());
+
+        ErrorResponseDTO error = new ErrorResponseDTO(
+            HttpStatus.NOT_FOUND.value(),
+            "Not Found",
+            "O recurso pedido não existe",
+            request.getRequestURI(),
+            ErrorCode.RESOURCE_NOT_FOUND.getCode()
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
     @ExceptionHandler(Exception.class)
