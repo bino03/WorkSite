@@ -4,7 +4,9 @@ import com.management.managementapi.enterprises.dto.invoice.request.Construction
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.BatchAllocateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTransferResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.RubricSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
@@ -355,6 +357,21 @@ public class ConstructionInvoiceController {
                         "repartida por " + lineCount + " rubrica(s)", null, request));
 
         return ResponseEntity.ok(service.getDetail(id));
+    }
+
+    /**
+     * Transfere a fatura de âmbito/obra. Razão obrigatória; apaga as despesas,
+     * guarda a repartição antiga no {@code activity_log} e move as notas de
+     * crédito ligadas junto. Em "Por identificar", preencher a obra faz-se por
+     * aqui. O {@code activity_log} é escrito pelo serviço, de forma síncrona —
+     * por isso não há {@code activityLogger} aqui.
+     */
+    @PostMapping("/{id}/transfer")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<InvoiceTransferResultDTO> transfer(
+            @PathVariable UUID id,
+            @Valid @RequestBody InvoiceTransferDTO dto) {
+        return ResponseEntity.ok(service.transfer(id, dto));
     }
 
     /**

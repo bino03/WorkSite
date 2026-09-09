@@ -7,7 +7,8 @@ public enum ActivityType {
     DELETE("delete"),
     LOGIN("login"),
     LOGOUT("logout"),
-    RESTORE("restore");
+    RESTORE("restore"),
+    TRANSFER("transfer");
 
     private final String dbValue;
 

@@ -3482,6 +3482,15 @@
       "invoiceTooLarge": "O ficheiro excede o tamanho máximo de 25 MB."
     }
   },
+  "incidents": {
+    "drawerTitle": "Registar inconsistência",
+    "create": "Registar",
+    "createSuccess": "Inconsistência registada.",
+    "fieldInvoices": "Faturas ligadas",
+    "fieldTitle": "Título",
+    "fieldBody": "Descrição",
+    "bodyHint": "Aceita markdown (listas, negrito, tabelas)."
+  },
   "invoices": {
     "formErrors": {
       "supplierNameTooLong": "Nome do fornecedor demasiado longo.",
@@ -3500,7 +3509,30 @@
       "amountPositive": "O valor tem de ser positivo.",
       "referenceTooLong": "Referência demasiado longa.",
       "movementRequired": "Indique o valor do movimento.",
-      "creditNoteAmountRequired": "Indique o valor da nota de crédito."
+      "creditNoteAmountRequired": "Indique o valor da nota de crédito.",
+      "transferReasonRequired": "Indique a razão da transferência.",
+      "transferReasonTooLong": "A razão é demasiado longa.",
+      "transferReasonInvalid": "A razão tem caracteres não permitidos.",
+      "transferEnterpriseRequired": "Escolha a obra de destino.",
+      "titleRequired": "Indique um título.",
+      "bodyRequired": "Escreva o corpo da inconsistência.",
+      "invoicesRequired": "Ligue pelo menos uma fatura."
+    },
+    "transfer": {
+      "action": "Transferir",
+      "drawerTitle": "Transferir fatura",
+      "submit": "Transferir",
+      "success": "Fatura transferida.",
+      "warning": "As despesas desta fatura nesta obra vão ser apagadas. As notas de crédito ligadas são transferidas junto.",
+      "fieldScope": "Destino",
+      "fieldEnterprise": "Obra de destino",
+      "fieldReason": "Razão",
+      "enterprisePlaceholder": "Escrever para procurar a obra…",
+      "scope": {
+        "PROJECT": "Outra obra",
+        "COMPANY": "Despesas da empresa",
+        "UNIDENTIFIED": "Por identificar"
+      }
     },
     "payment": {
       "status": { "UNPAID": "Por liquidar", "PARTIAL": "Parcial", "PAID": "Paga" },

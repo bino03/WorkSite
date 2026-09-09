@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import CreditNoteDrawer from "@/components/invoices/CreditNoteDrawer";
 import InvoiceDocumentGallery from "@/components/invoices/InvoiceDocumentGallery";
 import MarkPaidDrawer from "@/components/invoices/MarkPaidDrawer";
+import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import { deletePayment } from "@/services/paymentService";
 import {
   DEFAULT_INVOICE_TYPE,
@@ -28,7 +29,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { parseApiError } from "@/utils/apiError";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import type { ConstructionInvoice } from "@/types/invoice";
+import type { ConstructionInvoice, InvoiceScope } from "@/types/invoice";
+
+const SCOPE_LABEL: Record<InvoiceScope, string> = {
+  PROJECT: "Obra",
+  COMPANY: "Despesas da empresa",
+  UNIDENTIFIED: "Por identificar",
+};
 
 const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrador", EMPLOYEE: "Funcionário" };
 
@@ -47,6 +54,12 @@ interface Props {
   onClose: () => void;
   onChanged: () => void;
   onAllocate: (invoice: ConstructionInvoice) => void;
+  /**
+   * Depois de uma transferência em que o backend devolveu `suggestIncident`:
+   * o pai abre o `IncidentDrawer` já com esta fatura. Opcional — sem isto a
+   * transferência apenas fecha o detalhe e recarrega a lista.
+   */
+  onIncidentSuggested?: (invoice: ConstructionInvoice) => void;
   /**
    * Tipo de documento a pré-selecionar quando o número está por preencher —
    * o mais usado nas faturas já registadas (ver `suggestInvoiceType`).
@@ -80,6 +93,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   onClose,
   onChanged,
   onAllocate,
+  onIncidentSuggested,
   suggestedInvoiceType = DEFAULT_INVOICE_TYPE,
 }) => {
   const { isAdmin } = useAuth();
@@ -92,6 +106,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   /**
    * Fatura que a drawer está mesmo a mostrar, quando não é a que o pai pediu:
    * saltar de uma fatura para uma nota de crédito sua (e de volta) acontece
@@ -452,6 +467,11 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                 </div>
               )}
 
+              {/* Âmbito — antes não aparecia em lado nenhum do detalhe. */}
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                Âmbito: <strong>{SCOPE_LABEL[invoice.scope]}</strong>
+              </div>
+
               {isAdmin() && (
                 <div style={{ display: "flex", gap: 8 }}>
                   {invoice.allocated ? (
@@ -485,6 +505,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                       {t("invoices.creditNote.register")}
                     </Button>
                   )}
+
+                  {/* Transferir de obra/âmbito — nunca numa NC (segue a fatura). */}
+                  {invoice.documentType === "INVOICE" && (
+                    <Button onClick={() => setTransferOpen(true)}>
+                      {t("invoices.transfer.action")}
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -502,6 +529,9 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                 onDeletePayment={handleDeletePayment}
               />
               )}
+
+              {/* Histórico de transferências ---------------------------- */}
+              {invoice.transfers.length > 0 && <InvoiceTransferSection invoice={invoice} />}
 
               {/* Campos --------------------------------------------------- */}
               <InvoiceFields
@@ -536,7 +566,46 @@ export const InvoiceDetailDrawer: FC<Props> = ({
           onChanged();
         }}
       />
+
+      <TransferInvoiceDrawer
+        open={transferOpen}
+        invoice={invoice}
+        onClose={() => setTransferOpen(false)}
+        onTransferred={(result) => {
+          onChanged();
+          onClose();
+          if (result.suggestIncident) {
+            onIncidentSuggested?.(result.invoice);
+          }
+        }}
+      />
     </>
+  );
+};
+
+/**
+ * As transferências de âmbito/obra desta fatura, da mais recente para a mais
+ * antiga. Mesmo molde do bloco de pagamentos.
+ */
+const InvoiceTransferSection: FC<{ invoice: ConstructionInvoice }> = ({ invoice }) => {
+  const label = (scope: InvoiceScope, name: string | null) => name ?? SCOPE_LABEL[scope];
+  return (
+    <div className="ind-card" style={{ padding: "13.6px" }}>
+      <div className="ind-card-kicker">Histórico de transferências</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+        {invoice.transfers.map((tr, i) => (
+          <div key={`${tr.transferredAt}-${i}`} style={{ fontSize: 12 }}>
+            <div style={{ fontWeight: 600 }}>
+              {label(tr.fromScope, tr.fromEnterpriseName)} → {label(tr.toScope, tr.toEnterpriseName)}
+            </div>
+            <div style={{ opacity: 0.7 }}>{tr.reason}</div>
+            <div style={{ opacity: 0.55, marginTop: 2 }}>
+              {tr.byName} · {formatDate(tr.transferredAt)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 

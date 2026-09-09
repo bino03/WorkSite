@@ -22,6 +22,7 @@ import EnterpriseInvoicesPage from "./pages/backoffice/enterprise/EnterpriseInvo
 import ClassifyInvoicesPage from "./pages/backoffice/enterprise/ClassifyInvoicesPage";
 import UnidentifiedInvoicesPage from "./pages/backoffice/invoices/UnidentifiedInvoicesPage";
 import CompanyInvoicesPage from "./pages/backoffice/invoices/CompanyInvoicesPage";
+import InvoiceIncidentsPage from "./pages/backoffice/invoices/InvoiceIncidentsPage";
 import TasksPage from "./pages/backoffice/TasksPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import "antd/dist/reset.css";
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="empreendimentos/:enterpriseId/classify" element={<ClassifyInvoicesPage />} />
               <Route path="invoices/unidentified" element={<UnidentifiedInvoicesPage />} />
               <Route path="invoices/company" element={<CompanyInvoicesPage />} />
+              <Route path="invoices/incidents" element={<InvoiceIncidentsPage />} />
               <Route path="tasks" element={<TasksPage />} />
             </Route>
 

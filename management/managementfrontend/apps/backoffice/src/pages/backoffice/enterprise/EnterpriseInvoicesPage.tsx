@@ -22,12 +22,15 @@ import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
+import IncidentDrawer from "@/components/invoices/IncidentDrawer";
+import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
 import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import type { ConstructionInvoice, InvoiceFilters } from "@/types/invoice";
+import type { IncidentInvoiceRef } from "@/types/incident";
 
 /** Os filtros que se usam de facto — cada um responde a uma pergunta concreta. */
 const VIEWS = [
@@ -75,6 +78,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -445,6 +449,16 @@ const EnterpriseInvoicesPage: FC = () => {
               setDetailId(null);
               setAllocating([invoice]);
             }}
+            onIncidentSuggested={(invoice) =>
+              setIncidentInvoices([toIncidentInvoiceRef(invoice)])
+            }
+          />
+
+          <IncidentDrawer
+            open={incidentInvoices !== null}
+            presetInvoices={incidentInvoices ?? []}
+            onClose={() => setIncidentInvoices(null)}
+            onCreated={() => setIncidentInvoices(null)}
           />
 
           <AggregatePaymentDrawer

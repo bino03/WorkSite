@@ -285,6 +285,13 @@ public enum ErrorCode {
     // Repartição e classificação (fase 4)
     INVOICE_SPLIT_EMPTY("INVOICE_029", "Indique pelo menos uma rubrica para repartir a fatura"),
     INVOICE_SPLIT_DUPLICATE_ITEM("INVOICE_030", "A mesma rubrica aparece duas vezes na repartição"),
+
+    // Transferências e inconsistências (fase 5)
+    INVOICE_TRANSFER_TEST_TARGET("INVOICE_031", "Não se transfere uma fatura para uma obra de teste"),
+    INVOICE_TRANSFER_SAME_TARGET("INVOICE_032", "A fatura já está neste âmbito"),
+    INVOICE_TRANSFER_CREDIT_NOTE("INVOICE_033", "Uma nota de crédito não se transfere sozinha — segue a fatura de origem"),
+    INVOICE_INCIDENT_NOT_FOUND("INVOICE_034", "Inconsistência não encontrada"),
+    INVOICE_INCIDENT_INVOICE_NOT_FOUND("INVOICE_035", "Uma das faturas indicadas não existe"),
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================

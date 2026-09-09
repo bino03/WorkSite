@@ -106,6 +106,18 @@ Quando houver paginação, importar `DEFAULT_PAGE_SIZE`/`PAGE_SIZE_OPTIONS` de `
 
 > Corrigido a 2026-08-09: até essa data o `index.css` ainda tinha a pele terracotta herdada (`.ant-table` a `--ivory`, cabeçalhos a `--warm-sand`, `padding: 24px !important`), que pintava **todas** as tabelas na paleta legacy e contradizia o resto da app. Foi substituída pela pele Industry. Se vires warm sand numa tabela, é drift a voltar — não o repitas.
 
+## 7. Lista mestre-detalhe (sem tabela) — `InvoiceIncidentsPage` (2026-09-09)
+
+Quando o registo tem um corpo longo para ler (não um punhado de campos), a página é uma **coluna
+de cartões `.ind-card` clicáveis à esquerda** (título + badge de estado + meta) e um **painel de
+detalhe `.ind-card` à direita**, em vez de tabela + drawer. O cartão selecionado leva
+`border: 1px solid var(--ind-color-accent)`. É o padrão para volumes baixos onde paginar não
+compensa; para volumes altos, volta-se à tabela.
+
+**Markdown**: o corpo renderiza-se com `react-markdown` + `remark-gfm` (adicionados ao Backoffice
+a 2026-09-09), **sem `rehype-raw`** — HTML em bruto no texto fica literal, não é interpretado. É a
+única forma aprovada de mostrar markdown de utilizador; não reinventar com `dangerouslySetInnerHTML`.
+
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
 - [[backoffice-buttons-and-icons]] — variantes de botão e confirmação de ações destrutivas

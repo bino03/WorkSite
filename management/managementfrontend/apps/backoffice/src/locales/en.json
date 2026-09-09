@@ -3451,6 +3451,15 @@
       "invoiceTooLarge": "File exceeds the maximum size of 25 MB."
     }
   },
+  "incidents": {
+    "drawerTitle": "Log incident",
+    "create": "Log",
+    "createSuccess": "Incident logged.",
+    "fieldInvoices": "Linked invoices",
+    "fieldTitle": "Title",
+    "fieldBody": "Description",
+    "bodyHint": "Markdown is supported (lists, bold, tables)."
+  },
   "invoices": {
     "formErrors": {
       "supplierNameTooLong": "Supplier name is too long.",
@@ -3469,7 +3478,30 @@
       "amountPositive": "The amount must be positive.",
       "referenceTooLong": "Reference is too long.",
       "movementRequired": "Enter the movement amount.",
-      "creditNoteAmountRequired": "Enter the credit note amount."
+      "creditNoteAmountRequired": "Enter the credit note amount.",
+      "transferReasonRequired": "Enter a reason for the transfer.",
+      "transferReasonTooLong": "The reason is too long.",
+      "transferReasonInvalid": "The reason has characters that are not allowed.",
+      "transferEnterpriseRequired": "Choose the destination project.",
+      "titleRequired": "Enter a title.",
+      "bodyRequired": "Write the incident body.",
+      "invoicesRequired": "Link at least one invoice."
+    },
+    "transfer": {
+      "action": "Transfer",
+      "drawerTitle": "Transfer invoice",
+      "submit": "Transfer",
+      "success": "Invoice transferred.",
+      "warning": "This invoice's expenses on this project will be deleted. Linked credit notes are transferred along with it.",
+      "fieldScope": "Destination",
+      "fieldEnterprise": "Destination project",
+      "fieldReason": "Reason",
+      "enterprisePlaceholder": "Type to search for the project…",
+      "scope": {
+        "PROJECT": "Another project",
+        "COMPANY": "Company expenses",
+        "UNIDENTIFIED": "Unidentified"
+      }
     },
     "payment": {
       "status": { "UNPAID": "Unpaid", "PARTIAL": "Partial", "PAID": "Paid" },

@@ -11,6 +11,8 @@ import type {
   InvoicePreviewResult,
   InvoiceRegisterPayload,
   InvoiceSplitLine,
+  InvoiceTransferPayload,
+  InvoiceTransferResult,
   InvoiceUploadResult,
   RubricSuggestion,
 } from "@/types/invoice";
@@ -245,6 +247,19 @@ export async function splitInvoice(
   lines: InvoiceSplitLine[]
 ): Promise<ConstructionInvoice> {
   const response = await api.post(`/construction-invoices/${id}/expenses/split`, { lines });
+  return response.data;
+}
+
+/**
+ * Transfere a fatura de âmbito/obra (fase 5). Razão obrigatória; o backend apaga
+ * as despesas, guarda a repartição antiga e move as NC ligadas junto. A resposta
+ * traz `suggestIncident` — se `true`, oferecer criar uma inconsistência.
+ */
+export async function transferInvoice(
+  id: string,
+  payload: InvoiceTransferPayload
+): Promise<InvoiceTransferResult> {
+  const response = await api.post(`/construction-invoices/${id}/transfer`, payload);
   return response.data;
 }
 

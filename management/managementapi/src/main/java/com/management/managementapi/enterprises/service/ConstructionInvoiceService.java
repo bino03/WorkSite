@@ -1,15 +1,21 @@
 package com.management.managementapi.enterprises.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.management.managementapi.dto.activity.ActivityLogCreateDTO;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteExpenseLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteRefDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceAllocationDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTransferResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTransferSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.RubricSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.DuplicateInvoiceRefDTO;
@@ -37,10 +43,14 @@ import com.management.managementapi.exeption.StorageException;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.model.Profile;
+import com.management.managementapi.model.enums.ActivityType;
+import com.management.managementapi.model.enums.EntityType;
 import com.management.managementapi.notifications.model.Notification;
 import com.management.managementapi.notifications.service.NotificationService;
+import com.management.managementapi.repository.ActivityLogRepository;
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.security.AuthContext;
+import com.management.managementapi.service.ActivityLogService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +74,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -109,6 +120,9 @@ public class ConstructionInvoiceService {
     private final AuthContext authContext;
     private final NotificationService notifications;
     private final PaymentService paymentService;
+    private final ActivityLogService activityLogService;
+    private final ActivityLogRepository activityLogRepository;
+    private final ObjectMapper objectMapper;
 
     // ── carregar ──────────────────────────────────────────────
 
@@ -375,6 +389,171 @@ public class ConstructionInvoiceService {
             expenseRepository.save(expense);
         }
     }
+
+    // ── transferências (fase 5) ───────────────────────────────
+
+    /**
+     * Move uma fatura de âmbito/obra. Nunca é edição direta: a razão é
+     * obrigatória e a repartição antiga (a da fatura e a das notas de crédito
+     * ligadas) fica no {@code activity_log} <b>antes</b> de as despesas serem
+     * apagadas — daí a escrita síncrona, não o {@link com.management.managementapi.service.ActivityLogger}
+     * assíncrono.
+     *
+     * As notas de crédito seguem a fatura (mesmo âmbito, mesma obra, despesas
+     * apagadas). Documentos e pagamentos ficam presos pela FK {@code invoice_id}
+     * — não há nada a mover, e um pagamento agregado que passe a atravessar obras
+     * é aceite: o invariante "mesma obra" do {@code registerAggregate} só vale à
+     * criação, e as somas por obra usam o valor por fatura. Ver
+     * docs/faturas-modelo-alvo.md §4.
+     */
+    public InvoiceTransferResultDTO transfer(UUID id, InvoiceTransferDTO dto) {
+        ConstructionInvoice invoice = getById(id);
+        if (invoice.getDocumentType() == ConstructionInvoice.DocumentType.CREDIT_NOTE) {
+            throw new BusinessException(ErrorCode.INVOICE_TRANSFER_CREDIT_NOTE);
+        }
+        String reason = trimToNull(dto.reason());
+        if (reason == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "A transferência precisa de uma razão.");
+        }
+
+        ConstructionInvoice.Scope targetScope = parseScope(dto.targetScope());
+        Enterprise targetEnterprise = resolveEnterpriseFor(targetScope, dto.targetEnterpriseId());
+
+        ConstructionInvoice.Scope fromScope = invoice.getScope();
+        UUID fromEnterpriseId = invoice.getEnterpriseId();
+        UUID toEnterpriseId = targetEnterprise == null ? null : targetEnterprise.getId();
+        if (fromScope == targetScope && Objects.equals(fromEnterpriseId, toEnterpriseId)) {
+            throw new BusinessException(ErrorCode.INVOICE_TRANSFER_SAME_TARGET);
+        }
+        if (targetEnterprise != null && Boolean.TRUE.equals(targetEnterprise.getIsTest())) {
+            throw new BusinessException(ErrorCode.INVOICE_TRANSFER_TEST_TARGET);
+        }
+
+        List<ConstructionInvoice> creditNotes = repository.findCreditNotesFor(id);
+        List<ConstructionExpense> invoiceAllocations = findAllocations(id);
+        boolean hadPayments = !paymentService.paymentsForInvoice(id, false).isEmpty();
+
+        // 1. Snapshot antes de apagar — fatura e cada NC.
+        Map<String, List<AllocationSnapshot>> oldAllocations = new LinkedHashMap<>();
+        oldAllocations.put(id.toString(), snapshotAllocations(invoiceAllocations));
+        for (ConstructionInvoice creditNote : creditNotes) {
+            oldAllocations.put(creditNote.getId().toString(),
+                    snapshotAllocations(findAllocations(creditNote.getId())));
+        }
+
+        // 2. Grava o log já (mesma transação): se a transferência falhar a
+        //    seguir, o rollback leva o log também — nunca fica um registo de uma
+        //    transferência que não aconteceu.
+        writeTransferLog(invoice, fromScope, fromEnterpriseId, targetScope, targetEnterprise,
+                reason, oldAllocations);
+
+        // 3. Apaga as despesas (fatura + NC): sem obra não há rubrica a que pertençam.
+        expenseRepository.deleteAll(invoiceAllocations);
+        for (ConstructionInvoice creditNote : creditNotes) {
+            expenseRepository.deleteAll(findAllocations(creditNote.getId()));
+        }
+
+        // 4. Move o âmbito/obra da fatura e das NC.
+        applyScope(invoice, targetScope, targetEnterprise);
+        for (ConstructionInvoice creditNote : creditNotes) {
+            applyScope(creditNote, targetScope, targetEnterprise);
+            repository.save(creditNote);
+        }
+        ConstructionInvoice saved = repository.save(invoice);
+
+        boolean suggestIncident = !invoiceAllocations.isEmpty() || !creditNotes.isEmpty() || hadPayments;
+        return new InvoiceTransferResultDTO(toResponseDTO(saved, true), suggestIncident);
+    }
+
+    private void applyScope(ConstructionInvoice invoice, ConstructionInvoice.Scope scope, Enterprise enterprise) {
+        invoice.setScope(scope);
+        invoice.setEnterprise(enterprise); // null em COMPANY/UNIDENTIFIED — o check ck_invoice_scope_enterprise
+        if (scope != ConstructionInvoice.Scope.UNIDENTIFIED) {
+            invoice.setPossibleEnterprises(null);
+            invoice.setAskWhom(null);
+        }
+    }
+
+    private List<AllocationSnapshot> snapshotAllocations(List<ConstructionExpense> allocations) {
+        return allocations.stream()
+                .map(expense -> {
+                    ConstructionBudgetItem item = expense.getBudgetItem();
+                    return new AllocationSnapshot(
+                            item == null ? null : item.getId(),
+                            item == null ? null : item.getCode(),
+                            item == null ? null : item.getName(),
+                            expense.getTotalPrice());
+                })
+                .toList();
+    }
+
+    private void writeTransferLog(ConstructionInvoice invoice,
+                                  ConstructionInvoice.Scope fromScope, UUID fromEnterpriseId,
+                                  ConstructionInvoice.Scope toScope, Enterprise toEnterprise,
+                                  String reason, Map<String, List<AllocationSnapshot>> oldAllocations) {
+        String fromName = fromEnterpriseId == null ? null : enterpriseName(fromEnterpriseId);
+        String toName = toEnterprise == null ? null : toEnterprise.getName();
+        TransferMetadata meta = new TransferMetadata(
+                fromScope.name(), fromEnterpriseId, fromName,
+                toScope.name(), toEnterprise == null ? null : toEnterprise.getId(), toName,
+                reason, oldAllocations);
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(meta);
+        } catch (JsonProcessingException e) {
+            // Não deixar a serialização do log rebentar a transferência — mas
+            // registá-lo: um log sem metadata perde a repartição antiga.
+            log.warn("Não foi possível serializar o metadata da transferência da fatura {}: {}",
+                    invoice.getId(), e.getMessage());
+            json = null;
+        }
+        UUID userId = authContext.currentProfileId()
+                .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED));
+        String userName = authContext.currentUserName().orElse("(desconhecido)");
+        String label = (fromName != null ? fromName : fromScope.name())
+                + " → " + (toName != null ? toName : toScope.name());
+        activityLogService.createActivity(new ActivityLogCreateDTO(
+                userId, userName, ActivityType.TRANSFER,
+                EntityType.CONSTRUCTION_INVOICE, invoice.getId(), descreveFatura(invoice),
+                "Transferida: " + label, json, null, null));
+    }
+
+    /** As transferências desta fatura, da mais recente para a mais antiga. Só no detalhe. */
+    private List<InvoiceTransferSummaryDTO> loadTransfers(UUID invoiceId) {
+        return activityLogRepository
+                .findByEntityTypeAndEntityIdOrderByCreatedAtDesc(EntityType.CONSTRUCTION_INVOICE, invoiceId)
+                .stream()
+                .filter(entry -> entry.getActivityType() == ActivityType.TRANSFER && entry.getMetadata() != null)
+                .map(entry -> {
+                    try {
+                        TransferMetadata meta = objectMapper.readValue(entry.getMetadata(), TransferMetadata.class);
+                        return new InvoiceTransferSummaryDTO(
+                                entry.getCreatedAt(),
+                                meta.fromScope(), meta.fromEnterpriseId(), meta.fromEnterpriseName(),
+                                meta.toScope(), meta.toEnterpriseId(), meta.toEnterpriseName(),
+                                meta.reason(), entry.getUserName());
+                    } catch (JsonProcessingException e) {
+                        log.warn("activity_log {} com metadata de transferência ilegível: {}",
+                                entry.getId(), e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private String enterpriseName(UUID enterpriseId) {
+        return enterpriseRepository.findById(enterpriseId).map(Enterprise::getName).orElse(null);
+    }
+
+    private record TransferMetadata(
+            String fromScope, UUID fromEnterpriseId, String fromEnterpriseName,
+            String toScope, UUID toEnterpriseId, String toEnterpriseName,
+            String reason,
+            Map<String, List<AllocationSnapshot>> oldAllocations) {}
+
+    private record AllocationSnapshot(
+            UUID budgetItemId, String budgetItemCode, String budgetItemName, BigDecimal amount) {}
 
     /**
      * Junta mais um documento a uma fatura que já existe: a foto tirada na obra
@@ -1266,6 +1445,9 @@ public class ConstructionInvoiceService {
 
                 creditNoteTotal,
                 creditNotes.stream().map(this::toCreditNoteRef).toList(),
+
+                // Histórico de transferências: só no detalhe (mesma condição do fileUrl).
+                includeFileUrl ? loadTransfers(invoice.getId()) : List.of(),
 
                 invoice.isSentToAccountant(),
                 invoice.getSentToAccountantBy(),

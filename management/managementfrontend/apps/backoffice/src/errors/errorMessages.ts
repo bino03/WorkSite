@@ -284,6 +284,11 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_028': 'A repartição por rubricas tem de somar o total da fatura.',
   'INVOICE_029': 'Indique pelo menos uma rubrica para repartir a fatura.',
   'INVOICE_030': 'A mesma rubrica aparece duas vezes na repartição.',
+  'INVOICE_031': 'Não se transfere uma fatura para uma obra de teste.',
+  'INVOICE_032': 'A fatura já está neste âmbito.',
+  'INVOICE_033': 'Uma nota de crédito não se transfere sozinha — segue a fatura de origem.',
+  'INVOICE_034': 'Inconsistência não encontrada.',
+  'INVOICE_035': 'Uma das faturas indicadas não existe.',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

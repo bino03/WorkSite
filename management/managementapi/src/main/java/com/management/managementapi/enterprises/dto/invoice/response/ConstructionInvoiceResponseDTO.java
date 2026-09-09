@@ -118,6 +118,14 @@ public record ConstructionInvoiceResponseDTO(
         /** As notas de crédito ligadas a esta fatura, da mais recente para a mais antiga. */
         List<CreditNoteRefDTO> creditNotes,
 
+        // ── transferências (fase 5) ──
+        /**
+         * Histórico de transferências de âmbito/obra, da mais recente para a mais
+         * antiga. Só vem preenchido no detalhe ({@code GET /construction-invoices/{id}});
+         * nas listas vem vazio.
+         */
+        List<InvoiceTransferSummaryDTO> transfers,
+
         // ── contabilidade ──
         boolean sentToAccountant,
         UUID sentToAccountantBy,

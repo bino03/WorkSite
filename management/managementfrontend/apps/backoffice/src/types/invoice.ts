@@ -132,6 +132,23 @@ export interface CreditNoteRef {
 }
 
 /**
+ * Uma linha do histórico de transferências de uma fatura (fase 5). Só vem no
+ * detalhe (`getInvoice`); nas listas é sempre `[]`. É uma projeção das entradas
+ * `transfer` do `activity_log`.
+ */
+export interface InvoiceTransferSummary {
+  transferredAt: string;
+  fromScope: InvoiceScope;
+  fromEnterpriseId: string | null;
+  fromEnterpriseName: string | null;
+  toScope: InvoiceScope;
+  toEnterpriseId: string | null;
+  toEnterpriseName: string | null;
+  reason: string;
+  byName: string;
+}
+
+/**
  * Um ficheiro da fatura. Desde a V24 são 0..N por fatura: a foto tirada na obra
  * e o PDF que o fornecedor mandou depois são o mesmo documento fiscal.
  */
@@ -220,6 +237,9 @@ export interface ConstructionInvoice {
   /** As NC ligadas a esta fatura, da mais recente para a mais antiga. */
   creditNotes: CreditNoteRef[];
 
+  // ── transferências (fase 5) — só no detalhe, nas listas é `[]` ──
+  transfers: InvoiceTransferSummary[];
+
   /** Só vem no detalhe (`getInvoice`) — nas listas é sempre null. */
   fileUrl: string | null;
   thumbnailUrl: string | null;
@@ -289,6 +309,28 @@ export interface InvoiceRegisterPayload {
   possibleEnterprises?: string | null;
   askWhom?: string | null;
   notes?: string | null;
+}
+
+// ── transferências (fase 5) ──
+
+/**
+ * Corpo de `POST /construction-invoices/{id}/transfer`. `targetEnterpriseId` é
+ * obrigatório sse `targetScope === "PROJECT"` e proibido nos outros dois
+ * (`ck_invoice_scope_enterprise`). `reason` nunca vazia.
+ */
+export interface InvoiceTransferPayload {
+  targetScope: InvoiceScope;
+  targetEnterpriseId?: string | null;
+  reason: string;
+}
+
+/**
+ * Resposta da transferência: a fatura já no novo âmbito e se vale a pena propor
+ * registar uma inconsistência (tinha repartição, pagamentos ou NC).
+ */
+export interface InvoiceTransferResult {
+  invoice: ConstructionInvoice;
+  suggestIncident: boolean;
 }
 
 // ── pagamentos (fase 2) ──

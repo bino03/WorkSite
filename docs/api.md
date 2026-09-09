@@ -537,6 +537,11 @@ associada acompanha os novos valores.
 | `INVOICE_028` | a repartição por rubricas não soma o total da fatura (era "NC por várias rubricas fica para a fase 4"; a `V32` tornou-a possível e o código passou a significar o que sobrou) |
 | `INVOICE_029` | repartição sem nenhuma rubrica |
 | `INVOICE_030` | a mesma rubrica repetida na repartição |
+| `INVOICE_031` | transferência para uma obra de teste (`is_test`) |
+| `INVOICE_032` | transferência cujo destino é o âmbito/obra onde a fatura já está |
+| `INVOICE_033` | `POST /{id}/transfer` sobre uma nota de crédito — a NC segue a fatura de origem, não se transfere sozinha |
+| `INVOICE_034` | inconsistência não encontrada (`GET/POST /invoice-incidents/{id}`) |
+| `INVOICE_035` | `POST /invoice-incidents` com uma fatura que não existe |
 
 (`ENT_032` — slug de projeto duplicado — sai do `EnterpriseController`, não daqui; ver [[excel-parity.md]] §2.)
 
@@ -650,6 +655,58 @@ remaining, overBudget}]`. Aceita código (`4.2`) ou texto (`betão`); o `path` c
 (`4. Estrutura › 4.2 Lajes › 4.2.1 Betão`) é o que distingue os três "Betão" de um orçamento
 real. Rubricas que não aceitam despesas não aparecem; `chapter: true` assinala que ainda tem
 sub-rubricas por baixo — classificar ao capítulo é legítimo, mas fica assinalado.
+
+## Transferir faturas (`ConstructionInvoiceController`)
+
+Fase 5 da paridade com o Excel. Mudar uma fatura de obra ou de âmbito é uma **transferência com
+razão obrigatória**, nunca edição direta do `scope`/`enterprise` (o `PUT /{id}` não lhes toca).
+Ver [[faturas-modelo-alvo.md]] §4.
+
+`POST /construction-invoices/{id}/transfer` (`ADMIN`), corpo
+`{ targetScope, targetEnterpriseId?, reason }`:
+
+- `targetScope` `PROJECT` exige `targetEnterpriseId`; `COMPANY`/`UNIDENTIFIED` **não** o aceitam e
+  a obra é limpa (check `ck_invoice_scope_enterprise`).
+- `reason` obrigatória (`@NotBlank` → `VALIDATION_ERROR`).
+- **Apaga as despesas** da fatura — sem obra não há rubrica a que pertençam — depois de guardar a
+  repartição antiga (a da fatura **e a de cada nota de crédito ligada**) no `activity_log`
+  (`activity_type = transfer`, snapshot em `metadata`). A escrita do log é **síncrona**, na mesma
+  transação: se a transferência falhar a seguir, o log desaparece no rollback.
+- As **notas de crédito** (`related_invoice_id`) seguem a fatura: mesmo âmbito, mesma obra,
+  despesas apagadas.
+- **Documentos e pagamentos ficam** — presos pela FK `invoice_id`, nada a mover. Um pagamento
+  agregado que passe a atravessar obras é aceite: o invariante "mesma obra" do `registerAggregate`
+  só vale à criação, e as somas por obra usam o valor por fatura (`invoice_payment.amount`).
+- Recusa: destino = obra `is_test` (`INVOICE_031`); destino = âmbito/obra atual (`INVOICE_032`);
+  chamada sobre uma NC (`INVOICE_033`).
+
+Resposta: `{ invoice, suggestIncident }` — `suggestIncident` fica `true` quando a fatura trazia
+repartição, pagamentos ou NC (os casos em que vale a pena propor registar uma inconsistência).
+
+**Em "Por identificar", preencher a obra É transferir** — o Backoffice abre o mesmo fluxo com
+`targetScope` fixo em `PROJECT`.
+
+O **detalhe da fatura** (`GET /construction-invoices/{id}`) ganhou `transfers[]`:
+`{ transferredAt, fromScope, fromEnterpriseId, fromEnterpriseName, toScope, toEnterpriseId,
+toEnterpriseName, reason, byName }`, da mais recente para a mais antiga. É uma projeção leve das
+entradas `transfer` do `activity_log` — **só vem no detalhe**, nas listas vem vazio.
+
+## Inconsistências (`InvoiceIncidentController`, `/invoice-incidents`)
+
+Fase 5. Notas livres (markdown) sobre uma ou mais faturas que ficaram por conciliar —
+tipicamente depois de uma transferência. A transferência **sugere** criar uma (`suggestIncident`);
+a criação é sempre à mão. Tudo `ADMIN`. Ver [[database.md]] → `invoice_incident`.
+
+| Método | Rota | Notas |
+|---|---|---|
+| GET | `/invoice-incidents` | lista; por resolver primeiro, depois as mais recentes |
+| GET | `/invoice-incidents/{id}` | uma; `INVOICE_034` se não existir |
+| POST | `/invoice-incidents` | `{ title, body, invoiceIds[] }` — `body` markdown, `invoiceIds` não vazio; `201`. Fatura inexistente → `INVOICE_035` |
+| POST | `/invoice-incidents/{id}/resolve` | marca `resolvedAt`/`resolvedBy`; idempotente (não mexe na data se já resolvida) |
+
+`InvoiceIncidentResponseDTO`: `{ id, title, body, resolvedAt, resolvedBy, resolvedByName,
+createdBy, createdByName, createdAt, updatedAt, invoices: [{id, invoiceNumber, supplierName,
+scope, enterpriseId}] }`.
 
 ## Fornecedores (`SupplierController`, `/suppliers`)
 

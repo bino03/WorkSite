@@ -19,8 +19,11 @@ import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
+import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
+import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import type { ConstructionInvoice, InvoiceScope } from "@/types/invoice";
+import type { IncidentInvoiceRef } from "@/types/incident";
 
 interface Props {
   /** `COMPANY` ou `UNIDENTIFIED` — a lista de obra é a `EnterpriseInvoicesPage`. */
@@ -58,6 +61,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
+  const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
 
   const fetch = useCallback(
     async (nextPage: number, nextSize: number, q: string, onlyOutstanding: boolean) => {
@@ -232,6 +236,14 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onClose={() => setDetailId(null)}
         onChanged={reload}
         onAllocate={() => undefined}
+        onIncidentSuggested={(invoice) => setIncidentInvoices([toIncidentInvoiceRef(invoice)])}
+      />
+
+      <IncidentDrawer
+        open={incidentInvoices !== null}
+        presetInvoices={incidentInvoices ?? []}
+        onClose={() => setIncidentInvoices(null)}
+        onCreated={() => setIncidentInvoices(null)}
       />
 
       <InvoiceRegisterDrawer

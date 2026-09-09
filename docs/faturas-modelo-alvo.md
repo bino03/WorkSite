@@ -140,12 +140,17 @@ aviso, não bloqueio, para o utilizador poder repartir em dois momentos.
 | `slug` | **nova**, `text`, único parcial. É o **nome da pasta no vault Vilatro** (`Vila Petrus`, `Vila Aleu`, `Villa Atrium`). Chave da migração nos dois sentidos — ver [[excel-parity.md]] §2 |
 | `is_test` | **nova**, boolean, default `false`. "Vila Sol" é só de teste **[decidido]**; nunca entra numa exportação nem numa soma da empresa |
 
-### 2.6 `invoice_incident` — nova (fase 5, opcional)
+### 2.6 `invoice_incident` — nova (fase 5) ✅
+
+> **Implementada na fase 5 (`V33`, 2026-09-09).** Colunas finais: `title`, `body` (markdown),
+> `resolved_at`, `resolved_by`, `created_by`, mais a junção `invoice_incident_invoice`. Sem
+> `occurred_on` — o `created_at` da `BaseEntity` chega. Sem soft-delete. CRUD em
+> `/invoice-incidents` (`InvoiceIncidentController`, tudo `ADMIN`); ver [[api.md]] → "Inconsistências".
+> A criação é **sempre manual**: a transferência devolve `suggestIncident` mas não cria nada.
 
 O `Registo de inconsistências` do Vilatro: uma nota por ocorrência, escrita para se mostrar a quem está
-na obra. Mínimo viável na app: `occurred_on`, `title`, `body` (markdown), `resolved_at`, e uma tabela de
-junção `invoice_incident_invoice` para as faturas envolvidas. Sem isto, as transferências e correções
-ficam só no `activity_log`, que não é legível por quem não é da app.
+na obra. Sem isto, as transferências e correções ficam só no `activity_log`, que não é legível por quem
+não é da app.
 
 ### 2.7 `supplier_rubric_rule` — **adiada** (não entrou na fase 4)
 
@@ -184,23 +189,29 @@ Regras (decisões 16 e 24 do Vilatro, que a app **honra**):
 - Regras de identificação automática ("data anterior a 15-05-2026 → Villa Atrium") **não** entram na
   app: são regras de um momento e de uma obra, decididas pelo utilizador; ficam no Vilatro.
 
-## 4. Transferir uma fatura de obra
+## 4. Transferir uma fatura de obra ✅ (fase 5, 2026-09-09)
 
-**[decidido]** Existe uma operação própria: `POST /enterprises/{id}/invoices/{invoiceId}/transfer` com
-`{ targetScope, targetEnterpriseId?, reason }`. Cobre os três fluxos do Vilatro: obra → obra (Fluxo A),
-quarentena → obra (Fluxo B), obra → empresa/quarentena (secções "→ Despesas da empresa" e "→ Faturas por
-identificar" da decisão 20).
+**[implementado]** Operação própria: `POST /construction-invoices/{id}/transfer` com
+`{ targetScope, targetEnterpriseId?, reason }` (a rota ficou no `ConstructionInvoiceController`, junto
+das outras de fatura, não numa aninhada em `/enterprises`). Cobre os três fluxos do Vilatro: obra → obra
+(Fluxo A), quarentena → obra (Fluxo B), obra → empresa/quarentena. Ver [[api.md]] → "Transferir faturas".
 
 O que a operação faz, nesta ordem, numa transação:
 
-1. Valida: `reason` obrigatório; destino ≠ origem; se destino é `PROJECT`, a obra existe e não é `is_test`.
-2. Apaga as `construction_expense` da fatura — as rubricas eram da obra antiga e não têm correspondência
-   na nova. Guarda a repartição antiga no `activity_log` (`details` JSON) para se poder reconstituir.
-3. Atualiza `scope` + `enterprise_id`. Documentos e pagamentos **viajam com a fatura** sem mudar.
-4. Escreve `activity_log` com `reason`, origem e destino. Se existir `invoice_incident` (§2.6), oferece
-   criar um.
+1. Valida: `reason` obrigatório (`@NotBlank`); destino ≠ origem (`INVOICE_032`); se destino é `PROJECT`,
+   a obra existe e não é `is_test` (`INVOICE_031`). Chamar sobre uma NC → `INVOICE_033`.
+2. Guarda a repartição antiga — a da fatura **e a de cada NC ligada** — no `activity_log`
+   (`activity_type = transfer`, snapshot em `metadata` JSONB), **de forma síncrona**. Só depois apaga
+   as `construction_expense` da fatura e das NC (as rubricas eram da obra antiga).
+3. Atualiza `scope` + `enterprise_id` na fatura **e nas NC ligadas** (seguem a fatura). Para
+   `COMPANY`/`UNIDENTIFIED` a obra é limpa (check `ck_invoice_scope_enterprise`). Documentos e
+   pagamentos **ficam** — presos pela FK `invoice_id`. Um pagamento agregado que passe a atravessar
+   obras é aceite (o invariante "mesma obra" só valia à criação).
+4. Devolve `{ invoice, suggestIncident }`. `suggestIncident` fica `true` quando havia repartição,
+   pagamentos ou NC — a UI oferece então criar um `invoice_incident` (§2.6), mas **não o cria sozinha**.
 
-**Nunca** se "apaga e relança": perde-se o documento, a ordem de segurança, e o porquê (decisão 20).
+O detalhe da fatura ganhou `transfers[]` (projeção das entradas `transfer` do `activity_log`, só no
+detalhe). **Nunca** se "apaga e relança": perde-se o documento, a ordem de segurança, e o porquê.
 
 ## 5. Recibos
 

@@ -202,7 +202,7 @@ Não se repetem aqui — lêem-se em `Decisões.md`. Esta lista diz **como** a a
 | 16 / 24 — fatura em dúvida não entra em obra nenhuma | `scope = UNIDENTIFIED`, sem despesas possíveis |
 | 17 — duas datas | `invoice_date` ≠ `uploaded_at`/`created_at` |
 | 18 — nº único no vault inteiro | índices únicos globais (§5) |
-| 20 — transferir, não apagar e relançar | operação `transfer` com `reason` obrigatório ([[faturas-modelo-alvo.md]] §4) |
+| 20 — transferir, não apagar e relançar | ✅ `POST /construction-invoices/{id}/transfer` com `reason` obrigatório (fase 5, `V33`, 2026-09-09) — apaga despesas, guarda a repartição antiga no `activity_log`, as NC seguem a fatura ([[faturas-modelo-alvo.md]] §4) |
 | 21 — combustível segue quem o consumiu | `scope = COMPANY` para viatura; obra para equipamento. A pergunta continua a ser do utilizador |
 | 22 — `Liquidada` com prova escrita | `payment.reference` + `registered_by/at` |
 | 23 — pagamento agregado só com confirmação | fluxo "registar pagamento agregado" mostra soma e faturas de fora |

@@ -15,6 +15,7 @@ import { useConfirm } from "@/context/ConfirmDialogContext";
 import {
   BankOutlined,
   QuestionCircleOutlined,
+  WarningOutlined,
   BuildOutlined,
   CheckSquareOutlined,
   TeamOutlined,
@@ -194,6 +195,11 @@ export default function AppLayout() {
         {isAdmin() && (
           <NavLink to={`${getBasePath()}/invoices/company`} style={linkStyle}>
             <BankOutlined />Despesas da empresa
+          </NavLink>
+        )}
+        {isAdmin() && (
+          <NavLink to={`${getBasePath()}/invoices/incidents`} style={linkStyle}>
+            <WarningOutlined />Inconsistências
           </NavLink>
         )}
 
