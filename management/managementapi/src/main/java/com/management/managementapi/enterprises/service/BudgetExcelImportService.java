@@ -247,7 +247,9 @@ public class BudgetExcelImportService {
             } else if (quantity != null || unitPrice != null || totalPrice != null) {
                 // ── "Alternativa ..." — sem número, mas é quem traz o preço ──
                 draft.kind = BudgetRowKind.ITEM;
-                parent = lastItem != null ? lastItem : currentChapter;
+                Draft target = alternativeTarget(lastItem);
+                parent = target != null ? target
+                        : (lastItem != null ? lastItem : currentChapter);
 
             } else {
                 // ── sub-título: passa a agrupar tudo o que vier a seguir ──
@@ -263,6 +265,33 @@ public class BudgetExcelImportService {
                 currentChapter = draft;
             }
         }
+    }
+
+    /**
+     * A rubrica que uma linha "Alternativa ..." está a preencher.
+     *
+     * A regra "cola à anterior" ({@code lastItem}) só acerta quando a alternativa
+     * vem <i>logo a seguir</i> à rubrica que substitui. Quando pelo meio entraram
+     * sub-rubricas — ex. "8.4" seguido de "8.4.1".."8.4.3" e só depois a
+     * alternativa — o {@code lastItem} já desceu para a última sub-rubrica
+     * ("8.4.3"), e a alternativa acabava pendurada lá dentro em vez de em "8.4".
+     *
+     * Sobe pela cadeia de pais enquanto forem sub-rubricas numeradas (índice com
+     * ponto) sem total próprio — a mais alta que ainda o for é a que a alternativa
+     * preenche. Um capítulo ("8.") ou uma rubrica já com total travam a subida.
+     * Devolve {@code null} quando o {@code lastItem} nem sequer é uma sub-rubrica
+     * sem total (sub-título, capítulo, rubrica com total) — aí mantém-se a regra
+     * antiga de colar ao {@code lastItem}.
+     */
+    private static Draft alternativeTarget(Draft lastItem) {
+        Draft target = null;
+        for (Draft d = lastItem; d != null; d = d.parent) {
+            if (d.code == null || !d.code.contains(".") || d.totalPrice != null) {
+                break;
+            }
+            target = d;
+        }
+        return target;
     }
 
     /**
