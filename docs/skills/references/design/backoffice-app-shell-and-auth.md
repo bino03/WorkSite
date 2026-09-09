@@ -1,6 +1,6 @@
 # Backoffice — Rotas, Menu e Verificação de Role
 
-> Parte de [[../frontend-visual-consistency]]. Só Backoffice (é a única app frontend do Worksite). Baseado em `main.tsx`, `PrivateRoute.tsx`, `context/AuthContext.tsx`, `hooks/useAuth.ts`, `layouts/AppLayout.tsx`, `pages/backoffice/BackofficeHome.tsx`. Auditoria 2026-08-05, secções 2 e 3 revistas a 2026-08-18 (reorganização do header).
+> Parte de [[../frontend-visual-consistency]]. Só Backoffice (é a única app frontend do Worksite). Baseado em `main.tsx`, `PrivateRoute.tsx`, `context/AuthContext.tsx`, `hooks/useAuth.ts`, `layouts/AppLayout.tsx`, `pages/backoffice/BackofficeHome.tsx`. Auditoria 2026-08-05, secções 2 e 3 revistas a 2026-08-18, §2 revista a 2026-09-09 (2ª reorganização do header: dropdown "Gestão").
 
 ## 1. Superfície de rotas atual
 
@@ -28,9 +28,32 @@
 
 ## 2. Menu de navegação — hoje cobre todas as rotas de topo
 
-`AppLayout.tsx:154-167` lista: Home, Empreendimentos, Tarefas e — só para `ADMIN` — Gerir Contas (`funcionarios`). As restantes rotas (`funcionarios/:id`, as três de `construction`) são rotas de **detalhe**, alcançadas por drill-down a partir da lista respetiva; é correto não terem entrada própria no nav.
+Reorganizado a 2026-09-09 para reduzir ao mínimo os títulos no header (era uma linha de sete
+links achatados). Estrutura atual em `AppLayout.tsx`:
 
-**Convenção**: `AppLayout.tsx` é a única fonte de verdade para navegação persistente — uma rota **de topo** nova precisa de um item aqui, não basta um card em `BackofficeHome.tsx`. Rotas de detalhe (`:id`, sub-recursos) não entram no nav.
+| Entrada | Visível a | Destino |
+|---|---|---|
+| Wordmark **Worksite** (`NavLink to="/backoffice" end`) | todos | `/backoffice/` — substitui o antigo link "Início" |
+| **Empreendimentos** | todos | `/backoffice/empreendimentos` |
+| **Tarefas** / **Minhas Tarefas** (rótulo por `isAdmin()`) | todos | `/backoffice/tasks` |
+| **Gerir Contas** | só `ADMIN` | `/backoffice/funcionarios` — link direto (domínio próprio, fora do dropdown) |
+| **Faturas ▾** (`Dropdown`, `invoicesMenuItems`) | só `ADMIN` | Por identificar (`/invoices/unidentified`) · Despesas da empresa (`/invoices/company`) · Inconsistências (`/invoices/incidents`) |
+
+O trigger "Faturas" acende (`--ind-color-accent`) quando `pathname` começa por uma das suas
+rotas (`invoicesActive`); o item do dropdown fica `selected` por `selectedKeys: [pathname]`.
+As restantes rotas (`funcionarios/:id`, `empreendimentos/:id/budget`, `.../invoices`) são de
+**detalhe**, alcançadas por drill-down — é correto não terem entrada no nav.
+
+**Layout do header**: três secções — wordmark à esquerda, `<nav>` ao centro, ações (divisória,
+`NotificationBell`, menu do avatar) à direita. Os dois lados têm `flex: 1 1 0` iguais, o que
+mantém a `<nav>` no centro real do header independentemente da largura dos lados. Espaçamento
+entre itens da nav: `gap: 30`.
+
+**Convenção**: `AppLayout.tsx` é a única fonte de verdade para navegação persistente — uma rota
+**de topo** nova precisa de um item aqui, não basta um card em `BackofficeHome.tsx`. Uma rota de
+topo nova do domínio de **faturas fora de obra** entra no dropdown "Faturas"; as outras entram
+como link direto (com o gate `isAdmin()` quando for o caso). Rotas de detalhe (`:id`,
+sub-recursos) não entram no nav.
 
 ### 2.1 Menu de utilizador — um só ponto de entrada à direita (2026-08-18)
 

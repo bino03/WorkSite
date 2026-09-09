@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
@@ -24,6 +24,8 @@ import {
   MailOutlined,
   ShopOutlined,
   UserOutlined,
+  DownOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 
 function initialsOf(name: string) {
@@ -39,6 +41,8 @@ export default function AppLayout() {
   const { isAdmin } = useAuth();
   const { t, i18n } = useTranslation();
   const confirm = useConfirm();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
   const [isSuppliersDrawerOpen, setIsSuppliersDrawerOpen] = useState(false);
   const [isEmailProvidersDrawerOpen, setIsEmailProvidersDrawerOpen] = useState(false);
@@ -83,6 +87,43 @@ export default function AppLayout() {
   };
 
   const getBasePath = () => "/backoffice";
+  const base = getBasePath();
+
+  /**
+   * "Faturas" — o único dropdown de topo à esquerda. Junta as três listas de
+   * faturas que não pertencem a obra nenhuma e que antes eram três links soltos
+   * a encher o header. Só o ADMIN as vê; o gate real de cada rota é o
+   * `@PreAuthorize` do backend — esconder aqui só evita que um EMPLOYEE bata
+   * num 403 (ver backoffice-app-shell-and-auth.md §2). A gestão de contas fica
+   * de fora, como link direto: é de outro domínio.
+   */
+  const invoicesMenuItems: MenuProps["items"] = [
+    {
+      key: `${base}/invoices/unidentified`,
+      icon: <QuestionCircleOutlined />,
+      label: "Por identificar",
+      onClick: () => navigate(`${base}/invoices/unidentified`),
+    },
+    {
+      key: `${base}/invoices/company`,
+      icon: <BankOutlined />,
+      label: "Despesas da empresa",
+      onClick: () => navigate(`${base}/invoices/company`),
+    },
+    {
+      key: `${base}/invoices/incidents`,
+      icon: <WarningOutlined />,
+      label: "Inconsistências",
+      onClick: () => navigate(`${base}/invoices/incidents`),
+    },
+  ];
+
+  /** O trigger "Faturas" acende quando a rota atual é uma das que ele contém. */
+  const invoicesActive = [
+    `${base}/invoices/unidentified`,
+    `${base}/invoices/company`,
+    `${base}/invoices/incidents`,
+  ].some((p) => pathname.startsWith(p));
 
   /**
    * O menu único da direita. A conta e o idioma são pessoais; "Definições" fica num
@@ -142,12 +183,27 @@ export default function AppLayout() {
     },
   ];
 
-  const linkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
-    color: isActive ? "var(--ind-color-accent)" : "inherit",
+  const navBaseStyle: CSSProperties = {
     fontSize: 14,
     display: "inline-flex",
     alignItems: "center",
     gap: 5,
+  };
+
+  const linkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
+    ...navBaseStyle,
+    color: isActive ? "var(--ind-color-accent)" : "inherit",
+  });
+
+  /** Botão de dropdown com o mesmo aspeto de um `NavLink` do header. */
+  const navButtonStyle = (active: boolean): CSSProperties => ({
+    ...navBaseStyle,
+    color: active ? "var(--ind-color-accent)" : "inherit",
+    background: "none",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+    fontFamily: "inherit",
   });
 
   return (
@@ -165,44 +221,66 @@ export default function AppLayout() {
           zIndex: 5,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--ind-font-heading)", fontWeight: 600, fontSize: 18, marginRight: "auto" }}>
-          <BuildOutlined style={{ color: "var(--ind-color-accent)" }} />
-          Worksite
+        {/* Três secções: wordmark à esquerda, nav ao centro, ações à direita.
+            Os dois lados têm `flex: 1` iguais, por isso a nav fica mesmo no
+            meio do header. */}
+        <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", minWidth: 0 }}>
+          {/* O wordmark é o link para o início — evita um item "Início" à parte. */}
+          <NavLink
+            to={base}
+            end
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontFamily: "var(--ind-font-heading)",
+              fontWeight: 600,
+              fontSize: 18,
+              color: "inherit",
+            }}
+          >
+            <BuildOutlined style={{ color: "var(--ind-color-accent)" }} />
+            Worksite
+          </NavLink>
         </div>
 
-        <NavLink to={getBasePath()} end style={linkStyle}>
-          {t("nav.home")}
-        </NavLink>
-        <NavLink to={`${getBasePath()}/empreendimentos`} style={linkStyle}>
-          <BuildOutlined />{t("nav.enterprises")}
-        </NavLink>
-        <NavLink to={`${getBasePath()}/tasks`} style={linkStyle}>
-          <CheckSquareOutlined />{isAdmin() ? "Tarefas" : "Minhas Tarefas"}
-        </NavLink>
-        {isAdmin() && (
-          <NavLink to={`${getBasePath()}/funcionarios`} style={linkStyle}>
-            <TeamOutlined />{t("nav.manageAccounts")}
+        <nav style={{ display: "flex", alignItems: "center", gap: 30 }}>
+          <NavLink to={`${base}/empreendimentos`} style={linkStyle}>
+            <BuildOutlined />{t("nav.enterprises")}
           </NavLink>
-        )}
-        {/* Quarentena e despesas da empresa: as duas listas de faturas que não
-            pertencem a obra nenhuma. O gate real é o @PreAuthorize do backend —
-            esconder aqui só evita que um EMPLOYEE bata num 403. */}
-        {isAdmin() && (
-          <NavLink to={`${getBasePath()}/invoices/unidentified`} style={linkStyle}>
-            <QuestionCircleOutlined />Por identificar
+          <NavLink to={`${base}/tasks`} style={linkStyle}>
+            <CheckSquareOutlined />{isAdmin() ? "Tarefas" : "Minhas Tarefas"}
           </NavLink>
-        )}
-        {isAdmin() && (
-          <NavLink to={`${getBasePath()}/invoices/company`} style={linkStyle}>
-            <BankOutlined />Despesas da empresa
-          </NavLink>
-        )}
-        {isAdmin() && (
-          <NavLink to={`${getBasePath()}/invoices/incidents`} style={linkStyle}>
-            <WarningOutlined />Inconsistências
-          </NavLink>
-        )}
+          {isAdmin() && (
+            <NavLink to={`${base}/funcionarios`} style={linkStyle}>
+              <TeamOutlined />{t("nav.manageAccounts")}
+            </NavLink>
+          )}
 
+          {/* As três listas de faturas fora de obra, antes três links soltos a
+              encher o header. Ver `invoicesMenuItems`. */}
+          {isAdmin() && (
+            <Dropdown
+              trigger={["click"]}
+              menu={{ items: invoicesMenuItems, selectable: true, selectedKeys: [pathname] }}
+            >
+              <button type="button" style={navButtonStyle(invoicesActive)}>
+                <FileTextOutlined />Faturas <DownOutlined style={{ fontSize: 10 }} />
+              </button>
+            </Dropdown>
+          )}
+        </nav>
+
+        <div
+          style={{
+            flex: "1 1 0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: "13.6px",
+            minWidth: 0,
+          }}
+        >
         <div style={{ width: 1, height: 22, background: "var(--ind-color-divider)" }} />
 
         {/* Único ícone solto que sobrou à direita, e de propósito: um contador que
@@ -255,6 +333,7 @@ export default function AppLayout() {
             </span>
           </button>
         </Dropdown>
+        </div>
       </header>
 
       <main className="container-page" style={{ padding: "27.2px 20.4px" }}>
