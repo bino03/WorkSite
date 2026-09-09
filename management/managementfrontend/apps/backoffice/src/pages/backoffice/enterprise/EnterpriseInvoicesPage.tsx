@@ -22,6 +22,7 @@ import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
+import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
@@ -78,6 +79,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
   const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
@@ -418,6 +420,7 @@ const EnterpriseInvoicesPage: FC = () => {
         onDeallocate={handleDeallocate}
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
+        onTransfer={setTransferInvoice}
       />
 
       {enterpriseId && (
@@ -452,6 +455,19 @@ const EnterpriseInvoicesPage: FC = () => {
             onIncidentSuggested={(invoice) =>
               setIncidentInvoices([toIncidentInvoiceRef(invoice)])
             }
+          />
+
+          <TransferInvoiceDrawer
+            open={transferInvoice !== null}
+            invoice={transferInvoice}
+            onClose={() => setTransferInvoice(null)}
+            onTransferred={(result) => {
+              setTransferInvoice(null);
+              reload();
+              if (result.suggestIncident) {
+                setIncidentInvoices([toIncidentInvoiceRef(result.invoice)]);
+              }
+            }}
           />
 
           <IncidentDrawer

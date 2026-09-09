@@ -3487,6 +3487,9 @@
       "bodyRequired": "Write the incident body.",
       "invoicesRequired": "Link at least one invoice."
     },
+    "incident": {
+      "action": "Log an inconsistency"
+    },
     "transfer": {
       "action": "Transfer",
       "drawerTitle": "Transfer invoice",

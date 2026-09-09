@@ -19,6 +19,7 @@ import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
+import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
@@ -59,6 +60,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [outstanding, setOutstanding] = useState(false);
 
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
   const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
@@ -228,6 +230,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onDeallocate={() => undefined}
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
+        onTransfer={setTransferInvoice}
       />
 
       <InvoiceDetailDrawer
@@ -237,6 +240,21 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onChanged={reload}
         onAllocate={() => undefined}
         onIncidentSuggested={(invoice) => setIncidentInvoices([toIncidentInvoiceRef(invoice)])}
+      />
+
+      <TransferInvoiceDrawer
+        open={transferInvoice !== null}
+        invoice={transferInvoice}
+        // Na quarentena "atribuir uma obra" é transferir com o âmbito fixo em obra.
+        lockToProject={scope === "UNIDENTIFIED"}
+        onClose={() => setTransferInvoice(null)}
+        onTransferred={(result) => {
+          setTransferInvoice(null);
+          reload();
+          if (result.suggestIncident) {
+            setIncidentInvoices([toIncidentInvoiceRef(result.invoice)]);
+          }
+        }}
       />
 
       <IncidentDrawer

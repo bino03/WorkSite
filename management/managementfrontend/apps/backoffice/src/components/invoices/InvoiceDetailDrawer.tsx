@@ -512,6 +512,20 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                       {t("invoices.transfer.action")}
                     </Button>
                   )}
+
+                  {/* Registar uma inconsistência sobre esta fatura sem passar por
+                      uma transferência. Reusa o `IncidentDrawer` que a página
+                      monta — daí depender de `onIncidentSuggested`. */}
+                  {invoice.documentType === "INVOICE" && onIncidentSuggested && (
+                    <Button
+                      onClick={() => {
+                        onIncidentSuggested(invoice);
+                        onClose();
+                      }}
+                    >
+                      {t("invoices.incident.action")}
+                    </Button>
+                  )}
                 </div>
               )}
 

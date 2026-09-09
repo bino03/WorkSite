@@ -3518,6 +3518,9 @@
       "bodyRequired": "Escreva o corpo da inconsistência.",
       "invoicesRequired": "Ligue pelo menos uma fatura."
     },
+    "incident": {
+      "action": "Registar inconsistência"
+    },
     "transfer": {
       "action": "Transferir",
       "drawerTitle": "Transferir fatura",

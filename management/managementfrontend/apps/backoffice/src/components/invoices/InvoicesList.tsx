@@ -50,6 +50,12 @@ interface Props {
   onSendToAccountant: (invoice: ConstructionInvoice) => void;
   onDelete: (invoice: ConstructionInvoice) => void;
   /**
+   * Transferir de âmbito/obra. Opcional — sem isto a ação não aparece na linha
+   * (o detalhe da fatura continua a ter o seu botão). Só faz sentido numa
+   * `INVOICE`: uma nota de crédito segue a fatura a que está ligada.
+   */
+  onTransfer?: (invoice: ConstructionInvoice) => void;
+  /**
    * Onde esta lista está a ser mostrada. Muda as colunas, não os dados: a
    * rubrica só existe numa obra, e as notas de "de quem será?" só na
    * quarentena. Por omissão, obra — é a lista que já existia.
@@ -78,6 +84,7 @@ export const InvoicesList: FC<Props> = ({
   onDeallocate,
   onSendToAccountant,
   onDelete,
+  onTransfer,
   scope = "PROJECT",
 }) => {
   const { isAdmin } = useAuth();
@@ -301,6 +308,14 @@ export const InvoicesList: FC<Props> = ({
                 </span>
               </Tooltip>
             ))}
+          {/* Uma NC não se transfere sozinha — segue a fatura a que está ligada
+              (o backend recusa com INVOICE_033). Na quarentena, transferir é
+              "dar uma obra" à fatura, e é a razão de ser da lista. */}
+          {isAdmin() && onTransfer && row.documentType === "INVOICE" && (
+            <ListActionSecondary onClick={() => onTransfer(row)}>
+              {isQuarantine ? "Atribuir a uma obra" : "Transferir"}
+            </ListActionSecondary>
+          )}
           {isAdmin() && (
             <ListActionSecondary onClick={() => onSendToAccountant(row)}>
               {row.sentToAccountant ? "Desmarcar envio" : "Enviar"}
