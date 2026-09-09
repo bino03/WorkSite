@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V33`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V34`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -155,7 +155,7 @@ atrás. O ficheiro de fatura é guardado apenas como `bucket`/`storage_key` **na
 | `revoked_token` | `worksite` | Lista negra de JWTs revogados (logout/invalidação) |
 | `settings.pending_invites` | `settings` | Convites de acesso pendentes (email, role, token) |
 | `settings.password_reset_tokens` | `settings` | Pedidos de recuperação de password (`V22`). Espelha `pending_invites`: token opaco + prazo (1 hora) + `used_at`. `auth_user_id` **sem FK** — o schema `auth` é do Supabase e não se referencia a partir das nossas migrações, tal como em `profile.auth_user_id`. Um pedido novo queima os anteriores por usar do mesmo utilizador |
-| `settings.email_providers` | `settings` | Configuração SMTP (`V7`), gerível pelo Backoffice desde a `V21` (`EmailProviderController`). Índice único parcial `uq_email_provider_single_default` — só uma linha pode ter `is_default`. O trigger de `updated_at` da `V11` só percorre o schema `worksite`, por isso o desta tabela foi criado à mão na `V21`. `password` em **texto simples**; a API nunca a devolve |
+| `settings.email_providers` | `settings` | Configuração SMTP (`V7`), gerível pelo Backoffice desde a `V21` (`EmailProviderController`). Índice único parcial `uq_email_provider_single_default` — só uma linha pode ter `is_default`. O trigger de `updated_at` da `V11` só percorre o schema `worksite`, por isso o desta tabela foi criado à mão na `V21`. **`password` cifrada em repouso** (AES-256-GCM) desde a `V34`: coluna passou a `text`, valor no formato `gcm:<base64 iv>:<base64 ct+tag>`, cifra/decifra transparente pelo `EncryptedStringConverter` com a chave `APP_EMAIL_CRYPTO_KEY`. Um valor sem o prefixo `gcm:` é lido como texto em claro legado e re-cifrado no arranque seguinte (`EmailProviderPasswordReEncryptRunner`). A API nunca a devolve. Rotação de chave: ver [[security]] |
 | `tasks.task` | `tasks` | Tarefa standalone (nome, descrição, prazo, estado), sem ligação a nenhum ativo/imóvel |
 | `tasks.task_assignee` | `tasks` | Junção many-to-many entre `tasks.task` e `worksite.profile` — utilizadores atribuídos |
 | `notification` | `worksite` | Notificações in-app dirigidas a um `profile` (`V20`). `title`/`body` guardados **já escritos**, não tipo + parâmetros: torna a leitura um `select` simples, ao custo de o histórico ficar na língua em que nasceu. `entity_id` **sem FK** de propósito — aponta para tabelas diferentes conforme o `type`, e o aviso deve sobreviver ao desaparecimento da origem. `read_at` nulo = por ler |

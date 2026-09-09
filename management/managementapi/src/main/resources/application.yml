@@ -105,3 +105,11 @@ app:
       secure: ${COOKIE_SECURE:false}
       # Domain dos cookies (localhost em dev, seu-app.com em prod)
       domain: ${COOKIE_DOMAIN:localhost}
+
+  # Cifra em repouso de segredos (hoje só a password SMTP de settings.email_providers).
+  # AES-256-GCM. Chaves em base64 de 32 bytes — gerar com `openssl rand -base64 32`.
+  crypto:
+    # Obrigatória: a app não arranca sem ela.
+    email-key: ${APP_EMAIL_CRYPTO_KEY:}
+    # Opcional, só decifra — a rede durante uma rotação de chave. Ver docs/security.md.
+    email-key-previous: ${APP_EMAIL_CRYPTO_KEY_PREVIOUS:}

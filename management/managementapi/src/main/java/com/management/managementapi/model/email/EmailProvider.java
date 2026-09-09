@@ -2,6 +2,8 @@ package com.management.managementapi.model.email;
 
 
 
+import com.management.managementapi.model.converters.EncryptedStringConverter;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -30,7 +32,14 @@ public class EmailProvider {
     @Column(nullable = false, length = 255)
     private String username;
 
-    @Column(nullable = false, length = 255)
+    /**
+     * Guardada cifrada (AES-256-GCM) pelo {@link EncryptedStringConverter}. Em
+     * memória é sempre o valor em claro; a coluna é {@code text} desde a V34
+     * (o {@code gcm:iv:ct} não cabe nos 255 originais). Nunca sai da API — o
+     * mapper só expõe {@code hasPassword}.
+     */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(nullable = false)
     private String password;
 
     @Column(name = "from_email", nullable = false, length = 255)

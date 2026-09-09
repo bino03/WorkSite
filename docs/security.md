@@ -40,6 +40,30 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 
 Configurado via `CorsConfigurationSource` em `SecurityConfig.java` — ajustar as origens permitidas para o domínio real do Backoffice (dev: `http://localhost:5173`) e o de produção quando existir.
 
+## Segredos em repouso — password SMTP
+
+A password de `settings.email_providers` é a única credencial que a app guarda na sua própria
+base de dados (o resto é do Supabase). Cifrada em repouso desde a `V34`:
+
+- **AES-256-GCM**, IV de 12 bytes aleatório por valor, tag de 128 bits. Valor no formato
+  `gcm:<base64 iv>:<base64 ct+tag>` na coluna `password` (`text`).
+- `util/SecretCipher` + `model/converters/EncryptedStringConverter` (`@Convert` no campo) —
+  cifra/decifra transparente; `EmailService` e `EmailProviderService` não sabem que existe.
+- A API **nunca** devolve a password (o mapper só expõe `hasPassword`); a cifra fecha a exposição
+  por acesso direto à base de dados.
+- Chave em `APP_EMAIL_CRYPTO_KEY` (base64 de 32 bytes). **Obrigatória** — sem ela o backend não
+  arranca. Gerar: `openssl rand -base64 32`.
+- Um valor sem prefixo `gcm:` é lido como texto em claro legado; `EmailProviderPasswordReEncryptRunner`
+  re-cifra-o no arranque.
+
+### Rodar a chave
+
+1. `APP_EMAIL_CRYPTO_KEY_PREVIOUS` = a chave atual; `APP_EMAIL_CRYPTO_KEY` = a chave nova.
+2. Reiniciar o backend. O runner de arranque decifra cada password com a chave anterior e
+   re-grava-a cifrada com a nova.
+3. Confirmar nos logs (`SMTP: N password(s) ... re-cifradas`) e enviar um email de teste.
+4. Remover `APP_EMAIL_CRYPTO_KEY_PREVIOUS` e reiniciar.
+
 ## Outros detalhes
 
 - Sessão **stateless**; **CSRF desativado** (esperado numa API pura consumida por SPA/JWT).

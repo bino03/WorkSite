@@ -15,6 +15,7 @@ SUPABASE_JWT_SECRET=<jwt secret>
 COOKIE_SECURE=false
 COOKIE_DOMAIN=localhost
 APP_FRONTEND_URL=http://localhost:5173
+APP_EMAIL_CRYPTO_KEY=<base64 de 32 bytes>
 ```
 
 Template completo em `management/managementapi/.env.example`.
@@ -32,6 +33,10 @@ Notas que se pagam caro por não se saberem:
 - A configuração de SMTP **não vive aqui** — está na tabela `settings.email_providers`, gerida no
   Backoffice em *Definições → Provedores de email* (`ADMIN`). Sem um provedor predefinido e ativo
   lá, o convite de funcionário e a recuperação de password falham com `EMAIL_002`.
+- O `APP_EMAIL_CRYPTO_KEY` cifra a password SMTP em repouso (AES-256-GCM). É **obrigatório** — sem
+  ele o backend não arranca. Gerar com `openssl rand -base64 32`. Para rodar a chave existe o
+  opcional `APP_EMAIL_CRYPTO_KEY_PREVIOUS` (só decifra, é a rede durante a troca) — procedimento
+  em [[security]].
 
 ## Backoffice — `.env` em `management/managementfrontend/apps/backoffice/`
 
