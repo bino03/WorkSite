@@ -20,10 +20,10 @@ Larguras observadas no código atual variam livremente: `600`, `640`, `800`, `85
 
 ## Modals — quando usar em vez de Drawer
 
-Drawer é o padrão dominante (25 ficheiros usam `<Drawer>` contra 12 com `<Modal>`), mas `Modal` não está reservado só para confirmações — está a ser usado para formulários e conteúdo completo, o que compete diretamente com o papel do Drawer:
+Drawer é o padrão dominante (24 ficheiros usam `<Drawer>` contra 12 com `<Modal>`), mas `Modal` não está reservado só para confirmações — está a ser usado para formulários e conteúdo completo, o que compete diretamente com o papel do Drawer:
 
 - `StatusChangeModal.tsx:86` — Modal usado para um **formulário** de mudança de estado, não uma confirmação simples.
-- `MyProfileModal.tsx:310` (`width={760}`) — formulário completo de edição de perfil num Modal, enquanto `ProfileDrawer`/`ProfileView` (usados a partir das listas) mostram o mesmo tipo de conteúdo num Drawer — o mesmo conceito, dois contentores diferentes.
+- `MyProfileModal.tsx:310` (`width={760}`) — formulário completo de edição de perfil num Modal, enquanto `ProfileView` (usado a partir das listas, dentro de um `Drawer` em `EmployeesList.tsx`) mostra o mesmo tipo de conteúdo — o mesmo conceito, dois contentores diferentes.
 - `PropertySearchModal.tsx`, `DownloadHistoryModal.tsx`, `EditGalleryCard.tsx`, `EditPhotoOrder.tsx`, `EditDivisionOrder.tsx`, `SeeLicense.tsx` — Modal usado para edição/navegação secundária conceptualmente semelhante ao que os Drawers tratam noutros sítios.
 
 **Convenção daqui em diante**:

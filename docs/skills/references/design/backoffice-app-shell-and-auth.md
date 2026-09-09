@@ -85,7 +85,7 @@ Antes desta revisão eram o cartão de perfil **mais três botões de ícone sol
 
 **Convenção**: qualquer gate de permissão ou variação de UI baseada na role do utilizador **autenticado** passa por `useAuth()` (`isAdmin()`/`isEmployee()`/`hasRole()`) — nunca ler `role`/`userRole` direto do contexto de auth para essa finalidade.
 
-**Não confundir** com rotular a role de **outro** perfil num `<Tag>`/badge, que legitimamente lê o `role` do objeto em causa: `AppLayout.tsx:213` (badge do próprio perfil), `utils/profile.ts:13,18`, `InvitesDrawer.tsx:113-121`, `TaskFormDrawer.tsx:167-168`, `EmployeeMiniCard.tsx:136`, `ProfileDrawer.tsx:131,152,253-254`, `MyProfileModal.tsx:400`. Não são gates de permissão.
+**Não confundir** com rotular a role de **outro** perfil num `<Tag>`/badge, que legitimamente lê o `role` do objeto em causa: `AppLayout.tsx:213` (badge do próprio perfil), `utils/profile.ts:13,18`, `InvitesDrawer.tsx:113-121`, `TaskFormDrawer.tsx:167-168`, `MyProfileModal.tsx:400`. Não são gates de permissão.
 
 ## 4. Guarda de rota
 
