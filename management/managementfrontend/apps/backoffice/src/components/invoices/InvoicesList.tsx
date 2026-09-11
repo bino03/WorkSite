@@ -169,6 +169,24 @@ export const InvoicesList: FC<Props> = ({
               .filter(Boolean)
               .join(" · ") || "sem identificação"}
           </span>
+          {/* O "Produto/Serviço" do Excel — numa despesa da empresa é o único
+              texto que diz o que se comprou. */}
+          {row.description && (
+            <span
+              style={{
+                display: "block",
+                fontSize: 12,
+                opacity: 0.8,
+                maxWidth: 360,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={row.description}
+            >
+              {row.description}
+            </span>
+          )}
         </span>
       ),
     },

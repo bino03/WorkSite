@@ -356,7 +356,8 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
   const handleSave = (updatedData: EnterpriseFullResponseDTO) => {
     setData(updatedData);
     setEditing(false);
-    message.success("Empreendimento atualizado");
+    // O toast de sucesso é do card que fez o submit (cada um tem a sua mensagem:
+    // overview, datas, financeiro…). Repeti-lo aqui e na lista dava três por gravação.
     if (onUpdated && enterpriseId) onUpdated(enterpriseId, updatedData);
   };
 

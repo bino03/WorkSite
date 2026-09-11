@@ -77,6 +77,8 @@ type Values = {
   invoiceAtcud: string;
   invoiceDate: string;
   totalAmount: number | null;
+  /** O "Produto/Serviço" do Excel — o que se comprou. */
+  description: string;
   notes: string;
 };
 
@@ -157,6 +159,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
         invoiceAtcud: data.invoiceAtcud ?? "",
         invoiceDate: data.invoiceDate ?? "",
         totalAmount: data.totalAmount,
+        description: data.description ?? "",
         notes: data.notes ?? "",
       });
     } catch (error) {
@@ -199,6 +202,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
         invoiceAtcud: values.invoiceAtcud || null,
         invoiceDate: values.invoiceDate || null,
         totalAmount: values.totalAmount,
+        description: values.description || null,
         notes: values.notes || null,
       });
       notificationService.success("Fatura", "Dados atualizados.");
@@ -411,7 +415,11 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                     </span>
                   ))
                 ) : (
-                  <span className="ind-tag ind-tag-outline">por associar</span>
+                  // Sem obra não há rubrica: numa fatura da empresa ou por
+                  // identificar o selo (e o botão abaixo) só confundiam.
+                  invoice.scope === "PROJECT" && (
+                    <span className="ind-tag ind-tag-outline">por associar</span>
+                  )
                 )}
 
                 {invoice.allocationStatus === "PARTIAL" && invoice.unallocatedAmount != null && (
@@ -481,21 +489,26 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                         : "Desassociar da rubrica"}
                     </Button>
                   ) : (
-                    <Tooltip
-                      title={
-                        invoice.needsReview
-                          ? "Preencha a data e o total antes de associar."
-                          : undefined
-                      }
-                    >
-                      <Button
-                        type="primary"
-                        disabled={invoice.needsReview}
-                        onClick={() => onAllocate(invoice)}
+                    // Só uma fatura de obra se associa (o backend recusa as outras
+                    // com INVOICE_013; as páginas da empresa/quarentena nem têm
+                    // `onAllocate` a sério) — o botão nem chega a aparecer.
+                    invoice.scope === "PROJECT" && (
+                      <Tooltip
+                        title={
+                          invoice.needsReview
+                            ? "Preencha a data e o total antes de associar."
+                            : undefined
+                        }
                       >
-                        Associar a uma rubrica
-                      </Button>
-                    </Tooltip>
+                        <Button
+                          type="primary"
+                          disabled={invoice.needsReview}
+                          onClick={() => onAllocate(invoice)}
+                        >
+                          Associar a uma rubrica
+                        </Button>
+                      </Tooltip>
+                    )
                   )}
 
                   {/* Uma NC não se credita a si própria — o backend recusa com
@@ -977,6 +990,21 @@ const InvoiceFields: FC<{
       )}
 
       {numbers}
+
+      <Field
+        id="invoice-description"
+        label="Descrição"
+        hint="O que é esta despesa — o «Produto/Serviço» do Excel."
+      >
+        <Input
+          id="invoice-description"
+          size="large"
+          value={values.description}
+          disabled={!editable}
+          onChange={(e) => onChange("description", e.target.value)}
+          placeholder="Seguro da carrinha, betão C30/37, …"
+        />
+      </Field>
 
       <Field id="invoice-notes" label="Notas">
         <Input.TextArea

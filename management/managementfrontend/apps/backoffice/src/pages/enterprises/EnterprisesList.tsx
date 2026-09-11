@@ -138,7 +138,7 @@ export default function EnterprisesList() {
         return item;
       })
     );
-    message.success(t('enterprises.updated'));
+    // Sem toast: o card que gravou já o mostrou (ver `handleEnterpriseCreated`).
   };
 
   const handleEnterpriseCreated = () => {
