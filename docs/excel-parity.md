@@ -133,6 +133,12 @@ rubricas".
 
 ## 6. Rubricas
 
+> **Decisão (2026-09-15): cada construção tem um único orçamento.** Não há versões/revisões nem tabela
+> `construction_budget` entre o projeto e as rubricas — a árvore em `construction_budget_item` é *o* orçamento da
+> obra. O nome da folha ("Orçamento inicial") não implica revisões futuras na app. Corrigir um orçamento importado
+> mal faz-se pelo CRUD de rubricas, não por substituição (decisão de 2026-08-18 mantida). O cabeçalho do Excel
+> (empreiteiro, cliente, obra, data), o `TOTAL` e as notas de condições continuam a **não** ser guardados.
+
 | | App | Excel |
 |---|---|---|
 | Fonte | `construction_budget_item`, árvore importada da folha "Orçamento inicial" (colunas `Art`, `Descrição`, `Un.`, `Quant`, `Preço Un`, `Preço total`, `Obs.` — mapa em [[database.md]]) | a mesma folha "Orçamento inicial", no mesmo Excel |
