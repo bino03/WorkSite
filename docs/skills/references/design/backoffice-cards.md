@@ -2,30 +2,48 @@
 
 > Parte de [[../frontend-visual-consistency]]. Só Backoffice.
 
-## SectionCard — o padrão de header partilhado
+## BlueprintCard / `.ind-card` — o padrão
 
-`src/components/properties/create/ui/SectionCard.tsx` é o padrão real:
+O card do sistema Industry é `src/components/common/BlueprintCard.tsx` (classe `.ind-card` em
+`index.css`): caixa transparente com borda hairline, cantos **quadrados** (raio forçado globalmente),
+quatro marcas "+" de registo nos cantos (`.ind-corner`), elevação por `.ind-elev-sm/md/lg`. Props:
+`kicker` (rótulo pequeno em caixa alta, `.ind-card-kicker`), `elevation`, `corners`, `style`.
 
-- **Gradiente real**: `linear-gradient(135deg, #78716cff 0%, #44403cff 100%)` — cinza-pedra (stone), **não** azul-roxo. (A documentação antiga no `CLAUDE.md` do Backoffice tinha o gradiente errado — `#86b3dd → #7738cf` — já corrigida para refletir o código real.)
-- `Card` com `rounded-2xl`, `shadow-sm`, `border-0`, `bodyStyle={{padding:0}}`
-- Ícone em container 56×56px, `borderRadius:16px`, `backgroundColor: rgba(255,255,255,0.2)`, `backdropFilter: blur(10px)`
-- Círculo decorativo `rgba(255,255,255,0.1)` no canto superior direito
-- Corpo com `p-8`
+O header de secção com ícone é `src/components/enterprise/create/ui/SectionCard.tsx` — um
+`BlueprintCard` com ícone em `var(--ind-color-accent)` + `.ind-card-title`. **Não tem gradiente,
+nem ícone em caixa translúcida, nem círculo decorativo** — isso era o padrão do Property-Management,
+substituído a 2026-08-05 (ver [[backoffice-tokens-and-colors]]).
 
-**Reutilizado corretamente** (mesmo gradiente `#78716c → #44403c`) em: `enterprise/EnterpriseViewDrawer.tsx`, vários `building/edit/Edit*Card.tsx`, `properties/edit/EditSettingsCard.tsx`, `properties/view/ViewSettings.tsx`, `properties/create/SettingsSection.tsx`.
+Usado, entre outros, em `enterprise/EnterpriseViewDrawer.tsx`, `enterprise/create/*Section.tsx`,
+`invoices/InvoiceDocumentGallery.tsx`, `ConstructionExpensesPage` (cartão de total) e nas páginas de
+Construção. Antes de escrever um `<Card>` do AntD com `bodyStyle` à mão, verifica se `BlueprintCard`
+ou `className="ind-card"` já resolve.
 
-## Drift encontrado — não repetir
+Acentos de estado num sub-card: usar as classes `.ind-tag-*` ou os tokens `--ind-accent-*` /
+`--ind-neutral-*` — não gradientes claros por cor de estado (ver drift abaixo).
 
-- Alguns headers (ex. um bloco em `EnterpriseViewDrawer.tsx`) usam `borderRadius: 12px` + um padrão SVG de fundo em vez do círculo decorativo — inconsistente com o `SectionCard` original.
-- Vários "sub-cards" usam gradientes claros ad-hoc por cor de estado, sem ligação a `theme.ts`:
-  - Âmbar (aviso): `#fff7e6 → #fef3e2`
-  - Verde (sucesso): `#f6ffed → #f0fff3`
-  - Azul (informação): `#f0f9ff → #e0f2fe`
-  - Neutro: `#fafaf9 → #f5f5f4`
+## Drift — o que ainda está no look antigo (não copiar)
 
-  Usar **exatamente estas quatro combinações** se precisares de um acento de cor de estado num sub-card — não inventar mais.
+- **`enterprise/edit/Edit*Card.tsx`** (os cinco: `EditEnterpriseOverviewCard`, `EditDatesAndAreasCard`,
+  `EditFinancialCard`, `EditEnterpriseLocationCard`, `EditEnterpriseGalleryCard`) — são os **únicos**
+  ficheiros do Backoffice onde sobrevive o header em gradiente cinza-pedra
+  `linear-gradient(135deg, #78716c 0%, #44403c 100%)` com ícone em caixa translúcida, mais os sub-cards
+  em gradientes claros ad-hoc (`#fff7e6 → #fef3e2`, `#f6ffed → #f0fff3`, `#f0f9ff → #e0f2fe`,
+  `#fafaf9 → #f5f5f4`) e `<Card>` do AntD. Aparecem **dentro do próprio `EnterpriseViewDrawer`** ao
+  carregar em "Editar", por isso o mesmo drawer muda de sistema visual a meio — a visualização é
+  Industry, a edição é o look herdado. Está no [[ToDo]] (Projetos) para migrar
+  para `BlueprintCard`/`SectionCard`; junto com a migração de AntD Form → RHF+Zod já pedida em
+  [[backoffice-forms-and-validation]].
+- Os mesmos gradientes claros aparecem ainda em `InvitesDrawer.tsx`, `MapLocationPickerDrawer.tsx` e
+  `ProfileView.tsx` — limpar quando esses ficheiros forem tocados.
+
+> Histórico: até 2026-09-15 este ficheiro descrevia o gradiente pedra como "o padrão real" e dizia
+> que os `Edit*Card` o "reutilizavam corretamente" — era a documentação do Property-Management, que
+> ficou por atualizar na migração Industry. Foi o que deixou os cards de edição do empreendimento
+> parecerem legítimos.
 
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
 - [[backoffice-tokens-and-colors]]
 - [[backoffice-drawers-and-modals]]
+- [[backoffice-forms-and-validation]] — os `Edit*Card` também divergem na biblioteca de formulários
