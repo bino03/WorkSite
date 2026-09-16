@@ -5,14 +5,11 @@ import java.time.OffsetDateTime;
 public class ProfileDTO {
 
     private String name;
-    private String photoUrl;
     private String phoneNumber;
     private String role;
     private String accountStatus;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
-    private String photoBucket;
-    private String photoKey;
     private String email;  // Novo campo para o email
 
     // Getters e Setters
@@ -23,14 +20,6 @@ public class ProfileDTO {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getPhotoUrl() {
-        return photoUrl;
-    }
-
-    public void setPhotoUrl(String photoUrl) {
-        this.photoUrl = photoUrl;
     }
 
     public String getPhoneNumber() {
@@ -71,22 +60,6 @@ public class ProfileDTO {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
-    }
-
-    public String getPhotoBucket() {
-        return photoBucket;
-    }
-
-    public void setPhotoBucket(String photoBucket) {
-        this.photoBucket = photoBucket;
-    }
-
-    public String getPhotoKey() {
-        return photoKey;
-    }
-
-    public void setPhotoKey(String photoKey) {
-        this.photoKey = photoKey;
     }
 
     public String getEmail() {

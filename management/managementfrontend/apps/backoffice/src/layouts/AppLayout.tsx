@@ -2,12 +2,11 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
-import MyProfileModal from "@/components/profile/MyProfileModal";
+import MyProfileDrawer from "@/components/profile/MyProfileDrawer";
 import { SuppliersDrawer } from "@/components/suppliers/SuppliersDrawer";
 import { EmailProvidersDrawer } from "@/components/settings/EmailProvidersDrawer";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { useState, useEffect } from "react";
-import api from "@/api";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthContext } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,28 +46,8 @@ export default function AppLayout() {
   const [isSuppliersDrawerOpen, setIsSuppliersDrawerOpen] = useState(false);
   const [isEmailProvidersDrawerOpen, setIsEmailProvidersDrawerOpen] = useState(false);
 
-  const userPhoto = user?.photoUrl ?? null;
   const userName = user?.name ?? t("common.user");
   const userRole = user?.role ?? null;
-
-  const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!userPhoto) { setAvatarBlobUrl(null); return; }
-
-    if (userPhoto.startsWith("http://") || userPhoto.startsWith("https://")) {
-      setAvatarBlobUrl(userPhoto);
-      return;
-    }
-
-    let objectUrl: string;
-    api.get(userPhoto, { responseType: "blob" })
-      .then((res) => {
-        objectUrl = URL.createObjectURL(res.data);
-        setAvatarBlobUrl(objectUrl);
-      })
-      .catch(() => setAvatarBlobUrl(null));
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [userPhoto]);
 
   const handleLogoutClick = () => {
     confirm({
@@ -312,20 +291,17 @@ export default function AppLayout() {
                 width: 28,
                 height: 28,
                 borderRadius: "50%",
-                background: avatarBlobUrl ? undefined : "var(--ind-accent-100)",
+                background: "var(--ind-accent-100)",
                 color: "var(--ind-accent-800)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontFamily: "var(--ind-font-heading)",
                 fontSize: 12,
-                backgroundImage: avatarBlobUrl ? `url(${avatarBlobUrl})` : undefined,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
                 flexShrink: 0,
               }}
             >
-              {!avatarBlobUrl && initialsOf(userName)}
+              {initialsOf(userName)}
             </div>
             <span>{userName}</span>
             <span className="ind-tag ind-tag-outline">
@@ -341,7 +317,7 @@ export default function AppLayout() {
       </main>
 
       {isProfileModalVisible && (
-        <MyProfileModal onClose={() => setIsProfileModalVisible(false)} />
+        <MyProfileDrawer onClose={() => setIsProfileModalVisible(false)} />
       )}
 
       <EmailProvidersDrawer

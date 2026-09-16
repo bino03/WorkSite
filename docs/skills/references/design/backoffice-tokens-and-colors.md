@@ -37,10 +37,11 @@ Se precisares de uma cor em JSX, usa `var(--ind-*)` numa string de `style`; `IND
 ## Drift que ainda existe — não repetir
 
 ### `#1890ff` (azul por omissão do AntD) hardcoded por cima do tema
-16 ocorrências em 6 ficheiros: `ProfileView.tsx` (5), `InvitesDrawer.tsx` (4), `MapLocationPickerDrawer.tsx` (4), `EmployeeContextMenu.tsx`, `EditEnterpriseOverviewCard.tsx`, `MediaUploadsSection.tsx`. É quase sempre um bug visual — um componente que devia herdar `colorPrimary` mas tem o azul do AntD escrito à mão. Usa `var(--ind-color-accent)`, ou deixa o componente AntD herdar do tema.
+16 ocorrências em 5 ficheiros: `ProfileView.tsx` (5), `InvitesDrawer.tsx` (4), `MapLocationPickerDrawer.tsx` (4), `EmployeeContextMenu.tsx` (2), `MediaUploadsSection.tsx` (1). É quase sempre um bug visual — um componente que devia herdar `colorPrimary` mas tem o azul do AntD escrito à mão. Usa `var(--ind-color-accent)`, ou deixa o componente AntD herdar do tema. (`EditEnterpriseOverviewCard.tsx` saiu desta lista a 2026-09-16 — reescrito de raiz, ver [[backoffice-cards]].)
 
-### Paleta legacy ainda local em `MyProfileModal.tsx`
-`MyProfileModal.tsx:26-35` mantém um objeto `D` local com os hex terracotta reais (`#c96442`, `#e8e6dc`…) e usa `fontFamily: "Georgia, serif"` — é o último componente por migrar para o sistema Industry. Migrar quando for tocado.
+> ✅ **A paleta legacy do `MyProfileModal.tsx` já não existe** (2026-09-16). O objeto `D` local com
+> hex terracotta reais (`#c96442`, `#e8e6dc`…) e `fontFamily: "Georgia, serif"` saiu na reescrita
+> para `MyProfileDrawer.tsx`, que usa só tokens `--ind-*` e o tema partilhado do AntD.
 
 > Nota: `EmployeesList.tsx:51-64` também tem um objeto chamado `D`, mas os valores já apontam para `var(--ind-*)` — é só um alias local, não drift de cor.
 

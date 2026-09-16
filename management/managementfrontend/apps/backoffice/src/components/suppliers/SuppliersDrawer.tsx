@@ -22,8 +22,7 @@ import type { Supplier, UnknownSupplierNif } from "@/types/supplier";
  *
  * A drawer vive no cabeçalho, longe da lista de faturas — sem isto, dar nome a
  * um NIF só se via depois de recarregar a página. Um evento de janela evita
- * ligar o layout à página das faturas só para isto (mesmo padrão do
- * `auth:refresh-success` do `api.ts`).
+ * ligar o layout à página das faturas só para isto.
  */
 export const SUPPLIERS_CHANGED_EVENT = "suppliers:changed";
 

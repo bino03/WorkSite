@@ -148,9 +148,6 @@ api.interceptors.response.use(
       // Backend reads refresh_token from cookie, returns new access_token in Set-Cookie header
       await api.post('/auth/refresh');
 
-      // Signal AuthContext to fetch fresh user info (signed photoUrl expires every hour)
-      window.dispatchEvent(new CustomEvent('auth:refresh-success'));
-
       // Reprocess all queued requests (they'll use the new access_token cookie)
       processQueue(null);
 

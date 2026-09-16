@@ -232,6 +232,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'BUDGET_010': 'Já existe uma rubrica com este índice neste projeto.',
   'BUDGET_011': 'A data de fim não pode ser anterior à data de início.',
   'BUDGET_012': 'Uma rubrica não pode mudar de projeto.',
+  'BUDGET_013': 'Esta rubrica (ou uma das suas sub-rubricas) tem despesas — mova-as ou apague-as primeiro.',
+  'BUDGET_014': 'Esta rubrica não está eliminada.',
 
   // ── Importação de orçamento (.xlsx) ───────────────────────────────────────
   'BUDGET_020': 'O ficheiro de orçamento está vazio.',

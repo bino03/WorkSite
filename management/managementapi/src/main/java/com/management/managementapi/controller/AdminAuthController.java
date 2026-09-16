@@ -67,7 +67,6 @@ public class AdminAuthController {
                 .name(profile.getName())
                 .email(supabaseUser.getEmail())
                 .phoneNumber(profile.getPhoneNumber())
-                .photoUrl(null)
                 .role(profile.getRole().name())
                 .status(profile.getAccountStatus().name())
                 .createdAt(profile.getCreatedAt() != null ? profile.getCreatedAt().toInstant() : Instant.now())

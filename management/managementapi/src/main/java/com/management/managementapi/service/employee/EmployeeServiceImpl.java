@@ -50,7 +50,6 @@ public class EmployeeServiceImpl implements EmployeeService {
                 (String) row.get("name"),
                 (String) row.get("email"),
                 (String) row.get("phone_number"),
-                (String) row.get("photo_url"),
                 (String) row.get("role"),
                 (String) row.get("account_status"),
                 toOffsetDateTime(row.get("created_at")),
@@ -75,7 +74,6 @@ public class EmployeeServiceImpl implements EmployeeService {
               p.auth_user_id,
               p.name,
               p.phone_number,
-              p.photo_url,
               p.role::text as role,
               p.account_status::text as account_status,
               p.created_at,
@@ -243,25 +241,6 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         log.debug("employee.patchRole byActor={} targetId={} newRole={}",
                 currentActorOrNull(), id, dto.role());
-
-        return getById(id);
-    }
-
-    @Override
-    public EmployeeResponseDTO updateAvatar(UUID id, EmployeeAvatarUpdateRequestDTO dto) {
-        var params = new MapSqlParameterSource()
-                .addValue("id", id)
-                .addValue("avatar", dto.avatarUrl());
-
-        int updated = jdbc.update("""
-            update worksite.profile set
-              photo_url = :avatar
-            where id = :id
-            """, params);
-
-        if (updated == 0) throw new NotFoundException("Funcionário não encontrado: " + id);
-
-        log.debug("employee.updateAvatar byActor={} targetId={}", currentActorOrNull(), id);
 
         return getById(id);
     }

@@ -45,7 +45,6 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
-import defaultProfile from "@/assets/images/profile/profile.jpg";
 
 type Mode = "page" | "drawer";
 
@@ -212,14 +211,13 @@ export default function ProfileView({
                   <div style={{ position: 'relative' }}>
                     <Avatar
                       size={80}
-                      src={employee.photoUrl ?? defaultProfile}
                       alt={employee.name}
                       style={{
                         boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
                         border: '4px solid white'
                       }}
                     >
-                      {!employee.photoUrl && getInitials(employee.name)}
+                      {getInitials(employee.name)}
                     </Avatar>
                     
                     {/* Badge de status */}

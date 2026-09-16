@@ -24,6 +24,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.InvoicePrev
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
+import com.management.managementapi.enterprises.model.BudgetRowKind;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -371,6 +372,7 @@ public class ConstructionInvoiceService {
 
         for (CreditNoteExpenseLineDTO line : lines) {
             ConstructionBudgetItem item = budgetItemRepository.findById(line.budgetItemId())
+                    .filter(candidate -> !candidate.isDeleted())
                     .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
             if (origin.getEnterpriseId() == null
                     || !item.getEnterprise().getId().equals(origin.getEnterpriseId())) {
@@ -888,12 +890,13 @@ public class ConstructionInvoiceService {
      */
     @Transactional(readOnly = true)
     public Page<ConstructionInvoiceResponseDTO> search(UUID enterpriseId, Boolean allocated, Boolean needsReview,
-                                                       Boolean outstanding, Boolean sentToAccountant,
+                                                       Boolean outstanding, Boolean sentToAccountant, Boolean atChapter,
                                                        LocalDate from, LocalDate to,
                                                        String q, Pageable pageable) {
         String query = isBlank(q) ? null : q.trim();
         Page<ConstructionInvoice> page = repository.search(
-                enterpriseId, allocated, needsReview, outstanding, sentToAccountant, from, to, query, pageable);
+                enterpriseId, allocated, needsReview, outstanding, sentToAccountant, atChapter, BudgetRowKind.ITEM,
+                from, to, query, pageable);
 
         // Uma query para as afetações da página toda, em vez de uma por linha.
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
@@ -932,7 +935,8 @@ public class ConstructionInvoiceService {
                 .findBudgetItemIdsUsedBySupplier(enterpriseId, supplierNif.trim(), PageRequest.of(0, 1))
                 .stream()
                 .findFirst()
-                .flatMap(budgetItemRepository::findById);
+                .flatMap(budgetItemRepository::findById)
+                .filter(item -> !item.isDeleted());
     }
 
     /**
@@ -1270,6 +1274,7 @@ public class ConstructionInvoiceService {
     /** A rubrica tem de existir, ser desta obra e aceitar despesas. */
     private ConstructionBudgetItem requireItemOf(ConstructionInvoice invoice, UUID budgetItemId) {
         ConstructionBudgetItem item = budgetItemRepository.findById(budgetItemId)
+                .filter(candidate -> !candidate.isDeleted())
                 .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
         if (!item.getEnterprise().getId().equals(invoice.getEnterpriseId())) {
             throw new BusinessException(ErrorCode.INVOICE_ITEM_OTHER_ENTERPRISE);
@@ -1500,7 +1505,17 @@ public class ConstructionInvoiceService {
                 item == null ? null : item.getId(),
                 item == null ? null : item.getCode(),
                 item == null ? null : item.getName(),
-                expense.getTotalPrice());
+                expense.getTotalPrice(),
+                isChapter(item));
+    }
+
+    /**
+     * Mesma regra do ecrã "Classificar" ({@code BudgetItemSearchResultDTO}): uma
+     * rubrica é "ao capítulo" quando ainda tem pelo menos uma filha {@code ITEM}
+     * — a despesa devia ter ido para a filha, não para aqui.
+     */
+    private boolean isChapter(ConstructionBudgetItem item) {
+        return item != null && budgetItemRepository.existsByParentIdAndRowKind(item.getId(), BudgetRowKind.ITEM);
     }
 
     /**

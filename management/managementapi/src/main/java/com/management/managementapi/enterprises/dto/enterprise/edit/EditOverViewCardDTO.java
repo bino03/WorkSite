@@ -30,4 +30,7 @@ public class EditOverViewCardDTO {
     /** Obra só de teste — excluída de exportações, importações e somas da empresa. */
     private Boolean isTest;
 
+    private String constructionCompany;
+    private String architect;
+
 }

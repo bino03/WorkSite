@@ -60,9 +60,9 @@ A árvore de rubricas, importada do Excel do empreiteiro, e as despesas lançada
 | Camada | Ficheiros |
 |---|---|
 | **Entrada** | rota `/backoffice/empreendimentos/:enterpriseId/budget` → `pages/backoffice/enterprise/ConstructionBudgetPage.tsx` |
-| **Frontend** | `components/budget/` — drawers de despesas/detalhe/formulário/datas, `BudgetImportModal`, `budgetTree.ts`, `budgetFormSchemas.ts` · `services/budgetService.ts` · `types/budget.ts` |
+| **Frontend** | `components/budget/` — drawers de despesas/detalhe/formulário, `BudgetItemDrawer` (criar/editar rubrica, com datas), `BudgetMoveToModal`, `BudgetRecycleBinDrawer` (zona de recuperação), `BudgetImportModal`, `budgetTree.ts`, `budgetFormSchemas.ts` · `services/budgetService.ts` · `types/budget.ts` |
 | **Backend** | `enterprises/controller/ConstructionBudgetItemController` + `ConstructionExpenseController` · `service/ConstructionBudgetItemService` · `ConstructionExpenseService` · `BudgetExcelImportService` (Apache POI) |
-| **Base de dados** | `worksite.construction_budget_item` (auto-referenciada) + `construction_expense` — `V15` |
+| **Base de dados** | `worksite.construction_budget_item` (auto-referenciada) + `construction_expense` — `V15`; soft delete (`deleted_at`) — `V36` |
 | **Detalhe** | [[api.md]] → "Orçamento de Construção" |
 
 ## Projetos (Enterprises)

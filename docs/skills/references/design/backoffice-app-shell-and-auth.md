@@ -61,7 +61,7 @@ sub-recursos) não entram no nav.
 
 | Item | O que faz |
 |---|---|
-| Minha Conta | abre o `MyProfileModal` |
+| Minha Conta | abre o `MyProfileDrawer` |
 | *Definições* (grupo) → Fornecedores | abre a `SuppliersDrawer` |
 | *Definições* (grupo) → Provedores de email | abre a `EmailProvidersDrawer`; a entrada só é montada se `isAdmin()` — o endpoint por trás é `ADMIN` e mostrá-la a um `EMPLOYEE` só lhe dava um 403 |
 | Idioma ▸ Português / English | `i18n.changeLanguage` + `localStorage`; o idioma activo fica `disabled` |
@@ -85,7 +85,7 @@ Antes desta revisão eram o cartão de perfil **mais três botões de ícone sol
 
 **Convenção**: qualquer gate de permissão ou variação de UI baseada na role do utilizador **autenticado** passa por `useAuth()` (`isAdmin()`/`isEmployee()`/`hasRole()`) — nunca ler `role`/`userRole` direto do contexto de auth para essa finalidade.
 
-**Não confundir** com rotular a role de **outro** perfil num `<Tag>`/badge, que legitimamente lê o `role` do objeto em causa: `AppLayout.tsx:213` (badge do próprio perfil), `utils/profile.ts:13,18`, `InvitesDrawer.tsx:113-121`, `TaskFormDrawer.tsx:167-168`, `MyProfileModal.tsx:400`. Não são gates de permissão.
+**Não confundir** com rotular a role de **outro** perfil num `<Tag>`/badge, que legitimamente lê o `role` do objeto em causa: `AppLayout.tsx:213` (badge do próprio perfil), `utils/profile.ts:13,18`, `InvitesDrawer.tsx:113-121`, `TaskFormDrawer.tsx:167-168`, `MyProfileDrawer.tsx` (tag de role na tira de identidade). Não são gates de permissão.
 
 ## 4. Guarda de rota
 

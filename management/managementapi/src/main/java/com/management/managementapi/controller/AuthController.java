@@ -4,7 +4,6 @@ import com.management.managementapi.dto.auth.AuthDTO;
 import com.management.managementapi.dto.auth.AuthResponse;
 import com.management.managementapi.dto.auth.LoginRequest;
 import com.management.managementapi.dto.auth.SupabaseAuthResponse;
-import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.security.AuthContext;
 import com.management.managementapi.security.CookieUtil;
 import com.management.managementapi.service.ActivityLogger;
@@ -42,7 +41,6 @@ public class AuthController {
     private final ProfileRepository profileRepository;
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
-    private final SupabaseStorageService storage;
     private final InviteService inviteService;
     private final PasswordResetService passwordResetService;
 
@@ -85,8 +83,6 @@ public class AuthController {
             Profile profile = profileRepository.findByAuthUserId(authUserId).orElse(null);
 
             // 4. Retorna apenas user data (SEM tokens no body!)
-            String photoUrl = resolvePhotoUrl(profile);
-
             AuthResponse.UserData userData = new AuthResponse.UserData(
                 supabaseResponse.getUser().getId(),
                 supabaseResponse.getUser().getEmail(),
@@ -96,7 +92,6 @@ public class AuthController {
                         : null
                 ),
                 profile != null ? profile.getRole().name() : "EMPLOYEE",
-                photoUrl,
                 profile != null ? profile.getId().toString() : null
             );
 
@@ -181,8 +176,6 @@ public class AuthController {
         Profile profile = profileRepository.findByAuthUserId(authUserId).orElse(null);
 
         // 5. Retorna user data
-        String photoUrl = resolvePhotoUrl(profile);
-
         AuthResponse.UserData userData = new AuthResponse.UserData(
             supabaseResponse.getUser().getId(),
             supabaseResponse.getUser().getEmail(),
@@ -192,7 +185,6 @@ public class AuthController {
                     : null
             ),
             profile != null ? profile.getRole().name() : "EMPLOYEE",
-            photoUrl,
             profile != null ? profile.getId().toString() : null
         );
 
@@ -249,23 +241,10 @@ public class AuthController {
             email,
             profile != null ? profile.getName() : null,
             profile != null ? profile.getRole().name() : "EMPLOYEE",
-            resolvePhotoUrl(profile),
             profile != null ? profile.getId().toString() : null
         );
 
         return ResponseEntity.ok(new AuthResponse(userData));
-    }
-
-    private String resolvePhotoUrl(Profile profile) {
-        if (profile == null || profile.getPhotoKey() == null) return null;
-        try {
-            String bucket = profile.getPhotoBucket();
-            String key = profile.getPhotoKey().startsWith("/") ? profile.getPhotoKey().substring(1) : profile.getPhotoKey();
-            return storage.createSignedUrl(bucket, key, 3600);
-        } catch (Exception e) {
-            log.warn("Não foi possível gerar signed URL para a foto do perfil: {}", e.getMessage());
-            return null;
-        }
     }
 
     private String getAccessTokenFromCookies(HttpServletRequest request) {

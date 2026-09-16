@@ -47,6 +47,7 @@ const initialFilters: InvoiceFilters = {
   allocated: false,
   needsReview: null,
   outstanding: null,
+  atChapter: null,
   sentToAccountant: null,
   from: null,
   to: null,
@@ -379,6 +380,14 @@ const EnterpriseInvoicesPage: FC = () => {
           onClick={() => applyFilters({ outstanding: filters.outstanding ? null : true })}
         >
           Por liquidar
+        </Button>
+
+        <Button
+          size="small"
+          type={filters.atChapter ? "primary" : "default"}
+          onClick={() => applyFilters({ atChapter: filters.atChapter ? null : true })}
+        >
+          Ao capítulo
         </Button>
 
         {allocatableSelected.length > 0 && (

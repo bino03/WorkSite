@@ -2577,18 +2577,13 @@
   },
   "myProfile": {
     "loadError": "Erro ao carregar os dados do perfil",
-    "clickToEditPhoto": "Clica para alterar a foto",
-    "removingPhoto": "A remover foto...",
-    "photoRemoved": "Foto removida",
-    "photoRemoveError": "Erro ao remover a foto",
-    "cancelPhoto": "Cancelar foto",
     "admin": "Administrador",
     "employee": "Funcionário",
     "navGeneral": "Perfil",
     "navEmail": "Email",
     "navSecurity": "Segurança",
     "generalTitle": "Informações Pessoais",
-    "generalSubtitle": "Gere o teu nome, telefone e fotografia de perfil",
+    "generalSubtitle": "Gere o teu nome e telefone",
     "emailTitle": "Endereço de Email",
     "emailSubtitle": "Atualiza o email associado à tua conta",
     "passwordTitle": "Palavra-passe",
@@ -2616,7 +2611,6 @@
     "saveSuccess": "Dados guardados",
     "emailUpdated": "Email atualizado",
     "passwordUpdated": "Palavra-passe atualizada",
-    "profileIdError": "Não foi possível determinar o ID do perfil para enviar a foto.",
     "updatePasswordBtn": "Atualizar palavra-passe"
   },
   "profileView": {

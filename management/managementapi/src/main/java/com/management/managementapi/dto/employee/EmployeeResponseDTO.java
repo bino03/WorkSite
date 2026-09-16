@@ -17,8 +17,6 @@ public record EmployeeResponseDTO(
         String email,
         @Schema(description = "Telefone")
         String phoneNumber,
-        @Schema(description = "URL do avatar/foto")
-        String photoUrl,
         @Schema(description = "Role no sistema (enum do PostgreSQL, guardado como texto)", example = "EMPLOYEE")
         String role,
         @Schema(description = "Estado da conta", example = "unlocked")

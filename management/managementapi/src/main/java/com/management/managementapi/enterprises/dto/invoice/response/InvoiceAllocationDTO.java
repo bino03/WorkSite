@@ -12,11 +12,15 @@ import java.util.UUID;
  *
  * {@code amount} é o {@code total_price} da despesa — zero numa fatura ainda sem
  * total (docs/faturas-modelo-alvo.md §7), negativo numa nota de crédito.
+ *
+ * {@code chapter} é a mesma regra do ecrã "Classificar": a rubrica ainda tem
+ * filhas {@code ITEM} — a despesa devia ter ido para uma delas, não para aqui.
  */
 public record InvoiceAllocationDTO(
         UUID expenseId,
         UUID budgetItemId,
         String budgetItemCode,
         String budgetItemName,
-        BigDecimal amount
+        BigDecimal amount,
+        boolean chapter
 ) {}

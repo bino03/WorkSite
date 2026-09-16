@@ -2546,18 +2546,13 @@
   },
   "myProfile": {
     "loadError": "Error loading profile data",
-    "clickToEditPhoto": "Click to change photo",
-    "removingPhoto": "Removing photo...",
-    "photoRemoved": "Photo removed",
-    "photoRemoveError": "Error removing photo",
-    "cancelPhoto": "Cancel photo",
     "admin": "Administrator",
     "employee": "Employee",
     "navGeneral": "Profile",
     "navEmail": "Email",
     "navSecurity": "Security",
     "generalTitle": "Personal Information",
-    "generalSubtitle": "Manage your name, phone and profile photo",
+    "generalSubtitle": "Manage your name and phone",
     "emailTitle": "Email Address",
     "emailSubtitle": "Update the email associated with your account",
     "passwordTitle": "Password",
@@ -2585,7 +2580,6 @@
     "saveSuccess": "Data saved",
     "emailUpdated": "Email updated",
     "passwordUpdated": "Password updated",
-    "profileIdError": "Could not determine profile ID to upload photo.",
     "updatePasswordBtn": "Update password"
   },
   "profileView": {

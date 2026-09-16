@@ -105,6 +105,17 @@ export interface BudgetItemUpsert {
   propagateEndDate?: boolean;
 }
 
+/** Uma rubrica eliminada (soft delete) — uma linha na zona de recuperação. */
+export interface BudgetItemDeleted {
+  id: string;
+  code: string | null;
+  name: string;
+  rowKind: BudgetRowKind;
+  deletedAt: string;
+  /** `deletedAt + 30 dias` — quando o job de purga a apaga de vez. */
+  purgeAt: string;
+}
+
 export interface DatePropagationHint {
   ancestorId: string;
   ancestorCode: string | null;

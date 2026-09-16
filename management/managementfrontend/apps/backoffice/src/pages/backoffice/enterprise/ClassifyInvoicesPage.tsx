@@ -75,6 +75,7 @@ const ClassifyInvoicesPage: FC = () => {
         allocated: false,
         needsReview: null,
         outstanding: null,
+        atChapter: null,
         sentToAccountant: null,
         from: null,
         to: null,

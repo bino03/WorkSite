@@ -20,7 +20,6 @@ public class EmployeeResponseDTO {
     private String name;
     private String email;
     private String phoneNumber;
-    private String photoUrl;
     private String role;
     private String status;
 

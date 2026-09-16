@@ -12,6 +12,7 @@ const TYPE_OPTIONS = [
   { value: "commercial", labelKey: "enterprises.types.commercial" },
   { value: "industrial", labelKey: "enterprises.types.industrial" },
   { value: "mixed_use", labelKey: "enterprises.types.mixed_use" },
+  { value: "land", labelKey: "enterpriseEdit.typeLabels.land" },
 ];
 
 const STATUS_OPTIONS = [
@@ -22,7 +23,16 @@ const STATUS_OPTIONS = [
   { value: "active", labelKey: "buildings.status.active" },
 ];
 
-export default function BasicInfoSection() {
+type Props = {
+  /**
+   * `is_active` não existe no `PATCH .../overview` — é mantido pelo ciclo de
+   * vida de eliminação/restauro (`deleteEnterprise`), não por edição direta.
+   * Na criação fica sempre visível (omitir a prop); a edição desliga-o.
+   */
+  showActiveToggle?: boolean;
+};
+
+export default function BasicInfoSection({ showActiveToggle = true }: Props = {}) {
   const { t } = useTranslation();
   const { control, formState: { errors } } = useFormContext();
 
@@ -147,18 +157,20 @@ export default function BasicInfoSection() {
           </div>
         </div>
 
-        <Controller
-          control={control}
-          name="is_active"
-          render={({ field }) => (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Switch checked={field.value} onChange={field.onChange} />
-              <span style={{ fontSize: 13 }}>
-                {field.value ? "Ativo — visível no sistema" : "Inativo — oculto no sistema"}
-              </span>
-            </div>
-          )}
-        />
+        {showActiveToggle && (
+          <Controller
+            control={control}
+            name="is_active"
+            render={({ field }) => (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Switch checked={field.value} onChange={field.onChange} />
+                <span style={{ fontSize: 13 }}>
+                  {field.value ? "Ativo — visível no sistema" : "Inativo — oculto no sistema"}
+                </span>
+              </div>
+            )}
+          />
+        )}
 
         <Controller
           control={control}

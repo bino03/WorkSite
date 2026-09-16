@@ -7,7 +7,6 @@ export interface UserInfo {
   authUserId: string;
   profileId: string;
   name: string;
-  photoUrl: string | null;
 }
 
 export interface LoginResponse {
@@ -16,7 +15,6 @@ export interface LoginResponse {
     email: string;
     name: string;
     role: string;
-    photoUrl: string | null;
     profileId: string | null;
   };
 }
@@ -58,7 +56,6 @@ export async function login(email: string, password: string): Promise<UserInfo> 
     role: raw.role as UserInfo["role"],
     accountStatus: "unlocked",
     profileId: raw.profileId ?? "",
-    photoUrl: raw.photoUrl ?? null,
   };
 
   saveUser(userInfo);
@@ -84,15 +81,11 @@ interface MeResponse {
     email: string;
     name: string;
     role: string;
-    photoUrl: string | null;
     profileId: string | null;
   };
 }
 
-/**
- * Fetch fresh user info (including signed photoUrl) from /auth/me.
- * Call this after token refresh to avoid stale signed URLs.
- */
+/** Fetch fresh user info from /auth/me — chamado no arranque e depois de um refresh de token. */
 export async function fetchMe(): Promise<UserInfo> {
   const { data } = await api.get<MeResponse>('/auth/me');
   const raw = data.user;
@@ -102,7 +95,6 @@ export async function fetchMe(): Promise<UserInfo> {
     role: raw.role as UserInfo['role'],
     accountStatus: 'unlocked',
     profileId: raw.profileId ?? '',
-    photoUrl: raw.photoUrl ?? null,
   };
   saveUser(userInfo);
   return userInfo;

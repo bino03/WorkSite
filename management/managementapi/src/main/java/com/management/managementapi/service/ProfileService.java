@@ -14,10 +14,7 @@ import jakarta.persistence.Tuple;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.validation.ValidationException;
 
-import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.repository.ProfileRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -29,21 +26,17 @@ import org.springframework.lang.NonNull;
 @Service
 public class ProfileService {
 
-    private static final Logger log = LoggerFactory.getLogger(ProfileService.class);
-
     private final ProfileRepository profileRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final SupabaseStorageService storage;
     @PersistenceContext
     private EntityManager em;
 
     public ProfileService(ProfileRepository profileRepository, UserRepository userRepository,
-                          PasswordEncoder passwordEncoder, SupabaseStorageService storage) {
+                          PasswordEncoder passwordEncoder) {
         this.profileRepository = profileRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.storage = storage;
     }
 
  public Optional<ProfileDTO> getProfileByUserId(UUID authUserId) {
@@ -56,14 +49,11 @@ public class ProfileService {
 
             ProfileDTO profileDTO = new ProfileDTO();
             profileDTO.setName(profile.getName());
-            profileDTO.setPhotoUrl(resolvePhotoUrl(profile));
             profileDTO.setPhoneNumber(profile.getPhoneNumber());
             profileDTO.setRole(profile.getRole().name());
             profileDTO.setAccountStatus(profile.getAccountStatus().name());
             profileDTO.setCreatedAt(profile.getCreatedAt());
             profileDTO.setUpdatedAt(profile.getUpdatedAt());
-            profileDTO.setPhotoBucket(profile.getPhotoBucket());
-            profileDTO.setPhotoKey(profile.getPhotoKey());
             profileDTO.setEmail(email);  // Set the email
 
             return Optional.of(profileDTO);
@@ -145,16 +135,4 @@ public class ProfileService {
 //     public List<ProfileListResponseDTO> getAllProfilesExceptCurrent(UUID currentAuthUserId) {
 //         return profileRepository.findAllProfilesExceptCurrent(currentAuthUserId);
 //     }
-
-    private String resolvePhotoUrl(Profile profile) {
-        if (profile == null || profile.getPhotoKey() == null) return null;
-        try {
-            String bucket = profile.getPhotoBucket();
-            String key = profile.getPhotoKey().startsWith("/") ? profile.getPhotoKey().substring(1) : profile.getPhotoKey();
-            return storage.createSignedUrl(bucket, key, 3600);
-        } catch (Exception e) {
-            log.warn("Não foi possível gerar signed URL para a foto do perfil: {}", e.getMessage());
-            return null;
-        }
-    }
 }

@@ -215,11 +215,12 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) Boolean needsReview,
             @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) Boolean sentToAccountant,
+            @RequestParam(required = false) Boolean atChapter,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String q,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return service.search(enterpriseId, allocated, needsReview, outstanding, sentToAccountant, from, to, q, pageable);
+        return service.search(enterpriseId, allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q, pageable);
     }
 
     /** Quantas faturas estão por associar — alimenta o aviso no ecrã do orçamento. */

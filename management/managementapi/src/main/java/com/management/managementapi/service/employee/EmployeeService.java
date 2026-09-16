@@ -24,8 +24,6 @@ public interface EmployeeService {
 
     EmployeeResponseDTO updateRole(UUID id, EmployeeRolePatchRequestDTO dto);
 
-    EmployeeResponseDTO updateAvatar(UUID id, EmployeeAvatarUpdateRequestDTO dto);
-
     List<EmployeeResponseDTO> getDeletedProfiles();
 
     EmployeeResponseDTO restoreProfile(UUID id);

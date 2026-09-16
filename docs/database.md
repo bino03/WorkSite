@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V34`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V36`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -123,6 +123,7 @@ Cada rubrica espelha uma linha do Excel de orçamento:
 | `Preço Un` | `unit_price` |
 | `Preço total` | `total_price` |
 | `Obs.` | `observations` |
+| — | `deleted_at` — soft delete (`V36`). Não nulo = eliminada; nunca aparece nas leituras normais |
 
 `row_kind` (enum `worksite.budget_row_kind`) distingue o papel da linha:
 
@@ -134,12 +135,16 @@ Cada rubrica espelha uma linha do Excel de orçamento:
 - **`NOTE`** — nota de contexto entre parêntesis, filha da rubrica anterior.
 
 Só rubricas `ITEM` aceitam despesas. `code` é único por projeto (índice parcial
-`uq_budget_item_code`, que ignora os nulos).
+`uq_budget_item_code`, que ignora os nulos **e** as eliminadas desde a `V36`).
 
 Eliminação em cascata (`ON DELETE CASCADE`) em toda a cadeia, incluindo a FK
-auto-referenciada — eliminar um projeto, ou uma rubrica, leva a sub-árvore e as despesas
-atrás. O ficheiro de fatura é guardado apenas como `bucket`/`storage_key` **na sua linha de
-`construction_invoice_document`** (bucket
+auto-referenciada — eliminar um **projeto** continua a levar a sub-árvore e as despesas atrás,
+de imediato. Eliminar uma **rubrica** (o `DELETE` do ecrã) já não: desde a `V36` é soft delete —
+marca `deleted_at` na rubrica e em toda a sub-árvore (bloqueado com `BUDGET_013` se houver
+despesas nalgum nó), e só a purga automática 30 dias depois (job agendado,
+`ConstructionBudgetItemPurgeConfig`) é que apaga a linha a sério, e aí sim com a cascata da FK.
+Ver [[api.md]] → "Orçamento de Construção". O ficheiro de fatura é guardado apenas como
+`bucket`/`storage_key` **na sua linha de `construction_invoice_document`** (bucket
 `"documents"`), nunca a URL bruta — ver [[skill-add-file-upload]].
 
 ## Outras tabelas principais

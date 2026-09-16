@@ -177,7 +177,11 @@ public class ConstructionExpenseService {
     }
 
     private ConstructionBudgetItem resolveBudgetItem(UUID budgetItemId) {
+        // Uma rubrica eliminada (soft delete) conta como inexistente aqui — nunca
+        // tem despesas por baixo (é bloqueado ao eliminar), por isso nunca deveria
+        // ser um destino válido para uma nova.
         ConstructionBudgetItem item = budgetItemRepository.findById(budgetItemId)
+                .filter(candidate -> !candidate.isDeleted())
                 .orElseThrow(() -> new BusinessException(ErrorCode.EXPENSE_BUDGET_ITEM_NOT_FOUND));
         if (!item.getRowKind().acceptsExpenses()) {
             throw new BusinessException(ErrorCode.EXPENSE_ITEM_NOT_EXPENSABLE);

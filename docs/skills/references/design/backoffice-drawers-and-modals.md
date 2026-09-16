@@ -23,15 +23,19 @@ Larguras observadas no código atual variam livremente: `600`, `640`, `800`, `85
 Drawer é o padrão dominante (24 ficheiros usam `<Drawer>` contra 12 com `<Modal>`), mas `Modal` não está reservado só para confirmações — está a ser usado para formulários e conteúdo completo, o que compete diretamente com o papel do Drawer:
 
 - `StatusChangeModal.tsx:86` — Modal usado para um **formulário** de mudança de estado, não uma confirmação simples.
-- `MyProfileModal.tsx:310` (`width={760}`) — formulário completo de edição de perfil num Modal, enquanto `ProfileView` (usado a partir das listas, dentro de um `Drawer` em `EmployeesList.tsx`) mostra o mesmo tipo de conteúdo — o mesmo conceito, dois contentores diferentes.
 - `PropertySearchModal.tsx`, `DownloadHistoryModal.tsx`, `EditGalleryCard.tsx`, `EditPhotoOrder.tsx`, `EditDivisionOrder.tsx`, `SeeLicense.tsx` — Modal usado para edição/navegação secundária conceptualmente semelhante ao que os Drawers tratam noutros sítios.
+
+> ✅ **Migrado a 2026-09-16**: `MyProfileModal.tsx` (`width={760}`, formulário completo de edição
+> da própria conta num Modal) passou a `MyProfileDrawer.tsx` — `Drawer` de `640`, kicker + `h2`,
+> `Tabs` (Geral/Email/Segurança) em vez do sidebar escuro à parte, cada separador com o seu
+> Cancelar/Guardar. Era o exemplo mais citado deste documento; deixou de ser drift.
 
 **Convenção daqui em diante**:
 - **Drawer** — qualquer criação/edição/visualização de uma entidade (o padrão já estabelecido e maioritário).
 - **Modal** — só para utilitários autocontidos e curtos: um seletor de pesquisa (`PropertySearchModal`, `BudgetItemPickerModal`), um visualizador de documento, um histórico (`DownloadHistoryModal`), ou reordenação de itens (`EditPhotoOrder`, `EditDivisionOrder`). Nunca um formulário completo de edição de entidade — isso é sempre Drawer.
 
 **Exemplo de aplicação (2026-08-09)**: o seletor de rubrica era `BudgetItemPickerDrawer` (600, à direita) e passou a `BudgetItemPickerModal` (centrado, `min(640px, 94vw)`, `max-height:88vh`) ao ser redesenhado. Escolher uma rubrica é um seletor de pesquisa, não a edição de uma entidade — cai do lado do Modal. O modal traz cabeçalho/rodapé fixos e uma lista que faz scroll no meio, e navega em **dois passos** (capítulo → rubrica) em vez de uma lista plana de ~200 linhas.
-- `MyProfileModal.tsx` e `StatusChangeModal.tsx` são os dois exemplos claros a **não copiar**: são formulários de entidade que deviam ser Drawer. Migrar oportunisticamente, não é preciso reescrever já.
+- `StatusChangeModal.tsx` continua a ser o exemplo claro a **não copiar**: é um formulário de entidade que devia ser Drawer. Migrar oportunisticamente, não é preciso reescrever já — `MyProfileModal.tsx` era o outro exemplo, migrado a 2026-09-16 (ver acima).
 - Confirmações de ações destrutivas usam o diálogo partilhado `useConfirm()` (`context/ConfirmDialogContext`) — ver [[backoffice-buttons-and-icons]]. `Popconfirm` só sobrevive em três ficheiros por migrar; não o uses em código novo. `Modal.confirm` só quando a confirmação precisa de mais contexto do que o diálogo partilhado permite.
 
 ## Skills relacionadas

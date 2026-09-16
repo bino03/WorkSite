@@ -1,6 +1,7 @@
 import api from "@/api";
 import type {
   BudgetImportResult,
+  BudgetItemDeleted,
   BudgetItemNode,
   BudgetItemSaveResponse,
   BudgetItemSearchResult,
@@ -70,9 +71,25 @@ export async function moveBudgetItem(
   return response.data;
 }
 
-/** Elimina a rubrica **e toda a sub-árvore**, despesas incluídas. */
+/**
+ * Elimina a rubrica **e toda a sub-árvore** — soft delete (`deleted_at`), não
+ * apaga a linha. Recusa com `BUDGET_013` se houver despesas nalgum nó; a purga
+ * real só acontece 30 dias depois, por job agendado no servidor.
+ */
 export async function deleteBudgetItem(id: string): Promise<void> {
   await api.delete(`/construction-budget/items/${id}`);
+}
+
+/** As rubricas eliminadas de um projeto, mais recente primeiro — a zona de recuperação. */
+export async function listDeletedBudgetItems(enterpriseId: string): Promise<BudgetItemDeleted[]> {
+  const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/deleted`);
+  return response.data;
+}
+
+/** Repõe a rubrica e a sub-árvore que foi eliminada junto com ela. */
+export async function recoverBudgetItem(id: string): Promise<BudgetItemNode> {
+  const response = await api.patch(`/construction-budget/items/${id}/recover`);
+  return response.data;
 }
 
 /**

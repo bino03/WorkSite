@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { Empty, Pagination, Spin, Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { FileTextOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 
 import {
   ListActions,
@@ -88,6 +89,7 @@ export const InvoicesList: FC<Props> = ({
   scope = "PROJECT",
 }) => {
   const { isAdmin } = useAuth();
+  const { t } = useTranslation();
   const isProject = scope === "PROJECT";
   const isQuarantine = scope === "UNIDENTIFIED";
 
@@ -238,28 +240,44 @@ export const InvoicesList: FC<Props> = ({
                   </span>
                 );
               }
+              // "Ao capítulo": pelo menos uma linha aponta para uma rubrica que
+              // ainda tem filhas ITEM — a despesa devia ter ido mais fundo.
+              const chapter = row.allocations.some((a) => a.chapter);
+              const chapterTag = chapter && (
+                <Tooltip title={t("invoices.classify.chapterHint")}>
+                  <span className="ind-tag ind-tag-neutral" style={{ fontSize: 10 }}>
+                    {t("invoices.classify.chapterTag")}
+                  </span>
+                </Tooltip>
+              );
               // Repartida: os campos singulares vêm a null de propósito (o
               // backend recusa-se a apontar para a primeira e mentir sobre as
               // outras). Mostra-se a contagem, e a lista completa no tooltip.
               if (row.allocations.length > 1) {
                 return (
-                  <Tooltip
-                    title={row.allocations
-                      .map((a) => `${a.budgetItemCode ?? a.budgetItemName} · ${formatCurrency(a.amount ?? 0)}`)
-                      .join("\n")}
-                  >
-                    <span className="ind-tag ind-tag-accent-2">
-                      {row.allocations.length} rubricas
-                    </span>
-                  </Tooltip>
+                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <Tooltip
+                      title={row.allocations
+                        .map((a) => `${a.budgetItemCode ?? a.budgetItemName} · ${formatCurrency(a.amount ?? 0)}`)
+                        .join("\n")}
+                    >
+                      <span className="ind-tag ind-tag-accent-2">
+                        {row.allocations.length} rubricas
+                      </span>
+                    </Tooltip>
+                    {chapterTag}
+                  </span>
                 );
               }
               return (
-                <Tooltip title={row.budgetItemName}>
-                  <span className="ind-tag ind-tag-accent">
-                    {row.budgetItemCode ?? row.budgetItemName}
-                  </span>
-                </Tooltip>
+                <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <Tooltip title={row.budgetItemName}>
+                    <span className="ind-tag ind-tag-accent">
+                      {row.budgetItemCode ?? row.budgetItemName}
+                    </span>
+                  </Tooltip>
+                  {chapterTag}
+                </span>
               );
             },
           },

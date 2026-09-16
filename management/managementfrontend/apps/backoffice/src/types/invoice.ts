@@ -76,6 +76,8 @@ export interface InvoiceAllocation {
   budgetItemCode: string | null;
   budgetItemName: string | null;
   amount: number | null;
+  /** A rubrica ainda tem filhas que aceitam despesas — mesma regra do ecrã "Classificar". */
+  chapter: boolean;
 }
 
 /** Uma linha da repartição, do lado de quem a envia. */
@@ -506,6 +508,8 @@ export interface InvoiceFilters {
   needsReview: boolean | null;
   /** `true` = só as por liquidar (pago < líquido, ou ainda sem total). */
   outstanding: boolean | null;
+  /** `true` = pelo menos uma linha de repartição ainda está ao capítulo (só faz sentido numa obra). */
+  atChapter: boolean | null;
   sentToAccountant: boolean | null;
   from: string | null;
   to: string | null;

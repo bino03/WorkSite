@@ -217,6 +217,8 @@ public enum ErrorCode {
     BUDGET_DUPLICATE_CODE("BUDGET_010", "Já existe uma rubrica com este índice neste projeto"),
     BUDGET_INVALID_DATES("BUDGET_011", "A data de fim não pode ser anterior à data de início"),
     BUDGET_ITEM_OTHER_ENTERPRISE("BUDGET_012", "Uma rubrica não pode mudar de projeto"),
+    BUDGET_ITEM_HAS_EXPENSES("BUDGET_013", "Esta rubrica (ou uma das suas sub-rubricas) tem despesas — mova-as ou apague-as primeiro"),
+    BUDGET_ITEM_NOT_DELETED("BUDGET_014", "Esta rubrica não está eliminada"),
 
     // Importação de Excel (BUDGET_02x)
     BUDGET_IMPORT_EMPTY_FILE("BUDGET_020", "Ficheiro de orçamento vazio"),

@@ -17,9 +17,6 @@ export type MyProfile = {
   accountStatus: AccountStatus;
   createdAt: string;
   updatedAt: string;
-  photoUrl: string | null;
-  photoBucket: string | null;
-  photoKey: string | null;
 };
 
 export type Employee = {
@@ -28,19 +25,12 @@ export type Employee = {
   name: string;
   email: string;
   phoneNumber: string | null;
-  photoUrl: string | null;
   role: Role;
   status: AccountStatus;
   createdAt: string;
   updatedAt: string;
   /** Vem do backend: esta linha é o próprio utilizador autenticado. */
   me: boolean;
-};
-
-export type SignedUrlResponse = {
-  url: string;
-  expiresIn: number;
-  expiresAt: string; // ISO
 };
 
 export type AssignableEmployee = {
@@ -57,9 +47,6 @@ export type PasswordUpdateRequest = { currentPassword: string; newPassword: stri
 /* ===========================
    Helpers
 =========================== */
-const ALLOWED_IMAGE_MIME = ["image/jpeg", "image/jpg", "image/png", "image/webp"] as const;
-const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB — mantém em sintonia com o backend
-
 const isBlank = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 
 function assertNonEmpty(value: unknown, label: string) {
@@ -88,13 +75,6 @@ export function getAuthUserIdFromContext(authUserId?: string): string | null {
 export async function getMyProfile(): Promise<MyProfile> {
   const { data } = await api.get<MyProfile>("/profile/myprofile");
   return data;
-}
-
-/** URL da foto: se houver bucket/key usa GET /files/profiles/{id}/photo, senão fallback local */
-export function buildProfilePhotoUrl(p: Pick<MyProfile, "id" | "photoBucket" | "photoKey">) {
-  return p.id && p.photoBucket && p.photoKey
-    ? `${import.meta.env.VITE_API_URL}/files/profiles/${p.id}/photo`
-    : "/src/assets/images/profile/profile1.jpg";
 }
 
 /** Atualiza nome e telefone (PUT /profile/updateNamePhone) */
@@ -129,48 +109,6 @@ export async function updatePassword(payload: PasswordUpdateRequest): Promise<vo
   });
 }
 
-/** Upload da foto (multipart/form-data) — POST /profiles/{id}/photo */
-export async function uploadProfilePhoto(profileId: string | undefined, file: File) {
-  if (!profileId) throw new Error("Não foi possível determinar o ID do perfil para enviar a foto.");
-  if (!file) throw new Error("Nenhum ficheiro selecionado");
-  if (!ALLOWED_IMAGE_MIME.includes(file.type as (typeof ALLOWED_IMAGE_MIME)[number])) {
-    throw new Error("Tipo de ficheiro inválido (aceites: JPEG, PNG, WEBP)");
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error(`Ficheiro demasiado grande (máx. ${(MAX_IMAGE_BYTES / 1024 / 1024) | 0}MB)`);
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const { data } = await api.post(`/profile/${profileId}/photo`, formData);
-  return data as { photoBucket: string; photoKey: string; photoUrl?: string };
-}
-
-// pede a foto ao servidor
-export async function getSignedFileUrl(params: {
-  bucket: string;
-  photoKey: string;
-  expiresIn?: number; // default 600s
-}): Promise<SignedUrlResponse> {
-  const { bucket, photoKey, expiresIn = 600 } = params;
-  const { data } = await api.post<SignedUrlResponse>("/profile/photo-url", {
-    bucket,
-    photoKey,
-    expiresIn,
-  });
-  return data;
-}
-
-/** Apaga a foto do servidor — DELETE /profiles/{id}/photo */
-export async function deleteProfilePhoto(profileId: string | undefined) {
-  if (!profileId) throw new Error("Não foi possível determinar o ID do perfil para apagar a foto.");
-  await api.delete(`/profile/${profileId}/photo`);
-}
-
-
-
-
 
 /* ===========================
    Admin/Legacy (se usares noutras telas)
@@ -182,7 +120,7 @@ export async function getEmployee(id: string): Promise<Employee> {
 
 export async function updateEmployee(
   id: string,
-  payload: Partial<Pick<Employee, "name" | "email" | "phoneNumber" | "photoUrl" | "role">>
+  payload: Partial<Pick<Employee, "name" | "email" | "phoneNumber" | "role">>
 ): Promise<Partial<Employee>> {
   const { data } = await api.put<Partial<Employee>>(`/employees/${id}`, payload);
   return data;

@@ -69,27 +69,29 @@ legível, o original fica intacto em Storage — a melhor hipótese para revisã
 
 ## URLs de fotos nas respostas da API
 
-Sempre que um endpoint devolve um URL de foto/media, **gerar um signed URL do Supabase** com
-`SupabaseStorageService.createSignedUrl(bucket, key, expiresInSeconds)`. Nunca devolver a chave
-guardada em cru.
+Sempre que um endpoint devolve um URL de foto/media, **gerar um signed URL do Supabase** —
+`SignedUrlService.resolve(bucket, storageKey)` é o sítio canónico: cacheia por 50 min (a
+assinatura vale 1h), tira a `/` inicial da chave e devolve `null` em vez de lançar se não houver
+ficheiro ou a chamada falhar. Nunca devolver a chave guardada em cru, e nunca reimplementar este
+try/catch por endpoint — é o que `SignedUrlService` já faz.
 
 ```java
-private String resolvePhotoUrl(Profile profile) {
-    if (profile == null || profile.getPhotoKey() == null) return null;
+public String resolve(String bucket, String storageKey) {
+    if (bucket == null || storageKey == null || storageKey.isBlank()) return null;
     try {
-        String bucket = profile.getPhotoBucket();
-        String key = profile.getPhotoKey().startsWith("/") ? profile.getPhotoKey().substring(1) : profile.getPhotoKey();
-        return storage.createSignedUrl(bucket, key, 3600);
+        String key = storageKey.startsWith("/") ? storageKey.substring(1) : storageKey;
+        return storage.createSignedUrl(bucket, key, EXPIRES_SECONDS);
     } catch (Exception e) {
-        log.warn("Nao foi possivel gerar signed URL: {}", e.getMessage());
+        log.warn("Não foi possível gerar signed URL para {}/{}: {}", bucket, storageKey, e.getMessage());
         return null;
     }
 }
 ```
 
-- Tirar a `/` inicial da chave antes de chamar `createSignedUrl`.
-- Devolver `null` sem estardalhaço se não houver foto ou se a chamada falhar.
-- Implementação de referência: `POST /profile/photo-url` no `ProfileController`.
+Implementação de referência: `SignedUrlService`, usada pelo `ConstructionInvoiceService` para
+miniaturas e documentos de faturas. (As fotos de perfil, que tinham o seu próprio `resolvePhotoUrl`
+duplicado em três sítios — `AuthController`, `ProfileService`, `ProfileController` — foram
+eliminadas por completo a 2026-09-16; ver `docs/api.md`.)
 
 ## Uploads
 

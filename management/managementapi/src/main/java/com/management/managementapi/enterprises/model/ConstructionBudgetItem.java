@@ -17,6 +17,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -85,6 +86,10 @@ public class ConstructionBudgetItem extends BaseEntity {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    /** Não nulo = eliminada (soft delete). A sub-árvore inteira fica marcada junto. */
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
     public Enterprise getEnterprise() { return enterprise; }
     public void setEnterprise(Enterprise enterprise) { this.enterprise = enterprise; }
 
@@ -126,4 +131,9 @@ public class ConstructionBudgetItem extends BaseEntity {
 
     public UUID getCreatedBy() { return createdBy; }
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
+
+    public OffsetDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(OffsetDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public boolean isDeleted() { return deletedAt != null; }
 }

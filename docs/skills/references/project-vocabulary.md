@@ -37,15 +37,15 @@ Dizer "modal" quando é um Drawer faz com que se leia o sub-ficheiro de design e
 
 | Termo | O que é | Exemplos reais |
 |---|---|---|
-| **Drawer** (ou "painel lateral") | `<Drawer>` do AntD | `InvoiceDetailDrawer`, `InvoiceUploadDrawer`, `SuppliersDrawer`, `EmailProvidersDrawer`, `CreateEnterpriseDrawer`, `EnterpriseViewDrawer` |
-| **Modal** | `<Modal>` do AntD | `BudgetItemPickerModal`, `BudgetImportModal`, `InvoicePreviewModal`, `MyProfileModal` |
+| **Drawer** (ou "painel lateral") | `<Drawer>` do AntD | `InvoiceDetailDrawer`, `InvoiceUploadDrawer`, `SuppliersDrawer`, `EmailProvidersDrawer`, `CreateEnterpriseDrawer`, `EnterpriseViewDrawer`, `MyProfileDrawer` |
+| **Modal** | `<Modal>` do AntD | `BudgetItemPickerModal`, `BudgetImportModal`, `InvoicePreviewModal` |
 | **Diálogo de confirmação** | `useConfirm()`, partilhado | o "Eliminar esta fatura?" |
 | **Página** | tem rota em `main.tsx` | `EnterpriseInvoicesPage`, `ConstructionBudgetPage` |
 | **Lista** / **tabela** | `<Table>` do AntD + `ListActions` | `InvoicesList`, `EnterprisesList` |
 | **Card** | bloco de conteúdo dentro de uma página | `EditEnterpriseOverviewCard`, classe `.ind-card` |
 | **Notificação** / **toast** | `notificationService` | o aviso de "Fatura associada" |
 
-> `MyProfileModal` e `StatusChangeModal` são formulários de entidade dentro de um Modal — drift conhecido, **não copiar**. Ver [[design/backoffice-drawers-and-modals]].
+> `StatusChangeModal` é um formulário de entidade dentro de um Modal — drift conhecido, **não copiar**. Ver [[design/backoffice-drawers-and-modals]]. `MyProfileModal` era o outro exemplo; migrou para `MyProfileDrawer` a 2026-09-16.
 
 ---
 

@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSearchResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSaveResponseDTO;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -121,7 +123,7 @@ public class ConstructionBudgetItemService {
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
 
-        List<ConstructionBudgetItem> items = repository.findTreeByEnterpriseId(enterpriseId);
+        List<ConstructionBudgetItem> items = livesOnly(repository.findTreeByEnterpriseId(enterpriseId));
         Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(enterpriseId);
         Map<UUID, List<ConstructionBudgetItem>> childrenByParent = groupByParent(items);
 
@@ -176,7 +178,7 @@ public class ConstructionBudgetItemService {
         UUID enterpriseId = item.getEnterprise().getId();
 
         Map<UUID, List<ConstructionBudgetItem>> childrenByParent =
-                groupByParent(repository.findTreeByEnterpriseId(enterpriseId));
+                groupByParent(livesOnly(repository.findTreeByEnterpriseId(enterpriseId)));
         Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(enterpriseId);
 
         return buildNode(item, childrenByParent, expensesByItem, depthOf(item));
@@ -251,9 +253,108 @@ public class ConstructionBudgetItemService {
         return getNode(item.getId());
     }
 
-    /** Elimina a rubrica e toda a sub-árvore (cascata na BD, incluindo despesas). */
+    /**
+     * Elimina a rubrica e toda a sub-árvore — soft delete, não cascata na BD.
+     *
+     * Bloqueado se houver despesas lançadas em qualquer nó da sub-árvore
+     * ({@code BUDGET_013}): mover ou apagar as despesas primeiro é a única
+     * forma de esvaziar a rubrica, para nunca se perder uma despesa por engano
+     * atrás de uma eliminação. A purga real (hard delete) só acontece 30 dias
+     * depois, por job agendado — ver {@code ConstructionBudgetItemPurgeConfig}.
+     */
     public void delete(UUID id) {
-        repository.delete(getById(id));
+        ConstructionBudgetItem item = getById(id);
+        List<ConstructionBudgetItem> subtree = collectSubtree(item);
+        List<UUID> subtreeIds = subtree.stream().map(ConstructionBudgetItem::getId).toList();
+
+        if (expenseRepository.existsByBudgetItemIdIn(subtreeIds)) {
+            throw new BusinessException(ErrorCode.BUDGET_ITEM_HAS_EXPENSES);
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        subtree.forEach(node -> node.setDeletedAt(now));
+        repository.saveAll(subtree);
+    }
+
+    /** As rubricas eliminadas de um projeto, mais recente primeiro — a zona de recuperação. */
+    @Transactional(readOnly = true)
+    public List<BudgetItemDeletedDTO> listDeleted(UUID enterpriseId) {
+        return repository.findByEnterpriseIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(enterpriseId).stream()
+                .map(item -> new BudgetItemDeletedDTO(
+                        item.getId(), item.getCode(), item.getName(), item.getRowKind(),
+                        item.getDeletedAt(), item.getDeletedAt().plusDays(30)))
+                .toList();
+    }
+
+    /**
+     * Repõe uma rubrica eliminada e a sub-árvore que foi eliminada junto com ela.
+     *
+     * Volta à mãe original se ela ainda existir e não estiver eliminada; ao
+     * topo (sem mãe) caso contrário — a mãe pode ter sido eliminada depois, ou
+     * entretanto ter mudado de sítio de um jeito que já não faz sentido. O
+     * {@code code}, entretanto livre, pode ter sido reutilizado por outra
+     * rubrica — nesse caso {@code BUDGET_DUPLICATE_CODE}, tal como uma
+     * criação normal.
+     */
+    public BudgetItemNodeDTO recover(UUID id) {
+        ConstructionBudgetItem item = repository.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.budgetItem(id.toString()));
+        if (!item.isDeleted()) {
+            throw new BusinessException(ErrorCode.BUDGET_ITEM_NOT_DELETED);
+        }
+
+        UUID enterpriseId = item.getEnterprise().getId();
+        validateCodeIsFree(enterpriseId, item.getCode(), item.getId());
+
+        ConstructionBudgetItem parent = item.getParent();
+        boolean parentRecoverable = parent != null && !parent.isDeleted();
+        if (!parentRecoverable) {
+            item.setParent(null);
+            item.setSortOrder(repository.nextSortOrder(enterpriseId, null));
+        }
+
+        List<ConstructionBudgetItem> deletedSubtree = collectDeletedSubtree(item);
+        deletedSubtree.forEach(node -> node.setDeletedAt(null));
+        repository.saveAll(deletedSubtree);
+
+        return getNode(item.getId());
+    }
+
+    /** A rubrica e toda a sua sub-árvore viva — usado para verificar despesas antes de eliminar. */
+    private List<ConstructionBudgetItem> collectSubtree(ConstructionBudgetItem root) {
+        Map<UUID, List<ConstructionBudgetItem>> childrenByParent =
+                groupByParent(livesOnly(repository.findTreeByEnterpriseId(root.getEnterprise().getId())));
+        List<ConstructionBudgetItem> out = new ArrayList<>();
+        collectSubtreeInto(root, childrenByParent, out);
+        return out;
+    }
+
+    private void collectSubtreeInto(ConstructionBudgetItem node,
+                                    Map<UUID, List<ConstructionBudgetItem>> childrenByParent,
+                                    List<ConstructionBudgetItem> out) {
+        out.add(node);
+        for (ConstructionBudgetItem child : childrenByParent.getOrDefault(node.getId(), List.of())) {
+            collectSubtreeInto(child, childrenByParent, out);
+        }
+    }
+
+    /**
+     * A rubrica e a parte da sua sub-árvore que também está eliminada — usado
+     * ao recuperar. Descer só por filhos eliminados evita repor algo que
+     * nunca chegou a sair (uma sub-rubrica criada depois da eliminação do pai,
+     * hipótese hoje impossível pela UI mas não pela BD).
+     */
+    private List<ConstructionBudgetItem> collectDeletedSubtree(ConstructionBudgetItem root) {
+        Map<UUID, List<ConstructionBudgetItem>> childrenByParent = new HashMap<>();
+        for (ConstructionBudgetItem candidate : repository.findTreeByEnterpriseId(root.getEnterprise().getId())) {
+            if (!candidate.isDeleted() || candidate.getParent() == null) {
+                continue;
+            }
+            childrenByParent.computeIfAbsent(candidate.getParent().getId(), k -> new ArrayList<>()).add(candidate);
+        }
+        List<ConstructionBudgetItem> out = new ArrayList<>();
+        collectSubtreeInto(root, childrenByParent, out);
+        return out;
     }
 
     // ── construção da árvore ──────────────────────────────────
@@ -435,11 +536,17 @@ public class ConstructionBudgetItemService {
             return null;
         }
         ConstructionBudgetItem parent = repository.findById(parentId)
+                .filter(candidate -> !candidate.isDeleted())
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_PARENT_NOT_FOUND));
         if (!parent.getEnterprise().getId().equals(enterpriseId)) {
             throw new BusinessException(ErrorCode.BUDGET_PARENT_OTHER_ENTERPRISE);
         }
         return parent;
+    }
+
+    /** As rubricas vivas — a árvore visível nunca inclui eliminadas (soft delete). */
+    private static List<ConstructionBudgetItem> livesOnly(List<ConstructionBudgetItem> items) {
+        return items.stream().filter(i -> !i.isDeleted()).toList();
     }
 
     /** Impede que uma rubrica seja arrastada para dentro da sua própria sub-árvore. */

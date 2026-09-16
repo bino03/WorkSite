@@ -135,4 +135,21 @@ class EnterpriseOverviewSlugTest {
         assertThat(e.getName()).isEqualTo("Obra renomeada");
         verify(enterpriseRepository, never()).existsBySlugAndIdNot(anyString(), any());
     }
+
+    @Test
+    @DisplayName("construtora e arquiteto são aplicados pelo overview (mudaram-se do finance a 2026-09-16)")
+    void aplicaConstrutoraEArquiteto() {
+        Enterprise e = existing("Vila Petrus", false);
+
+        EditOverViewCardDTO dto = new EditOverViewCardDTO();
+        dto.setConstructionCompany("Construções Alves");
+        dto.setArchitect("Ana Ferreira");
+
+        EditOverViewCardDTO out = service().updateOverview(ID, dto);
+
+        assertThat(e.getConstructionCompany()).isEqualTo("Construções Alves");
+        assertThat(e.getArchitect()).isEqualTo("Ana Ferreira");
+        assertThat(out.getConstructionCompany()).isEqualTo("Construções Alves");
+        assertThat(out.getArchitect()).isEqualTo("Ana Ferreira");
+    }
 }

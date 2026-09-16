@@ -103,26 +103,74 @@ export async function updateEnterprise(
 
 export const updateEnterpriseOverview = async (enterpriseId: string, data: {
   name: string;
-  internalReference?: string;
+  internalReference?: string | null;
   type: string;
   status: string;
-  description?: string;
   slug?: string | null;
   isTest?: boolean;
+  constructionCompany?: string | null;
+  architect?: string | null;
 }) => {
   const response = await api.patch(`/enterprise-relations/${enterpriseId}/overview`, data);
   return response.data;
 };
 
 export const updateEnterpriseDatesAreas = async (enterpriseId: string, data: {
-  landArea?: number;
-  totalArea?: number;
+  landArea?: number | null;
+  totalArea?: number | null;
   startDate?: string | null;
   completionDate?: string | null;
 }) => {
-  const response = await api.patch(`/enterprises/${enterpriseId}/dates-areas`, data);
+  // Vivia em `/enterprises/{id}/dates-areas` — essa rota nunca existiu no backend (404). O
+  // controlador real é o `EntrepriseRelationsController`, o mesmo do overview e do finance.
+  const response = await api.patch(`/enterprise-relations/${enterpriseId}/dates-areas`, data);
   return response.data;
 };
+
+export const updateEnterpriseFinance = async (enterpriseId: string, data: {
+  totalInvestment?: number | null;
+  currentValue?: number | null;
+  currency?: string;
+}) => {
+  const response = await api.patch(`/enterprise-relations/${enterpriseId}/finance`, data);
+  return response.data;
+};
+
+export interface EnterpriseLocationDTO {
+  id: string;
+  enterpriseId: string;
+  location: LocationResponseDTO;
+  isPrimary: boolean;
+  sortOrder: number;
+  notes?: string | null;
+}
+
+/**
+ * `id` sozinho → liga a uma localização já existente (os outros campos são ignorados pelo
+ * backend nesse caso). Sem `id` → cria uma localização nova a partir dos campos e liga-a.
+ */
+export const upsertEnterpriseLocation = async (enterpriseId: string, data: {
+  id?: string;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  municipality?: string | null;
+  parish?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  googlePlaceId?: string | null;
+  notes?: string | null;
+}): Promise<EnterpriseLocationDTO> => {
+  const response = await api.post(`/enterprise-relations/${enterpriseId}/location/upsert`, data);
+  return response.data;
+};
+
+export async function removeEnterpriseLocation(enterpriseId: string): Promise<void> {
+  await api.delete(`/enterprise-relations/${enterpriseId}/location`);
+}
 
 /**
  * Soft delete de uma enterprise (is_active → false, status → deleted)

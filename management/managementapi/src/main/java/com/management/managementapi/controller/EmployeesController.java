@@ -117,15 +117,4 @@ public class EmployeesController {
     ) {
         return service.updateRole(id, body);
     }
-
-    @Operation(summary = "Atualizar avatarUrl (metadados)")
-    @ApiResponse(responseCode = "200", description = "Atualizado")
-    @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{id}/avatar")
-    public EmployeeResponseDTO updateAvatar(
-            @PathVariable UUID id,
-            @Valid @RequestBody EmployeeAvatarUpdateRequestDTO body
-    ) {
-        return service.updateAvatar(id, body);
-    }
 }

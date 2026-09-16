@@ -8,7 +8,15 @@ import BlueprintCard from "@/components/common/BlueprintCard";
 
 const FIELD_SIZE = "large" as const;
 
-export default function TimelineMetricsSection() {
+type Props = {
+  /**
+   * `totalUnits` não entra no `PATCH .../dates-areas` (é derivado, não editável) — na edição
+   * mostra-se desativado, com uma nota. Na criação fica sempre editável (omitir a prop).
+   */
+  totalUnitsReadOnly?: boolean;
+};
+
+export default function TimelineMetricsSection({ totalUnitsReadOnly = false }: Props = {}) {
   const { t } = useTranslation();
   const { control } = useFormContext();
 
@@ -86,9 +94,15 @@ export default function TimelineMetricsSection() {
                   className="w-full"
                   min={0}
                   placeholder="0"
+                  disabled={totalUnitsReadOnly}
                 />
               )}
             />
+            {totalUnitsReadOnly && (
+              <p style={{ color: "var(--ind-neutral-600)", fontSize: 12, marginTop: 4 }}>
+                {t('enterpriseDatesAndAreas.unitsHint')}
+              </p>
+            )}
           </div>
         </div>
         <div className="field">

@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Card,
   Row,
   Col,
   Button,
@@ -11,11 +10,9 @@ import {
   Image,
   List,
   Typography,
-  message,
   Modal,
   Input,
   Form,
-  Popconfirm,
 } from "antd";
 import {
   FileImageOutlined,
@@ -26,6 +23,10 @@ import {
   CloseOutlined,
 } from "@ant-design/icons";
 import api from "@/api";
+import { ErrorHandler } from "@/errors/errorHandler";
+import { notificationService } from "@/services/general/notificationService";
+import { useConfirm } from "@/context/ConfirmDialogContext";
+import BlueprintCard from "@/components/common/BlueprintCard";
 
 const { Text } = Typography;
 
@@ -38,13 +39,13 @@ type Props = {
 // Função para resolver a URL do banner do empreendimento
 const resolveHeroUrl = (data: any) => {
   if (!data) return "/src/assets/images/enterprise/default.jpg";
-  
+
   // Primeiro tenta usar o banner das media
   const bannerMedia = data.media?.find((m: any) => m?.type === "banner");
   if (bannerMedia) {
     return resolveMediaUrl(bannerMedia) || "/src/assets/images/enterprise/default.jpg";
   }
-  
+
   // Fallback para imagem padrão
   return "/src/assets/images/enterprise/default.jpg";
 };
@@ -68,6 +69,7 @@ const resolveMediaUrl = (m: any): string | undefined => {
 
 const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   // Estados para o banner
   const [editingBanner, setEditingBanner] = useState(false);
   const [selectedBannerFile, setSelectedBannerFile] = useState<File | null>(null);
@@ -118,12 +120,12 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      message.error(t('enterpriseEdit.selectImageFile'));
+      notificationService.error(t('enterpriseEdit.selectImageFile'));
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      message.error(t('enterpriseEdit.imageSizeLimit'));
+      notificationService.error(t('enterpriseEdit.imageSizeLimit'));
       return;
     }
 
@@ -146,11 +148,11 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
     // Validar ficheiros
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
-        message.error(t('enterpriseEdit.onlyImages'));
+        notificationService.error(t('enterpriseEdit.onlyImages'));
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        message.error(t('enterpriseEdit.imageTooLarge', { name: file.name }));
+        notificationService.error(t('enterpriseEdit.imageTooLarge', { name: file.name }));
         return;
       }
     }
@@ -168,7 +170,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
     }));
 
     setLocalGallery(prev => [...prev, ...newItems]);
-    message.info(t('enterpriseEdit.photosAddedLocal', { count: files.length }));
+    notificationService.info(t('enterpriseEdit.photosAddedLocal', { count: files.length }));
 
     // Reset do input
     if (galleryFileInputRef.current) {
@@ -199,7 +201,15 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
     }
 
     setLocalGallery(prev => prev.filter(item => item.id !== photoId));
-    message.info(t('enterpriseEdit.photoRemovedLocal'));
+    notificationService.info(t('enterpriseEdit.photoRemovedLocal'));
+  };
+
+  const confirmDeletePhoto = (photoId: string) => {
+    confirm({
+      title: t('enterpriseEdit.deletePhoto'),
+      message: t('common.cannotBeUndone'),
+      onConfirm: () => handleDeletePhoto(photoId),
+    });
   };
 
   // Handler para editar nome da foto
@@ -241,17 +251,16 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
         const response = await api.get(`/enterprises/${data.id}`);
         onSave(response.data);
 
-        message.success(t('enterpriseEdit.photoNameUpdated'));
+        notificationService.success(t('enterpriseEdit.photoNameUpdated'));
       } else {
-        message.success(t('enterpriseEdit.photoNameLocal'));
+        notificationService.success(t('enterpriseEdit.photoNameLocal'));
       }
 
       setEditingPhotoName(null);
       setPhotoNameInput("");
 
     } catch (error) {
-      console.error('Erro ao atualizar nome da foto:', error);
-      message.error(t('enterpriseEdit.photoNameError'));
+      ErrorHandler.handle(error);
     } finally {
       setSavingPhotoName(false);
     }
@@ -289,7 +298,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
         },
       });
 
-      message.success(t('enterpriseEdit.bannerUpdated'));
+      notificationService.success(t('enterpriseEdit.bannerUpdated'));
 
       const updatedEnterprise = response.data.enterprise || {
         ...data,
@@ -300,8 +309,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
       handleCancelEdit();
 
     } catch (error) {
-      console.error('Erro ao atualizar banner:', error);
-      message.error(t('enterpriseEdit.bannerError'));
+      ErrorHandler.handle(error);
     } finally {
       setUploadingBanner(false);
     }
@@ -312,14 +320,22 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
     try {
       await api.delete(`/enterprises/${data.id}/photos/banner`);
 
-      message.success(t('enterpriseEdit.bannerRemoved'));
+      notificationService.success(t('enterpriseEdit.bannerRemoved'));
 
       const response = await api.get(`/enterprises/${data.id}`);
       onSave(response.data);
     } catch (error) {
-      console.error('Erro ao remover banner:', error);
-      message.error(t('enterpriseEdit.bannerRemoveError'));
+      ErrorHandler.handle(error);
     }
+  };
+
+  const confirmDeleteBanner = () => {
+    confirm({
+      title: t('enterpriseEdit.deleteBanner'),
+      message: t('enterpriseGalleryEdit.deleteBannerConfirm'),
+      actionLabel: t('enterpriseEdit.deleteBanner'),
+      onConfirm: handleDeleteBanner,
+    });
   };
 
   // Handler para guardar alterações da galeria
@@ -328,11 +344,6 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
     try {
       // 1. Identificar fotos novas para upload
       const newPhotos = localGallery.filter(item => item.isNew);
-
-      console.log('DEBUG - Guardar galeria:', {
-        newPhotos: newPhotos.map(p => ({ id: p.id, name: p.displayName, hasCustomName: p.hasCustomName })),
-        removedPhotos: removedOriginalPhotos
-      });
 
       // 2. Fazer upload das novas fotos
       if (newPhotos.length > 0) {
@@ -382,7 +393,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
         });
       }
 
-      message.success(t('enterpriseEdit.galleryUpdated'));
+      notificationService.success(t('enterpriseEdit.galleryUpdated'));
 
       // 6. Recarregar os dados atualizados
       const response = await api.get(`/enterprises/${data.id}`);
@@ -392,8 +403,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
       setRemovedOriginalPhotos([]);
 
     } catch (error) {
-      console.error('Erro ao guardar galeria:', error);
-      message.error(t('enterpriseEdit.galleryError'));
+      ErrorHandler.handle(error);
     } finally {
       setSavingGallery(false);
     }
@@ -414,7 +424,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
 
     setLocalGallery(galleryResolved);
     setRemovedOriginalPhotos([]);
-    message.info(t('enterpriseEdit.galleryCancelled'));
+    notificationService.info(t('enterpriseEdit.galleryCancelled'));
   };
 
   // Handler para guardar tudo
@@ -429,7 +439,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
   };
 
   return (
-    <Space direction="vertical" className="w-full" size={16}>
+    <Space direction="vertical" className="w-full" size={16} style={{ width: "100%" }}>
       {/* Input de ficheiro hidden para banner */}
       <input
         type="file"
@@ -477,36 +487,15 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
         </Form>
       </Modal>
 
-      {/* =================== CARD BANNER =================== */}
-      <Card className="rounded-2xl shadow-sm" title={<span><EditOutlined /> {t('enterpriseGalleryEdit.editBannerTitle')}</span>}>
-        {/* Cabeçalho informativo */}
-        <div style={{
-          padding: '12px 16px',
-          backgroundColor: '#fafafa',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          border: '1px solid #e8e8e8'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <Text strong style={{ fontSize: '14px' }}>{t('enterpriseGalleryEdit.bannerImage')}</Text>
-              <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
-                {editingBanner ? t('enterpriseGalleryEdit.bannerPreviewDesc') : t('enterpriseGalleryEdit.bannerMainDesc')}
-              </Text>
-            </div>
-            <FileImageOutlined style={{ fontSize: '20px', color: '#78716c', opacity: 0.6 }} />
-          </div>
-        </div>
-
+      {/* =================== BANNER =================== */}
+      <BlueprintCard kicker={t('enterpriseGalleryEdit.editBannerTitle')} style={{ padding: "13.6px", gap: "13.6px" }}>
         <Row gutter={[20, 20]} align="middle">
           <Col xs={24} lg={14}>
-            {/* Container da imagem com efeitos */}
+            {/* Container da imagem */}
             <div style={{
               position: 'relative',
-              borderRadius: '12px',
               overflow: 'hidden',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              border: '1px solid #e8e8e8'
+              border: '1px solid var(--ind-color-divider)'
             }}>
               <Image
                 src={currentBannerUrl}
@@ -519,20 +508,12 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
               />
 
               {/* Badge de tipo */}
-              <div style={{
-                position: 'absolute',
-                top: '12px',
-                left: '12px',
-                background: editingBanner ? '#52c41a' : 'rgba(120, 113, 108, 0.9)',
-                color: 'white',
-                padding: '4px 12px',
-                borderRadius: '16px',
-                fontSize: '12px',
-                fontWeight: 500,
-                backdropFilter: 'blur(4px)'
-              }}>
+              <span
+                className="ind-tag ind-tag-accent"
+                style={{ position: 'absolute', top: 12, left: 12 }}
+              >
                 {editingBanner ? t('enterpriseGalleryEdit.bannerPreviewBadge') : t('enterpriseGalleryEdit.bannerMainBadge')}
-              </div>
+              </span>
 
               {/* Overlay de preview */}
               {editingBanner && (
@@ -566,22 +547,14 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
                   >
                     {t('enterpriseGalleryEdit.changeBanner')}
                   </Button>
-                  <Popconfirm
-                    title={t('enterpriseEdit.deleteBanner')}
-                    description={t('enterpriseGalleryEdit.deleteBannerConfirm')}
-                    onConfirm={handleDeleteBanner}
-                    okText={t('common.yes')}
-                    cancelText={t('common.cancel')}
-                    okButtonProps={{ danger: true }}
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    disabled={!data.media?.find((m: any) => m?.type === "banner")}
+                    onClick={confirmDeleteBanner}
                   >
-                    <Button
-                      danger
-                      icon={<DeleteOutlined />}
-                      disabled={!data.media?.find((m: any) => m?.type === "banner")}
-                    >
-                      {t('enterpriseGalleryEdit.deleteBanner')}
-                    </Button>
-                  </Popconfirm>
+                    {t('enterpriseGalleryEdit.deleteBanner')}
+                  </Button>
                 </Space>
               ) : (
                 <Space>
@@ -606,13 +579,13 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
           </Col>
 
           <Col xs={24} lg={10}>
-            <div style={{ padding: '0 8px' }}>
+            <div>
               {/* Seção de informações */}
               <div style={{ marginBottom: '20px' }}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>
                   {editingBanner ? t('enterpriseGalleryEdit.confirmChangeTitle') : t('enterpriseGalleryEdit.bannerInfoTitle')}
                 </Text>
-                <Text style={{ fontSize: '14px', lineHeight: '1.6', color: '#595959' }}>
+                <Text style={{ fontSize: '14px', lineHeight: '1.6' }}>
                   {editingBanner
                     ? t('enterpriseGalleryEdit.confirmChangeDesc')
                     : t('enterpriseGalleryEdit.bannerInfoDesc')
@@ -622,10 +595,9 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
 
               {/* Especificações técnicas */}
               <div style={{
-                padding: '16px',
-                backgroundColor: 'white',
-                borderRadius: '8px',
-                border: '1px solid #e8e8e8'
+                padding: '13.6px',
+                background: 'var(--ind-color-surface)',
+                border: '1px solid var(--ind-color-divider)'
               }}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
                   {t('enterpriseGalleryEdit.techSpecs')}
@@ -633,17 +605,16 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
                 <List
                   size="small"
                   dataSource={[
-                    { k: t('enterpriseGalleryEdit.specType'), v: "Banner/Capa", icon: "🏷️" },
-                    { k: t('enterpriseGalleryEdit.specFormat'), v: "JPEG/WEBP", icon: "📁" },
-                    { k: t('enterpriseGalleryEdit.specOrientation'), v: "Horizontal (16:9)", icon: "📐" },
-                    { k: t('enterpriseGalleryEdit.specMaxSize'), v: "10MB", icon: "💾" },
+                    { k: t('enterpriseGalleryEdit.specType'), v: "Banner/Capa" },
+                    { k: t('enterpriseGalleryEdit.specFormat'), v: "JPEG/WEBP" },
+                    { k: t('enterpriseGalleryEdit.specOrientation'), v: "Horizontal (16:9)" },
+                    { k: t('enterpriseGalleryEdit.specMaxSize'), v: "10MB" },
                   ]}
                   renderItem={(it) => (
                     <List.Item style={{ padding: "6px 0", border: 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                        <span style={{ marginRight: '8px' }}>{it.icon}</span>
                         <Text strong style={{ minWidth: '100px' }}>{it.k}:</Text>
-                        <Text style={{ color: '#595959' }}>{it.v}</Text>
+                        <Text type="secondary">{it.v}</Text>
                       </div>
                     </List.Item>
                   )}
@@ -652,214 +623,135 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
             </div>
           </Col>
         </Row>
-      </Card>
+      </BlueprintCard>
 
-      {/* =================== CARD GALERIA =================== */}
-      <Card
-        className="rounded-2xl shadow-sm"
-        title={<span><FileImageOutlined /> {t('enterpriseGalleryEdit.editGalleryTitle')}</span>}
-      >
+      {/* =================== GALERIA =================== */}
+      <BlueprintCard kicker={t('enterpriseGalleryEdit.editGalleryTitle')} style={{ padding: "13.6px", gap: "13.6px" }}>
         {/* Cabeçalho da galeria com botão adicionar */}
-        <div style={{
-          padding: '12px 16px',
-          backgroundColor: '#fafafa',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          border: '1px solid #e8e8e8'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <Text strong style={{ fontSize: '14px' }}>
-                {t('enterpriseGalleryEdit.galleryCount', { count: localGallery.length })}
-                {hasChanges && ` ${t('enterpriseGalleryEdit.galleryPendingChanges')}`}
-              </Text>
-              <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
-                {t('enterpriseGalleryEdit.galleryManage')}
-              </Text>
-            </div>
-
-            <Space>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleAddPhotos}
-              >
-                {t('enterpriseGalleryEdit.addPhotos')}
-              </Button>
-            </Space>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <Text strong style={{ fontSize: '14px' }}>
+              {t('enterpriseGalleryEdit.galleryCount', { count: localGallery.length })}
+              {hasChanges && ` ${t('enterpriseGalleryEdit.galleryPendingChanges')}`}
+            </Text>
+            <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
+              {t('enterpriseGalleryEdit.galleryManage')}
+            </Text>
           </div>
+
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddPhotos}
+          >
+            {t('enterpriseGalleryEdit.addPhotos')}
+          </Button>
         </div>
 
         {localGallery.length ? (
-          <>
-            {/* Grid de imagens */}
-            <div style={{ marginBottom: '16px' }}>
-              <Text type="secondary" style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
-                {t('enterpriseGalleryEdit.allImages')} {hasChanges && '📝'}
-              </Text>
-            </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              gap: 13.6,
+            }}
+          >
+            {localGallery.map((m: any, index) => (
+              <div
+                key={m.id}
+                style={{
+                  overflow: "hidden",
+                  border: `1px solid ${m.isNew ? "var(--ind-color-accent)" : "var(--ind-color-divider)"}`,
+                  position: "relative",
+                }}
+              >
+                <Image
+                  src={m._url}
+                  alt={m.displayName || `Imagem ${index + 1}`}
+                  height={160}
+                  width="100%"
+                  style={{ objectFit: "cover" }}
+                  preview={{ mask: "🔍 Ver" }}
+                />
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                gap: 16,
-                padding: '16px',
-                backgroundColor: 'white',
-                borderRadius: '8px',
-                border: '1px solid #e8e8e8'
-              }}
-            >
-              {localGallery.map((m: any, index) => (
-                <div
-                  key={m.id}
-                  style={{
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    border: "1px solid #e8e8e8",
-                    position: "relative",
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                    borderColor: m.isNew ? '#78716c' : '#e8e8e8'
-                  }}
-                >
-                  <Image
-                    src={m._url}
-                    alt={m.displayName || `Imagem ${index + 1}`}
-                    height={160}
-                    width="100%"
-                    style={{ objectFit: "cover" }}
-                    preview={{ mask: "🔍 Ver" }}
+                {/* Badge para fotos novas */}
+                {m.isNew && (
+                  <span className="ind-tag ind-tag-accent" style={{ position: 'absolute', top: 8, left: 8 }}>
+                    {t('enterpriseGalleryEdit.newImageBadge')}
+                  </span>
+                )}
+
+                {/* Overlay de ações */}
+                <div style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}>
+                  <Button
+                    size="small"
+                    shape="circle"
+                    icon={<EditOutlined />}
+                    onClick={() => handleEditPhotoName(m)}
                   />
-
-                  {/* Badge para fotos novas */}
-                  {m.isNew && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '12px',
-                      left: '12px',
-                      background: '#52c41a',
-                      color: 'white',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '10px',
-                      fontWeight: 500
-                    }}>
-                      {t('enterpriseGalleryEdit.newImageBadge')}
-                    </div>
-                  )}
-
-                  {/* Overlay de ações */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                    opacity: 0.8,
-                    transition: 'opacity 0.3s'
-                  }}>
-                    {/* Botão Editar Nome (Lápis Amarelo) */}
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<EditOutlined />}
-                      onClick={() => handleEditPhotoName(m)}
-                      style={{
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#faad14',
-                        borderColor: '#faad14'
-                      }}
-                    />
-
-                    {/* Botão Eliminar (Lixeira Vermelha) */}
-                    <Popconfirm
-                      title={t('enterpriseEdit.deletePhoto')}
-                      description={t('common.cannotBeUndone')}
-                      onConfirm={() => handleDeletePhoto(m.id)}
-                      okText={t('common.yes')}
-                      cancelText={t('common.cancel')}
-                      okButtonProps={{ danger: true }}
-                    >
-                      <Button
-                        type="primary"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        style={{
-                          borderRadius: '50%',
-                          width: '32px',
-                          height: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      />
-                    </Popconfirm>
-                  </div>
-
-                  {/* Nome da imagem */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 8,
-                    left: 8,
-                    right: 8,
-                    background: 'rgba(0,0,0,0.7)',
-                    color: 'white',
-                    borderRadius: '8px',
-                    padding: '6px 8px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    textOverflow: 'ellipsis',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {m.displayName}
-                    {m.hasCustomName && " ✏️"}
-                  </div>
-
-                  {/* Número da imagem */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 8,
-                    left: 8,
-                    background: 'rgba(0,0,0,0.7)',
-                    color: 'white',
-                    borderRadius: '12px',
-                    padding: '2px 8px',
-                    fontSize: '12px',
-                    fontWeight: 500
-                  }}>
-                    #{index + 1}
-                  </div>
+                  <Button
+                    danger
+                    size="small"
+                    shape="circle"
+                    icon={<DeleteOutlined />}
+                    onClick={() => confirmDeletePhoto(m.id)}
+                  />
                 </div>
-              ))}
-            </div>
-          </>
+
+                {/* Nome da imagem */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  background: 'rgba(0,0,0,0.7)',
+                  color: 'white',
+                  padding: '6px 8px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {m.displayName}
+                  {m.hasCustomName && " ✏️"}
+                </div>
+
+                {/* Número da imagem */}
+                <div style={{
+                  position: 'absolute',
+                  top: 8,
+                  left: 8,
+                  background: 'rgba(0,0,0,0.7)',
+                  color: 'white',
+                  padding: '2px 8px',
+                  fontSize: '12px',
+                  fontWeight: 500
+                }}>
+                  #{index + 1}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           /* Estado vazio */
-          <div style={{
-            textAlign: 'center',
-            padding: '60px 20px',
-            color: '#8c8c8c'
-          }}>
-            <FileImageOutlined style={{ fontSize: '64px', marginBottom: '20px', opacity: 0.3 }} />
-            <div style={{ fontSize: '18px', marginBottom: '8px' }}>{t('enterpriseGalleryEdit.emptyGallery')}</div>
-            <div style={{ fontSize: '14px', marginBottom: '20px' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <FileImageOutlined style={{ fontSize: '48px', marginBottom: '20px', opacity: 0.3 }} />
+            <div style={{ fontSize: '16px', marginBottom: '8px' }}>{t('enterpriseGalleryEdit.emptyGallery')}</div>
+            <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
               {t('enterpriseGalleryEdit.emptyGalleryDesc')}
-            </div>
+            </Text>
             <Button
               type="primary"
-              size="large"
               icon={<PlusOutlined />}
               onClick={handleAddPhotos}
-              style={{ marginBottom: '20px' }}
             >
               {t('enterpriseGalleryEdit.addFirstPhoto')}
             </Button>
@@ -868,9 +760,8 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
 
         {/* Botões de ação globais */}
         <div style={{
-          marginTop: '24px',
-          paddingTop: '16px',
-          borderTop: '1px solid #e8e8e8',
+          paddingTop: '13.6px',
+          borderTop: '1px solid var(--ind-color-divider)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -885,13 +776,12 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
           </div>
 
           <Space>
-            <Button onClick={handleCancelAll} size="large">
+            <Button onClick={handleCancelAll}>
               {t('common.cancel')}
             </Button>
             <Button
               type="primary"
               onClick={handleSaveAll}
-              size="large"
               loading={savingGallery}
               disabled={!hasChanges}
             >
@@ -899,7 +789,7 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
             </Button>
           </Space>
         </div>
-      </Card>
+      </BlueprintCard>
     </Space>
   );
 };

@@ -24,23 +24,16 @@ Acentos de estado num sub-card: usar as classes `.ind-tag-*` ou os tokens `--ind
 
 ## Drift — o que ainda está no look antigo (não copiar)
 
-- **`enterprise/edit/Edit*Card.tsx`** (os cinco: `EditEnterpriseOverviewCard`, `EditDatesAndAreasCard`,
-  `EditFinancialCard`, `EditEnterpriseLocationCard`, `EditEnterpriseGalleryCard`) — são os **únicos**
-  ficheiros do Backoffice onde sobrevive o header em gradiente cinza-pedra
-  `linear-gradient(135deg, #78716c 0%, #44403c 100%)` com ícone em caixa translúcida, mais os sub-cards
-  em gradientes claros ad-hoc (`#fff7e6 → #fef3e2`, `#f6ffed → #f0fff3`, `#f0f9ff → #e0f2fe`,
-  `#fafaf9 → #f5f5f4`) e `<Card>` do AntD. Aparecem **dentro do próprio `EnterpriseViewDrawer`** ao
-  carregar em "Editar", por isso o mesmo drawer muda de sistema visual a meio — a visualização é
-  Industry, a edição é o look herdado. Está no [[ToDo]] (Projetos) para migrar
-  para `BlueprintCard`/`SectionCard`; junto com a migração de AntD Form → RHF+Zod já pedida em
-  [[backoffice-forms-and-validation]].
-- Os mesmos gradientes claros aparecem ainda em `InvitesDrawer.tsx`, `MapLocationPickerDrawer.tsx` e
-  `ProfileView.tsx` — limpar quando esses ficheiros forem tocados.
+> ✅ **`enterprise/edit/Edit*Card.tsx` migrados a 2026-09-16.** Os cinco já usam `BlueprintCard`/
+> tokens `--ind-*`, sem gradiente cinza-pedra nem `<Card>` do AntD com `bodyStyle` à mão — o mesmo
+> drawer deixou de mudar de sistema visual a meio ao carregar em "Editar". Overview, Datas & Áreas e
+> Financeiro passaram também para RHF+Zod, reutilizando as secções da criação (ver
+> [[backoffice-forms-and-validation]] §1). Localização e Galeria ficaram com `BlueprintCard` mas
+> estado local próprio (razão em [[backoffice-forms-and-validation]] §1).
 
-> Histórico: até 2026-09-15 este ficheiro descrevia o gradiente pedra como "o padrão real" e dizia
-> que os `Edit*Card` o "reutilizavam corretamente" — era a documentação do Property-Management, que
-> ficou por atualizar na migração Industry. Foi o que deixou os cards de edição do empreendimento
-> parecerem legítimos.
+- Os mesmos gradientes claros ad-hoc (`#fff7e6 → #fef3e2`, `#f6ffed → #f0fff3`, `#f0f9ff → #e0f2fe`,
+  `#fafaf9 → #f5f5f4`) que os `Edit*Card` tinham continuam em `InvitesDrawer.tsx`,
+  `MapLocationPickerDrawer.tsx` e `ProfileView.tsx` — limpar quando esses ficheiros forem tocados.
 
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]

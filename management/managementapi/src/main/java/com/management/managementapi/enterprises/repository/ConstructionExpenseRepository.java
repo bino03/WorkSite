@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,9 @@ import java.util.UUID;
 public interface ConstructionExpenseRepository extends JpaRepository<ConstructionExpense, UUID> {
 
     List<ConstructionExpense> findByBudgetItemIdOrderByCreatedAtDesc(UUID budgetItemId);
+
+    /** Alguma destas rubricas tem despesas? Usado para bloquear a eliminação de uma sub-árvore. */
+    boolean existsByBudgetItemIdIn(Collection<UUID> budgetItemIds);
 
     /**
      * Os lançamentos que saíram desta fatura, do mais antigo para o mais recente.

@@ -1,19 +1,37 @@
 # Backoffice — Formulários e Validação
 
-> Parte de [[../frontend-visual-consistency]]. Só Backoffice. Baseado em `ConstructionStageUpsertDrawer.tsx`, `ConstructionSubStageUpsertDrawer.tsx`, `ConstructionExpenseUpsertDrawer.tsx`, `CreateEnterpriseDrawer.tsx` (+ `create/*Section.tsx`), `enterprise/edit/Edit*Card.tsx`, `CreateEmployeeDrawer.tsx`, `TaskFormDrawer.tsx`, `TaskDetailDrawer.tsx`, `MyProfileModal.tsx`, `ProfileView.tsx`, `AcceptInvitePage.tsx`. Auditoria 2026-08-05.
+> Parte de [[../frontend-visual-consistency]]. Só Backoffice. Baseado em `ConstructionStageUpsertDrawer.tsx`, `ConstructionSubStageUpsertDrawer.tsx`, `ConstructionExpenseUpsertDrawer.tsx`, `CreateEnterpriseDrawer.tsx` (+ `create/*Section.tsx`), `enterprise/edit/Edit*Card.tsx`, `CreateEmployeeDrawer.tsx`, `TaskFormDrawer.tsx`, `TaskDetailDrawer.tsx`, `MyProfileDrawer.tsx`, `ProfileView.tsx`, `AcceptInvitePage.tsx`. Auditoria 2026-08-05, ponto 1 atualizado a 2026-09-16.
 
 O [[../../frontend/skill-frontend-design-system]] prescreve **React Hook Form + Zod** para todos os formulários (e [[../code-best-practices]] repete a regra). A auditoria mostra duas convenções a competir — e o corte não é "código antigo vs novo", é **por domínio**.
 
 ## 1. Biblioteca de formulário: RHF+Zod no domínio de construção/criação, AntD Form no resto
 
-- **RHF + Zod** (`zodResolver`): `ConstructionStageUpsertDrawer.tsx:4,47-48`, `ConstructionSubStageUpsertDrawer.tsx:4,47-48`, `ConstructionExpenseUpsertDrawer.tsx:4,54-55`, `CreateEnterpriseDrawer.tsx:5,38-39`.
-- **AntD `Form.useForm()`**: `CreateEmployeeDrawer.tsx:24`, `TaskFormDrawer.tsx:30`, `TaskDetailDrawer.tsx:24`, `ProfileView.tsx:76`, `MyProfileModal.tsx:146-148` (três formulários no mesmo modal), `AcceptInvitePage.tsx:20`, e **todos** os cards de edição de empreendimento: `EditDatesAndAreasCard.tsx:40`, `EditEnterpriseOverviewCard.tsx:62`, `EditFinancialCard.tsx:58`.
+- **RHF + Zod** (`zodResolver`): `ConstructionStageUpsertDrawer.tsx:4,47-48`, `ConstructionSubStageUpsertDrawer.tsx:4,47-48`, `ConstructionExpenseUpsertDrawer.tsx:4,54-55`, `CreateEnterpriseDrawer.tsx:5,38-39`, e agora também `EditEnterpriseOverviewCard.tsx`, `EditDatesAndAreasCard.tsx`, `EditFinancialCard.tsx` (2026-09-16 — ver nota abaixo).
+- **AntD `Form.useForm()`**: `CreateEmployeeDrawer.tsx:24`, `TaskFormDrawer.tsx:30`, `TaskDetailDrawer.tsx:24`, `ProfileView.tsx:76`, `MyProfileDrawer.tsx` (três formulários no mesmo drawer, um por separador), `AcceptInvitePage.tsx:20`.
+- **Estado local próprio (`useState`), sem Form nenhum**: `EditEnterpriseLocationCard.tsx` e `EditEnterpriseGalleryCard.tsx` — de propósito, não é drift por preguiça (ver nota abaixo).
 
 Só existem dois schemas Zod no projeto: `components/construction/constructionFormSchemas.ts` e `components/enterprise/create/enterpriseFormSchema.ts`.
 
-**O caso mais gritante é o empreendimento**: a **criação** (`CreateEnterpriseDrawer` + secções) usa RHF+Zod, mas a **edição** da mesma entidade (os três `Edit*Card`) usa AntD Form. Mesma entidade, mesmos campos, duas bibliotecas e duas definições de "campo obrigatório" — a de edição não passa pelo `EnterpriseFormSchema`.
-
-**Convenção escolhida: RHF + Zod**, como o skill prescreve. Migrar oportunisticamente quando um destes ficheiros for tocado; prioridade aos `Edit*Card` do empreendimento, por serem os que divergem da criação da mesma entidade.
+> ✅ **Migrado a 2026-09-16**: os três `Edit*Card` de empreendimento que partilhavam campos 1:1 com a
+> criação (Overview, Datas & Áreas, Financeiro) passaram a **reutilizar as próprias secções da
+> criação** (`BasicInfoSection`, `TimelineMetricsSection`, `FinancialSection`) dentro de um
+> `FormProvider` próprio, com `EnterpriseFormSchema.pick({...})` a recortar só os campos de cada
+> card. Cada wrapper mapeia `camelCase` (DTO) ↔ `snake_case` (schema) à entrada e à saída — não há
+> mapper partilhado, é explícito em cada ficheiro, como já era em `CreateEnterpriseDrawer.onSubmit`.
+> Duas secções partilhadas ganharam um prop para a diferença de comportamento entre criar e editar:
+> `BasicInfoSection({ showActiveToggle })` (o `PATCH .../overview` não tem `isActive` — é o
+> ciclo de eliminação/restauro que o mantém) e `TimelineMetricsSection({ totalUnitsReadOnly })`
+> (o `PATCH .../dates-areas` não aceita `totalUnits` — é derivado). Ambas continuam a funcionar sem
+> a prop (o valor por omissão é o comportamento da criação).
+>
+> **Localização e Galeria ficaram de fora, por decisão, não por falta de tempo**: `EditEnterpriseLocationCard`
+> fala com um endpoint próprio (`POST .../location/upsert`, forma diferente do `newLocation`/
+> `existingLocationId` embutido no payload da criação) — meteu-se `MapLocationPickerDrawer` (a
+> mesma da criação) com estado local em vez de RHF, porque a secção da criação está presa ao
+> `EnterpriseFormSchema` inteiro. `EditEnterpriseGalleryCard` mexe em ficheiros e três endpoints
+> distintos (banner imediato, galeria diferida com "Guardar", `PATCH` de `altText`) — RHF não
+> encaixava no padrão de guardar em passos; ficou só o restilo (`BlueprintCard`, tokens `--ind-*`,
+> `useConfirm()` em vez de `Popconfirm`).
 
 ## 2. Mensagens de erro do Zod: i18n keys num schema, string PT fixa no outro
 

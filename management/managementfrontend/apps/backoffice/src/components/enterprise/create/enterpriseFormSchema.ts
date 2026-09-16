@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-// Defina os enums com base no que existe no banco
-export const EnterpriseTypeEnum = z.enum(["residential", "commercial", "industrial", "mixed_use"]);
-export const EnterpriseStatusEnum = z.enum(["planning", "under_construction", "completed", "on_hold", "cancelled"]);
+// Enums alinhados com o backend (EnterPriseType/EnterPriseStatus) e com enterpriseService.ts —
+// "on_hold"/"cancelled" nunca existiram no backend; "active"/"archived"/"deleted" faltavam aqui.
+export const EnterpriseTypeEnum = z.enum(["residential", "commercial", "industrial", "mixed_use", "land"]);
+export const EnterpriseStatusEnum = z.enum(["planning", "under_construction", "active", "completed", "archived", "deleted"]);
 export const VisibilityEnum = z.enum(["PUBLIC", "PRIVATE"]);
 
 // Schema para nova localização

@@ -27,20 +27,11 @@ public class Profile extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "photo_url")
-    private String photoUrl;
-
     @Column(name = "phone_number")
     private String phoneNumber;
 
     @Column(name = "last_token_reset_at")
     private Instant lastTokenResetAt;
-
-    @Column(name = "photo_bucket")
-    private String photoBucket = "private";  // Padrão de bucket (pode ser alterado para 'documents' se necessário)
-
-    @Column(name = "photo_key")
-    private String photoKey;
 
     // enum DB; String aqui
     @Enumerated(EnumType.STRING)
@@ -64,9 +55,6 @@ public class Profile extends BaseEntity {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
-    public String getPhotoUrl() { return photoUrl; }
-    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
-
     public String getPhoneNumber() { return phoneNumber; }
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
 
@@ -82,21 +70,5 @@ public class Profile extends BaseEntity {
 
     public void setLastTokenResetAt(Instant lastTokenResetAt) {
         this.lastTokenResetAt = lastTokenResetAt;
-    }
-
-    public String getPhotoBucket() {
-        return photoBucket;
-    }
-
-    public void setPhotoBucket(String photoBucket) {
-        this.photoBucket = photoBucket;
-    }
-
-    public String getPhotoKey() {
-        return photoKey;
-    }
-
-    public void setPhotoKey(String photoKey) {
-        this.photoKey = photoKey;
     }
 }

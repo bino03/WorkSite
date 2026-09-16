@@ -84,7 +84,6 @@ CRUD sobre `worksite.profile` — não existe entidade `Employee` separada.
 | PATCH | `/employees/{id}/block` | `ADMIN` |
 | PATCH | `/employees/{id}/unblock` | `ADMIN` |
 | PATCH | `/employees/{id}/role` | `ADMIN` |
-| PUT | `/employees/{id}/avatar` | `ADMIN` |
 
 Todas as respostas com `EmployeeResponseDTO` trazem `me: boolean` — verdadeiro na linha do
 próprio utilizador autenticado. Existe para o frontend não ter de guardar o id da sessão só
@@ -104,10 +103,14 @@ admin a eliminar-se ficava de fora sem ninguém que lhe repusesse a conta. `USER
 | PUT | `/profile/updateNamePhone` | autenticado |
 | PUT | `/profile/updateEmail` | autenticado |
 | PUT | `/profile/updatePassword` | autenticado |
-| POST | `/profile/{authUserId}/photo` | autenticado (multipart) |
-| GET | `/profile/{authUserId}/photo` | autenticado |
-| DELETE | `/profile/{authUserId}/photo` | autenticado |
-| POST | `/profile/photo-url` | autenticado |
+
+> 🧹 **Fotos de perfil eliminadas por completo a 2026-09-16** (`V35`): saíram os 4 endpoints de
+> foto daqui (`POST/GET/DELETE /{authUserId}/photo`, `POST /photo-url`) e o `PUT
+> /employees/{id}/avatar` acima. O substituto são as iniciais do nome — já era o fallback nos 3
+> sítios que mostravam a foto. `ProfileDTO`, `AuthResponse.UserData` e `EmployeeResponseDTO` (os
+> dois, `dto/employee` e `dto/admin`) perderam o campo `photoUrl`; `Profile`/`profile` perderam as
+> colunas `photo_url`/`photo_bucket`/`photo_key`. Os objetos já gravados em
+> `private/profilephoto/**` no Supabase Storage não foram apagados — são poucos e apagam-se à mão.
 
 ## Projetos / Empreendimentos (`EnterpriseController`, `/enterprises`)
 
@@ -150,6 +153,10 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | PATCH | `/enterprise-relations/{id}/dates-areas` | autenticado |
 | PATCH | `/enterprise-relations/{id}/finance` | autenticado |
 
+> 🧹 **`constructionCompany`/`architect` mudaram do `finance` para o `overview` a 2026-09-16**
+> (`EditOverViewCardDTO`/`FinanceCardDTO`) — o Financeiro ficou só com valores e moeda; construtora e
+> arquiteto entram junto do resto dos dados descritivos do projeto.
+
 ## Orçamento de Construção (`ConstructionBudgetItemController`, `/construction-budget`)
 
 Árvore de rubricas do orçamento de obra (profundidade livre via `parentId`) — ver
@@ -162,8 +169,22 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | POST | `/construction-budget/items` | `ADMIN` |
 | PUT | `/construction-budget/items/{id}` | `ADMIN` |
 | PATCH | `/construction-budget/items/{id}/move?parentId=&sortOrder=` | `ADMIN` — reordenar / mudar de rubrica-mãe |
-| DELETE | `/construction-budget/items/{id}` | `ADMIN` — leva a sub-árvore e as despesas |
+| DELETE | `/construction-budget/items/{id}` | `ADMIN` — soft delete da sub-árvore (ver abaixo) |
+| GET | `/construction-budget/enterprise/{enterpriseId}/deleted` | `ADMIN` — a zona de recuperação |
+| PATCH | `/construction-budget/items/{id}/recover` | `ADMIN` — repõe a rubrica e a sub-árvore eliminada junto |
 | POST | `/construction-budget/enterprise/{enterpriseId}/import?dryRun=&replace=` | `ADMIN` — multipart `file` (.xlsx) |
+
+> 🧹 **`DELETE` passou a soft delete a 2026-09-16** (`V36`, coluna `deleted_at`). Bloqueado com
+> `BUDGET_013` se houver despesas em **qualquer** nó da sub-árvore (mover ou apagar as despesas
+> primeiro); sem elas, marca `deleted_at` na rubrica e em toda a sub-árvore — nunca a linha em si.
+> Uma rubrica eliminada deixa de aparecer em `GET` da árvore/pesquisa, deixa de aceitar despesas
+> novas e o seu `code` fica livre para reutilização. A purga real (hard delete, cascata na BD) só
+> corre **30 dias depois**, por job agendado (`ConstructionBudgetItemPurgeConfig`, 3h da manhã) — a
+> janela é a zona de recuperação. `GET .../deleted` devolve `{id, code, name, rowKind, deletedAt,
+> purgeAt}`, mais recente primeiro; `purgeAt = deletedAt + 30 dias`, para o cliente não embutir a
+> regra. `PATCH .../recover` volta à mãe original se ela ainda existir e não estiver eliminada, ao
+> topo (sem mãe) caso contrário; se o `code` entretanto foi reutilizado por outra rubrica → `BUDGET_014`
+> se a rubrica não estava eliminada, `BUDGET_010` (`BUDGET_DUPLICATE_CODE`) se o código colidir.
 
 **Agregados por nó** (nos `GET`): `rolledUpBudget` soma o `totalPrice` das **folhas** da
 sub-árvore — somar todos os nós duplicaria, porque o Excel guarda o total do capítulo na
@@ -431,6 +452,7 @@ ordenada por `uploadedAt` descendente:
 | `allocated` | `false` → o que está por classificar (o que o cliente abre por omissão) |
 | `needsReview` | `true` → falta a data ou o total |
 | `sentToAccountant` | `false` → o que falta enviar |
+| `atChapter` | `true` → pelo menos uma linha de repartição aponta para uma rubrica que ainda tem filhas `ITEM` (a mesma regra do `chapter` do ecrã "Classificar" — ver `BudgetItemSearchResultDTO`). Só existe aqui: as outras duas listas não têm rubrica |
 | `from` / `to` | intervalo de `invoiceDate` (ISO `AAAA-MM-DD`) |
 | `q` | procura no nome e NIF do fornecedor, número, ATCUD, nome do ficheiro e notas |
 
@@ -624,7 +646,7 @@ ainda **sem total** classifica-se na mesma e as linhas nascem a zero (§7). O
 
 | Campo | O que diz |
 |---|---|
-| `allocations[]` | `{expenseId, budgetItemId, budgetItemCode, budgetItemName, amount}` — a verdade completa |
+| `allocations[]` | `{expenseId, budgetItemId, budgetItemCode, budgetItemName, amount, chapter}` — a verdade completa. `chapter` é a mesma regra do ecrã "Classificar": a rubrica ainda tem filhas `ITEM` |
 | `allocationStatus` | `NONE` · `COMPLETE` · `PARTIAL` · `PROVISIONAL` (fatura sem total, linhas a zero) |
 | `unallocatedAmount` | `total − Σ despesas`; null quando a fatura não tem total |
 | `expenseId`, `budgetItemId`, `budgetItemCode`, `budgetItemName` | **só preenchidos com exatamente uma** afetação; null quando repartida — apontar para a primeira mentiria sobre as outras |

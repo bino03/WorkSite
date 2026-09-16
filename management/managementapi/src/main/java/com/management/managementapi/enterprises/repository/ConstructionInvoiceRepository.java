@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.repository;
 
+import com.management.managementapi.enterprises.model.BudgetRowKind;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 
 import org.springframework.data.domain.Page;
@@ -29,6 +30,9 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
      * @param outstanding    true = só as por liquidar (pago &lt; total, ou ainda sem total),
      *                       false = só as pagas por inteiro, null = todas. O pago é a soma das
      *                       ligações em {@code invoice_payment} — estado derivado, não coluna.
+     * @param atChapter      true = pelo menos uma linha de repartição aponta para uma rubrica que
+     *                       ainda tem filhas {@code ITEM} (a mesma regra do ecrã "Classificar" —
+     *                       ver {@code BudgetItemSearchResultDTO}), false = nenhuma, null = todas
      */
     @Query("""
             select i from ConstructionInvoice i
@@ -51,6 +55,13 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                 >= i.totalAmount)
                    )))
               and (:sentToAccountant is null or i.sentToAccountant = :sentToAccountant)
+              and (:atChapter is null
+                   or (:atChapter = true  and     exists (select 1 from ConstructionExpense e
+                             where e.invoice = i and exists (select 1 from ConstructionBudgetItem c
+                                 where c.parent = e.budgetItem and c.rowKind = :itemRowKind)))
+                   or (:atChapter = false and not exists (select 1 from ConstructionExpense e
+                             where e.invoice = i and exists (select 1 from ConstructionBudgetItem c
+                                 where c.parent = e.budgetItem and c.rowKind = :itemRowKind))))
               and (:from is null or i.invoiceDate >= :from)
               and (:to   is null or i.invoiceDate <= :to)
               and (:q is null
@@ -68,6 +79,8 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                      @Param("needsReview") Boolean needsReview,
                                      @Param("outstanding") Boolean outstanding,
                                      @Param("sentToAccountant") Boolean sentToAccountant,
+                                     @Param("atChapter") Boolean atChapter,
+                                     @Param("itemRowKind") BudgetRowKind itemRowKind,
                                      @Param("from") LocalDate from,
                                      @Param("to") LocalDate to,
                                      @Param("q") String q,

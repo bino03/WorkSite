@@ -1,26 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Badge, Button, Empty, Input, Space, Spin, Table } from "antd";
+import { Badge, Button, Empty, Input, Space, Spin, Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   ArrowLeftOutlined,
+  DeleteOutlined,
+  DownOutlined,
   EditOutlined,
   FileTextOutlined,
+  PlusOutlined,
   SearchOutlined,
+  SwapOutlined,
+  UndoOutlined,
   UploadOutlined,
+  UpOutlined,
 } from "@ant-design/icons";
 
-import { getBudgetTree } from "@/services/budgetService";
+import { deleteBudgetItem, getBudgetTree, listDeletedBudgetItems, moveBudgetItem } from "@/services/budgetService";
 import { countPendingInvoices } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
+import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
+import { useConfirm } from "@/context/ConfirmDialogContext";
 import { formatCurrency } from "@/utils/formatters";
 import type { BudgetItemNode, BudgetTree } from "@/types/budget";
 import { BudgetExpensesDrawer } from "@/components/budget/BudgetExpensesDrawer";
-import { BudgetDatesDrawer } from "@/components/budget/BudgetDatesDrawer";
+import { BudgetItemDrawer } from "@/components/budget/BudgetItemDrawer";
+import { BudgetMoveToModal } from "@/components/budget/BudgetMoveToModal";
+import { BudgetRecycleBinDrawer } from "@/components/budget/BudgetRecycleBinDrawer";
 import { BudgetImportModal } from "@/components/budget/BudgetImportModal";
-import { collectAncestorsMissingDates, flattenTree, matchesQuery } from "@/components/budget/budgetTree";
+import { flattenTree, matchesQuery, siblingsOf } from "@/components/budget/budgetTree";
 
 /** Quantos caracteres de descrição mostrar antes de oferecer "ver mais". */
 const DESC_CLAMP = 150;
@@ -29,6 +39,7 @@ const ConstructionBudgetPage: FC = () => {
   const { enterpriseId } = useParams<{ enterpriseId: string }>();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
+  const confirm = useConfirm();
 
   const [tree, setTree] = useState<BudgetTree | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,10 +48,15 @@ const ConstructionBudgetPage: FC = () => {
   const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set());
 
   const [pendingInvoices, setPendingInvoices] = useState(0);
+  const [deletedCount, setDeletedCount] = useState(0);
 
   const [expensesItem, setExpensesItem] = useState<BudgetItemNode | null>(null);
-  const [datesItem, setDatesItem] = useState<BudgetItemNode | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [movingItem, setMovingItem] = useState<BudgetItemNode | null>(null);
+  const [itemDrawer, setItemDrawer] = useState<{ item: BudgetItemNode | null; parentId: string | null } | null>(
+    null
+  );
 
   const fetchTree = useCallback(async () => {
     if (!enterpriseId) return;
@@ -67,6 +83,17 @@ const ConstructionBudgetPage: FC = () => {
     countPendingInvoices(enterpriseId).then(setPendingInvoices).catch(() => setPendingInvoices(0));
   }, [enterpriseId]);
 
+  const refreshDeletedCount = useCallback(() => {
+    if (!enterpriseId || !isAdmin()) return;
+    listDeletedBudgetItems(enterpriseId)
+      .then((items) => setDeletedCount(items.length))
+      .catch(() => setDeletedCount(0));
+  }, [enterpriseId, isAdmin]);
+
+  useEffect(() => {
+    refreshDeletedCount();
+  }, [refreshDeletedCount]);
+
   /**
    * A pesquisa mantém os ascendentes de qualquer nó que corresponda — sem isso
    * uma rubrica encontrada apareceria sem o capítulo a que pertence.
@@ -91,6 +118,41 @@ const ConstructionBudgetPage: FC = () => {
     // Com pesquisa activa mostra-se tudo o que sobreviveu ao filtro.
     if (query.trim()) setExpandedKeys(flattenTree(visibleRoots).map((n) => n.id));
   }, [query, visibleRoots]);
+
+  const moveSibling = async (row: BudgetItemNode, direction: "up" | "down") => {
+    if (!tree) return;
+    const siblings = siblingsOf(tree.roots, row.id);
+    const index = siblings.findIndex((s) => s.id === row.id);
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+
+    try {
+      await moveBudgetItem(row.id, row.parentId, siblings[targetIndex].sortOrder);
+      fetchTree();
+    } catch (error) {
+      ErrorHandler.handle(error);
+    }
+  };
+
+  const confirmDelete = (row: BudgetItemNode) => {
+    confirm({
+      title: "Eliminar rubrica",
+      message:
+        row.children.length > 0
+          ? `Eliminar "${row.name}" e as suas ${row.children.length} sub-rubrica(s)? Ficam na zona de recuperação por 30 dias.`
+          : `Eliminar "${row.name}"? Fica na zona de recuperação por 30 dias.`,
+      onConfirm: async () => {
+        try {
+          await deleteBudgetItem(row.id);
+          notificationService.success("Rubrica", "Rubrica eliminada — pode recuperá-la em \"Eliminadas\".");
+          fetchTree();
+          refreshDeletedCount();
+        } catch (error) {
+          ErrorHandler.handle(error);
+        }
+      },
+    });
+  };
 
   const toggleDesc = (id: string) =>
     setExpandedDescs((prev) => {
@@ -157,20 +219,6 @@ const ConstructionBudgetPage: FC = () => {
                 <span className="ind-tag ind-tag-outline" style={{ marginLeft: 6 }}>
                   alternativa
                 </span>
-              )}
-
-              {isAdmin() && (
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  title="Editar datas"
-                  style={{ opacity: 0.6, marginLeft: 4 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDatesItem(row);
-                  }}
-                />
               )}
 
               {name.length > DESC_CLAMP && !isHeading && (
@@ -254,8 +302,78 @@ const ConstructionBudgetPage: FC = () => {
           );
         },
       },
+      ...(isAdmin()
+        ? [
+            {
+              title: "",
+              key: "actions",
+              width: 150,
+              render: (_: unknown, row: BudgetItemNode) => {
+                const siblings = tree ? siblingsOf(tree.roots, row.id) : [];
+                const index = siblings.findIndex((s) => s.id === row.id);
+                return (
+                  <Space size={2} onClick={(e) => e.stopPropagation()}>
+                    <Tooltip title="Editar">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={() => setItemDrawer({ item: row, parentId: row.parentId })}
+                      />
+                    </Tooltip>
+                    {row.rowKind !== "NOTE" && (
+                      <Tooltip title="Nova sub-rubrica">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          onClick={() => setItemDrawer({ item: null, parentId: row.id })}
+                        />
+                      </Tooltip>
+                    )}
+                    <Tooltip title="Mover para…">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<SwapOutlined />}
+                        onClick={() => setMovingItem(row)}
+                      />
+                    </Tooltip>
+                    <Tooltip title="Subir">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<UpOutlined />}
+                        disabled={index <= 0}
+                        onClick={() => moveSibling(row, "up")}
+                      />
+                    </Tooltip>
+                    <Tooltip title="Descer">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<DownOutlined />}
+                        disabled={index < 0 || index >= siblings.length - 1}
+                        onClick={() => moveSibling(row, "down")}
+                      />
+                    </Tooltip>
+                    <Tooltip title="Eliminar">
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => confirmDelete(row)}
+                      />
+                    </Tooltip>
+                  </Space>
+                );
+              },
+            } as ColumnsType<BudgetItemNode>[number],
+          ]
+        : []),
     ],
-    [expandedDescs, isAdmin]
+    [expandedDescs, isAdmin, tree]
   );
 
   const totals = tree;
@@ -303,6 +421,21 @@ const ConstructionBudgetPage: FC = () => {
               Faturas
             </Button>
           </Badge>
+          {isAdmin() && (
+            <Badge count={deletedCount} overflowCount={99} offset={[-4, 2]}>
+              <Button icon={<UndoOutlined />} onClick={() => setRecycleBinOpen(true)}>
+                Eliminadas
+              </Button>
+            </Badge>
+          )}
+          {isAdmin() && tree && (
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => setItemDrawer({ item: null, parentId: null })}
+            >
+              Nova rubrica
+            </Button>
+          )}
           {/* Importar por cima de um orçamento existente duplicava a árvore toda. O
               backend recusa na mesma (`BUDGET_IMPORT_NOT_EMPTY`); aqui tira-se o botão
               da frente. Com `tree` ainda por carregar não aparece, para não piscar. */}
@@ -417,13 +550,38 @@ const ConstructionBudgetPage: FC = () => {
         onChanged={fetchTree}
       />
 
-      <BudgetDatesDrawer
-        item={datesItem}
+      <BudgetItemDrawer
+        open={!!itemDrawer}
         enterpriseId={enterpriseId ?? ""}
-        ancestorsMissing={datesItem && tree ? collectAncestorsMissingDates(tree.roots, datesItem.id) : null}
-        open={!!datesItem}
-        onClose={() => setDatesItem(null)}
-        onSaved={fetchTree}
+        tree={tree}
+        item={itemDrawer?.item ?? null}
+        defaultParentId={itemDrawer?.parentId ?? null}
+        onClose={() => setItemDrawer(null)}
+        onSaved={() => {
+          setItemDrawer(null);
+          fetchTree();
+        }}
+      />
+
+      <BudgetMoveToModal
+        open={!!movingItem}
+        tree={tree}
+        item={movingItem}
+        onClose={() => setMovingItem(null)}
+        onMoved={() => {
+          setMovingItem(null);
+          fetchTree();
+        }}
+      />
+
+      <BudgetRecycleBinDrawer
+        open={recycleBinOpen}
+        enterpriseId={enterpriseId ?? ""}
+        onClose={() => setRecycleBinOpen(false)}
+        onRecovered={() => {
+          fetchTree();
+          refreshDeletedCount();
+        }}
       />
 
       <BudgetImportModal

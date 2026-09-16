@@ -235,6 +235,12 @@ public EditOverViewCardDTO updateOverview(@NonNull UUID id, EditOverViewCardDTO 
         if (dto.getIsTest() != null) {
             enterprise.setIsTest(dto.getIsTest());
         }
+        if (dto.getConstructionCompany() != null) {
+            enterprise.setConstructionCompany(dto.getConstructionCompany());
+        }
+        if (dto.getArchitect() != null) {
+            enterprise.setArchitect(dto.getArchitect());
+        }
 
         // Salvar a entidade atualizada
         Enterprise updatedEnterprise = Objects.requireNonNull(enterpriseRepository.save(enterprise), "saved enterprise");
@@ -252,6 +258,8 @@ public EditOverViewCardDTO updateOverview(@NonNull UUID id, EditOverViewCardDTO 
         dto.setStatus(enterprise.getStatus());
         dto.setSlug(enterprise.getSlug());
         dto.setIsTest(enterprise.getIsTest());
+        dto.setConstructionCompany(enterprise.getConstructionCompany());
+        dto.setArchitect(enterprise.getArchitect());
         return dto;
     }
 
@@ -309,12 +317,6 @@ public FinanceCardDTO updateFinance(@NonNull UUID id, FinanceCardDTO dto) {
     if (dto.getCurrency() != null) {
         enterprise.setCurrency(dto.getCurrency());
     }
-    if (dto.getConstructionCompany() != null) {
-        enterprise.setConstructionCompany(dto.getConstructionCompany());
-    }
-    if (dto.getArchitect() != null) {
-        enterprise.setArchitect(dto.getArchitect());
-    }
 
     // Salvar a entidade atualizada
     Enterprise updatedEnterprise = Objects.requireNonNull(enterpriseRepository.save(enterprise), "saved enterprise");
@@ -328,8 +330,6 @@ private FinanceCardDTO convertToFinanceCardDTO(Enterprise enterprise) {
     dto.setTotalInvestment(enterprise.getTotalInvestment());
     dto.setCurrentValue(enterprise.getCurrentValue());
     dto.setCurrency(enterprise.getCurrency());
-    dto.setConstructionCompany(enterprise.getConstructionCompany());
-    dto.setArchitect(enterprise.getArchitect());
     return dto;
 }
 

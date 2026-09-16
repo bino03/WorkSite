@@ -15,6 +15,4 @@ public class FinanceCardDTO {
         private BigDecimal totalInvestment;
         private BigDecimal currentValue;
         private String currency ;
-        private String constructionCompany;
-        private String architect;    
 }

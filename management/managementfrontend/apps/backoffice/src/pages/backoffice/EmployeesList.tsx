@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Table,
@@ -33,7 +34,7 @@ import type { SortOrder } from "antd/es/table/interface";
 import dayjs from "dayjs";
 import api from "@/api";
 import ProfileView from "@/components/profile/ProfileView";
-import MyProfileModal from "@/components/profile/MyProfileModal";
+import MyProfileDrawer from "@/components/profile/MyProfileDrawer";
 import type { Employee } from "@/services/profileService";
 import { markAccountDeleted } from "@/services/profileService";
 import type { AccountStatus } from "@/services/profileService";
@@ -162,6 +163,7 @@ function CopyableText({
 // component -------------------------------------------------------
 export default function EmployeesList() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const confirm = useConfirm();
   // filtros/estado de UI
   const [q, setQ] = useState("");
@@ -269,30 +271,35 @@ export default function EmployeesList() {
         dataIndex: "name",
         render: (_: unknown, record) => {
           const initials = initialsFromName(record.name);
+          const canNavigate = !record.me && record.status !== "deleted";
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Avatar
                 size={40}
-                src={record.photoUrl}
                 style={{
-                  backgroundColor: record.photoUrl ? 'transparent' : D.warmSand,
+                  backgroundColor: D.warmSand,
                   color: D.charcoalWarm,
                   border: `1px solid ${D.borderCream}`,
                   boxShadow: D.whisper,
                 }}
               >
-                {!record.photoUrl && initials}
+                {initials}
               </Avatar>
               <div>
-                <div style={{
-                  fontWeight: 600,
-                  color: D.nearBlack,
-                  fontSize: '14px'
-                }}>
+                <div
+                  onClick={canNavigate ? () => navigate(`/backoffice/funcionarios/${record.id}`) : undefined}
+                  style={{
+                    fontWeight: 600,
+                    color: D.nearBlack,
+                    fontSize: '14px',
+                    cursor: canNavigate ? 'pointer' : 'default',
+                  }}
+                  className={canNavigate ? 'hover:underline' : undefined}
+                >
                   {record.name}
                 </div>
-                <CopyableText 
-                  text={record.email} 
+                <CopyableText
+                  text={record.email}
                   className="text-gray-500 text-sm"
                 />
               </div>
@@ -671,9 +678,9 @@ export default function EmployeesList() {
         onClose={() => setInvitesDrawerOpen(false)}
       />
 
-      {/* A mesma modal que o avatar do header abre — o perfil próprio edita-se num sítio só. */}
+      {/* O mesmo drawer que o avatar do header abre — o perfil próprio edita-se num sítio só. */}
       {myProfileOpen && (
-        <MyProfileModal
+        <MyProfileDrawer
           onClose={() => setMyProfileOpen(false)}
           onProfileUpdated={() => {
             const controller = new AbortController();

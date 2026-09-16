@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSearchResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSaveResponseDTO;
@@ -79,6 +80,13 @@ public class ConstructionBudgetItemController {
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
     public ResponseEntity<BudgetItemNodeDTO> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(service.getNode(id));
+    }
+
+    /** A zona de recuperação: rubricas eliminadas (soft delete) desta obra, mais recente primeiro. */
+    @GetMapping("/enterprise/{enterpriseId}/deleted")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<BudgetItemDeletedDTO>> getDeleted(@PathVariable UUID enterpriseId) {
+        return ResponseEntity.ok(service.listDeleted(enterpriseId));
     }
 
     // ── escrita ───────────────────────────────────────────────
@@ -173,5 +181,18 @@ public class ConstructionBudgetItemController {
 
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Repõe uma rubrica eliminada (e a sub-árvore eliminada junto com ela). */
+    @PatchMapping("/items/{id}/recover")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BudgetItemNodeDTO> recover(@PathVariable UUID id, HttpServletRequest request) {
+        BudgetItemNodeDTO recovered = service.recover(id);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.BUDGET_ITEM, id, recovered.name(), null, request));
+
+        return ResponseEntity.ok(recovered);
     }
 }

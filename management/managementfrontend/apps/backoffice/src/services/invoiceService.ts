@@ -179,6 +179,7 @@ export async function listInvoices(
   if (filters.allocated !== null) params.set("allocated", String(filters.allocated));
   if (filters.needsReview !== null) params.set("needsReview", String(filters.needsReview));
   if (filters.outstanding !== null) params.set("outstanding", String(filters.outstanding));
+  if (filters.atChapter !== null) params.set("atChapter", String(filters.atChapter));
   if (filters.sentToAccountant !== null)
     params.set("sentToAccountant", String(filters.sentToAccountant));
   if (filters.from) params.set("from", filters.from);
