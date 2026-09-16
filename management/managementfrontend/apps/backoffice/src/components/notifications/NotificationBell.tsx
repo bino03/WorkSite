@@ -3,7 +3,7 @@ import type { FC } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge, Dropdown, Empty, Spin } from "antd";
-import { BellOutlined, CheckSquareOutlined, FileTextOutlined } from "@ant-design/icons";
+import { BellOutlined, CheckSquareOutlined, ClockCircleOutlined, FileTextOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import {
@@ -19,6 +19,7 @@ import type { AppNotification } from "@/types/notification";
 const iconFor = (type: string) => {
   if (type === "task_assigned") return <CheckSquareOutlined />;
   if (type === "invoice_pending") return <FileTextOutlined />;
+  if (type === "budget_item_deadline") return <ClockCircleOutlined />;
   return <BellOutlined />;
 };
 

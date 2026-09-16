@@ -21,6 +21,14 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     long countByRecipientIdAndReadAtIsNull(UUID recipientId);
 
     /**
+     * Já existe este aviso para este destinatário e esta entidade? É a única
+     * barreira contra repetições nos avisos gerados por jobs agendados — a
+     * tabela não tem unique index nisto de propósito (os gatilhos manuais
+     * podem legitimamente repetir um tipo para a mesma entidade).
+     */
+    boolean existsByRecipientIdAndTypeAndEntityId(UUID recipientId, String type, UUID entityId);
+
+    /**
      * Marca todas as por ler do destinatário. Em bloco e não uma a uma: o
      * "marcar todas como lidas" é o caso normal quando o sino tem 20 avisos.
      */

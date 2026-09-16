@@ -96,6 +96,17 @@ Tarefas standalone, isoladas no seu próprio schema — sem ligação a obra nen
 | **Backend** | `controller/EmployeesController` · `ProfileController` · `AdminAuthController` (envio de convites) · `AuthController` + `service/InviteService` (aceitação) · `service/employee/` · `ProfileService` · `service/email/` |
 | **Base de dados** | `worksite.profile` (`V3`) · `settings.pending_invites` + `email_providers` (`V7`) |
 
+## Notificações
+
+| Camada | Ficheiros |
+|---|---|
+| **Entrada** | o sino do cabeçalho — `components/notifications/NotificationBell.tsx` (`iconFor` escolhe o ícone por `type`; sem polling) |
+| **Frontend** | `services/notificationInboxService.ts` · `types/notification.ts` |
+| **Backend** | `notifications/controller/NotificationController` · `service/NotificationService` (escrita chamada pelos serviços de domínio, na mesma transação) · `service/BudgetItemDeadlineNotifier` (o gatilho por job) · `repository/NotificationRepository` · `model/Notification` (constantes `TYPE_*`) |
+| **Jobs agendados** | `enterprises/config/BudgetItemDeadlineNotifierConfig` (07:00 + arranque) — os outros dois jobs do projeto são `security/RevokedTokenCleanupConfig` (limpeza de tokens) e `enterprises/config/ConstructionBudgetItemPurgeConfig` (purga às 3h) |
+| **Base de dados** | `worksite.notification` — `V20` |
+| **Detalhe** | [[api.md]] → "Quem gera notificações" |
+
 ## Autenticação
 
 JWT do Supabase validado localmente, cookies HttpOnly. **Sem SDK do Supabase no frontend.**
@@ -131,6 +142,7 @@ começar a olhar.
 | o email de convite ou de recuperação não sai | falta um provedor predefinido **ativo** em *Definições → Provedores de email* — o erro é `EMAIL_002`/`EMAIL_003`, não `ERR_001` |
 | o link do email aponta para `localhost` | `APP_FRONTEND_URL` não está definido no ambiente — ver [[environment.md]] |
 | aceitar um convite dá erro | `InviteService#accept` — `USER_013` (desconhecido/usado/cancelado) ou `USER_012` (fora do prazo) |
+| o aviso de prazo de rubrica não aparece / aparece a dobrar | `BudgetItemDeadlineNotifier` — só `ITEM` vivas de obras não `completed/archived/deleted`, `end_date` em [hoje, hoje+N]; dedupe por `(recipient, type, entity)`, por isso adiar a data **não** reavisa |
 | recuperar a password não faz nada | `PasswordResetService` — o `204` do `forgot-password` é sempre igual, exista ou não a conta; confirmar no log se saiu email |
 | preciso de acrescentar um campo à fatura | migração → `ConstructionInvoice` → DTOs de `dto/invoice/` → `ConstructionInvoiceService` → `types/invoice.ts` → `InvoiceDetailDrawer` |
 

@@ -1,7 +1,7 @@
 /** Uma notificação in-app. O texto vem já escrito do backend — ver `V20__notification.sql`. */
 export interface AppNotification {
   id: string;
-  /** `task_assigned` | `invoice_pending`. Só serve para escolher o ícone. */
+  /** `task_assigned` | `invoice_pending` | `budget_item_deadline`. Só serve para escolher o ícone. */
   type: string;
   title: string;
   body: string | null;

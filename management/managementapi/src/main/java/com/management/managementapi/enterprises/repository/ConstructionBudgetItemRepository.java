@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,6 +88,32 @@ public interface ConstructionBudgetItemRepository extends JpaRepository<Construc
               and i.deletedAt is null
             """)
     int nextSortOrder(@Param("enterpriseId") UUID enterpriseId, @Param("parentId") UUID parentId);
+
+    /**
+     * Rubricas vivas cujo prazo termina na janela {@code [from, to]}, em obras
+     * ainda em curso. Só {@code ITEM}: títulos e notas podem ter datas herdadas
+     * do Excel, mas não são trabalho que se atrase. O {@code join fetch} traz
+     * a obra porque o aviso escreve o nome dela.
+     *
+     * O {@code rowKind} vai como parâmetro e não como literal: um literal de enum
+     * em JPQL sai como {@code 'ITEM'::BudgetRowKind}, e o tipo no Postgres
+     * chama-se {@code worksite.budget_row_kind}.
+     */
+    @Query("""
+            select i from ConstructionBudgetItem i
+            join fetch i.enterprise e
+            where i.rowKind = :rowKind
+              and i.deletedAt is null
+              and i.endDate between :from and :to
+              and e.status not in (
+                  com.management.managementapi.enterprises.model.enums.EnterPriseStatus.completed,
+                  com.management.managementapi.enterprises.model.enums.EnterPriseStatus.archived,
+                  com.management.managementapi.enterprises.model.enums.EnterPriseStatus.deleted)
+            order by i.endDate asc
+            """)
+    List<ConstructionBudgetItem> findActiveItemsEndingBetween(@Param("rowKind") BudgetRowKind rowKind,
+                                                              @Param("from") LocalDate from,
+                                                              @Param("to") LocalDate to);
 
     /**
      * Purga real (hard delete) das rubricas eliminadas há mais de 30 dias — a

@@ -801,6 +801,11 @@ confirmaria a existência a quem não devia sequer saber disso.
 |---|---|---|
 | `task_assigned` | `POST /tasks` e `PUT /tasks/{id}` | Os atribuídos, **menos** os que já estavam atribuídos antes e **menos** quem fez a atribuição |
 | `invoice_pending` | `POST /construction-invoices` (upload) | **Só quem carregou** |
+| `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` desbloqueados**, uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
+
+> O `budget_item_deadline` corre também no arranque porque a app não está ligada 24h por dia —
+> um cron às 7h numa app que só arranca às 9h nunca dispararia. O link é a página do orçamento da
+> obra (`/backoffice/empreendimentos/{id}/budget`), sem realçar a rubrica. Decisões de 2026-09-16.
 
 > ⚠️ Consequência conhecida do `invoice_pending`: alocar uma fatura a uma rubrica é
 > `hasRole('ADMIN')`, mas carregar é `ADMIN` **ou** `EMPLOYEE`. Quando um empregado carrega uma

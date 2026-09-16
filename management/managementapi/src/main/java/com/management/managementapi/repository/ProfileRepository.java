@@ -36,6 +36,11 @@ public interface ProfileRepository extends JpaRepository<Profile, UUID> {
 
     Long countByRole(ProfileRole role);
 
+    /** Só contas desbloqueadas — um admin bloqueado/eliminado não recebe avisos. */
+    @Query("select p.id from Profile p where p.role = :role and p.accountStatus = :status")
+    List<UUID> findIdsByRoleAndAccountStatus(@Param("role") ProfileRole role,
+                                             @Param("status") AccountStatus status);
+
     @Query("select p.name from Profile p where p.id = :id")
     Optional<String> findNameOnlyById(UUID id);
 

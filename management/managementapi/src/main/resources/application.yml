@@ -113,3 +113,8 @@ app:
     email-key: ${APP_EMAIL_CRYPTO_KEY:}
     # Opcional, só decifra — a rede durante uma rotação de chave. Ver docs/security.md.
     email-key-previous: ${APP_EMAIL_CRYPTO_KEY_PREVIOUS:}
+
+  notifications:
+    budget-item-deadline:
+      # Com quantos dias de antecedência os admins são avisados do fim de uma rubrica.
+      days-ahead: ${APP_BUDGET_DEADLINE_DAYS_AHEAD:7}

@@ -37,6 +37,9 @@ Notas que se pagam caro por não se saberem:
   ele o backend não arranca. Gerar com `openssl rand -base64 32`. Para rodar a chave existe o
   opcional `APP_EMAIL_CRYPTO_KEY_PREVIOUS` (só decifra, é a rede durante a troca) — procedimento
   em [[security]].
+- `APP_BUDGET_DEADLINE_DAYS_AHEAD` (opcional, default `7`): com quantos dias de antecedência o
+  job `BudgetItemDeadlineNotifierConfig` avisa os `ADMIN` do fim de uma rubrica de orçamento.
+  Ver [[api]] → "Quem gera notificações".
 
 ## Backoffice — `.env` em `management/managementfrontend/apps/backoffice/`
 

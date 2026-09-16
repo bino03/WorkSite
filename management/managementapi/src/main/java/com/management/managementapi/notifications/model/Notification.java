@@ -27,6 +27,9 @@ public class Notification extends BaseEntity {
     /** Fatura carregada e ainda por classificar numa rubrica. */
     public static final String TYPE_INVOICE_PENDING = "invoice_pending";
 
+    /** Rubrica de orçamento cujo prazo (`end_date`) está a chegar ao fim. */
+    public static final String TYPE_BUDGET_ITEM_DEADLINE = "budget_item_deadline";
+
     @Column(name = "recipient_id", nullable = false)
     private UUID recipientId;
 
