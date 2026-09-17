@@ -61,17 +61,16 @@ export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick,
     [enterpriseId]
   );
 
+  // Com o campo vazio pede-se na mesma: o backend devolve os capítulos, que é
+  // por onde se começa quando não se sabe o código. Sem isto o campo parecia
+  // avariado — nada por baixo até alguém escrever (2026-09-17).
   useEffect(() => {
     const text = query.trim();
-    if (!text) {
-      requestId.current++;
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-    const timer = window.setTimeout(() => void run(text), 250);
+    const timer = window.setTimeout(() => void run(text), text ? 250 : 0);
     return () => window.clearTimeout(timer);
   }, [query, run]);
+
+  const browsing = !query.trim();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "10.2px", minHeight: 0 }}>
@@ -86,10 +85,16 @@ export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick,
 
       <Spin spinning={loading}>
         <div style={{ maxHeight: 320, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-          {query.trim() && !loading && results.length === 0 && (
+          {browsing && !loading && results.length > 0 && (
+            <div style={{ fontSize: 11, opacity: 0.55, padding: "0 2px 2px" }}>
+              {t("invoices.classify.browseHint")}
+            </div>
+          )}
+
+          {!loading && results.length === 0 && (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("invoices.classify.searchEmpty")}
+              description={t(browsing ? "invoices.classify.noBudget" : "invoices.classify.searchEmpty")}
             />
           )}
 
@@ -155,6 +160,22 @@ export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick,
                       {t("invoices.classify.chapterTag")}
                     </span>
                   </Tooltip>
+                )}
+                {/* Abrir o capítulo é pesquisar pelo prefixo do código ("4."):
+                    o `startsWithCode` do backend põe as suas sub-rubricas à
+                    frente. Um `span` e não um `button`, porque já estamos dentro
+                    de um; o `stopPropagation` evita que abrir conte como escolher. */}
+                {item.chapter && item.code && (
+                  <span
+                    role="link"
+                    style={{ fontSize: 10, color: "var(--ind-color-accent)", cursor: "pointer" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQuery(`${item.code}.`);
+                    }}
+                  >
+                    {t("invoices.classify.drillDown")} ›
+                  </span>
                 )}
                 {item.overBudget && (
                   <span className="ind-tag ind-tag-outline" style={{ fontSize: 10 }}>

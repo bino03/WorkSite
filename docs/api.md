@@ -681,7 +681,10 @@ Dois níveis, o primeiro que existir ganha:
 
 Não há nível de **regras** declaradas (`supplier_rubric_rule`): ficaram de fora por decisão de
 2026-09-08 — o histórico já cobre os casos que interessam, as regras envelhecem, e no vault da
-Vilatro nunca existiram. A sugestão **nunca grava sozinha**.
+Vilatro nunca existiram. A sugestão **nunca grava sozinha**. O nome do fornecedor na `explanation` — e o
+`supplierName` de qualquer resposta de fatura — cai para o **catálogo** (`supplier` por NIF) quando a
+fatura não o tem (2026-09-17): só leitura, não grava nada na fatura; antes aparecia o NIF cru mesmo
+com a empresa registada ao lado.
 
 **Lote** — `POST /construction-invoices/batch-allocate` (`ADMIN`), corpo
 `{ invoiceIds: [], budgetItemId }` → `{ succeeded, failures: [{invoiceId, invoiceNumber,
@@ -693,7 +696,9 @@ fatura que outro separador entretanto classificou não faz perder as outras quat
 remaining, overBudget}]`. Aceita código (`4.2`) ou texto (`betão`); o `path` completo
 (`4. Estrutura › 4.2 Lajes › 4.2.1 Betão`) é o que distingue os três "Betão" de um orçamento
 real. Rubricas que não aceitam despesas não aparecem; `chapter: true` assinala que ainda tem
-sub-rubricas por baixo — classificar ao capítulo é legítimo, mas fica assinalado.
+sub-rubricas por baixo — classificar ao capítulo é legítimo, mas fica assinalado. **`q` vazio ou
+omitido devolve os capítulos** (2026-09-17) — é o estado inicial do campo de pesquisa do ecrã
+"Classificar", que antes ficava em branco até se escrever alguma coisa.
 
 ## Transferir faturas (`ConstructionInvoiceController`)
 

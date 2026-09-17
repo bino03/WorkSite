@@ -871,6 +871,27 @@ public class ConstructionInvoiceService {
                 .ifPresent(supplier -> invoice.setSupplierName(supplier.getName()));
     }
 
+    /**
+     * O nome a mostrar para o fornecedor: o da fatura e, se esta não o tiver, o
+     * do catálogo para o mesmo NIF. Só leitura — não grava nada na fatura.
+     *
+     * Existe porque nem todas as faturas passam por {@link #applyKnownSupplierName}
+     * (as que já existiam quando o NIF entrou no catálogo, notas de crédito,
+     * quarentena…), e ver "500000000" numa sugestão quando a empresa está
+     * registada ao lado é o que o utilizador apontou a 2026-09-17.
+     */
+    private String displaySupplierName(ConstructionInvoice invoice) {
+        if (!isBlank(invoice.getSupplierName())) {
+            return invoice.getSupplierName();
+        }
+        if (isBlank(invoice.getSupplierNif())) {
+            return null;
+        }
+        return supplierRepository.findByNif(invoice.getSupplierNif().trim())
+                .map(Supplier::getName)
+                .orElse(null);
+    }
+
     // ── leitura ───────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -1004,7 +1025,7 @@ public class ConstructionInvoiceService {
 
     private String historyProjectExplanation(ConstructionInvoice invoice, ConstructionBudgetItem item,
                                              ConstructionInvoiceRepository.SupplierRubricUse use) {
-        String supplier = firstNonBlank(invoice.getSupplierName(), invoice.getSupplierNif(), "este fornecedor");
+        String supplier = firstNonBlank(displaySupplierName(invoice), invoice.getSupplierNif(), "este fornecedor");
         String rubric = firstNonBlank(item.getCode(), item.getName());
         return use.getTotalUses() == use.getUses()
                 ? "Todas as faturas de %s nesta obra foram para %s.".formatted(supplier, rubric)
@@ -1014,7 +1035,7 @@ public class ConstructionInvoiceService {
 
     private String historyGlobalExplanation(ConstructionInvoice invoice, ConstructionBudgetItem item,
                                             ConstructionInvoiceRepository.SupplierRubricCodeUse use) {
-        String supplier = firstNonBlank(invoice.getSupplierName(), invoice.getSupplierNif(), "este fornecedor");
+        String supplier = firstNonBlank(displaySupplierName(invoice), invoice.getSupplierNif(), "este fornecedor");
         return "Primeira fatura de %s nesta obra. Em %s foi lançada em %s, e esta obra também tem essa rubrica."
                 .formatted(supplier, firstNonBlank(use.getEnterpriseName(), "outra obra"), item.getCode());
     }
@@ -1409,7 +1430,7 @@ public class ConstructionInvoiceService {
                 invoice.getDocumentStatus().name(),
                 invoice.getDescription(),
 
-                invoice.getSupplierName(),
+                displaySupplierName(invoice),
                 invoice.getSupplierNif(),
                 invoice.getInvoiceNumber(),
                 invoice.getInvoiceAtcud(),

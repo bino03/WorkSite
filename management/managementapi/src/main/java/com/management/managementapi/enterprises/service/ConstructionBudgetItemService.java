@@ -76,12 +76,23 @@ public class ConstructionBudgetItemService {
     @Transactional(readOnly = true)
     public List<BudgetItemSearchResultDTO> search(UUID enterpriseId, String query, int limit) {
         String needle = query == null ? "" : query.trim().toLowerCase();
+        List<BudgetItemNodeDTO> roots = getTree(enterpriseId).roots();
+
+        // Sem texto, a lista são os capítulos: é por onde se começa a procurar
+        // quando não se sabe o código, e um campo vazio sem nada por baixo
+        // parecia avariado (2026-09-17).
         if (needle.isEmpty()) {
-            return List.of();
+            List<BudgetItemSearchResultDTO> chapters = new ArrayList<>();
+            for (BudgetItemNodeDTO root : roots) {
+                if (root.acceptsExpenses()) {
+                    chapters.add(toSearchResult(root, label(root)));
+                }
+            }
+            return chapters.size() > limit ? chapters.subList(0, limit) : chapters;
         }
 
         List<BudgetItemSearchResultDTO> results = new ArrayList<>();
-        for (BudgetItemNodeDTO root : getTree(enterpriseId).roots()) {
+        for (BudgetItemNodeDTO root : roots) {
             collectMatches(root, "", needle, results);
         }
         // O código é uma resposta mais precisa do que o nome: quem escreve "4.2"
@@ -95,18 +106,25 @@ public class ConstructionBudgetItemService {
 
     private void collectMatches(BudgetItemNodeDTO node, String parentPath, String needle,
                                 List<BudgetItemSearchResultDTO> out) {
-        String label = node.code() == null ? node.name() : node.code() + " " + node.name();
-        String path = parentPath.isEmpty() ? label : parentPath + " › " + label;
+        String path = parentPath.isEmpty() ? label(node) : parentPath + " › " + label(node);
 
         if (node.acceptsExpenses() && matches(node, needle)) {
-            boolean chapter = node.children().stream().anyMatch(BudgetItemNodeDTO::acceptsExpenses);
-            out.add(new BudgetItemSearchResultDTO(
-                    node.id(), node.code(), node.name(), path, node.depth(), chapter,
-                    node.rolledUpBudget(), node.spentTotal(), node.remaining(), node.overBudget()));
+            out.add(toSearchResult(node, path));
         }
         // Continua a descer mesmo quando o pai não deu match: a sub-rubrica pode
         // dar, e é ela que interessa.
         node.children().forEach(child -> collectMatches(child, path, needle, out));
+    }
+
+    private static String label(BudgetItemNodeDTO node) {
+        return node.code() == null ? node.name() : node.code() + " " + node.name();
+    }
+
+    private static BudgetItemSearchResultDTO toSearchResult(BudgetItemNodeDTO node, String path) {
+        boolean chapter = node.children().stream().anyMatch(BudgetItemNodeDTO::acceptsExpenses);
+        return new BudgetItemSearchResultDTO(
+                node.id(), node.code(), node.name(), path, node.depth(), chapter,
+                node.rolledUpBudget(), node.spentTotal(), node.remaining(), node.overBudget());
     }
 
     private static boolean matches(BudgetItemNodeDTO node, String needle) {

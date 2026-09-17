@@ -111,7 +111,7 @@ public class ConstructionBudgetItemController {
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
     public ResponseEntity<List<BudgetItemSearchResultDTO>> search(
             @PathVariable UUID enterpriseId,
-            @RequestParam String q,
+            @RequestParam(required = false, defaultValue = "") String q,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(service.search(enterpriseId, q, limit));
     }
