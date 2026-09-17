@@ -635,18 +635,32 @@ public class ConstructionBudgetItemService {
         return hints;
     }
 
-    /** Reatribui posições consecutivas aos irmãos depois de uma inserção no meio. */
+    /**
+     * Reatribui posições consecutivas aos irmãos depois de um movimento.
+     *
+     * {@code targetOrder} é a <b>posição final</b> que a rubrica movida deve
+     * ocupar entre os irmãos vivos (0 = primeira): tiram-se-a da lista, e volta
+     * a entrar nesse índice. Era um desempate "o movido fica à frente do que
+     * tiver o mesmo sortOrder", e isso fazia o "Descer" não mexer: descer um
+     * lugar pedia o sortOrder do irmão de baixo, empatava com ele, e o movido
+     * ficava outra vez à frente (2026-09-17).
+     */
     private void resequenceSiblings(UUID enterpriseId, UUID parentId, UUID movedId, int targetOrder) {
         List<ConstructionBudgetItem> siblings = new ArrayList<>(
                 parentId == null
                         ? repository.findTreeByEnterpriseId(enterpriseId).stream()
-                                .filter(i -> i.getParent() == null).toList()
+                                .filter(i -> i.getParent() == null && !i.isDeleted()).toList()
                         : repository.findByParentIdOrderBySortOrderAsc(parentId));
 
-        siblings.sort(Comparator
-                .comparingInt((ConstructionBudgetItem i) -> i.getSortOrder() == null ? 0 : i.getSortOrder())
-                // em caso de empate, o que acabou de ser movido fica à frente
-                .thenComparing(i -> i.getId().equals(movedId) ? 0 : 1));
+        ConstructionBudgetItem moved = siblings.stream()
+                .filter(i -> i.getId().equals(movedId))
+                .findFirst()
+                .orElse(null);
+        siblings.removeIf(i -> i.getId().equals(movedId));
+        siblings.sort(Comparator.comparingInt(i -> i.getSortOrder() == null ? 0 : i.getSortOrder()));
+        if (moved != null) {
+            siblings.add(Math.max(0, Math.min(targetOrder, siblings.size())), moved);
+        }
 
         int order = 0;
         for (ConstructionBudgetItem sibling : siblings) {

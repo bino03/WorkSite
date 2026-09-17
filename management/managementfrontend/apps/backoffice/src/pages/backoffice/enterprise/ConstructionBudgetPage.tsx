@@ -130,7 +130,10 @@ const ConstructionBudgetPage: FC = () => {
     if (targetIndex < 0 || targetIndex >= siblings.length) return;
 
     try {
-      await moveBudgetItem(row.id, row.parentId, siblings[targetIndex].sortOrder);
+      // O backend lê `sortOrder` como a posição final entre os irmãos, por isso
+      // vai o índice — o sortOrder do vizinho só coincide quando já está tudo
+      // consecutivo.
+      await moveBudgetItem(row.id, row.parentId, targetIndex);
       fetchTree();
     } catch (error) {
       ErrorHandler.handle(error);

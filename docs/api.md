@@ -168,7 +168,7 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | GET | `/construction-budget/items/{id}` | `ADMIN` ou `EMPLOYEE` — um nó e a sua sub-árvore |
 | POST | `/construction-budget/items` | `ADMIN` |
 | PUT | `/construction-budget/items/{id}` | `ADMIN` |
-| PATCH | `/construction-budget/items/{id}/move?parentId=&sortOrder=` | `ADMIN` — reordenar / mudar de rubrica-mãe |
+| PATCH | `/construction-budget/items/{id}/move?parentId=&sortOrder=` | `ADMIN` — reordenar / mudar de rubrica-mãe. `sortOrder` é a **posição final** entre os irmãos vivos (0 = primeira; omitido = último) — desde 2026-09-17, antes era "antes de quem tiver esse sortOrder" e o "Descer" não mexia |
 | DELETE | `/construction-budget/items/{id}` | `ADMIN` — soft delete da sub-árvore (ver abaixo) |
 | GET | `/construction-budget/enterprise/{enterpriseId}/deleted` | `ADMIN` — a zona de recuperação |
 | PATCH | `/construction-budget/items/{id}/recover` | `ADMIN` — repõe a rubrica e a sub-árvore eliminada junto |
