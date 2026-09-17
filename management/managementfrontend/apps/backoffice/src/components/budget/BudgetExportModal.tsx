@@ -131,6 +131,7 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
     <Modal
       open={open}
       onCancel={onClose}
+      centered
       width={620}
       title="Exportar para Excel"
       footer={
