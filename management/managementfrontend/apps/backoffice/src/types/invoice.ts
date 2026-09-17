@@ -517,3 +517,80 @@ export interface InvoiceFilters {
   page: number;
   size: number;
 }
+
+/* ========= Importação da folha "Despesas" do Excel (fase 6) ========= */
+
+/** Um erro que impede a importação, preso à linha do Excel (1-based; 0 = a folha toda). */
+export interface ExpensesImportIssue {
+  excelRow: number;
+  message: string;
+}
+
+export type ExpensesImportQuestionKind = "CREDIT_NOTE_ORIGIN" | "AGGREGATE_PAYMENT";
+
+export interface ExpensesImportQuestion {
+  /** Estável entre o dryRun e a gravação — deriva da linha do Excel. */
+  id: string;
+  kind: ExpensesImportQuestionKind;
+  text: string;
+  excelRows: number[];
+  options: { value: string; label: string }[];
+}
+
+export interface ExpensesImportLine {
+  excelRow: number;
+  rubricCode: string | null;
+  rubricLabel: string | null;
+  amount: number | null;
+}
+
+/** Uma fatura tal como foi lida, já com as linhas do mesmo nº juntas. */
+export interface ExpensesImportInvoice {
+  key: string;
+  excelRows: number[];
+  invoiceNumber: string | null;
+  documentStatus: InvoiceDocumentStatus | null;
+  invoiceDate: string | null;
+  description: string | null;
+  totalAmount: number | null;
+  creditNote: boolean;
+  creditNoteOrigin: string | null;
+  manualExpense: boolean;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod | null;
+  paidOn: string | null;
+  paidAmount: number | null;
+  paymentReference: string | null;
+  sentToAccountant: boolean;
+  notes: string | null;
+  supplierName: string | null;
+  supplierNif: string | null;
+  duplicate: boolean;
+  lines: ExpensesImportLine[];
+}
+
+export interface ExpensesImportResult {
+  dryRun: boolean;
+  scope: InvoiceScope;
+  sheetName: string;
+  rowCount: number;
+  invoiceCount: number;
+  creditNoteCount: number;
+  manualExpenseCount: number;
+  paidCount: number;
+  partiallyPaidCount: number;
+  unpaidCount: number;
+  parsedTotal: number;
+  sheetTotal: number | null;
+  totalDifference: number | null;
+  errors: ExpensesImportIssue[];
+  /** Frases já em português, prontas a mostrar — não são códigos. */
+  warnings: string[];
+  questions: ExpensesImportQuestion[];
+  invoices: ExpensesImportInvoice[];
+}
+
+export interface ExpensesImportAnswer {
+  questionId: string;
+  value: string;
+}

@@ -57,13 +57,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BudgetExcelImportService {
 
-    private static final int COL_CODE = 0;   // A "Art"
-    private static final int COL_NAME = 1;   // B "Descrição"
-    private static final int COL_UNIT = 2;   // C "Un."
-    private static final int COL_QTY = 3;    // D "Quant"
-    private static final int COL_UNIT_PRICE = 4; // E "Preço Un"
-    private static final int COL_TOTAL = 5;  // F "Preço total"
-    private static final int COL_OBS = 6;    // G "Obs."
+    /**
+     * As colunas resolvem-se pelo nome do cabeçalho (o vault já mudou a ordem
+     * uma vez, e a "Orçamento inicial" do {@code Despesas - <Obra>.xlsx} tem só
+     * {@code Rubrica | Descrição | Preço total}). Sem cabeçalho reconhecível numa
+     * coluna, vale a posição do orçamento do empreiteiro:
+     * {@code Art | Descrição | Un. | Quant | Preço Un | Preço total | Obs.}.
+     */
+    private record Columns(int code, int name, int unit, int quantity, int unitPrice, int total, int observations) {
+        static final Columns DEFAULT = new Columns(0, 1, 2, 3, 4, 5, 6);
+    }
 
     private static final int MAX_HEADER_SCAN_ROWS = 60;
 
@@ -131,7 +134,7 @@ public class BudgetExcelImportService {
                 throw new BusinessException(ErrorCode.BUDGET_IMPORT_NO_HEADER);
             }
 
-            buildTree(sheet, headerRow, result);
+            buildTree(sheet, headerRow, resolveColumns(sheet.getRow(headerRow)), result);
 
             if (result.roots.isEmpty()) {
                 throw new BusinessException(ErrorCode.BUDGET_IMPORT_NO_ROWS);
@@ -156,7 +159,7 @@ public class BudgetExcelImportService {
         for (int r = sheet.getFirstRowNum(); r <= limit; r++) {
             Row row = sheet.getRow(r);
             if (row == null) continue;
-            String a = text(row, COL_CODE);
+            String a = text(row, Columns.DEFAULT.code());
             if (a == null) continue;
             String header = a.trim().toLowerCase();
             if (header.startsWith("art") || header.equals("rubrica")) {
@@ -166,7 +169,34 @@ public class BudgetExcelImportService {
         return -1;
     }
 
-    private void buildTree(Sheet sheet, int headerRow, ParseResult result) {
+    /** Cada coluna pelo nome que tiver na linha de cabeçalho; as que não aparecem ficam na posição por omissão. */
+    private static Columns resolveColumns(Row header) {
+        Map<String, Integer> byName = new HashMap<>();
+        for (Cell cell : header) {
+            if (cell.getCellType() != CellType.STRING) continue;
+            String name = cell.getStringCellValue().trim().toLowerCase().replaceAll("[.\\s]+$", "");
+            byName.putIfAbsent(name, cell.getColumnIndex());
+        }
+        Columns d = Columns.DEFAULT;
+        return new Columns(
+                first(byName, d.code(), "art", "rubrica"),
+                first(byName, d.name(), "descrição", "descricao"),
+                first(byName, d.unit(), "un", "unidade"),
+                first(byName, d.quantity(), "quant", "quantidade", "qtd"),
+                first(byName, d.unitPrice(), "preço un", "preco un", "preço unitário", "preco unitario"),
+                first(byName, d.total(), "preço total", "preco total", "total"),
+                first(byName, d.observations(), "obs", "observações", "observacoes"));
+    }
+
+    private static int first(Map<String, Integer> byName, int fallback, String... names) {
+        for (String name : names) {
+            Integer col = byName.get(name);
+            if (col != null) return col;
+        }
+        return fallback;
+    }
+
+    private void buildTree(Sheet sheet, int headerRow, Columns cols, ParseResult result) {
         Map<String, Draft> byCode = new HashMap<>();
         Draft currentChapter = null;
         Draft currentHeading = null;
@@ -177,18 +207,18 @@ public class BudgetExcelImportService {
             if (row == null) continue;
 
             int excelRow = r + 1; // POI é 0-based, o Excel mostra 1-based
-            String rawCode = text(row, COL_CODE);
-            String name = text(row, COL_NAME);
+            String rawCode = text(row, cols.code());
+            String name = text(row, cols.name());
 
             // a linha "TOTAL" fecha a tabela — abaixo dela só há notas do orçamento
             if (isTotalRow(rawCode, name)) {
-                result.excelTotal = number(row, COL_TOTAL, 2, result, excelRow, "Preço total");
+                result.excelTotal = number(row, cols.total(), 2, result, excelRow, "Preço total");
                 break;
             }
 
-            BigDecimal quantity = number(row, COL_QTY, 3, result, excelRow, "Quant");
-            BigDecimal unitPrice = number(row, COL_UNIT_PRICE, 2, result, excelRow, "Preço Un");
-            BigDecimal totalPrice = number(row, COL_TOTAL, 2, result, excelRow, "Preço total");
+            BigDecimal quantity = number(row, cols.quantity(), 3, result, excelRow, "Quant");
+            BigDecimal unitPrice = number(row, cols.unitPrice(), 2, result, excelRow, "Preço Un");
+            BigDecimal totalPrice = number(row, cols.total(), 2, result, excelRow, "Preço total");
 
             String code = normalizeCode(rawCode);
 
@@ -213,11 +243,11 @@ public class BudgetExcelImportService {
             Draft draft = new Draft();
             draft.excelRow = excelRow;
             draft.name = name;
-            draft.unit = normalizeUnit(text(row, COL_UNIT));
+            draft.unit = normalizeUnit(text(row, cols.unit()));
             draft.quantity = quantity;
             draft.unitPrice = unitPrice;
             draft.totalPrice = totalPrice;
-            draft.observations = text(row, COL_OBS);
+            draft.observations = text(row, cols.observations());
 
             if (code != null && byCode.containsKey(code)) {
                 result.warnings.add("Linha " + excelRow + ": índice \"" + code + "\" repetido (já usado na linha "

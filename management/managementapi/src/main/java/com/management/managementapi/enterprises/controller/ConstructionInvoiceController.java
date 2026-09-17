@@ -2,6 +2,9 @@ package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.ExpensesImportAnswersDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportResultDTO;
+import com.management.managementapi.enterprises.service.DespesasExcelImportService;
 import com.management.managementapi.enterprises.dto.invoice.request.BatchAllocateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
@@ -65,6 +68,7 @@ import java.util.UUID;
 public class ConstructionInvoiceController {
 
     private final ConstructionInvoiceService service;
+    private final DespesasExcelImportService importService;
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
 
@@ -128,6 +132,40 @@ public class ConstructionInvoiceController {
                         invoiceLabel(created), request));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    /**
+     * Importa a folha "Despesas" do Excel do vault da Vilatro (fase 6,
+     * docs/excel-parity.md §9) — só para uma obra ({@code scope=PROJECT} +
+     * {@code enterpriseId}) ou para as despesas da empresa ({@code COMPANY}).
+     *
+     * Por omissão corre em {@code dryRun}: devolve as faturas, os erros por
+     * corrigir no Excel e as perguntas que só a pessoa sabe responder, sem gravar
+     * nada. Com {@code dryRun=false} grava — e exige zero erros, todas as
+     * perguntas respondidas na parte {@code answers} (JSON), e os totais a bater
+     * certo; qualquer falha anula tudo.
+     */
+    @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ExpensesImportResultDTO> importExcel(
+            @RequestParam String scope,
+            @RequestParam(required = false) UUID enterpriseId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(defaultValue = "true") boolean dryRun,
+            @RequestPart(value = "answers", required = false) @Valid ExpensesImportAnswersDTO answers,
+            HttpServletRequest request) {
+
+        ExpensesImportResultDTO result = importService.importExpenses(scope, enterpriseId, file, dryRun, answers);
+
+        if (!dryRun) {
+            authContext.currentProfileId().ifPresent(uid ->
+                    activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
+                            EntityType.CONSTRUCTION_INVOICE, enterpriseId,
+                            "Importação da folha \"Despesas\" (" + result.invoiceCount() + " faturas, "
+                                    + result.creditNoteCount() + " notas de crédito)", request));
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     /**

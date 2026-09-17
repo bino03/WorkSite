@@ -34,7 +34,9 @@ Os dois têm de continuar a poder trocar dados **sem conversão à mão**. É is
   limpo dos caracteres que o Windows recusa (`\ / : * ? " < > |` → `-`), com sufixo ` 2`, ` 3`… se
   já houver outra obra com esse slug; fica gravado na obra e o resumo da exportação di-lo. Um ficheiro
   exportado sem slug não teria pasta onde viver no vault.
-- `enterprises.is_test = true` (hoje: "Vila Sol") **nunca** entra numa importação ou soma da empresa.
+- `enterprises.is_test = true` (hoje: "Vila Teste Claude"; a "Vila Sol" foi apagada a 2026-09-17, com as
+  20 faturas de desenvolvimento que tinha — eram os números reais do Petrus e bloqueavam a migração)
+  **nunca** entra numa importação ou soma da empresa.
   **Exceção (2026-09-17)**: a exportação app → Excel aceita uma obra de teste, porque é a única
   forma de testar o exportador no browser sem tocar numa obra real — o ficheiro sai com o prefixo
   `TESTE - ` no nome e o resumo avisa que não deve entrar no vault.
@@ -57,6 +59,13 @@ A folha `Despesas` de cada obra é uma tabela Excel chamada `TabelaDespesas`, co
 | `Bizdocs`          | `sent_to_accountant`                                                      | `x`/`X` → `true`; vazio → `false`. Na exportação escreve-se `X`                                                                                                                                   |
 | `Observações`      | `notes`                                                                   | texto. A prova de pagamento que hoje vive aqui ("Pago por transferência em 28-08-2026 (extrato ABANCA)") vai para `payment.reference` quando for possível separar; caso contrário fica em `notes` |
 | `Rubrica`          | `construction_expense.budget_item_id` via `construction_budget_item.code` | ver §6                                                                                                                                                                                            |
+
+> **O que os ficheiros reais têm, a 2026-09-17** (lido ao escrever o importador): o cabeçalho
+> `Metodo Pagamento` tem uma **quebra de linha** (`Metodo\nPagamento`) nas três obras — mapear depois de
+> normalizar `\s+`→espaço, como os scripts do vault; o Vila Aleu escreve **`IMPRIMIR`** além de "Imprimir
+> fatura"; o Petrus usa **`-`** no nº para "não tem"; `Liquidada` tem `x`, `X` e `Sim` (o Villa Atrium tem
+> os três); `Metodo Pagamento` tem `Transferencia` e `pagamento MB` sem acento/caixa. O importador aceita
+> tudo isto (sem acentos, sem caixa) — ver §9.
 
 ### 3.1 O que falta no Excel para a migração ser limpa
 
@@ -99,6 +108,8 @@ rubricas".
 | `Transferência` | `TRANSFERENCIA` |
 | outro texto | `OUTRO` + o texto em `payment.notes` |
 
+(comparação sem acentos nem caixa: `Transferencia`, `pagamento MB` e `TPA` existem nos ficheiros reais.)
+
 - `Liquidada` preenchida sem método → `payment.method = OUTRO`, com aviso na migração.
 - Data do pagamento: o Excel não a tem em coluna; se `Observações` disser "Pago … em dd-mm-aaaa" usa-se
   essa, senão `paid_on = invoice_date` **com aviso**. Na exportação, a data do pagamento vai para `Observações`
@@ -112,13 +123,12 @@ rubricas".
 - `Liquidada` só se marca com prova (decisão 22). A app honra isto pedindo data + método + referência,
   e registando `registered_by`. **Não** exige ficheiro de prova — o Excel também não.
 
-> **Estado a 2026-09-07** (fase 2 feita — `V31`): `payment` + `invoice_payment` existem, com o
+> **Estado a 2026-09-17** (fases 2 e 6 feitas): `payment` + `invoice_payment` existem, com o
 > estado da fatura (`UNPAID`/`PARTIAL`/`PAID`) **derivado**; endpoints de marcar / agregado /
 > anular (`PaymentController`, tudo `ADMIN`); o agregado recusa faturas de obras diferentes e,
-> quando o valor não bate por baixo, devolve as que ficam de fora sem gravar nada. **Ainda não
-> implementado**: a interpretação da coluna `Metodo Pagamento` e da data em `Observações` na
-> importação, e a **geração** da observação `Pago por … junto com …` na exportação — isso é a
-> fase 6 (`DespesasExcelImportService` / exportador). A verificação no browser desta fase está
+> quando o valor não bate por baixo, devolve as que ficam de fora sem gravar nada. A interpretação
+> da coluna `Metodo Pagamento` e da data em `Observações` na importação, e a **geração** da
+> observação `Pago por … junto com …` na exportação, são a fase 6 — feitas (§9). A verificação no browser desta fase está
 > em [[verificacao-browser-pendente]] §1c, a fazer na passagem única do fim da linha.
 
 ## 5. Unicidade e duplicados
@@ -162,7 +172,11 @@ iguais letra a letra.
 
 > **Cabeçalho da folha "Orçamento inicial" (2026-09-17)**: no vault a coluna A chama-se **`Rubrica`**
 > (é o que o `gerar-orcamento-vs-gasto.ps1` procura), não `Art` como no orçamento do empreiteiro. O
-> `BudgetExcelImportService` aceita as duas; a exportação escreve `Rubrica`, com as 7 colunas
+> `BudgetExcelImportService` aceita as duas. **A "Orçamento inicial" real do vault tem só 3 colunas**
+> (`Rubrica | Descrição | Preço total`) — descoberto ao migrar o Vila Petrus a 2026-09-17, quando o
+> importador leu o total na coluna F e entrou tudo a zero; desde então **resolve as colunas pelo
+> cabeçalho** (`Art`/`Rubrica`, `Descrição`, `Un.`, `Quant`, `Preço Un`, `Preço total`, `Obs.`), com a
+> posição do orçamento do empreiteiro como fallback (`BudgetImportVaultLayoutTest`). A exportação escreve `Rubrica`, com as 7 colunas
 > (`Rubrica | Descrição | Un. | Quant | Preço Un | Preço total | Obs.`) e a linha `TOTAL` na coluna B —
 > um só formato que os dois lados leem. `rowKind` não tem coluna: na reimportação, sub-títulos e notas
 > voltam a ser classificados pela heurística do importador (sem índice e sem números → sub-título;
@@ -266,27 +280,73 @@ cópias em conflito; não há `.xlsx` a proteger).
 
 ### Excel → app (`DespesasExcelImportService`, fase 6)
 
-Entrada: a pasta de uma obra do vault (`Despesas - <Obra>.xlsx` + `Faturas\Lançadas\**`). Ou só o `.xlsx`.
+> ✅ **Feito a 2026-09-17** (`POST /construction-invoices/import-excel`, ver [[api.md]] → "Importar a
+> folha "Despesas" do Excel"). O que segue é o contrato **como ficou implementado**. Ficam de fora desta
+> implementação — para a ronda seguinte — o passo 7 (documentos de `Faturas\Lançadas\`) e a quarentena
+> (`Faturas por identificar.xlsx`, que tem outra tabela, `TabelaPorIdentificar`).
 
-1. Resolver a obra por `slug`; recusar `is_test`.
-2. Ler `TabelaDespesas` por nome de cabeçalho. Ignorar a linha de totais e linhas totalmente vazias.
-3. Agrupar por `Nº Fatura` (§3.3). Linhas sem nº ficam uma-a-uma.
-4. Por grupo: criar `construction_invoice` (`scope = PROJECT`), com `document_status` conforme §3.
-5. Se `Rubrica` preenchida: resolver `code` (§6) → `construction_expense` por linha. Se não existir na árvore: erro listado.
-6. Se `Liquidada`: criar `payment` (§4). Agregar por observação idêntica → perguntar.
-7. Ficheiros: procurar em `Faturas\Lançadas\` por `<NºFatura sanitizado>` no nome; anexar como documentos.
-   `uploaded_at` = data da importação, **aproximada** — desde 10-09-2026 a data real não existe no arquivo
-   (ver o aviso em §7). Ficheiros sem correspondência: listados, não anexados.
-8. `dryRun` (como o importador do orçamento): relatório com contagens, somas, erros — **nada gravado**.
-9. Verificação obrigatória no fim: **nº de faturas = nº de grupos**, **Σ `total_amount` = total da folha**
-   (a linha de totais), nº por liquidar igual nos dois lados.
+Entrada: **só o `.xlsx`** (`Despesas - <Obra>.xlsx` ou `Despesas da empresa.xlsx`), por upload; a obra vem
+no pedido (`scope=PROJECT&enterpriseId=`), não do nome do ficheiro.
 
-Depois, os mesmos passos para `Faturas por identificar.xlsx` (→ `UNIDENTIFIED`, com `Empreendimento`
-preenchido → transferência para essa obra) e para `Despesas da empresa\Despesas da empresa.xlsx` (desde
-16-09-2026 tem a mesma `TabelaDespesas` de uma obra, **sem coluna `Rubrica`** — mapear direto para
-`scope = COMPANY`, sem passo 5; passos 6-9 iguais. Ficheiros em `Despesas da empresa\Faturas\Lançadas\`,
-mesma mecânica do passo 7. Antes de 16-09-2026 só havia a nota `.md`; documentos anteriores a essa data
-podem ainda estar só descritos em prosa lá — não assumir que a tabela é exaustiva para o histórico).
+1. Obra do pedido. Uma obra `is_test` **grava** só a partir de um ficheiro `TESTE - …` — o que o exportador
+   gera para obras de teste — senão recusa (`INVOICE_045`); em `dryRun` lê sempre.
+2. Só a folha **`Despesas`**, pelo nome (o livro tem 4 folhas, e o do Villa Atrium tem ainda a
+   `Prumo Determinante LDA`). Colunas pelo cabeçalho normalizado (`\s+`→espaço, sem acentos, sem caixa —
+   o `Metodo\nPagamento` real, com quebra de linha, passa; `Rubrica`/`Fornecedor`/`NIF` opcionais). A linha
+   de totais é a da `TabelaDespesas` (ou a primeira com `TOTAL` no nº); linhas vazias saltam; uma linha
+   só com descrição e observação (ex. "preencher após o reembolso") salta **com aviso**.
+3. Agrupar por `Nº Fatura` normalizado (só letras e dígitos, maiúsculas — a mesma regra do
+   `rejectIfDuplicate`). `Imprimir…`/`IMPRIMIR` → `TO_PRINT`, `Pedir…` → `TO_REQUEST`, vazio ou **`-`** (é
+   como o Petrus marca "sem nº") → `MISSING`. Linhas sem nº só se juntam quando **contíguas e iguais** em
+   tudo menos rubrica e valor (é o que o exportador escreve para uma fatura repartida ainda sem nº).
+   Dentro de um grupo, datas diferentes avisam; `Liquidada` diferente é erro; sinais misturados é erro.
+4. Por grupo: `construction_invoice` (`scope` do pedido), `total_amount` = Σ linhas (sem nenhum valor →
+   total nulo, "por rever"); `Bizdocs` (`x`/`X`) → `sent_to_accountant`; `Fornecedor`/`NIF` se existirem.
+   **Nº que já existe na app → erro** (decisão 18: o nº é único no vault todo; sem NIF é o único cheque
+   possível). As faturas de obras `is_test` **não contam** — são cópias dos números reais.
+5. `Rubrica` `<Art> — …` → índice (até ao primeiro espaço ou ` — `, sem ponto final) → rubrica viva da obra
+   → `construction_expense` por linha (`POST …/split`, a mesma rubrica repetida soma-se). Inexistente,
+   ou capítulo/sub-título/nota → **erro listado, nunca se cria**. Um grupo com rubrica numa linha e sem
+   noutra → erro. Rubrica em `scope = COMPANY` → erro.
+6. Pagamento (§4): `Liquidada` = `x`/`X`/`Sim` manda; método pela coluna, sem acentos nem caixa
+   (`Transferencia`, `pagamento MB`, `TPA` passam), texto desconhecido → `OUTRO` com o original nas notas
+   do pagamento e aviso; liquidada sem método → `OUTRO` com aviso. **As frases que o exportador gera são
+   lidas de volta** — `Pago por <m> em dd-mm-aaaa (ref)`, `Pago parcialmente <v> por <m> em … (ref)`
+   (→ pagamento parcial mesmo com `Liquidada` vazia), `Pago por <m> em …, <v> junto com <nºs> (ref)`
+   (→ um só `payment` para o conjunto, sem perguntar), `Nota de crédito da fatura <nº>`. Texto da Vilatro
+   com "Pago … em dd-mm-aaaa" dá a data (e a referência entre parêntesis no fim) e fica inteiro em `notes`;
+   sem data → `paid_on = invoice_date` com aviso; sem nenhuma → erro. Faturas pagas com a **mesma
+   observação com data** → **pergunta** `AGGREGATE_PAYMENT` (um movimento / um por fatura).
+   Linha negativa = **nota de crédito** (§3.2): origem pela frase acima, ou por nº igual no ficheiro/na
+   app; senão **pergunta** `CREDIT_NOTE_ORIGIN` (fatura do ficheiro, fatura já na app, ou não importar).
+   **Uma fatura que uma NC do ficheiro anula por inteiro entra sem pagamento**, mesmo "Liquidada", com
+   aviso — o líquido é zero e a app recusa pagá-la (`INVOICE_019`); no vault ela foi paga no lote e a
+   NC abatida no lote (Villa Atrium, `FT FA.A/31025`; Vila Petrus, o Manitou da Civica). Consequência:
+   um lote com NC abatida fica na app com o valor **bruto** das faturas (Atrium: 17 241,36 € em vez de
+   16 942,47 €), porque a NC reduz a fatura de origem, não o movimento.
+   A linha "Despesa registada à mão na app, sem fatura." volta a ser uma despesa solta (exige rubrica e data).
+7. ~~Ficheiros de `Faturas\Lançadas\`~~ — **por fazer** (ronda seguinte). Quando entrar: `uploaded_at` =
+   data da importação, **aproximada** — desde 10-09-2026 a data real não existe no arquivo (aviso em §7).
+8. `dryRun` (por omissão): relatório com contagens, somas, **erros por linha do Excel**, avisos, perguntas e
+   a pré-visualização fatura a fatura — **nada gravado**. As respostas às perguntas vão no 2.º pedido
+   (`answers[{questionId, value}]`, ids estáveis por linha).
+9. Verificação: **Σ linhas = linha de totais** da folha acima de 1 cêntimo → **erro que bloqueia** (ao
+   contrário do orçamento, onde só avisa). Ao gravar (tudo numa transação: registar → repartir → NC →
+   pagamentos), confere-se contra a base de dados **nº de faturas gravadas = nº de grupos**,
+   **Σ `total_amount` = Σ da folha**, **nº de liquidadas igual** — diferença → `INVOICE_046`, rollback.
+
+Round-trip: a "Despesas" exportada volta a entrar sem erros, sem perguntas e com os mesmos números —
+**é teste automático** (`DespesasExcelImportRoundTripTest`: fatura repartida, NC ligada, parcial, agregado,
+"Imprimir fatura", despesa à mão). O Excel real do Vila Petrus também (`DespesasExcelImportServiceTest`,
+cópia em `src/test/resources/excel-parity/`). O que **não** sobrevive ao round-trip: `payment.notes`
+(volta como `invoice.notes`); uma fatura repartida sem nº só se reconstitui se as linhas ficarem contíguas.
+
+`Despesas da empresa\Despesas da empresa.xlsx` (desde 16-09-2026 tem a mesma `TabelaDespesas` de uma
+obra, **sem coluna `Rubrica`**) entra pelo mesmo endpoint com `scope = COMPANY`, sem passo 5. Antes de
+16-09-2026 só havia a nota `.md`; documentos anteriores a essa data podem ainda estar só descritos em
+prosa lá — não assumir que a tabela é exaustiva para o histórico. `Faturas por identificar.xlsx`
+(→ `UNIDENTIFIED`, com `Empreendimento` preenchido → transferência para essa obra) **fica para outra ronda**
+(`INVOICE_047`).
 
 ### App → Excel (exportação, fase 6)
 
@@ -346,8 +406,8 @@ nota); para a "Despesas" fica para quando o `DespesasExcelImportService` existir
   Excel tiver de mudar por causa disso → escrever a decisão em `Vilatro/Decisões.md` e o pedido em
   `Vilatro/Início.md` → "Por fazer".
 - Os dois `CLAUDE.md` apontam para aqui (secção "Projeto irmão"). Nenhum deles repete o conteúdo.
-- O hook `.githooks/pre-commit` deste repo já avisa em migrações; quando a fase 6 existir, acrescentar
-  aviso para `DespesasExcelImportService`/exportador → rever este ficheiro.
+- O hook `.githooks/pre-commit` deste repo avisa em migrações e, desde 2026-09-17, quando
+  `DespesasExcelImportService` ou `BudgetExcelExportService` mudam → rever este ficheiro.
 
 ## Relacionado
 

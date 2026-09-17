@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FC } from "react";
-import { Button, Input } from "antd";
-import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Input, Space } from "antd";
+import { PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
 
 import {
   deleteInvoice,
@@ -19,6 +19,7 @@ import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
+import { ExpensesImportModal } from "@/components/invoices/ExpensesImportModal";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
@@ -62,6 +63,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
   const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
 
@@ -172,9 +174,17 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
           <h1 style={{ margin: 0 }}>{title}</h1>
         </div>
         {isAdmin() && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
-            Registar sem ficheiro
-          </Button>
+          <Space>
+            {/* A quarentena tem outra tabela no vault (TabelaPorIdentificar) — ainda não se importa. */}
+            {scope === "COMPANY" && (
+              <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
+                Importar Excel
+              </Button>
+            )}
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
+              Registar sem ficheiro
+            </Button>
+          </Space>
         )}
       </div>
 
@@ -270,6 +280,15 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onClose={() => setRegisterOpen(false)}
         onCreated={reload}
       />
+
+      {scope === "COMPANY" && (
+        <ExpensesImportModal
+          open={importOpen}
+          scope="COMPANY"
+          onClose={() => setImportOpen(false)}
+          onImported={reload}
+        />
+      )}
 
       <InvoicePreviewModal
         open={previewInvoice !== null}

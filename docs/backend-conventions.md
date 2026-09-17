@@ -29,7 +29,11 @@ Dependências que existem para **ler** o que os clientes enviam:
 
 - **Apache POI** (`poi-ooxml`) — `BudgetExcelImportService` reconstrói a árvore de rubricas a
   partir do `.xlsx` do empreiteiro. `BudgetExcelExportService` faz o inverso e escreve o livro
-  do vault da Vilatro. Armadilhas do POI a escrever: as tabelas (`XSSFTable`) têm de existir
+  do vault da Vilatro; `DespesasExcelImportService` lê a folha "Despesas" desse livro de volta
+  (pelo nome da folha e pelo nome dos cabeçalhos, nunca por índice — e a linha TOTAL é um
+  `SUBTOTAL` sobre a tabela: num ficheiro escrito pelo POI não há valor em cache, avalia-se com o
+  `FormulaEvaluator`, que sabe referências estruturadas; se falhar vale o cache que o Excel deixou).
+  Armadilhas do POI a escrever: as tabelas (`XSSFTable`) têm de existir
   **antes** da primeira fórmula que as nomeie (`TabelaDespesas[Valor]`), senão o parser atira
   `Illegal table name`; os formatos numéricos escrevem-se na sintaxe en-US do ficheiro
   (`#,##0.00\ "€"`, `dd/mm/yyyy`) e é o Excel pt-PT que os mostra como `# ##0,00 €` /

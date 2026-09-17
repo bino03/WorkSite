@@ -151,6 +151,33 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
             """)
     List<ConstructionInvoice> findAllByEnterpriseIdForExport(@Param("enterpriseId") UUID enterpriseId);
 
+    /**
+     * O mesmo que {@link #findAllByEnterpriseIdForExport} para as faturas sem
+     * obra (empresa, quarentena) — a importação da folha "Despesas" precisa da
+     * lista inteira para ligar uma nota de crédito a uma fatura já na app.
+     */
+    @Query("""
+            select i from ConstructionInvoice i
+            where i.scope = :scope and i.enterprise is null
+            order by i.invoiceDate asc nulls last, i.createdAt asc
+            """)
+    List<ConstructionInvoice> findAllByScopeWithoutEnterprise(@Param("scope") ConstructionInvoice.Scope scope);
+
+    /**
+     * Todos os números de fatura da app, de todos os âmbitos — menos os das obras
+     * de teste, que nunca entram numa importação (excel-parity §2) e cujas faturas
+     * são cópias dos números reais. A importação da folha "Despesas" chega sem
+     * NIF (o vault não o tem), por isso não pode usar o par (NIF, número) de
+     * {@link #findBySupplierNif}: compara só o número, normalizado em memória —
+     * decisão 18 do Vilatro, o nº é único no vault todo.
+     */
+    @Query("""
+            select i.invoiceNumber from ConstructionInvoice i
+            where i.invoiceNumber is not null
+              and (i.enterprise is null or i.enterprise.isTest = false)
+            """)
+    List<String> findAllInvoiceNumbers();
+
     /** As notas de crédito de uma página inteira de faturas, numa query. */
     @Query("select i from ConstructionInvoice i where i.relatedInvoiceId in :invoiceIds")
     List<ConstructionInvoice> findCreditNotesForAll(@Param("invoiceIds") Collection<UUID> invoiceIds);

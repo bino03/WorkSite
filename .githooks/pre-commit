@@ -45,6 +45,13 @@ if [ -n "$controllers" ]; then
   fi
 fi
 
+# --- Contrato Excel ↔ app → docs/excel-parity.md ---------------------------
+# Os dois lados da fase 6 são a implementação do contrato: mudar uma coluna, um
+# valor aceite ou uma frase gerada nas observações muda o contrato.
+if echo "$staged" | grep -qE 'managementapi/.*(DespesasExcelImportService|BudgetExcelExportService)\.java'; then
+  warn "Importador/exportador do Excel da Vilatro alterado → rever docs/excel-parity.md (§3, §4, §9) e, se o Excel tiver de mudar, Vilatro/Decisões.md."
+fi
+
 # --- ErrorCode enum → frontend error enums --------------------------------
 if echo "$staged" | grep -q 'managementapi/.*dto/error/ErrorCode\.java'; then
   warn "ErrorCode.java changed → mirror new codes in the frontend error map (see docs/skills/frontend/skill-frontend-error-handling.md)."

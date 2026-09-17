@@ -210,7 +210,10 @@ lá dentro — somar os dois contaria a mesma derrapagem duas vezes.
 (índices repetidos, células de texto em colunas numéricas, rubricas sem descrição) e a
 reconciliação contra a linha `TOTAL` do Excel — sem gravar nada. Com `dryRun=false` grava, e
 exige `replace=true` se o projeto já tiver orçamento. O cabeçalho aceita `Art` **ou** `Rubrica`
-na coluna A (desde 2026-09-17 — é o nome que o vault usa e que a exportação escreve).
+na coluna A (desde 2026-09-17 — é o nome que o vault usa e que a exportação escreve), e **as restantes
+colunas resolvem-se pelo nome do cabeçalho** (`Descrição`, `Un.`, `Quant`, `Preço Un`, `Preço total`,
+`Obs.`), com a posição do orçamento do empreiteiro como fallback — a "Orçamento inicial" do vault tem só
+`Rubrica | Descrição | Preço total`. Ver [[excel-parity.md]] §6.
 
 **Exportação** (2026-09-17, fase 6 lado app → Excel — o contrato é [[excel-parity.md]] §9):
 `sheets` é um conjunto de `BUDGET` ("Orçamento inicial"), `EXPENSES` ("Despesas") e
@@ -280,6 +283,7 @@ de entrada.
 | POST | `/construction-invoices/preview?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — lê o QR e verifica duplicados, não grava nada |
 | POST | `/construction-invoices?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — multipart `file`; devolve `201` |
 | POST | `/construction-invoices/register` | `ADMIN` — regista uma fatura **sem ficheiro** (JSON, não multipart); devolve `201` |
+| POST | `/construction-invoices/import-excel?scope=&enterpriseId=&dryRun=` | `ADMIN` — multipart `file` (o `Despesas - <Obra>.xlsx` do vault) + parte `answers` (JSON, opcional). Importa a folha "Despesas"; ver [[#Importar a folha "Despesas" do Excel (fase 6)]] |
 | POST | `/construction-invoices/{id}/documents` | `ADMIN` ou `EMPLOYEE` — multipart `file`, **junta** mais um documento; devolve `201` |
 | DELETE | `/construction-invoices/{id}/documents/{documentId}` | `ADMIN` — remove **um** documento; devolve `204` |
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro |
@@ -582,6 +586,18 @@ associada acompanha os novos valores.
 | `INVOICE_033` | `POST /{id}/transfer` sobre uma nota de crédito — a NC segue a fatura de origem, não se transfere sozinha |
 | `INVOICE_034` | inconsistência não encontrada (`GET/POST /invoice-incidents/{id}`) |
 | `INVOICE_035` | `POST /invoice-incidents` com uma fatura que não existe |
+| `INVOICE_036` | `POST /import-excel` com ficheiro vazio |
+| `INVOICE_037` | `POST /import-excel` com ficheiro que não é `.xlsx` |
+| `INVOICE_038` | `POST /import-excel` — o POI não conseguiu ler o livro |
+| `INVOICE_039` | `POST /import-excel` — o livro não tem a folha `Despesas` |
+| `INVOICE_040` | `POST /import-excel` — sem linha de cabeçalho (procura-se a célula "Nº Fatura" nas primeiras 20 linhas) |
+| `INVOICE_041` | `POST /import-excel` — falta uma coluna obrigatória; a mensagem diz quais |
+| `INVOICE_042` | `POST /import-excel` — a folha não tem linhas |
+| `INVOICE_043` | `POST /import-excel?dryRun=false` com `errors` por corrigir — nada gravado |
+| `INVOICE_044` | `POST /import-excel?dryRun=false` com `questions` por responder — nada gravado |
+| `INVOICE_045` | `POST /import-excel?dryRun=false` numa obra `is_test` com um ficheiro que não começa por `TESTE - ` |
+| `INVOICE_046` | `POST /import-excel?dryRun=false` — o que ficou gravado não bate com a folha (bug nosso, não erro do Excel); transação anulada |
+| `INVOICE_047` | `POST /import-excel` com `scope=UNIDENTIFIED` — a quarentena tem outra tabela (`TabelaPorIdentificar`), ainda não se importa |
 
 (`ENT_032` — slug de projeto duplicado — sai do `EnterpriseController`, não daqui; ver [[excel-parity.md]] §2.)
 
@@ -735,6 +751,52 @@ O **detalhe da fatura** (`GET /construction-invoices/{id}`) ganhou `transfers[]`
 `{ transferredAt, fromScope, fromEnterpriseId, fromEnterpriseName, toScope, toEnterpriseId,
 toEnterpriseName, reason, byName }`, da mais recente para a mais antiga. É uma projeção leve das
 entradas `transfer` do `activity_log` — **só vem no detalhe**, nas listas vem vazio.
+
+## Importar a folha "Despesas" do Excel (fase 6)
+
+`POST /construction-invoices/import-excel` — o sentido Excel → app do contrato de
+[[excel-parity.md]] §9; o inverso é `GET /construction-budget/enterprise/{id}/export`.
+Serviço: `DespesasExcelImportService`. Só `ADMIN`.
+
+| Parâmetro | Notas |
+|---|---|
+| `scope` | `PROJECT` (exige `enterpriseId`) ou `COMPANY` (proíbe-o). `UNIDENTIFIED` → `INVOICE_047` |
+| `file` | multipart, o `Despesas - <Obra>.xlsx` (ou `Despesas da empresa.xlsx`). Lê **só a folha `Despesas`**, pelo nome; as colunas pelo cabeçalho normalizado (`\s+`→espaço, sem acentos, sem caixa — o "Metodo\nPagamento" real passa), nunca pela letra. `Rubrica`, `Fornecedor` e `NIF` são opcionais |
+| `dryRun` | `true` por omissão: devolve o relatório, nada gravado. `false` grava tudo numa transação |
+| `answers` | parte multipart JSON `{ answers: [{ questionId, value }] }` — as respostas às `questions` do `dryRun` |
+
+**O que a leitura faz** (detalhe e decisões em [[excel-parity.md]] §9): agrupa as linhas por
+`Nº Fatura` (as sem nº só quando contíguas e iguais em tudo menos rubrica/valor); `Imprimir`/`Pedir`
+→ `documentStatus`; `-` conta como sem nº; linha negativa = nota de crédito; `Liquidada` (`x`/`X`/`Sim`)
++ `Metodo Pagamento` (mapa §4, sem acentos/caixa) + `Observações` ("Pago por … em dd-mm-aaaa (ref)",
+"Pago parcialmente …", "… junto com …", "Nota de crédito da fatura …" — as frases que o exportador
+gera são lidas de volta; o resto fica em `notes`); `Rubrica` `<Art> — …` → `construction_expense`
+por linha (inexistente ou título = erro); `Bizdocs` → `sentToAccountant`; a linha
+"Despesa registada à mão na app, sem fatura." volta a ser uma despesa solta.
+
+**Resposta** `ExpensesImportResultDTO`: `{ dryRun, scope, sheetName, rowCount, invoiceCount,
+creditNoteCount, manualExpenseCount, paidCount, partiallyPaidCount, unpaidCount, parsedTotal,
+sheetTotal, totalDifference, errors[{excelRow, message}], warnings[], questions[], invoices[] }`.
+`invoices[]` é a pré-visualização (uma por fatura, com `key`, `excelRows`, `lines[{excelRow,
+rubricCode, rubricLabel, amount}]`, `paymentStatus`, `creditNoteOrigin`, `duplicate`, …).
+
+**Bloqueia a gravação** (`errors`, → `INVOICE_043`): rubrica inexistente/título, nº que já existe
+na app (comparado sem NIF, decisão 18 do Vilatro; obras `is_test` não contam), data ilegível, fatura liquidada
+sem data nem "Pago … em", e **a soma das linhas ≠ linha TOTAL da `TabelaDespesas`** acima de 1
+cêntimo — ao contrário do orçamento, aqui a diferença é erro (passo 9 do §9).
+
+**Pergunta** (`questions`, → `INVOICE_044` se por responder): `CREDIT_NOTE_ORIGIN` (opções
+`file:<key>` para uma fatura do ficheiro, `db:<uuid>` para uma já na app, `SKIP`) e
+`AGGREGATE_PAYMENT` (faturas pagas com a mesma observação com data — `ONE_PAYMENT` ou `SEPARATE`).
+Os `id` das perguntas derivam da linha do Excel, por isso são estáveis entre o `dryRun` e a gravação.
+
+**Gravação**: `register` → `split` (rubricas) → NC (`createCreditNote`, com as despesas negativas
+da linha) → pagamentos (`registerAggregate` / `markAsPaid`; uma fatura anulada por inteiro por NC do
+ficheiro entra **sem** pagamento, com aviso — líquido zero). Uma linha sem valor entra com total nulo
+(por rever), com aviso. No fim confere contra a folha: nº de
+faturas, Σ e nº de liquidadas — diferença → `INVOICE_046` e rollback. Uma obra `is_test` só aceita
+um ficheiro `TESTE - …` (o que o exportador gera para obras de teste) → senão `INVOICE_045`.
+Os documentos de `Faturas\Lançadas\` **não** entram por aqui (ronda seguinte).
 
 ## Inconsistências (`InvoiceIncidentController`, `/invoice-incidents`)
 

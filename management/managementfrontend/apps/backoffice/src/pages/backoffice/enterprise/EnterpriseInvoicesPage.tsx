@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Input, Space } from "antd";
-import { ArrowLeftOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
 
 import {
   batchAllocateInvoices,
@@ -21,6 +21,7 @@ import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
+import { ExpensesImportModal } from "@/components/invoices/ExpensesImportModal";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
@@ -78,6 +79,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
@@ -327,6 +329,9 @@ const EnterpriseInvoicesPage: FC = () => {
             >
               Classificar
             </Button>
+            <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
+              Importar Excel
+            </Button>
             <Button icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
               Registar sem ficheiro
             </Button>
@@ -447,6 +452,14 @@ const EnterpriseInvoicesPage: FC = () => {
             enterpriseId={enterpriseId}
             onClose={() => setRegisterOpen(false)}
             onCreated={reload}
+          />
+
+          <ExpensesImportModal
+            open={importOpen}
+            scope="PROJECT"
+            enterpriseId={enterpriseId}
+            onClose={() => setImportOpen(false)}
+            onImported={reload}
           />
 
           <InvoiceDetailDrawer

@@ -61,7 +61,7 @@ A árvore de rubricas, importada do Excel do empreiteiro, e as despesas lançada
 |---|---|
 | **Entrada** | rota `/backoffice/empreendimentos/:enterpriseId/budget` → `pages/backoffice/enterprise/ConstructionBudgetPage.tsx` |
 | **Frontend** | `components/budget/` — drawers de despesas/detalhe/formulário, `BudgetItemDrawer` (criar/editar rubrica, com datas), `BudgetMoveToModal`, `BudgetRecycleBinDrawer` (zona de recuperação), `BudgetImportModal`, `budgetTree.ts`, `budgetFormSchemas.ts` · `services/budgetService.ts` · `types/budget.ts` |
-| **Backend** | `enterprises/controller/ConstructionBudgetItemController` + `ConstructionExpenseController` · `service/ConstructionBudgetItemService` · `ConstructionExpenseService` · `BudgetExcelImportService` / `BudgetExcelExportService` (Apache POI) |
+| **Backend** | `enterprises/controller/ConstructionBudgetItemController` + `ConstructionExpenseController` · `service/ConstructionBudgetItemService` · `ConstructionExpenseService` · `BudgetExcelImportService` / `BudgetExcelExportService` / `DespesasExcelImportService` (Apache POI) |
 | **Base de dados** | `worksite.construction_budget_item` (auto-referenciada) + `construction_expense` — `V15`; soft delete (`deleted_at`) — `V36` |
 | **Detalhe** | [[api.md]] → "Orçamento de Construção" |
 
@@ -140,6 +140,7 @@ começar a olhar.
 | a lista diz "0 resultado(s)" com linhas, ou um cartão diz "undefined" | a página do Spring vem `{content, page:{…}}` (`VIA_DTO`) e o código lê `totalElements` no topo — usar `utils/springPage.ts` `normalizeSpringPage` |
 | a importação do Excel do orçamento falha | `BudgetExcelImportService` (procura a linha de cabeçalho "Art" ou "Rubrica") |
 | a exportação para Excel sai mal (folhas, tabelas, fórmulas, nome do ficheiro) | `BudgetExcelExportService` — o contrato é [[excel-parity]] §9 |
+| a importação da folha "Despesas" do vault lista erros ou perguntas que não fazem sentido | `DespesasExcelImportService` (`enterprises/service/`, endpoint em `ConstructionInvoiceController` `/import-excel`) — o contrato é [[excel-parity]] §9; as frases das observações que ele lê de volta são as que o exportador gera (§4) |
 | o email de convite ou de recuperação não sai | falta um provedor predefinido **ativo** em *Definições → Provedores de email* — o erro é `EMAIL_002`/`EMAIL_003`, não `ERR_001` |
 | o link do email aponta para `localhost` | `APP_FRONTEND_URL` não está definido no ambiente — ver [[environment.md]] |
 | aceitar um convite dá erro | `InviteService#accept` — `USER_013` (desconhecido/usado/cancelado) ou `USER_012` (fora do prazo) |

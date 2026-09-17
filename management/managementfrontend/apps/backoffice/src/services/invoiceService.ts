@@ -7,7 +7,10 @@ import type {
   ConstructionInvoiceUpsert,
   CreditNoteCreatePayload,
   CreditNoteSplitPreview,
+  ExpensesImportAnswer,
+  ExpensesImportResult,
   InvoiceFilters,
+  InvoiceScope,
   InvoicePreviewResult,
   InvoiceRegisterPayload,
   InvoiceSplitLine,
@@ -328,4 +331,28 @@ export async function suggestBudgetItem(
     params: { supplierNif },
   });
   return response.status === 204 ? null : response.data;
+}
+
+/**
+ * Importa a folha "Despesas" do Excel do vault da Vilatro (fase 6).
+ *
+ * `dryRun` é `true` por omissão no backend: devolve as faturas, os erros por
+ * corrigir no Excel e as perguntas que só a pessoa sabe responder, sem gravar.
+ * A gravação leva as respostas na parte `answers` (JSON no mesmo multipart).
+ */
+export async function importExpensesExcel(
+  scope: Exclude<InvoiceScope, "UNIDENTIFIED">,
+  enterpriseId: string | null,
+  file: File,
+  dryRun = true,
+  answers: ExpensesImportAnswer[] = []
+): Promise<ExpensesImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("answers", new Blob([JSON.stringify({ answers })], { type: "application/json" }));
+  const response = await api.post(`/construction-invoices/import-excel`, form, {
+    params: { scope, enterpriseId: enterpriseId ?? undefined, dryRun },
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
 }
