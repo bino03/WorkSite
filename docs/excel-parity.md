@@ -30,6 +30,10 @@ Os dois têm de continuar a poder trocar dados **sem conversão à mão**. É is
 - O `slug` é **exatamente** o nome da pasta, com espaços e acentos (`Vila Petrus`, `Vila Aleu`, `Villa Atrium`).
   Renomear uma obra num lado obriga a renomear no outro — a skill `novo-empreendimento` já pede confirmação
   da grafia por isso.
+- Uma obra **sem slug** que seja exportada **fica com um** nesse momento (2026-09-17): o nome da obra,
+  limpo dos caracteres que o Windows recusa (`\ / : * ? " < > |` → `-`), com sufixo ` 2`, ` 3`… se
+  já houver outra obra com esse slug; fica gravado na obra e o resumo da exportação di-lo. Um ficheiro
+  exportado sem slug não teria pasta onde viver no vault.
 - `enterprises.is_test = true` (hoje: "Vila Sol") **nunca** entra numa importação ou soma da empresa.
   **Exceção (2026-09-17)**: a exportação app → Excel aceita uma obra de teste, porque é a única
   forma de testar o exportador no browser sem tocar numa obra real — o ficheiro sai com o prefixo
@@ -326,7 +330,7 @@ por ` · `.
 
 Antes do download, `GET …/export/summary` devolve o que vai sair: contagens (rubricas, capítulos,
 faturas, linhas, totais), os casos especiais (por classificar, à mão, NC, parciais, sem nº, por rever)
-e avisos — obra sem slug, obra de teste, despesa em rubrica eliminada ou sem índice, fatura repartida
+e avisos — slug criado agora (ver abaixo), obra de teste, despesa em rubrica eliminada ou sem índice, fatura repartida
 cuja soma não bate com o total, vários métodos de pagamento na mesma fatura.
 
 A verificação é a mesma do sentido contrário: importar o ficheiro exportado em `dryRun` tem de dar

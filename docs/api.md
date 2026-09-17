@@ -218,7 +218,8 @@ na coluna A (desde 2026-09-17 — é o nome que o vault usa e que a exportação
 `EXPENSES` — o painel é todo fórmulas `SUMIF` sobre a `TabelaDespesas`/`TabelaRubricas` e sem
 elas dava `#NAME?`. Regras: `BUDGET_026` sem folhas; `BUDGET_027` se a obra não tiver rubricas
 vivas e se pedir `BUDGET` ou `COMPARISON` (`EXPENSES` sozinha exporta sempre, mesmo sem faturas);
-`BUDGET_028` se o POI falhar a escrever. Uma obra `is_test` **exporta** (para se poder testar o
+Uma obra **sem slug fica com um** ao passar por qualquer dos dois endpoints (nome limpo, sufixo numérico
+em colisão — [[excel-parity.md]] §2); por isso nenhum deles é `readOnly`. `BUDGET_028` se o POI falhar a escrever. Uma obra `is_test` **exporta** (para se poder testar o
 próprio exportador), mas o ficheiro leva o prefixo `TESTE - `. O nome vai em
 `filename*=UTF-8''…` porque os slugs têm acentos e espaços — o cliente tem de descodificar esse
 parâmetro, não o `filename=` cru. `GET …/export/summary` devolve o `BudgetExportSummaryDTO`

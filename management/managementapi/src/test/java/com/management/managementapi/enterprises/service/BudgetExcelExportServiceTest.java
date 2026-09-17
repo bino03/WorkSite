@@ -57,6 +57,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -476,17 +477,29 @@ class BudgetExcelExportServiceTest {
     }
 
     @Test
-    @DisplayName("O nome do ficheiro é o do vault; sem slug cai para o nome; obra de teste leva prefixo")
+    @DisplayName("O nome do ficheiro é o do vault; obra de teste leva prefixo")
     void fileNameFollowsTheVault() {
         assertThat(BudgetExcelExportService.fileName(enterprise)).isEqualTo("Despesas - Vila Teste.xlsx");
-
-        enterprise.setSlug(null);
-        assertThat(BudgetExcelExportService.fileName(enterprise)).isEqualTo("Despesas - Vila Teste Claude.xlsx");
-        assertThat(service.summary(ENTERPRISE_ID).warnings()).anyMatch(w -> w.contains("não tem slug"));
 
         enterprise.setSlug("Obra: A/B?");
         enterprise.setIsTest(true);
         assertThat(BudgetExcelExportService.fileName(enterprise)).isEqualTo("TESTE - Despesas - Obra- A-B-.xlsx");
+    }
+
+    @Test
+    @DisplayName("Uma obra sem slug fica com um ao exportar: o nome limpo, com sufixo se já existir")
+    void missingSlugIsCreatedFromTheName() {
+        enterprise.setSlug(null);
+        enterprise.setName("Obra: Nova/Zona?  Sul");
+        when(enterpriseRepository.existsBySlugAndIdNot("Obra- Nova-Zona- Sul", ENTERPRISE_ID)).thenReturn(true);
+        when(enterpriseRepository.existsBySlugAndIdNot("Obra- Nova-Zona- Sul 2", ENTERPRISE_ID)).thenReturn(false);
+
+        BudgetExportSummaryDTO summary = service.summary(ENTERPRISE_ID);
+
+        assertThat(enterprise.getSlug()).isEqualTo("Obra- Nova-Zona- Sul 2");
+        assertThat(summary.fileName()).isEqualTo("Despesas - Obra- Nova-Zona- Sul 2.xlsx");
+        assertThat(summary.warnings()).anyMatch(w -> w.contains("não tinha slug") && w.contains("Obra- Nova-Zona- Sul 2"));
+        verify(enterpriseRepository).save(enterprise);
     }
 
     @Test

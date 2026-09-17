@@ -122,6 +122,8 @@ public class BudgetExcelExportService {
 
     private static final int LABEL_MAX_LENGTH = 70;
     private static final String TEST_PREFIX = "TESTE - ";
+    /** O mesmo limite do formulário do Backoffice (`enterpriseFormSchema`). */
+    private static final int SLUG_MAX_LENGTH = 120;
     private static final String NOTE_SEPARATOR = " · ";
 
     private static final DateTimeFormatter NOTE_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
@@ -137,12 +139,14 @@ public class BudgetExcelExportService {
     /** O ficheiro pronto a devolver. */
     public record ExportFile(String fileName, byte[] content) {}
 
-    @Transactional(readOnly = true)
+    // Nem `summary` nem `export` são `readOnly`: uma obra sem slug fica com um ao
+    // passar por aqui (ver {@link #ensureSlug}) — é a única escrita.
+    @Transactional
     public BudgetExportSummaryDTO summary(UUID enterpriseId) {
         return load(enterpriseId).toSummary();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ExportFile export(UUID enterpriseId, Set<BudgetExportSheet> requested) {
         if (requested == null || requested.isEmpty()) {
             throw new BusinessException(ErrorCode.BUDGET_EXPORT_NO_SHEETS);
@@ -164,10 +168,42 @@ public class BudgetExcelExportService {
 
     /** {@code Despesas - <slug>.xlsx}, como no vault; {@code TESTE - } à frente numa obra de teste. */
     static String fileName(Enterprise enterprise) {
-        String base = isBlank(enterprise.getSlug()) ? enterprise.getName() : enterprise.getSlug();
-        String safe = (base == null ? "obra" : base).replaceAll("[\\\\/:*?\"<>|]", "-").trim();
+        String safe = safeName(isBlank(enterprise.getSlug()) ? enterprise.getName() : enterprise.getSlug());
         String prefix = Boolean.TRUE.equals(enterprise.getIsTest()) ? TEST_PREFIX : "";
         return prefix + "Despesas - " + safe + ".xlsx";
+    }
+
+    /** Sem os caracteres que o Windows recusa num nome de pasta/ficheiro; espaços e acentos ficam. */
+    static String safeName(String name) {
+        String safe = (name == null ? "" : name).replaceAll("[\\\\/:*?\"<>|]", "-").replaceAll("\\s+", " ").trim();
+        return safe.isEmpty() ? "obra" : safe;
+    }
+
+    /**
+     * Uma obra sem slug fica com um ao ser exportada — o nome da pasta no vault
+     * é o slug, e um ficheiro exportado sem ele não teria pasta onde viver. O
+     * slug é o nome da obra (com espaços e acentos, como manda §2 do contrato),
+     * limpo do que o Windows não aceita, e com sufixo {@code 2}, {@code 3}… se
+     * já houver outra obra com esse nome. Pedido do utilizador a 2026-09-17, em
+     * vez do aviso que existia.
+     */
+    private String ensureSlug(Enterprise enterprise, Model model) {
+        if (!isBlank(enterprise.getSlug())) {
+            return enterprise.getSlug();
+        }
+        String base = safeName(enterprise.getName());
+        if (base.length() > SLUG_MAX_LENGTH) {
+            base = base.substring(0, SLUG_MAX_LENGTH).trim();
+        }
+        String slug = base;
+        for (int n = 2; enterpriseRepository.existsBySlugAndIdNot(slug, enterprise.getId()); n++) {
+            slug = base + " " + n;
+        }
+        enterprise.setSlug(slug);
+        enterpriseRepository.save(enterprise);
+        model.warnings.add("A obra não tinha slug — ficou com \"" + slug
+                + "\", que passa a ser o nome da sua pasta no vault.");
+        return slug;
     }
 
     // ── leitura ───────────────────────────────────────────────
@@ -178,11 +214,8 @@ public class BudgetExcelExportService {
 
         Model model = new Model();
         model.enterprise = enterprise;
+        ensureSlug(enterprise, model);
         model.fileName = fileName(enterprise);
-        if (isBlank(enterprise.getSlug())) {
-            model.warnings.add("A obra não tem slug — o ficheiro usa o nome (\"" + enterprise.getName()
-                    + "\"). No vault, o nome da pasta e do Excel é o slug.");
-        }
         if (Boolean.TRUE.equals(enterprise.getIsTest())) {
             model.warnings.add("Obra de teste — o ficheiro leva o prefixo \"" + TEST_PREFIX.trim()
                     + "\" e não deve entrar no vault.");
