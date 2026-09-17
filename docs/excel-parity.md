@@ -30,7 +30,10 @@ Os dois têm de continuar a poder trocar dados **sem conversão à mão**. É is
 - O `slug` é **exatamente** o nome da pasta, com espaços e acentos (`Vila Petrus`, `Vila Aleu`, `Villa Atrium`).
   Renomear uma obra num lado obriga a renomear no outro — a skill `novo-empreendimento` já pede confirmação
   da grafia por isso.
-- `enterprises.is_test = true` (hoje: "Vila Sol") **nunca** entra numa exportação, importação ou soma da empresa.
+- `enterprises.is_test = true` (hoje: "Vila Sol") **nunca** entra numa importação ou soma da empresa.
+  **Exceção (2026-09-17)**: a exportação app → Excel aceita uma obra de teste, porque é a única
+  forma de testar o exportador no browser sem tocar numa obra real — o ficheiro sai com o prefixo
+  `TESTE - ` no nome e o resumo avisa que não deve entrar no vault.
 - `Despesas da empresa\` e `Faturas por identificar\` **não são obras**: mapeiam para `scope = COMPANY` e
   `scope = UNIDENTIFIED`, com `enterprise_id` nulo.
 
@@ -148,7 +151,18 @@ rubricas".
 **Contrato para a coluna `Rubrica`**: o valor é o `Art` da rubrica, e só ele. Ao **ler**, normaliza-se:
 tira-se o ponto final (`4.` → `4`) e tudo a partir do primeiro espaço (`4. Estrutura…` → `4`). Ao
 **escrever** (exportação), escreve-se `code` seguido de ` — ` e `name`, para se ler no Excel
-(`4.2.1 — Lajes maciças`); a leitura tolera as duas formas.
+(`4.2.1 — Lajes maciças`); a leitura tolera as duas formas. A descrição corta-se aos **70 caracteres**
+(67 + `...`), exatamente como o `gerar-orcamento-vs-gasto.ps1` faz na `Etiqueta` — a `SUMIF` do painel
+compara a célula inteira, por isso a coluna `Rubrica` e a `Etiqueta` da `TabelaRubricas` têm de ser
+iguais letra a letra.
+
+> **Cabeçalho da folha "Orçamento inicial" (2026-09-17)**: no vault a coluna A chama-se **`Rubrica`**
+> (é o que o `gerar-orcamento-vs-gasto.ps1` procura), não `Art` como no orçamento do empreiteiro. O
+> `BudgetExcelImportService` aceita as duas; a exportação escreve `Rubrica`, com as 7 colunas
+> (`Rubrica | Descrição | Un. | Quant | Preço Un | Preço total | Obs.`) e a linha `TOTAL` na coluna B —
+> um só formato que os dois lados leem. `rowKind` não tem coluna: na reimportação, sub-títulos e notas
+> voltam a ser classificados pela heurística do importador (sem índice e sem números → sub-título;
+> nome entre parêntesis → nota), o que o teste de round-trip cobre.
 
 > ✅ **Pedido 2 da decisão 26 cumprido do lado do Excel a 2026-09-08.** A coluna `Rubrica` tem agora
 > **dropdown** com as rubricas válidas da obra (capítulos + artigos com preço — 151 no Vila Petrus) e
@@ -264,18 +278,61 @@ Entrada: a pasta de uma obra do vault (`Despesas - <Obra>.xlsx` + `Faturas\Lanç
    (a linha de totais), nº por liquidar igual nos dois lados.
 
 Depois, os mesmos passos para `Faturas por identificar.xlsx` (→ `UNIDENTIFIED`, com `Empreendimento`
-preenchido → transferência para essa obra) e para `Despesas da empresa` (só nota `.md` hoje → criar à mão
-ou a partir da tabela da nota; → `COMPANY`).
+preenchido → transferência para essa obra) e para `Despesas da empresa\Despesas da empresa.xlsx` (desde
+16-09-2026 tem a mesma `TabelaDespesas` de uma obra, **sem coluna `Rubrica`** — mapear direto para
+`scope = COMPANY`, sem passo 5; passos 6-9 iguais. Ficheiros em `Despesas da empresa\Faturas\Lançadas\`,
+mesma mecânica do passo 7. Antes de 16-09-2026 só havia a nota `.md`; documentos anteriores a essa data
+podem ainda estar só descritos em prosa lá — não assumir que a tabela é exaustiva para o histórico).
 
 ### App → Excel (exportação, fase 6)
 
-Uma obra → um `.xlsx` com as duas folhas ("Orçamento inicial" a partir da árvore; "Despesas" com as
-colunas de §3 **mais** `Fornecedor` e `NIF`), `TabelaDespesas` com linha de totais, formatos de moeda e
-data que os scripts do Vilatro esperam (`dd/mm/aaaa`; moeda `#.##0,00 €`). E a pasta `Faturas\Lançadas\`
-com os ficheiros renomeados (§7). Uma fatura com N despesas exporta N linhas com o mesmo nº.
+> ✅ **Feito a 2026-09-17** (`BudgetExcelExportService`, `GET /construction-budget/enterprise/{id}/export`,
+> modal "Exportar Excel" na página do orçamento). O que segue é o contrato **como ficou implementado**.
+> Fica de fora desta implementação a pasta `Faturas\Lançadas\` (§7) — só o `.xlsx`.
+
+Uma obra → um `.xlsx` (`Despesas - <slug>.xlsx`) com as folhas que o utilizador escolher, na ordem do
+vault: **"Orçamento inicial"** (7 colunas, cabeçalho `Rubrica`, `TOTAL` — ver §6), **"Despesas"**
+(`TabelaDespesas`, `TableStyleMedium2`, com as colunas de §3 **mais** `Fornecedor` e `NIF`, linha de totais
+`=SUBTOTAL(109,[Valor])`), **"Orçamento vs Gasto"** e **"Rubricas"** (`TabelaRubricas`) — estas duas
+saem juntas, **todas em fórmulas** iguais às do `gerar-orcamento-vs-gasto.ps1` (`SUMIF` por etiqueta e
+por índice, `SUMPRODUCT` das faturas sem rubrica), com a dropdown da coluna `Rubrica` a apontar para a
+coluna M escondida da "Rubricas", e obrigam a incluir a "Despesas" (sem `TabelaDespesas` dariam
+`#NAME?`). As duas folhas de orçamento exigem rubricas vivas; a "Despesas" sai sempre (sem faturas: só
+cabeçalho, uma linha vazia e totais a 0). Rubricas eliminadas (`deleted_at`) nunca saem.
+
+Formatos: data `dd/mm/aaaa` (célula de data, não texto); **moeda `# ##0,00 €`** — o mesmo código que a
+coluna `Valor` do vault já usa (`#,##0.00\ "€"` no ficheiro), e não o `#.##0,00 €` que este contrato dizia
+antes, que o próprio vault documenta como partido acima de 1 000 000 € (armadilha 16). `Quant` fica em
+General.
+
+**Linhas da "Despesas"** — a folha é *por despesa*, e é isso que faz o "Gasto" da app bater com o
+`SUMIF` do Excel:
+
+| Caso na app | Linha(s) no Excel |
+|---|---|
+| Fatura repartida por N rubricas | N linhas com o mesmo `Nº Fatura`, `Valor` = cada despesa |
+| Fatura por classificar (sem despesas) | 1 linha, `Rubrica` vazia, `Valor` = `total_amount` |
+| Despesa lançada à mão, sem fatura | 1 linha sem nº, `Data` = `expense_date`, `Rubrica` preenchida, observação "Despesa registada à mão na app" |
+| Nota de crédito | **valor negativo** (na app o `total_amount` está positivo — as despesas da NC já são negativas; sem despesas nega-se o total), `Observações` = "Nota de crédito da fatura <nº>" |
+| Fatura sem nº | `Nº Fatura` vazio; `TO_PRINT` → "Imprimir fatura", `TO_REQUEST` → "Pedir fatura" (§3) |
+| Rubrica sem índice ("Alternativa …") | herda a etiqueta do artigo com índice mais próximo acima — o vault faz o mesmo ao somar-lhe o valor |
+
+`Liquidada` = `Sim` só quando o estado derivado é `PAID`; `Metodo Pagamento` só nesse caso, pelo mapa
+inverso de §4 (`OUTRO` → "Outro", que o vault não conhece — o resumo avisa). **`PARTIAL` sai por
+liquidar**: `Liquidada` vazia e a observação gerada diz `Pago parcialmente <valor> por <método> em
+dd-mm-aaaa (<referência>)`. Agregados: `Pago por <método> em dd-mm-aaaa, <valor do movimento> junto com
+<nºs> (<referência>)`, como §4 já previa; segue-se `payment.notes` e depois `invoice.notes`, separados
+por ` · `.
+
+Antes do download, `GET …/export/summary` devolve o que vai sair: contagens (rubricas, capítulos,
+faturas, linhas, totais), os casos especiais (por classificar, à mão, NC, parciais, sem nº, por rever)
+e avisos — obra sem slug, obra de teste, despesa em rubrica eliminada ou sem índice, fatura repartida
+cuja soma não bate com o total, vários métodos de pagamento na mesma fatura.
 
 A verificação é a mesma do sentido contrário: importar o ficheiro exportado em `dryRun` tem de dar
-**zero diferenças**. É esse round-trip que prova o contrato — e é o teste automático a escrever na fase 6.
+**zero diferenças**. Para o orçamento esse round-trip **já é teste automático**
+(`BudgetExcelExportServiceTest`: mesma árvore, mesmo total, incluindo "Alternativa …", sub-título e
+nota); para a "Despesas" fica para quando o `DespesasExcelImportService` existir.
 
 ## 10. Como se mantém
 

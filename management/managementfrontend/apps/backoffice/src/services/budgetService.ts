@@ -1,5 +1,8 @@
 import api from "@/api";
+import { fileNameFromDisposition } from "@/utils/downloadBlob";
 import type {
+  BudgetExportSheet,
+  BudgetExportSummary,
   BudgetImportResult,
   BudgetItemDeleted,
   BudgetItemNode,
@@ -9,6 +12,7 @@ import type {
   BudgetTree,
   ConstructionExpense,
   ConstructionExpenseUpsert,
+  DownloadedFile,
 } from "@/types/budget";
 
 /* ========= Árvore de rubricas ========= */
@@ -152,4 +156,32 @@ export async function updateExpense(
  */
 export async function deleteExpense(id: string): Promise<void> {
   await api.delete(`/construction-expenses/${id}`);
+}
+
+/* ========= Exportação para Excel ========= */
+
+/** O que a exportação vai escrever — contagens e avisos, sem gerar o ficheiro. */
+export async function getExportSummary(enterpriseId: string): Promise<BudgetExportSummary> {
+  const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/export/summary`);
+  return response.data;
+}
+
+/**
+ * O `.xlsx` da obra com as folhas pedidas. O nome vem do `Content-Disposition`
+ * (o backend decide-o: `Despesas - <slug>.xlsx`, com prefixo `TESTE - ` numa obra
+ * de teste); `fallback` só serve se o header não chegar.
+ */
+export async function exportWorkbook(
+  enterpriseId: string,
+  sheets: BudgetExportSheet[],
+  fallbackFileName: string
+): Promise<DownloadedFile> {
+  const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/export`, {
+    params: { sheets: sheets.join(",") },
+    responseType: "blob",
+  });
+  return {
+    blob: response.data,
+    fileName: fileNameFromDisposition(response.headers["content-disposition"], fallbackFileName),
+  };
 }

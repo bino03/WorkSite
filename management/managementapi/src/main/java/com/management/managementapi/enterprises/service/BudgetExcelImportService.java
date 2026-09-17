@@ -146,14 +146,20 @@ public class BudgetExcelImportService {
         }
     }
 
-    /** A linha de cabeçalho é a que tem "Art" na coluna A. */
+    /**
+     * A linha de cabeçalho é a que tem "Art" na coluna A — ou "Rubrica", que é
+     * como a folha do vault da Vilatro (e a nossa exportação) lhe chama; o
+     * script {@code gerar-orcamento-vs-gasto.ps1} só reconhece esse nome.
+     */
     private int findHeaderRow(Sheet sheet) {
         int limit = Math.min(sheet.getLastRowNum(), MAX_HEADER_SCAN_ROWS);
         for (int r = sheet.getFirstRowNum(); r <= limit; r++) {
             Row row = sheet.getRow(r);
             if (row == null) continue;
             String a = text(row, COL_CODE);
-            if (a != null && a.trim().toLowerCase().startsWith("art")) {
+            if (a == null) continue;
+            String header = a.trim().toLowerCase();
+            if (header.startsWith("art") || header.equals("rubrica")) {
                 return r;
             }
         }

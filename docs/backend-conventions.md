@@ -28,7 +28,13 @@ MapStruct**. Não reordenar — o MapStruct precisa dos getters/setters que o Lo
 Dependências que existem para **ler** o que os clientes enviam:
 
 - **Apache POI** (`poi-ooxml`) — `BudgetExcelImportService` reconstrói a árvore de rubricas a
-  partir do `.xlsx` do empreiteiro.
+  partir do `.xlsx` do empreiteiro. `BudgetExcelExportService` faz o inverso e escreve o livro
+  do vault da Vilatro. Armadilhas do POI a escrever: as tabelas (`XSSFTable`) têm de existir
+  **antes** da primeira fórmula que as nomeie (`TabelaDespesas[Valor]`), senão o parser atira
+  `Illegal table name`; os formatos numéricos escrevem-se na sintaxe en-US do ficheiro
+  (`#,##0.00\ "€"`, `dd/mm/yyyy`) e é o Excel pt-PT que os mostra como `# ##0,00 €` /
+  `dd/mm/aaaa`; o POI não calcula fórmulas — `setForceFormulaRecalculation(true)` obriga o
+  Excel a fazê-lo ao abrir.
 - **ZXing + PDFBox** — `AtInvoiceQrService` lê o QR da AT. O PDFBox rasteriza a página quando é
   PDF, o ZXing descodifica. Preferido a OCR por ser determinístico e correr offline: **nada sai
   do servidor**. Sem QR legível devolve vazio e o preenchimento segue manual — nunca é erro.

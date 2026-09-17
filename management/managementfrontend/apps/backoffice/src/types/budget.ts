@@ -224,3 +224,40 @@ export interface BudgetImportResult {
   warnings: string[];
   rows: BudgetImportRow[];
 }
+
+/* ========= Exportação para Excel ========= */
+
+/**
+ * As folhas que se podem pedir ao exportador. `COMPARISON` arrasta `EXPENSES` e
+ * gera também a folha "Rubricas" — o painel é fórmulas sobre as duas tabelas.
+ */
+export type BudgetExportSheet = "BUDGET" | "EXPENSES" | "COMPARISON";
+
+/** O que a exportação vai escrever — o passo 2 do modal, antes do download. */
+export interface BudgetExportSummary {
+  enterpriseId: string;
+  enterpriseName: string;
+  isTest: boolean;
+  fileName: string;
+  hasBudget: boolean;
+  budgetItemCount: number;
+  chapterCount: number;
+  budgetTotal: number;
+  invoiceCount: number;
+  expenseRowCount: number;
+  expensesTotal: number;
+  unclassifiedInvoiceCount: number;
+  manualExpenseCount: number;
+  creditNoteCount: number;
+  partialPaymentCount: number;
+  missingNumberCount: number;
+  needsReviewCount: number;
+  /** Frases já em português, prontas a mostrar — não são códigos. */
+  warnings: string[];
+}
+
+/** Um ficheiro descarregado: os bytes e o nome que o backend lhe deu. */
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string;
+}

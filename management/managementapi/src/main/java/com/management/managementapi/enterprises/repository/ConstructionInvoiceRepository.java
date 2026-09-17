@@ -139,6 +139,18 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
             """)
     List<ConstructionInvoice> findCreditNotesFor(@Param("invoiceId") UUID invoiceId);
 
+    /**
+     * Todas as faturas (e notas de crédito) de uma obra, pela ordem da folha
+     * "Despesas" do vault — alimenta a exportação para Excel, que precisa da
+     * lista inteira e não de uma página.
+     */
+    @Query("""
+            select i from ConstructionInvoice i
+            where i.enterprise.id = :enterpriseId
+            order by i.invoiceDate asc nulls last, i.createdAt asc
+            """)
+    List<ConstructionInvoice> findAllByEnterpriseIdForExport(@Param("enterpriseId") UUID enterpriseId);
+
     /** As notas de crédito de uma página inteira de faturas, numa query. */
     @Query("select i from ConstructionInvoice i where i.relatedInvoiceId in :invoiceIds")
     List<ConstructionInvoice> findCreditNotesForAll(@Param("invoiceIds") Collection<UUID> invoiceIds);

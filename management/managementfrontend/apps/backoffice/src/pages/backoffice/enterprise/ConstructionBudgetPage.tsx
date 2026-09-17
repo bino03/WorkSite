@@ -7,6 +7,7 @@ import {
   ArrowLeftOutlined,
   DeleteOutlined,
   DownOutlined,
+  DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
   PlusOutlined,
@@ -30,6 +31,7 @@ import { BudgetItemDrawer } from "@/components/budget/BudgetItemDrawer";
 import { BudgetMoveToModal } from "@/components/budget/BudgetMoveToModal";
 import { BudgetRecycleBinDrawer } from "@/components/budget/BudgetRecycleBinDrawer";
 import { BudgetImportModal } from "@/components/budget/BudgetImportModal";
+import { BudgetExportModal } from "@/components/budget/BudgetExportModal";
 import { flattenTree, matchesQuery, siblingsOf } from "@/components/budget/budgetTree";
 
 /** Quantos caracteres de descrição mostrar antes de oferecer "ver mais". */
@@ -52,6 +54,7 @@ const ConstructionBudgetPage: FC = () => {
 
   const [expensesItem, setExpensesItem] = useState<BudgetItemNode | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [movingItem, setMovingItem] = useState<BudgetItemNode | null>(null);
   const [itemDrawer, setItemDrawer] = useState<{ item: BudgetItemNode | null; parentId: string | null } | null>(
@@ -444,6 +447,13 @@ const ConstructionBudgetPage: FC = () => {
               Importar Excel
             </Button>
           )}
+          {/* É leitura: quem vê o orçamento pode levá-lo. Sem `tree` não aparece,
+              pelo mesmo motivo do botão de importar. */}
+          {tree && (
+            <Button icon={<DownloadOutlined />} onClick={() => setExportOpen(true)}>
+              Exportar Excel
+            </Button>
+          )}
         </Space>
       </div>
 
@@ -590,6 +600,12 @@ const ConstructionBudgetPage: FC = () => {
         existingItemCount={tree?.itemCount ?? 0}
         onClose={() => setImportOpen(false)}
         onImported={fetchTree}
+      />
+
+      <BudgetExportModal
+        open={exportOpen}
+        enterpriseId={enterpriseId ?? ""}
+        onClose={() => setExportOpen(false)}
       />
     </div>
   );

@@ -239,9 +239,14 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'BUDGET_020': 'O ficheiro de orçamento está vazio.',
   'BUDGET_021': 'O ficheiro tem de ser um Excel (.xlsx).',
   'BUDGET_022': 'Não foi possível ler o ficheiro de orçamento.',
-  'BUDGET_023': 'Não foi encontrada a linha de cabeçalho (coluna "Art") no Excel.',
+  'BUDGET_023': 'Não foi encontrada a linha de cabeçalho (coluna "Art" ou "Rubrica") no Excel.',
   'BUDGET_024': 'O Excel não tem rubricas para importar.',
   'BUDGET_025': 'Este projeto já tem orçamento. Elimine-o primeiro ou importe com substituição.',
+
+  // ── Exportação para Excel ─────────────────────────────────────────────────
+  'BUDGET_026': 'Escolha pelo menos uma folha para exportar.',
+  'BUDGET_027': 'Esta obra não tem orçamento — só a folha "Despesas" pode ser exportada.',
+  'BUDGET_028': 'Não foi possível gerar o ficheiro Excel.',
 
   // ── Despesas de construção ────────────────────────────────────────────────
   'EXPENSE_001': 'Despesa não encontrada.',

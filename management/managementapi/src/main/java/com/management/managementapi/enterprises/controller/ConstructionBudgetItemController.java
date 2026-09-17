@@ -1,6 +1,8 @@
 package com.management.managementapi.enterprises.controller;
 
+import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
@@ -8,6 +10,7 @@ import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSe
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSaveResponseDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
+import com.management.managementapi.enterprises.service.BudgetExcelExportService;
 import com.management.managementapi.enterprises.service.BudgetExcelImportService;
 import com.management.managementapi.enterprises.service.ConstructionBudgetItemService;
 import com.management.managementapi.model.enums.EntityType;
@@ -19,6 +22,8 @@ import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +41,9 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,6 +56,7 @@ public class ConstructionBudgetItemController {
 
     private final ConstructionBudgetItemService service;
     private final BudgetExcelImportService importService;
+    private final BudgetExcelExportService exportService;
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
 
@@ -58,6 +66,38 @@ public class ConstructionBudgetItemController {
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
     public ResponseEntity<BudgetTreeDTO> getTree(@PathVariable UUID enterpriseId) {
         return ResponseEntity.ok(service.getTree(enterpriseId));
+    }
+
+    // ── exportação para Excel ─────────────────────────────────
+
+    /** O que a exportação vai escrever (contagens e avisos) — o passo 2 do modal, antes do download. */
+    @GetMapping("/enterprise/{enterpriseId}/export/summary")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<BudgetExportSummaryDTO> exportSummary(@PathVariable UUID enterpriseId) {
+        return ResponseEntity.ok(exportService.summary(enterpriseId));
+    }
+
+    /**
+     * O {@code Despesas - <Obra>.xlsx} do vault, com as folhas pedidas
+     * ({@code sheets=BUDGET,EXPENSES,COMPARISON}). É leitura: quem pode ver o
+     * orçamento pode levá-lo consigo.
+     *
+     * O nome do ficheiro vai em {@code filename*=UTF-8''…}: os slugs têm acentos
+     * e espaços, e o {@code filename="…"} cru só aguenta ISO-8859-1.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/export")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<byte[]> export(@PathVariable UUID enterpriseId,
+                                         @RequestParam Set<BudgetExportSheet> sheets) {
+        BudgetExcelExportService.ExportFile file = exportService.export(enterpriseId, sheets);
+
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(file.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType(BudgetExcelExportService.CONTENT_TYPE))
+                .body(file.content());
     }
 
     /**

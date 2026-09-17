@@ -96,6 +96,25 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// INTERCEPTOR DE RESPONSE — erro chegado como Blob (pedidos `responseType: 'blob'`)
+// Num download, o Axios entrega até o `{errorCode}` do backend como Blob; sem isto
+// nem o `ErrorHandler` nem o interceptor global conseguiam ler o código e caíam na
+// mensagem genérica. Corre primeiro, para os outros dois já verem JSON.
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const data = error?.response?.data;
+    if (typeof Blob !== "undefined" && data instanceof Blob && data.type.includes("json")) {
+      try {
+        error.response.data = JSON.parse(await data.text());
+      } catch {
+        // não era JSON afinal — segue como estava
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // INTERCEPTOR DE RESPONSE — token refresh em 401 (com refresh_token cookie)
 api.interceptors.response.use(
   (response) => {

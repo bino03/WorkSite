@@ -224,9 +224,14 @@ public enum ErrorCode {
     BUDGET_IMPORT_EMPTY_FILE("BUDGET_020", "Ficheiro de orçamento vazio"),
     BUDGET_IMPORT_INVALID_TYPE("BUDGET_021", "O ficheiro tem de ser um Excel (.xlsx)"),
     BUDGET_IMPORT_READ_ERROR("BUDGET_022", "Não foi possível ler o ficheiro de orçamento"),
-    BUDGET_IMPORT_NO_HEADER("BUDGET_023", "Não foi encontrada a linha de cabeçalho (coluna \"Art\") no Excel"),
+    BUDGET_IMPORT_NO_HEADER("BUDGET_023", "Não foi encontrada a linha de cabeçalho (coluna \"Art\" ou \"Rubrica\") no Excel"),
     BUDGET_IMPORT_NO_ROWS("BUDGET_024", "O Excel não tem rubricas para importar"),
     BUDGET_IMPORT_NOT_EMPTY("BUDGET_025", "O projeto já tem orçamento — elimine-o antes de importar ou use replace=true"),
+
+    // Exportação para Excel (BUDGET_026-029)
+    BUDGET_EXPORT_NO_SHEETS("BUDGET_026", "Escolha pelo menos uma folha para exportar"),
+    BUDGET_EXPORT_NO_BUDGET("BUDGET_027", "Esta obra não tem orçamento — só a folha \"Despesas\" pode ser exportada"),
+    BUDGET_EXPORT_WRITE_ERROR("BUDGET_028", "Não foi possível gerar o ficheiro Excel"),
 
     // ========================================================================
     // DESPESAS DE CONSTRUÇÃO (EXPENSE_xxx)

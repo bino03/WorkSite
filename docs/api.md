@@ -173,6 +173,8 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | GET | `/construction-budget/enterprise/{enterpriseId}/deleted` | `ADMIN` — a zona de recuperação |
 | PATCH | `/construction-budget/items/{id}/recover` | `ADMIN` — repõe a rubrica e a sub-árvore eliminada junto |
 | POST | `/construction-budget/enterprise/{enterpriseId}/import?dryRun=&replace=` | `ADMIN` — multipart `file` (.xlsx) |
+| GET | `/construction-budget/enterprise/{enterpriseId}/export/summary` | `ADMIN` ou `EMPLOYEE` — o que a exportação vai escrever (contagens, avisos, nome do ficheiro) |
+| GET | `/construction-budget/enterprise/{enterpriseId}/export?sheets=BUDGET,EXPENSES,COMPARISON` | `ADMIN` ou `EMPLOYEE` — o `.xlsx` (binário, `Content-Disposition: attachment`) |
 
 > 🧹 **`DELETE` passou a soft delete a 2026-09-16** (`V36`, coluna `deleted_at`). Bloqueado com
 > `BUDGET_013` se houver despesas em **qualquer** nó da sub-árvore (mover ou apagar as despesas
@@ -207,7 +209,22 @@ lá dentro — somar os dois contaria a mesma derrapagem duas vezes.
 **Importação**: `dryRun=true` (omissão) devolve a árvore que *seria* criada, com avisos
 (índices repetidos, células de texto em colunas numéricas, rubricas sem descrição) e a
 reconciliação contra a linha `TOTAL` do Excel — sem gravar nada. Com `dryRun=false` grava, e
-exige `replace=true` se o projeto já tiver orçamento.
+exige `replace=true` se o projeto já tiver orçamento. O cabeçalho aceita `Art` **ou** `Rubrica`
+na coluna A (desde 2026-09-17 — é o nome que o vault usa e que a exportação escreve).
+
+**Exportação** (2026-09-17, fase 6 lado app → Excel — o contrato é [[excel-parity.md]] §9):
+`sheets` é um conjunto de `BUDGET` ("Orçamento inicial"), `EXPENSES` ("Despesas") e
+`COMPARISON` ("Orçamento vs Gasto" **+** "Rubricas", gerada sempre). `COMPARISON` arrasta
+`EXPENSES` — o painel é todo fórmulas `SUMIF` sobre a `TabelaDespesas`/`TabelaRubricas` e sem
+elas dava `#NAME?`. Regras: `BUDGET_026` sem folhas; `BUDGET_027` se a obra não tiver rubricas
+vivas e se pedir `BUDGET` ou `COMPARISON` (`EXPENSES` sozinha exporta sempre, mesmo sem faturas);
+`BUDGET_028` se o POI falhar a escrever. Uma obra `is_test` **exporta** (para se poder testar o
+próprio exportador), mas o ficheiro leva o prefixo `TESTE - `. O nome vai em
+`filename*=UTF-8''…` porque os slugs têm acentos e espaços — o cliente tem de descodificar esse
+parâmetro, não o `filename=` cru. `GET …/export/summary` devolve o `BudgetExportSummaryDTO`
+(`fileName`, `hasBudget`, contagens de rubricas/faturas/linhas, `unclassifiedInvoiceCount`,
+`manualExpenseCount`, `creditNoteCount`, `partialPaymentCount`, `missingNumberCount`,
+`needsReviewCount`, `warnings`) — é o passo 2 do modal, antes do download.
 
 ## Despesas de Construção (`ConstructionExpenseController`, `/construction-expenses`)
 
