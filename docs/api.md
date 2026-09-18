@@ -445,28 +445,31 @@ um confirm para apagar **esta** fatura (ficheiro e miniatura do Storage, e a lin
 normal de quem está a completar uma fatura "por rever" à mão e só aí percebe que já a tinha
 carregado antes.
 
-O ATCUD e o checksum têm ainda uma garantia ao nível da base: `uq_invoice_enterprise_atcud`
-(`V17`) e `uq_invoice_enterprise_checksum` (`V18`), ambos únicos e parciais — sobre
-`(enterprise_id, invoice_atcud)` e `(enterprise_id, checksum_sha256)`, respetivamente. A
-verificação no serviço é SELECT-depois-INSERT em transações separadas, e o cliente carrega
-com três pedidos em paralelo — dois ficheiros iguais em voo ao mesmo tempo passavam os dois.
-Aconteceu com o ATCUD: duas linhas gravadas com 20 ms de diferença. Os índices fecham essa
-janela; o serviço continua a existir para dar a mensagem legível em vez de uma violação de
-constraint.
+O ATCUD, o par (NIF, número) e o checksum têm ainda uma garantia ao nível da base — os índices
+únicos parciais `uq_invoice_atcud`, `uq_invoice_nif_number` (`V29`, globais) e
+`uq_invoice_document_checksum` (`V24`, na tabela do documento). A verificação no serviço é
+SELECT-depois-INSERT em transações separadas, e o cliente carrega com três pedidos em paralelo —
+dois ficheiros iguais em voo ao mesmo tempo passavam os dois. Aconteceu com o ATCUD: duas linhas
+gravadas com 20 ms de diferença. Os índices fecham essa janela; o serviço continua a existir para
+dar a mensagem legível em vez de uma violação de constraint.
 
 Quando a janela fecha mesmo assim (dois pedidos em voo, nenhum vê o `INSERT` do outro), o
 Postgres recusa com um `unique_violation` — e é o `GlobalExceptionHandler` que traduz isso de
-volta para a mesma mensagem que o serviço teria dado no caminho normal: reconhece tanto
-`uq_invoice_enterprise_atcud` (`INVOICE_010`) como `uq_invoice_enterprise_checksum`
-(`INVOICE_012`) pelo nome na exceção do driver. Sem essa tradução por índice, cai no genérico
-`DATABASE_CONSTRAINT_VIOLATION` — foi o que aconteceu ao checksum até este ficar coberto, já
-que o handler só conhecia o ATCUD desde a `V17`. O Backoffice ainda reduz a corrida do lado do
-cliente: calcula o SHA-256 de cada ficheiro no browser antes do "Enviar" e recusa localmente um
-que já esteja reivindicado por outro do mesmo lote, sem gastar pedido nenhum ao servidor — mas
-isso só apanha duplicados dentro do próprio lote, nunca substitui a garantia da base.
+volta para a mesma mensagem que o serviço teria dado no caminho normal: reconhece os três índices
+pelo nome na exceção do driver (`uq_invoice_atcud` → `INVOICE_010`, `uq_invoice_nif_number` →
+`INVOICE_011`, `uq_invoice_document_checksum` → `INVOICE_012`). Sem essa tradução por índice, cai
+no genérico `DATABASE_CONSTRAINT_VIOLATION` (`DB_003`) — e foi o que aconteceu, em silêncio, entre
+a `V25`/`V29` e 2026-09-18: o handler ainda procurava os nomes antigos por projeto
+(`uq_invoice_enterprise_atcud`, `uq_invoice_enterprise_checksum`), já largados. O Backoffice ainda
+reduz a corrida do lado do cliente: calcula o SHA-256 de cada ficheiro no browser antes do "Enviar"
+e recusa localmente um que já esteja reivindicado por outro do mesmo lote, sem gastar pedido nenhum
+ao servidor — mas isso só apanha duplicados dentro do próprio lote, nunca substitui a garantia da
+base.
 
-O par (NIF, número) **não** leva índice de propósito: só entra em jogo na correção manual, uma
-pessoa de cada vez, onde não há corrida — e um índice ali criaria falsos positivos em gralhas.
+Em `POST /{id}/documents` a procura por checksum é global e **não exclui a própria fatura**: juntar
+outra vez um ficheiro que essa fatura já tem dá `INVOICE_012` com a mensagem "Este ficheiro já está
+anexado a esta fatura", antes de qualquer escrita no Storage. Até 2026-09-18 excluía-a, o ficheiro
+subia ao bucket e só o índice da `V24` o recusava — como `DB_003`, com o ficheiro já órfão.
 
 Filtros da caixa de entrada, todos opcionais e cumuláveis. `Page` com 20 por omissão,
 ordenada por `uploadedAt` descendente:

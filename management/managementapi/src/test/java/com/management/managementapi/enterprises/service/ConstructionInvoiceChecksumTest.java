@@ -33,6 +33,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -132,5 +133,79 @@ class ConstructionInvoiceChecksumTest {
                 .isNotBlank()
                 .hasSize(64); // SHA-256 em hexadecimal
         assertThat(captor.getValue().getInvoice()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("juntar a uma fatura o mesmo ficheiro que ela já tem → INVOICE_012, não DB_003")
+    void rejectsSameFileAddedTwiceToTheSameInvoice() throws IOException {
+        // O caso do TabuadaPioneira_2.jpeg (2026-09-18): o cheque excluía a
+        // própria fatura, o ficheiro ia para o Storage, e só o índice único
+        // global da V24 o apanhava — como DB_003, com o ficheiro já órfão.
+        UUID invoiceId = UUID.randomUUID();
+        Enterprise enterprise = new Enterprise();
+        enterprise.setId(UUID.randomUUID());
+        enterprise.setName("Vila Petrus");
+
+        ConstructionInvoice invoice = new ConstructionInvoice();
+        invoice.setId(invoiceId);
+        invoice.setEnterprise(enterprise);
+
+        ConstructionInvoiceDocument alreadyThere = new ConstructionInvoiceDocument();
+        alreadyThere.setInvoice(invoice);
+        alreadyThere.setOriginalFilename("TabuadaPioneira.jpeg");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "TabuadaPioneira_2.jpeg", "image/jpeg", "os-mesmos-bytes".getBytes());
+
+        when(repository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+        // A procura tem de ser global — sem excluir a fatura a que se junta.
+        when(documentRepository.findByChecksum(any(), isNull())).thenReturn(List.of(alreadyThere));
+
+        assertThatThrownBy(() -> service.addDocument(invoiceId, file))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.INVOICE_DUPLICATE_FILE))
+                .hasMessageContaining("já está anexado a esta fatura");
+
+        verify(storageService, never()).upload(any(), any(), any(), any());
+        verify(documentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("juntar a uma fatura um ficheiro que outra fatura já tem → INVOICE_012 a dizer onde está")
+    void rejectsFileAddedThatAnotherInvoiceAlreadyHas() throws IOException {
+        UUID invoiceId = UUID.randomUUID();
+        Enterprise enterprise = new Enterprise();
+        enterprise.setId(UUID.randomUUID());
+        enterprise.setName("Vila Petrus");
+
+        ConstructionInvoice invoice = new ConstructionInvoice();
+        invoice.setId(invoiceId);
+        invoice.setEnterprise(enterprise);
+
+        Enterprise otherEnterprise = new Enterprise();
+        otherEnterprise.setId(UUID.randomUUID());
+        otherEnterprise.setName("Vila Aleu");
+        ConstructionInvoice other = new ConstructionInvoice();
+        other.setId(UUID.randomUUID());
+        other.setEnterprise(otherEnterprise);
+        other.setSupplierName("Leroy Merlin");
+
+        ConstructionInvoiceDocument elsewhere = new ConstructionInvoiceDocument();
+        elsewhere.setInvoice(other);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "fatura.pdf", "application/pdf", "bytes-da-aleu".getBytes());
+
+        when(repository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+        when(documentRepository.findByChecksum(any(), isNull())).thenReturn(List.of(elsewhere));
+
+        assertThatThrownBy(() -> service.addDocument(invoiceId, file))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.INVOICE_DUPLICATE_FILE))
+                .hasMessageContaining("Vila Aleu");
+
+        verify(storageService, never()).upload(any(), any(), any(), any());
     }
 }

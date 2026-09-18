@@ -151,13 +151,22 @@ public class GlobalExceptionHandler {
         // aqui é raro, mas quem está do outro lado merece a mesma frase que
         // teria no caminho normal, e não "violação de constraint".
         //
-        //   uq_invoice_enterprise_atcud     (V17) — mesmo ATCUD da AT
-        //   uq_invoice_enterprise_checksum  (V18) — mesmo ficheiro, byte a byte
+        // Os nomes são os atuais — globais desde a V29 (ATCUD e NIF+número) e
+        // a V24 (checksum, na tabela do documento). Os antigos por projeto
+        // (uq_invoice_enterprise_atcud da V17, uq_invoice_enterprise_checksum
+        // da V18) já não existem; ficaram aqui a apontar para nada durante
+        // meses e tudo caía no DB_003.
+        //
+        //   uq_invoice_atcud              (V29) — mesmo ATCUD da AT
+        //   uq_invoice_nif_number         (V29) — mesmo fornecedor e número
+        //   uq_invoice_document_checksum  (V24) — mesmo ficheiro, byte a byte
         String message = String.valueOf(ex.getMessage());
         ErrorCode code;
-        if (message.contains("uq_invoice_enterprise_atcud")) {
+        if (message.contains("uq_invoice_atcud")) {
             code = ErrorCode.INVOICE_DUPLICATE_ATCUD;
-        } else if (message.contains("uq_invoice_enterprise_checksum")) {
+        } else if (message.contains("uq_invoice_nif_number")) {
+            code = ErrorCode.INVOICE_DUPLICATE_DOCUMENT;
+        } else if (message.contains("uq_invoice_document_checksum")) {
             code = ErrorCode.INVOICE_DUPLICATE_FILE;
         } else {
             code = ErrorCode.DATABASE_CONSTRAINT_VIOLATION;

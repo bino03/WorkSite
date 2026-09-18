@@ -34,8 +34,9 @@ Os dois têm de continuar a poder trocar dados **sem conversão à mão**. É is
   limpo dos caracteres que o Windows recusa (`\ / : * ? " < > |` → `-`), com sufixo ` 2`, ` 3`… se
   já houver outra obra com esse slug; fica gravado na obra e o resumo da exportação di-lo. Um ficheiro
   exportado sem slug não teria pasta onde viver no vault.
-- `enterprises.is_test = true` (hoje: "Vila Teste Claude"; a "Vila Sol" foi apagada a 2026-09-17, com as
-  20 faturas de desenvolvimento que tinha — eram os números reais do Petrus e bloqueavam a migração)
+- `enterprises.is_test = true` (hoje **nenhuma**: a "Vila Sol" foi apagada a 2026-09-17, com as
+  20 faturas de desenvolvimento que tinha — eram os números reais do Petrus e bloqueavam a migração;
+  a "Vila Teste Claude" a 2026-09-18, com 8 faturas sintéticas, slug limpo antes do soft delete)
   **nunca** entra numa importação ou soma da empresa.
   **Exceção (2026-09-17)**: a exportação app → Excel aceita uma obra de teste, porque é a única
   forma de testar o exportador no browser sem tocar numa obra real — o ficheiro sai com o prefixo

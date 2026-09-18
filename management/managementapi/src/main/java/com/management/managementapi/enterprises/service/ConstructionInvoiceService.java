@@ -575,10 +575,17 @@ public class ConstructionInvoiceService {
         String checksum = sha256Hex(original);
 
         // Só o ficheiro é verificado: a identidade da fatura é a que já lá está.
-        documentRepository.findByChecksum(checksum, invoiceId).stream()
+        // Sem excluir esta fatura — o índice único da V24 é global e apanha
+        // também o mesmo ficheiro juntado duas vezes à mesma fatura; sem este
+        // cheque, isso saía como DB_003 depois de o ficheiro já estar no Storage.
+        documentRepository.findByChecksum(checksum, null).stream()
                 .findFirst()
                 .ifPresent(document -> {
                     ConstructionInvoice other = document.getInvoice();
+                    if (invoiceId.equals(other.getId())) {
+                        throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_FILE,
+                                "Este ficheiro já está anexado a esta fatura");
+                    }
                     throw new BusinessException(ErrorCode.INVOICE_DUPLICATE_FILE, String.format(
                             "Este ficheiro já foi carregado em %s (%s, %s)",
                             whereItIs(other), describe(other), dateOf(other)));
