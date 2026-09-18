@@ -57,9 +57,12 @@ public class EmailProvider {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "created_at")
+    // Preenchidos pela base de dados (DEFAULT NOW() da V7 e o trigger da V21):
+    // com insertable a true o Hibernate mandava null explícito e o INSERT
+    // falhava na NOT NULL — o CRUD nunca chegou a criar um provedor no browser.
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private Instant updatedAt;
 }

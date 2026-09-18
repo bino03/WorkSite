@@ -176,7 +176,13 @@ public class MyTable extends BaseEntity {
 ```
 
 **Important**:
-- Extend `BaseEntity` (gives you `id`, `createdAt`, `updatedAt`)
+- Extend `BaseEntity` (gives you `id`, `createdAt`, `updatedAt`). If the entity **can't** extend it
+  (another schema, own id strategy), map the timestamps as `BaseEntity` does —
+  `@Column(name = "created_at", nullable = false, insertable = false, updatable = false)` — or with
+  `@CreationTimestamp`/`@CreatedDate`. A plain `@Column(name = "created_at")` makes Hibernate send an
+  explicit `null`, the `DEFAULT now()` never applies, and the INSERT dies on the NOT NULL. Unit tests
+  with mocked repositories never see it: `EmailProvider` and `PasswordResetToken` shipped like that
+  (2026-08-21) and only broke in the browser on 2026-09-18.
 - Use `@Enumerated(EnumType.STRING)` for enums
 - Use `FetchType.LAZY` on relations to avoid N+1 queries
 - Match column names exactly to your SQL

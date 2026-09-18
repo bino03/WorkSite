@@ -127,6 +127,16 @@ class PasswordResetServiceTest {
     }
 
     @Test
+    @DisplayName("sem provedor de email, um email com conta responde como um sem conta — a falha fica no log")
+    void falhaAEnviarNaoRevelaQueAContaExiste() {
+        contaExisteComPerfil();
+        org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.EMAIL_PROVIDER_INACTIVE))
+                .when(emailService).sendPasswordResetEmail(anyString(), anyString());
+
+        assertThatCode(() -> service().requestReset(EMAIL)).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("token já usado não define password nenhuma")
     void tokenJaUsado() {
         when(tokenRepository.findByToken("token-abc"))

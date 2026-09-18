@@ -45,9 +45,12 @@ public class PasswordResetToken {
     @Column(name = "used_at")
     private Instant usedAt;
 
-    @Column(name = "created_at")
+    // Preenchidos pela base de dados (DEFAULT NOW() da V22): com insertable a true
+    // o Hibernate mandava null explícito e o INSERT falhava na NOT NULL — o mesmo
+    // buraco do EmailProvider, apanhado no browser a 2026-09-18.
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private Instant updatedAt;
 }

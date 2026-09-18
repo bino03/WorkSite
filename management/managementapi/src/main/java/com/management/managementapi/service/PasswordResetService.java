@@ -89,7 +89,15 @@ public class PasswordResetService {
         reset.setExpiresAt(Instant.now().plus(TOKEN_TTL));
         tokenRepository.save(reset);
 
-        emailService.sendPasswordResetEmail(reset.getEmail(), reset.getToken());
+        // Uma falha a enviar (sem provedor configurado, SMTP em baixo) fica no log
+        // e sai daqui como se nada fosse: deixá-la subir dava 400 a um email com
+        // conta e 204 a um sem conta — exatamente a diferença que este método
+        // promete não mostrar. Visto no browser a 2026-09-18, sem provedor.
+        try {
+            emailService.sendPasswordResetEmail(reset.getEmail(), reset.getToken());
+        } catch (RuntimeException e) {
+            log.error("Pedido de recuperação para {}: o email não saiu ({})", email, e.getMessage());
+        }
     }
 
     /**

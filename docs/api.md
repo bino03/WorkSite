@@ -48,7 +48,9 @@ ainda por usar e grava um token novo em `settings.password_reset_tokens` com **1
 
 **Responde `204` exista ou não a conta.** É público e sem autenticação: distinguir os dois casos
 transformava-o num verificador de contas. O texto do ecrã já está escrito nesses termos ("se
-existir uma conta associada a…"). Não há limite de tentativas — vale a pena quando isto estiver
+existir uma conta associada a…"). **Uma falha a enviar o email (sem provedor configurado,
+SMTP em baixo) também responde `204`** — fica só no log do servidor; até 2026-09-18 subia como
+`400 EMAIL_002` e revelava a conta. Não há limite de tentativas — vale a pena quando isto estiver
 exposto fora da rede interna.
 
 `POST /auth/reset-password` valida o token (existe, por usar, dentro do prazo), define a password
