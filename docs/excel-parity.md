@@ -281,8 +281,9 @@ cópias em conflito; não há `.xlsx` a proteger).
 ### Excel → app (`DespesasExcelImportService`, fase 6)
 
 > ✅ **Feito a 2026-09-17** (`POST /construction-invoices/import-excel`, ver [[api.md]] → "Importar a
-> folha "Despesas" do Excel"). O que segue é o contrato **como ficou implementado**. Ficam de fora desta
-> implementação — para a ronda seguinte — o passo 7 (documentos de `Faturas\Lançadas\`) e a quarentena
+> folha "Despesas" do Excel"). O que segue é o contrato **como ficou implementado**. O passo 7 (documentos
+> de `Faturas\Lançadas\`) não está no importador — foi feito à parte na migração de 2026-09-18, pelo
+> endpoint de documentos, com as regras descritas no passo. Fica de fora a quarentena
 > (`Faturas por identificar.xlsx`, que tem outra tabela, `TabelaPorIdentificar`).
 
 Entrada: **só o `.xlsx`** (`Despesas - <Obra>.xlsx` ou `Despesas da empresa.xlsx`), por upload; a obra vem
@@ -325,8 +326,17 @@ no pedido (`scope=PROJECT&enterpriseId=`), não do nome do ficheiro.
    um lote com NC abatida fica na app com o valor **bruto** das faturas (Atrium: 17 241,36 € em vez de
    16 942,47 €), porque a NC reduz a fatura de origem, não o movimento.
    A linha "Despesa registada à mão na app, sem fatura." volta a ser uma despesa solta (exige rubrica e data).
-7. ~~Ficheiros de `Faturas\Lançadas\`~~ — **por fazer** (ronda seguinte). Quando entrar: `uploaded_at` =
-   data da importação, **aproximada** — desde 10-09-2026 a data real não existe no arquivo (aviso em §7).
+7. Ficheiros de `Faturas\Lançadas\` — **não fazem parte do importador**; na migração de 2026-09-18 foram
+   anexados à parte, por `POST /construction-invoices/{id}/documents`, com a correspondência feita pelo
+   **nº sanitizado no nome** (`<aaaammdd>_<Nº>_<Fornecedor>[_pN][_2].<ext>` → 2.º token, comparado sem
+   pontuação com o `invoice_number`; se não bater, aceita-se quando o nº do Excel é **sufixo** do nome —
+   o vault escreve `FTFAC2026-134` no ficheiro e `FAC2026/134` na folha). O que não é fatura (`RECIBO-…`,
+   `PROFORMA-…`, `ORCAMENTO-…`) fica de fora; `_pN` e `.jpeg`+`.pdf` do mesmo nº entram todos na mesma
+   fatura; um `_2` **byte a byte igual** ao original é recusado pelo checksum. O upload lê o QR e preenche
+   NIF/ATCUD/datas onde estavam vazios; quando o QR traz um nº mais completo do que o da folha (`FT FRZ.C2/…`
+   vs `FRZ.C2/…`, `T01 L1601/2111` vs `T01 16/2111`) fica só o aviso — o nº da folha não é sobreposto.
+   `uploaded_at` = data do upload, **aproximada** — desde 10-09-2026 a data real não existe no arquivo (aviso em §7).
+   Se um dia isto entrar no importador, é este o algoritmo.
 8. `dryRun` (por omissão): relatório com contagens, somas, **erros por linha do Excel**, avisos, perguntas e
    a pré-visualização fatura a fatura — **nada gravado**. As respostas às perguntas vão no 2.º pedido
    (`answers[{questionId, value}]`, ids estáveis por linha).

@@ -796,7 +796,9 @@ ficheiro entra **sem** pagamento, com aviso — líquido zero). Uma linha sem va
 (por rever), com aviso. No fim confere contra a folha: nº de
 faturas, Σ e nº de liquidadas — diferença → `INVOICE_046` e rollback. Uma obra `is_test` só aceita
 um ficheiro `TESTE - …` (o que o exportador gera para obras de teste) → senão `INVOICE_045`.
-Os documentos de `Faturas\Lançadas\` **não** entram por aqui (ronda seguinte).
+Os documentos de `Faturas\Lançadas\` **não** entram por aqui — juntam-se depois por `POST /{id}/documents`,
+um a um (a migração de 2026-09-18 fê-lo com a correspondência pelo nº no nome do ficheiro; regras em
+[[excel-parity.md]] §9, passo 7).
 
 ## Inconsistências (`InvoiceIncidentController`, `/invoice-incidents`)
 
