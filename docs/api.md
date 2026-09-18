@@ -212,7 +212,7 @@ reconciliação contra a linha `TOTAL` do Excel — sem gravar nada. Com `dryRun
 exige `replace=true` se o projeto já tiver orçamento. O cabeçalho aceita `Art` **ou** `Rubrica`
 na coluna A (desde 2026-09-17 — é o nome que o vault usa e que a exportação escreve), e **as restantes
 colunas resolvem-se pelo nome do cabeçalho** (`Descrição`, `Un.`, `Quant`, `Preço Un`, `Preço total`,
-`Obs.`), com a posição do orçamento do empreiteiro como fallback — a "Orçamento inicial" do vault tem só
+`Obs.`), com a posição do orçamento do empreiteiro como fallback só se o cabeçalho não tiver nomes conhecidos (as colunas ausentes num cabeçalho reconhecido ficam vazias) — a "Orçamento inicial" do vault tem só
 `Rubrica | Descrição | Preço total`. Ver [[excel-parity.md]] §6.
 
 **Exportação** (2026-09-17, fase 6 lado app → Excel — o contrato é [[excel-parity.md]] §9):
@@ -289,7 +289,7 @@ de entrada.
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
-| GET | `/construction-invoices/enterprise/{enterpriseId}/pending-count` | `ADMIN` ou `EMPLOYEE` — quantas por associar |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/pending-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total }` das faturas por associar (NC não entram): o contador do botão "Faturas" e o cartão "Por classificar" ao lado do "Gasto" no orçamento. Era `pending-count` (só o número) até 2026-09-18 |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida por NIF, sem o porquê (o `rubric-suggestion` por fatura veio substituí-lo); `204` sem histórico |
 | GET | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — única resposta com `fileUrl` |
 | PUT | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — correção manual |
@@ -659,7 +659,7 @@ Fase 3 da paridade com o Excel. Uma NC só existe **agarrada a uma fatura já la
 **Líquido da fatura** = `totalAmount − Σ (totalAmount das suas NC)`, exposto em todos os DTOs
 de fatura como `netAmount`, com `creditNoteTotal` e `creditNotes[]` (refs). É o `netAmount`
 que os pagamentos cobrem e o filtro `?outstanding=` usa; as linhas `CREDIT_NOTE` nunca contam
-como "por liquidar" nem entram no `pending-count`. `POST .../{id}/payments` recusa uma NC
+como "por liquidar" nem entram no `pending-summary`. `POST .../{id}/payments` recusa uma NC
 (`INVOICE_027`). O `preview` do upload passa a devolver `documentType` (campo `D` do QR): um
 `"NC"` encaminha o utilizador para este fluxo em vez do registo normal.
 

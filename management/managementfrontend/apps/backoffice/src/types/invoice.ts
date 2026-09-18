@@ -594,3 +594,9 @@ export interface ExpensesImportAnswer {
   questionId: string;
   value: string;
 }
+
+/** O que está por classificar numa obra: quantas faturas e quanto valem (NC não entram). */
+export interface PendingInvoicesSummary {
+  count: number;
+  total: number;
+}

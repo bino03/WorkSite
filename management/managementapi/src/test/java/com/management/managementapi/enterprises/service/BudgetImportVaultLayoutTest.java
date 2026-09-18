@@ -67,6 +67,12 @@ class BudgetImportVaultLayoutTest {
                     assertThat(r.kind()).isEqualTo(BudgetRowKind.ITEM);
                     assertThat(r.totalPrice()).isEqualByComparingTo("63359.20");
                 });
+        // a folha não tem "Un." nem "Quant": não se pode cair na posição por omissão (era o "Preço total" a ir parar a "Un.")
+        assertThat(result.rows()).allSatisfy(r -> {
+            assertThat(r.unit()).isNull();
+            assertThat(r.quantity()).isNull();
+            assertThat(r.unitPrice()).isNull();
+        });
         // os dois índices repetidos do Petrus (8.2 e 13.2.1) entram sem índice, avisados — nunca se desempata sozinho
         assertThat(result.warnings()).filteredOn(w -> w.contains("repetido")).hasSize(2);
     }

@@ -19,7 +19,8 @@ import {
 } from "@ant-design/icons";
 
 import { deleteBudgetItem, getBudgetTree, listDeletedBudgetItems, moveBudgetItem } from "@/services/budgetService";
-import { countPendingInvoices } from "@/services/invoiceService";
+import { getPendingInvoicesSummary } from "@/services/invoiceService";
+import type { PendingInvoicesSummary } from "@/types/invoice";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,7 +50,7 @@ const ConstructionBudgetPage: FC = () => {
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set());
 
-  const [pendingInvoices, setPendingInvoices] = useState(0);
+  const [pending, setPending] = useState<PendingInvoicesSummary>({ count: 0, total: 0 });
   const [deletedCount, setDeletedCount] = useState(0);
 
   const [expensesItem, setExpensesItem] = useState<BudgetItemNode | null>(null);
@@ -83,7 +84,7 @@ const ConstructionBudgetPage: FC = () => {
   useEffect(() => {
     if (!enterpriseId) return;
     // Falhar aqui só custa o contador — não vale um erro na cara de ninguém.
-    countPendingInvoices(enterpriseId).then(setPendingInvoices).catch(() => setPendingInvoices(0));
+    getPendingInvoicesSummary(enterpriseId).then(setPending).catch(() => setPending({ count: 0, total: 0 }));
   }, [enterpriseId]);
 
   const refreshDeletedCount = useCallback(() => {
@@ -419,7 +420,7 @@ const ConstructionBudgetPage: FC = () => {
         </div>
         <Space>
           {/* O contador é o que faz alguém lembrar-se de ir classificar. */}
-          <Badge count={pendingInvoices} overflowCount={99} offset={[-4, 2]}>
+          <Badge count={pending.count} overflowCount={99} offset={[-4, 2]}>
             <Button
               icon={<FileTextOutlined />}
               onClick={() => navigate(`/backoffice/empreendimentos/${enterpriseId}/invoices`)}
@@ -471,7 +472,22 @@ const ConstructionBudgetPage: FC = () => {
         }}
       >
         <MetricCard label="Orçamento" value={formatCurrency(totals?.budgetTotal ?? 0)} />
-        <MetricCard label="Gasto" value={formatCurrency(totals?.spentTotal ?? 0)} />
+        {/* "Gasto" só conta o que já está numa rubrica; sem o resto ao lado parecia
+            que o dinheiro das faturas por classificar tinha desaparecido. */}
+        <MetricCard
+          label="Gasto"
+          value={formatCurrency(totals?.spentTotal ?? 0)}
+          meta={pending.count > 0 ? `só o que está em rubricas` : undefined}
+        />
+        {pending.count > 0 && (
+          <MetricCard
+            label="Por classificar"
+            value={formatCurrency(pending.total)}
+            meta={`${pending.count} fatura${pending.count === 1 ? "" : "s"} fora do orçamento — total faturado ${formatCurrency(
+              (totals?.spentTotal ?? 0) + pending.total
+            )}`}
+          />
+        )}
         <MetricCard
           label="Restante"
           value={formatCurrency(totals?.remaining ?? 0)}

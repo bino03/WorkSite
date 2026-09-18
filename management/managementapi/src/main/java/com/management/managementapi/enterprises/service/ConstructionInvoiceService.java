@@ -22,6 +22,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.DuplicateIn
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
@@ -934,9 +935,13 @@ public class ConstructionInvoiceService {
                 false));
     }
 
+    /**
+     * O que está por classificar: quantas e quanto. O "Gasto" do orçamento só
+     * conta o que já está numa rubrica; isto é a outra metade do total faturado.
+     */
     @Transactional(readOnly = true)
-    public long countPending(UUID enterpriseId) {
-        return repository.countPending(enterpriseId);
+    public PendingInvoicesSummaryDTO pendingSummary(UUID enterpriseId) {
+        return new PendingInvoicesSummaryDTO(repository.countPending(enterpriseId), repository.sumPending(enterpriseId));
     }
 
     /**

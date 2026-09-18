@@ -176,7 +176,7 @@ iguais letra a letra.
 > (`Rubrica | Descrição | Preço total`) — descoberto ao migrar o Vila Petrus a 2026-09-17, quando o
 > importador leu o total na coluna F e entrou tudo a zero; desde então **resolve as colunas pelo
 > cabeçalho** (`Art`/`Rubrica`, `Descrição`, `Un.`, `Quant`, `Preço Un`, `Preço total`, `Obs.`), com a
-> posição do orçamento do empreiteiro como fallback (`BudgetImportVaultLayoutTest`). A exportação escreve `Rubrica`, com as 7 colunas
+> posição do orçamento do empreiteiro como fallback **só quando o cabeçalho não tem nomes conhecidos** — num cabeçalho reconhecido, a coluna que lá não está não existe (na folha de 3 colunas o "Preço total" ia parar a "Un." por cair na posição 2; visto e corrigido a 2026-09-18, `BudgetImportVaultLayoutTest`). A exportação escreve `Rubrica`, com as 7 colunas
 > (`Rubrica | Descrição | Un. | Quant | Preço Un | Preço total | Obs.`) e a linha `TOTAL` na coluna B —
 > um só formato que os dois lados leem. `rowKind` não tem coluna: na reimportação, sub-títulos e notas
 > voltam a ser classificados pela heurística do importador (sem índice e sem números → sub-título;

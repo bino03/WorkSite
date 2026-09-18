@@ -66,6 +66,8 @@ public class BudgetExcelImportService {
      */
     private record Columns(int code, int name, int unit, int quantity, int unitPrice, int total, int observations) {
         static final Columns DEFAULT = new Columns(0, 1, 2, 3, 4, 5, 6);
+        /** Nenhuma coluna: um cabeçalho reconhecido só tem o que nomeia. */
+        static final Columns ABSENT = new Columns(-1, -1, -1, -1, -1, -1, -1);
     }
 
     private static final int MAX_HEADER_SCAN_ROWS = 60;
@@ -169,7 +171,7 @@ public class BudgetExcelImportService {
         return -1;
     }
 
-    /** Cada coluna pelo nome que tiver na linha de cabeçalho; as que não aparecem ficam na posição por omissão. */
+    /** Cada coluna pelo nome que tiver na linha de cabeçalho; num cabeçalho reconhecido, o que não aparece não existe. */
     private static Columns resolveColumns(Row header) {
         Map<String, Integer> byName = new HashMap<>();
         for (Cell cell : header) {
@@ -177,9 +179,15 @@ public class BudgetExcelImportService {
             String name = cell.getStringCellValue().trim().toLowerCase().replaceAll("[.\\s]+$", "");
             byName.putIfAbsent(name, cell.getColumnIndex());
         }
-        Columns d = Columns.DEFAULT;
+        // Cabeçalho reconhecido (tem a descrição ou o preço total pelo nome): o que
+        // lá não estiver **não existe** — na folha de 3 colunas do vault, cair na
+        // posição por omissão punha o "Preço total" dentro de "Un.". Só um cabeçalho
+        // sem nomes conhecidos usa as posições do orçamento do empreiteiro.
+        boolean named = byName.keySet().stream()
+                .anyMatch(n -> n.startsWith("descri") || n.startsWith("preço total") || n.startsWith("preco total"));
+        Columns d = named ? Columns.ABSENT : Columns.DEFAULT;
         return new Columns(
-                first(byName, d.code(), "art", "rubrica"),
+                first(byName, Columns.DEFAULT.code(), "art", "rubrica"),
                 first(byName, d.name(), "descrição", "descricao"),
                 first(byName, d.unit(), "un", "unidade"),
                 first(byName, d.quantity(), "quant", "quantidade", "qtd"),
@@ -462,6 +470,7 @@ public class BudgetExcelImportService {
     // ── leitura de células ────────────────────────────────────
 
     private String text(Row row, int col) {
+        if (col < 0) return null;
         Cell cell = row.getCell(col);
         if (cell == null) return null;
 
@@ -484,6 +493,7 @@ public class BudgetExcelImportService {
     }
 
     private BigDecimal number(Row row, int col, int scale, ParseResult result, int excelRow, String colName) {
+        if (col < 0) return null;
         Cell cell = row.getCell(col);
         if (cell == null) return null;
 

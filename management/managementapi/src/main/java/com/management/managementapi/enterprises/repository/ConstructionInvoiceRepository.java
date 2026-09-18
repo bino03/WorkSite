@@ -127,6 +127,15 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
             """)
     long countPending(@Param("enterpriseId") UUID enterpriseId);
 
+    /** Quanto valem as faturas por associar — o que falta ao "Gasto" do orçamento para dar o total faturado. */
+    @Query("""
+            select coalesce(sum(i.totalAmount), 0) from ConstructionInvoice i
+            where i.enterprise.id = :enterpriseId
+              and i.relatedInvoiceId is null
+              and not exists (select 1 from ConstructionExpense e where e.invoice = i)
+            """)
+    java.math.BigDecimal sumPending(@Param("enterpriseId") UUID enterpriseId);
+
     // ── notas de crédito (fase 3) ─────────────────────────────
     // Uma linha com `related_invoice_id` preenchido É uma nota de crédito
     // (garantido pelo check `ck_invoice_credit_note_target` da V28).

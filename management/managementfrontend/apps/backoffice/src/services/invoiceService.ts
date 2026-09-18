@@ -17,6 +17,7 @@ import type {
   InvoiceTransferPayload,
   InvoiceTransferResult,
   InvoiceUploadResult,
+  PendingInvoicesSummary,
   RubricSuggestion,
 } from "@/types/invoice";
 
@@ -197,9 +198,13 @@ export async function listInvoices(
   return normalizePage(response.data);
 }
 
-/** Quantas faturas estão por associar — o contador no ecrã do orçamento. */
-export async function countPendingInvoices(enterpriseId: string): Promise<number> {
-  const response = await api.get(`/construction-invoices/enterprise/${enterpriseId}/pending-count`);
+/**
+ * Quantas faturas estão por associar e quanto valem — o contador e o "por
+ * classificar" ao lado do "Gasto" no ecrã do orçamento (o "Gasto" só conta o
+ * que já está numa rubrica).
+ */
+export async function getPendingInvoicesSummary(enterpriseId: string): Promise<PendingInvoicesSummary> {
+  const response = await api.get(`/construction-invoices/enterprise/${enterpriseId}/pending-summary`);
   return response.data;
 }
 

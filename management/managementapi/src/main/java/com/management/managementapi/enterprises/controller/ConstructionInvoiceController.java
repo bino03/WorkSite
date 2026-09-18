@@ -17,6 +17,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.Constructio
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.service.ConstructionInvoiceService;
@@ -261,11 +262,15 @@ public class ConstructionInvoiceController {
         return service.search(enterpriseId, allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q, pageable);
     }
 
-    /** Quantas faturas estão por associar — alimenta o aviso no ecrã do orçamento. */
-    @GetMapping("/enterprise/{enterpriseId}/pending-count")
+    /**
+     * Quantas faturas estão por associar e quanto valem — o contador e o
+     * "por classificar" ao lado do "Gasto" no ecrã do orçamento. Era
+     * {@code pending-count} (só o número) até 2026-09-18.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/pending-summary")
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
-    public ResponseEntity<Long> countPending(@PathVariable UUID enterpriseId) {
-        return ResponseEntity.ok(service.countPending(enterpriseId));
+    public ResponseEntity<PendingInvoicesSummaryDTO> pendingSummary(@PathVariable UUID enterpriseId) {
+        return ResponseEntity.ok(service.pendingSummary(enterpriseId));
     }
 
     /**
