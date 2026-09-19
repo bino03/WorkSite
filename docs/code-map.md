@@ -8,7 +8,7 @@ para isso há os outros:
 | **Onde está?** | este ficheiro |
 | Que rotas e regras de acesso tem? | [[api.md]] |
 | Que tabelas e colunas? | [[database.md]] |
-| Como se faz uma alteração aqui? | [[../management/managementapi/CLAUDE.md]] · [[../management/managementfrontend/apps/backoffice/CLAUDE.md]] |
+| Como se faz uma alteração aqui? | [[skills/SKILLS-INDEX]] (skills) · [[backend-conventions]] · [[skills/references/frontend-visual-consistency]] |
 | Como se chama isto? | [[skills/references/project-vocabulary]] |
 
 > Mantém-se **grosso de propósito**: portas de entrada e ficheiros-chave, não listas

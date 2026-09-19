@@ -186,4 +186,4 @@ Não copiado do Property-Management: `property_asset`, `buildings`, `agency`, `c
 
 - [[architecture.md]] — Como o backend acede à base de dados
 - [[security.md]] — `profile.role` e como é usado na autorização
-- [[../management/managementapi/CLAUDE.md]] — Guia do backend
+- [[backend-conventions]] — Convenções e armadilhas do backend

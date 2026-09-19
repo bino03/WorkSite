@@ -1,7 +1,9 @@
 # Faturas de obra — modelo alvo
 
-> **Estado: desenho aprovado, por implementar.** Descreve o que a app **vai** ter para chegar à
-> paridade com o Excel da Vilatro. O que a app tem **hoje** está em [[database.md]] e [[api.md]].
+> **Estado: implementado — fases 1 a 6 (2026-09-04 → 2026-09-18), as 3 obras reais migradas.** Este
+> ficheiro é o **registo das decisões** de desenho, não a descrição do que existe: para o estado atual
+> ver [[database.md]] e [[api.md]]. Fica só por fazer a fase 7 (conciliação bancária), que espera
+> pelo formato real dos extratos. As secções abaixo mantêm o tempo verbal original ("vai ter").
 > O mapa coluna-a-coluna com o Excel está em [[excel-parity.md]]. O faseamento e os critérios de
 > aceitação estão em `notes/roadmap/plans/2026-09-04-alinhamento-excel-app.md`.
 >

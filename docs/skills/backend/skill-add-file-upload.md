@@ -1,249 +1,156 @@
 # Skill: Add File Upload
 
-**When to use**: Feature needs to upload files/photos to Supabase Storage
+**Quando usar**: uma feature precisa de guardar ficheiros (fotos, PDFs, comprovativos) no Supabase Storage.
 
-**Time**: ~1-2 hours (validation + upload + storage + signed URLs)
+**Tempo**: ~1-2 h (validação + storage + signed URLs + limpeza ao apagar)
 
-> 📐 See also [[code-best-practices]] for general naming/error-handling conventions used throughout this checklist.
-
----
-
-## Fundamental Rules
-
-1. **Never return raw `photoUrl`** — Supabase Storage URLs don't work without signatures. Always use signed URLs.
-2. **Never store file in database** — Store `bucket` + `storageKey` in the table. File goes to Supabase Storage.
-3. **Validate MIME type before upload** — Never trust filename extension alone.
-4. **Strip leading `/` from key** before calling `createSignedUrl()` — Supabase rejects keys with leading `/`.
-5. **Global limit: 25 MB** per file (configured in `application.yml`).
+> 📐 Ler também [[code-best-practices]] para nomes e tratamento de erros.
+>
+> Reescrita a 2026-09-19. A versão anterior ensinava o `/assets/{id}/banner` do Property-Management,
+> um padrão que este projeto abandonou na `V24`/`V25`. Os exemplos abaixo são **o código real** do
+> Worksite: `ConstructionInvoiceService` (documentos de fatura, 0..N) e `PaymentService`
+> (comprovativo de pagamento, 0..1). Copiar destes, não inventar.
 
 ---
 
-## Entity Fields
+## Os dois padrões que existem
 
-Any entity storing a file needs these two fields:
+| Situação | Modelo | Exemplo real |
+|---|---|---|
+| A entidade pode ter **vários** ficheiros, ou **nenhum** | Tabela própria `<entidade>_document`, FK `ON DELETE CASCADE` | `construction_invoice_document` (`V24`) — ver [[database]] |
+| A entidade tem **no máximo um** ficheiro, opcional | Colunas `<x>_bucket` + `<x>_key` (+ `_filename`, `_mime`) na própria linha | `payment.proof_*` (`V31`) |
+
+Antes de escolher, responder: *pode chegar um segundo ficheiro para a mesma coisa?* Na fatura a
+resposta era sim (a foto do WhatsApp e depois o PDF; a página 1 e a página 2) e foi isso que obrigou
+à `V24` — não repetir o erro de meter o ficheiro dentro da entidade "para já".
+
+---
+
+## Regras fundamentais
+
+1. **Nunca devolver a URL bruta do Storage** — só signed URLs, geradas na leitura por `SignedUrlService.resolve(bucket, key)` (cache de 1 h, `EXPIRES_SECONDS = 3600`).
+2. **Nunca guardar o ficheiro na base de dados** — guardar `bucket` + `storage_key`. O bucket é sempre `"documents"` neste projeto.
+3. **Validar o MIME e o tamanho antes de subir** — nunca só a extensão. `file.getContentType()` com `Optional.ofNullable(...).orElse("")`.
+4. **Apagar no Storage quando se apaga a linha** — `deleteQuietly(bucket, key)` (e a miniatura, se houver). Um `DELETE` que deixa o ficheiro no bucket cria lixo que ninguém mais alcança — `scripts/README.md` existe por causa disso.
+5. **Se há regra de duplicado, verificar antes de subir** — o checksum sha256 calcula-se sobre os bytes originais e `rejectIfDuplicate` corre **antes** do `storageService.upload`. Já custou órfãos no bucket (2026-09-18).
+6. Limite global: `spring.servlet.multipart.max-file-size = 25MB` (`application.yml`); cada feature aperta o seu.
+
+---
+
+## Chave de storage
+
+```
+construction-invoices/<enterpriseId>/<8 chars de uuid>_<nome sanitizado>       ← documento de fatura
+construction-invoices/<enterpriseId>/thumb_<8 chars>.jpg                        ← miniatura
+construction-invoices/<enterpriseId ou scope>/payments/<8 chars>_<nome>          ← comprovativo
+```
+
+- `storageService.sanitizeFileName(originalFilename)` — nunca o nome cru.
+- O prefixo de 8 chars evita colisões sem esconder o nome original (útil ao olhar para o bucket).
+- Faturas sem obra (`COMPANY`/`UNIDENTIFIED`) usam o `scope` em minúsculas como segmento — ver `PaymentService.attachProof`.
+
+---
+
+## Passo 1 — MIME e tamanhos
 
 ```java
-@Column(name = "photo_bucket")
-private String photoBucket;       // e.g. "media", "documents"
-
-@Column(name = "photo_key")
-private String photoKey;          // e.g. "assets/uuid/banner/uuid.jpg"
+// PaymentService — comprovativo: imagem ou PDF, 10 MB
+private static final Set<String> PROOF_MIME = Set.of("image/jpeg", "image/png", "image/webp", "application/pdf");
+private static final long MAX_PROOF_BYTES = 10L * 1024 * 1024;
 ```
 
-**Never store the full URL** — it changes (signed URLs expire).
+Erros: tipo não permitido → código **do domínio** quando a mensagem tem de ser específica
+(`INVOICE_PAYMENT_PROOF_TYPE`), senão `FILE_TYPE_NOT_ALLOWED` (`FILE_003`); tamanho →
+`FileUploadException.sizeExceeded(nome, tamanho, limite)` (`FILE_002`); vazio → `FILE_EMPTY` (`FILE_008`).
 
----
-
-## Storage Key Naming Convention
-
-```
-<entity>/<id>/<type>/<uuid>.<ext>
-
-Examples:
-  assets/3fa85f64/banner/9b1a2c3d.jpg
-  assets/3fa85f64/gallery/1e2f3a4b.png
-  profiles/7c8d9e0f/photo/2a3b4c5d.jpg
-  documents/asset-requests/5f6g7h8i.pdf
-```
-
----
-
-## Step 1: Allowed MIME Types & Sizes
-
-Define what you accept:
+## Passo 2 — Subir (o esqueleto real)
 
 ```java
-private static final Set<String> ALLOWED_IMAGE_MIME = Set.of(
-    "image/jpeg", "image/jpg", "image/png", "image/webp", "image/avif"
-);
-private static final Set<String> ALLOWED_DOC_MIME = Set.of(
-    "application/pdf", "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-);
-private static final long MAX_IMAGE_BYTES = 15L * 1024 * 1024;  // 15 MB
-private static final long MAX_DOC_BYTES   = 25L * 1024 * 1024;  // 25 MB
-```
+// ConstructionInvoiceService.storeDocument — reduzido ao essencial
+String safeName = storageService.sanitizeFileName(originalFilename);
+String key = String.format("construction-invoices/%s/%s_%s",
+        enterpriseId, UUID.randomUUID().toString().substring(0, 8), safeName);
 
----
-
-## Step 2: Validate File
-
-```java
-private void validateImage(MultipartFile file) {
-    if (file == null || file.isEmpty())
-        throw FileUploadException.empty(file != null ? file.getOriginalFilename() : "file");
-
-    String mime = Optional.ofNullable(file.getContentType()).orElse("");
-    if (!ALLOWED_IMAGE_MIME.contains(mime))
-        throw FileUploadException.invalidImageFormat(file.getOriginalFilename());
-
-    if (file.getSize() > MAX_IMAGE_BYTES)
-        throw FileUploadException.imageSizeExceeded(file.getOriginalFilename(), file.getSize());
+try (InputStream in = new ByteArrayInputStream(content)) {
+    storageService.upload(BUCKET, key, mime, in);
+} catch (IOException e) {
+    throw StorageException.uploadError(originalFilename, e);
 }
+
+document.setBucket(BUCKET);
+document.setStorageKey(key);
+document.setOriginalFilename(originalFilename);
+document.setMimeType(mime);
+document.setSizeBytes((long) content.length);   // o que foi para o Storage, não o upload recebido
+document.setUploadedAt(OffsetDateTime.now());
+authContext.currentProfileId().ifPresent(document::setUploadedBy);
 ```
 
----
+Notas:
+- Ler os bytes **uma vez** (`file.getBytes()`) e passar `byte[]`; o checksum, a compressão e o upload usam os mesmos bytes.
+- Fotos: `InvoiceCompressionService` comprime antes de subir e guarda `original_size_bytes` à parte. Só faz sentido para imagens grandes — não aplicar a PDFs nem a comprovativos.
+- Miniatura (`InvoiceThumbnailService.render`) é **um extra**: se falhar, `log.warn` e `thumbnail_key = null`; nunca deixar cair o upload por causa dela.
 
-## Step 3: Upload to Supabase Storage
+## Passo 3 — Devolver
 
 ```java
-@RequiredArgsConstructor
-public class MediaService {
-    
-    private final SupabaseStorageService storageService;
-    
-    public void uploadAssetBanner(UUID assetId, MultipartFile file) {
-        validateImage(file);
-        
-        String mime = file.getContentType();
-        String ext = extFromMime(mime);  // "jpg", "png", etc.
-        String bucket = "media";
-        String key = "assets/" + assetId + "/banner/" + UUID.randomUUID() + "." + ext;
-        
-        try {
-            storageService.uploadFile(bucket, key, file.getInputStream(), mime);
-        } catch (IOException e) {
-            throw new StorageException("Upload failed: " + e.getMessage());
-        }
-    }
-}
+// no mapper/serviço, nunca no controller
+signedUrls.resolve(document.getBucket(), document.getStorageKey())
 ```
 
----
+Na **lista** devolver só a miniatura (`thumbnailUrl`); o documento completo só no **detalhe**
+(`GET /{id}`). Assinar 20 documentos por página que ninguém abre é trabalho deitado fora — ver
+[[api]] → "Faturas de obra".
 
-## Step 4: Save to Entity
+## Passo 4 — Controller
 
 ```java
-@Service
-@RequiredArgsConstructor
-public class AssetService {
-    
-    private final AssetRepository repository;
-    private final MediaService mediaService;
-    
-    public void uploadBanner(UUID assetId, MultipartFile file) {
-        Asset asset = repository.findById(assetId)
-            .orElseThrow(() -> new ResourceNotFoundException(...));
-        
-        // Upload to storage
-        String key = mediaService.uploadAssetBanner(assetId, file);
-        
-        // Save reference in entity
-        asset.setPhotoBucket("media");
-        asset.setPhotoKey(key);
-        repository.save(asset);
-    }
-}
+@PostMapping(value = "/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+@PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+public ResponseEntity<InvoiceUploadResultDTO> addDocument(@PathVariable UUID id,
+                                                          @RequestParam("file") MultipartFile file)
 ```
 
----
+- Ficheiro + JSON no mesmo pedido → `@RequestPart` para cada parte (ver `POST /construction-invoices/{id}/payments`, que leva o pagamento e o comprovativo).
+- Registar no [[api]] (o hook pre-commit avisa).
 
-## Step 5: Generate Signed URL When Returning Data
+## Passo 5 — Apagar
 
 ```java
-// In Service or DTO mapper
-public AssetResponseDTO toResponse(Asset asset) {
-    String photoUrl = null;
-    if (asset.getPhotoKey() != null) {
-        try {
-            String bucket = asset.getPhotoBucket();
-            String key = asset.getPhotoKey().startsWith("/") 
-                ? asset.getPhotoKey().substring(1) 
-                : asset.getPhotoKey();
-            photoUrl = storageService.createSignedUrl(bucket, key, 3600); // 1 hour
-        } catch (Exception e) {
-            log.warn("Failed to generate signed URL: {}", e.getMessage());
-        }
-    }
-    
-    return new AssetResponseDTO(
-        asset.getId(),
-        asset.getName(),
-        photoUrl,  // ← Return signed URL, not raw path
-        // ... other fields
-    );
-}
+deleteQuietly(document.getBucket(), document.getStorageKey());
+deleteQuietly(document.getBucket(), document.getThumbnailKey());
+documentRepository.delete(document);
 ```
 
----
-
-## Step 6: Controller Endpoint
-
-```java
-@RestController
-@RequestMapping("/assets/{id}/banner")
-@RequiredArgsConstructor
-public class AssetPhotosController {
-    
-    private final AssetService assetService;
-    
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<AssetResponseDTO> uploadBanner(
-            @PathVariable UUID id,
-            @RequestParam("file") MultipartFile file) {
-        
-        assetService.uploadBanner(id, file);
-        Asset updated = assetService.getById(id);
-        return ResponseEntity.ok(mapper.toResponse(updated));
-    }
-    
-    @DeleteMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteBanner(@PathVariable UUID id) {
-        assetService.deleteBanner(id);
-        return ResponseEntity.noContent().build();
-    }
-}
-```
+`deleteQuietly` engole o erro do Storage com `log.warn`: a linha desaparece de qualquer forma; um
+ficheiro órfão é melhor do que uma fatura que não se consegue apagar.
 
 ---
 
-## Step 7: Error Handling
+## Checklist final
 
-O bloco `FILE_xxx` de `dto/error/ErrorCode.java` já cobre os casos comuns de upload — **usa estes, não recries com números diferentes** (`FILE_001`–`FILE_010` já estão todos atribuídos a outros significados):
+- [ ] Decidido 0..N (tabela própria) vs 0..1 (colunas na entidade) — e porquê
+- [ ] Migração com `bucket` + `storage_key` (+ `original_filename`, `mime_type`, `size_bytes`), nunca URL
+- [ ] Whitelist de MIME + limite de tamanho, validados **antes** de subir
+- [ ] Regra de duplicado (se existir) verificada **antes** de subir
+- [ ] Chave com `sanitizeFileName` + prefixo aleatório, no bucket `documents`
+- [ ] Signed URL só na leitura, via `SignedUrlService`; lista = miniatura, detalhe = completo
+- [ ] `deleteQuietly` no apagar da linha e da entidade-mãe
+- [ ] `@PreAuthorize` no controller; rota em [[api]]
+- [ ] Frontend: `AuthenticatedImage` para imagens, `InvoicePreviewModal` para PDF/foto
+- [ ] Testado: tipo recusado, tamanho recusado, duplicado, apagar limpa o bucket
 
-| Caso | Usa |
-|---|---|
-| Formato/tipo não permitido | `FILE_TYPE_NOT_ALLOWED` (`FILE_003`) |
-| Tamanho excede o limite | `FILE_SIZE_EXCEEDED` (`FILE_002`) |
-| Ficheiro vazio | `FILE_EMPTY` (`FILE_008`) |
-| Erro genérico no upload | `FILE_UPLOAD_ERROR` (`FILE_001`) |
-| Erro no storage (Supabase) | `STORAGE_CONNECTION_ERROR` ou outro do bloco `STORAGE_xxx` — não `FILE_STORAGE_ERROR` (`FILE_010`) a menos que o erro seja especificamente sobre o *ficheiro em storage*, não sobre a *ligação* ao storage |
+## Erros comuns
 
-Só adiciona um código novo ao bloco `FILE_xxx` se o caso for genuinamente novo (ex. uma regra de negócio específica do teu upload que nenhum dos existentes descreve) — confirma sempre no ficheiro real antes de escolher o próximo número livre do bloco.
+❌ Meter o ficheiro dentro da entidade "para já" quando pode vir um segundo
+❌ Subir e só depois verificar duplicado (deixa órfãos no bucket)
+❌ Guardar a URL assinada
+❌ Assinar todos os documentos numa lista
+❌ Apagar a linha sem apagar no Storage
+❌ Deixar a miniatura derrubar o upload
 
----
+## Relacionado
 
-## Final Checklist
-
-- [ ] Entity has `photoBucket` + `photoKey` columns
-- [ ] MIME types whitelist defined
-- [ ] File size limits set
-- [ ] Validation method validates both MIME + size
-- [ ] Upload generates unique key (includes UUID)
-- [ ] File saved to Supabase Storage (not database)
-- [ ] Entity reference saved to database
-- [ ] Signed URL generated when returning data (1 hour expiry)
-- [ ] Leading `/` stripped from key before `createSignedUrl()`
-- [ ] Error codes added for all error cases
-- [ ] Controller has `@PreAuthorize` authorization
-- [ ] Tested with various file types + sizes
-
----
-
-## Common Mistakes
-
-❌ Storing full Supabase URL in entity (it expires)
-❌ Not validating MIME type
-❌ Not stripping leading `/` from key
-❌ Storing file in database instead of storage
-❌ Not handling upload exceptions
-❌ Forgetting to delete old file when uploading new one
-
----
-
-## Related Skills
-
-- [[code-best-practices]] — General code quality rules, incl. backend error-handling conventions
-- [[skill-add-backend-feature]] — General feature implementation
+- [[skill-add-database-table]] · [[skill-add-backend-feature]] · [[code-best-practices]]
+- [[database]] → `construction_invoice_document`, `payment` · [[api]] → "Faturas de obra", "Pagamentos"
+- `management/managementapi/scripts/README.md` — apagar faturas (linha + ficheiros) à mão

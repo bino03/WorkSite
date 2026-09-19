@@ -5,7 +5,7 @@ Nenhum destes ficheiros está no git. Num clone novo há que criá-los.
 ## Backend — `.env` em `management/managementapi/`
 
 ```
-DB_URL=jdbc:postgresql://<pooler-host>:5432/postgres?sslmode=require&preferQueryMode=simple&prepareThreshold=0
+DB_URL=jdbc:postgresql://<pooler-host>:6543/postgres?sslmode=require&preferQueryMode=simple&prepareThreshold=0
 DB_USER=postgres.<project-ref>
 DB_PASS=<password>
 SUPABASE_URL=https://<project-ref>.supabase.co

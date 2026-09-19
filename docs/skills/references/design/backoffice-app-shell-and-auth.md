@@ -23,9 +23,7 @@
 > cópias da mesma tabela.
 
 **Idioma dos segmentos**: os segmentos de topo herdados estão em português (`funcionarios`, `empreendimentos`), os criados depois em inglês (`tasks`, `construction`) — exatamente a exceção documentada em [[../../frontend/skill-frontend-design-system]] ("pai em português herdado + filhos novos em inglês"). **Segmento novo escreve-se sempre em inglês**, mesmo quando o pai está em português.
-
-> ⚠️ O [[../../frontend/skill-frontend-design-system]] ainda lista segmentos que **não existem** neste projeto (`edificios`, `propriedades`, `contactos`, `localizacoes`, `certificados`) — sobras da cópia do Property-Management. Não os tomes como rotas reais do Worksite.
-
+
 ## 2. Menu de navegação — hoje cobre todas as rotas de topo
 
 Reorganizado a 2026-09-09 para reduzir ao mínimo os títulos no header (era uma linha de sete

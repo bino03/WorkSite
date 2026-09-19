@@ -5,8 +5,8 @@
 > **aqui** que a mudança se regista primeiro — e o outro lado ganha um item de ToDo. Ver "Como se
 > mantém" no fim.
 >
-> Criado em 2026-09-04. O modelo alvo da app que este contrato assume está em [[faturas-modelo-alvo.md]];
-> enquanto esse modelo não estiver implementado, a coluna "BD" descreve o **destino**, não o que existe.
+> Criado em 2026-09-04. O modelo alvo que este contrato assume está em [[faturas-modelo-alvo.md]] e
+> **está implementado desde 2026-09-18** (fases 1–6): a coluna "BD" descreve o que existe.
 
 ## 1. Os dois projetos
 

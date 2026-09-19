@@ -57,24 +57,25 @@ src/components/
 | Files | PascalCase | `PropertyViewDrawer.tsx` |
 | Hooks | `use` prefix | `usePropertyForm.ts` |
 | Services | `Service` suffix | `propertyService.ts` |
-| Stores | `Store` suffix | `propertyStore.ts` |
-| Schemas | `Schema` suffix | `propertyFormSchema.ts` |
-| Types | PascalCase | `Property.ts` |
-| Route paths | kebab-case | `/properties`, `/my-requests` |
+| Schemas | `Schema` suffix | `invoiceFormSchema.ts`, `budgetFormSchemas.ts` |
+| Types | camelCase file, PascalCase type | `types/invoice.ts` → `ConstructionInvoice` |
+| Route paths | kebab-case | `/invoices/company`, `/accept-invite` |
 
 ---
 
 ## Idioma dos segmentos de rota (URL)
 
-O Backoffice tem hoje uma mistura real no `main.tsx`: os segmentos de topo herdados estão em **português** (`empreendimentos`, `funcionarios`), e os criados já neste projeto estão em inglês (`tasks`, `construction`) — não é a tabela acima aplicada ao pé da letra, é o estado real do código. Ver [[backoffice-app-shell-and-auth]] para a lista completa de rotas.
+O Backoffice tem hoje uma mistura real no `main.tsx`: os segmentos de topo herdados estão em **português** (`empreendimentos`, `funcionarios`), e os criados já neste projeto estão em inglês (`tasks`, `budget`, `invoices`, `classify`) — não é a tabela acima aplicada ao pé da letra, é o estado real do código. Ver [[backoffice-app-shell-and-auth]] para a lista completa de rotas.
 
 **Convenção daqui em diante**: qualquer segmento de rota **novo** (uma funcionalidade nova, ou sub-rotas aninhadas dentro de um domínio já existente) usa **termos em inglês**, mesmo que o segmento pai onde a nova rota se aninha esteja em português. Isto acompanha a decisão já tomada para nomes de ficheiros, componentes, tabelas na BD e endpoints do backend — só os segmentos de topo já existentes ficam em português por continuidade com o que já lá está, não é para migrar os antigos.
 
-Exemplo real (feature de etapas/despesas de construção, aninhada dentro do domínio `empreendimentos` já existente):
+Exemplo real (`main.tsx`, 2026-09): as sub-rotas de uma obra, aninhadas no domínio `empreendimentos` já existente:
 ```tsx
 // segmento pai em português (já existia) + segmentos novos em inglês
-<Route path="empreendimentos/:enterpriseId/construction" element={<ConstructionStagesPage />} />
-<Route path="empreendimentos/:enterpriseId/construction/:stageId" element={<ConstructionSubStagesPage />} />
+<Route path="empreendimentos/:enterpriseId/budget" element={<ConstructionBudgetPage />} />
+<Route path="empreendimentos/:enterpriseId/invoices" element={<EnterpriseInvoicesPage />} />
+<Route path="empreendimentos/:enterpriseId/classify" element={<ClassifyInvoicesPage />} />
+<Route path="invoices/company" element={<CompanyInvoicesPage />} />   // domínio novo: tudo em inglês
 ```
 Não `.../construcao/...` — isso reintroduziria a mistura de idioma dentro da mesma funcionalidade que esta convenção existe para evitar.
 

@@ -28,7 +28,7 @@ Se um dia os avisos pararem de aparecer numa máquina nova, é a primeira coisa 
 
 | Se o commit tocar... | Avisa para atualizar |
 |---|---|
-| Ficheiro em `managementapi/.../db/migration/` | `docs/database.md` — e verifica automaticamente se o `database.md` ainda menciona a versão de migração mais recente (aviso extra se a linha do intervalo de migrações estiver stale) |
+| Ficheiro em `managementapi/.../db/migration/` | `docs/database.md` — e verifica automaticamente se o `database.md` **e o `architecture.md`** ainda mencionam a versão de migração mais recente (aviso extra se a linha do intervalo estiver stale) |
 | `managementapi/.../security/SecurityConfig.java` | `docs/security.md` (regras de auth, CORS, lista de endpoints públicos/protegidos) |
 | Novo ficheiro de controller (`.../controller/*.java`) | `docs/api.md` (nova secção de endpoints) |
 | Controller **existente** com anotações `@*Mapping` adicionadas/alteradas no diff staged | `docs/api.md` (rotas, parâmetros, regras de acesso) — apanha o caso mais comum de drift: endpoints novos num controller antigo |

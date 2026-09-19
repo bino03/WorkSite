@@ -24,6 +24,10 @@ if echo "$staged" | grep -q 'managementapi/src/main/resources/db/migration/'; th
   if [ -n "$latest_n" ] && ! grep -qE "V${latest_n}([^0-9]|$)" docs/database.md 2>/dev/null; then
     warn "docs/database.md does not mention V${latest_n} — its migration-range line is stale."
   fi
+  # architecture.md também cita o intervalo — ficou em V22 até V36 sem ninguém dar por isso (2026-09-19).
+  if [ -n "$latest_n" ] && ! grep -qE "V${latest_n}([^0-9]|$)" docs/architecture.md 2>/dev/null; then
+    warn "docs/architecture.md does not mention V${latest_n} — its migration-range line is stale."
+  fi
 fi
 
 # --- SecurityConfig → docs/security.md ------------------------------------

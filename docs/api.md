@@ -145,6 +145,13 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | PATCH | `/enterprises/{id}/media/{mediaId}` | autenticado |
 | DELETE | `/enterprises/{id}/media/{mediaId}` | autenticado |
 
+> O `GET /enterprises` (`EnterpriseListDTO`) traz `budgetTotal` além do `totalInvestment`: é o
+> mesmo número que o cabeçalho da página do orçamento (`BudgetTreeDTO.budgetTotal`, mesma regra
+> de rollup — `ConstructionBudgetItemService.budgetTotalsByEnterprise`), e é o que a lista de
+> projetos mostra como "Investimento" desde 2026-09-18. O `totalInvestment` escrito à mão na obra
+> divergia do orçamento importado; fica só no cartão Financeiro da edição. `null` numa obra sem
+> rubricas.
+
 ### Relações do projeto (`EntrepriseRelationsController`, `/enterprise-relations/{id}`)
 
 | Método | Rota | Acesso |
@@ -341,7 +348,7 @@ estado guardado só arriscava ficar dessincronizado.
 documento completo de cada linha de uma lista de 20 seria trabalho deitado fora — quase
 nenhum é aberto. Ambas são signed URLs geradas na leitura; a chave de storage nunca sai daqui.
 
-Resposta do upload e do `PUT /{id}/file`:
+Resposta do upload e do `POST /{id}/file`:
 
 ```jsonc
 {
@@ -991,5 +998,5 @@ São regras inertes hoje (nenhuma rota corresponde), mas convém limpá-las para
 - [[security.md]] — Regras de acesso completas e roles
 - [[database.md]] — Entidades por trás destes endpoints
 - [[architecture.md]] — Quem consome cada grupo de endpoints
-- [[../management/managementapi/CLAUDE.md]] — Guia do backend
+- [[backend-conventions]] — Convenções e armadilhas do backend
 - [[vault-sync-hooks]] — O hook que avisa quando um controller muda sem este ficheiro ser atualizado

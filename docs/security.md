@@ -74,5 +74,5 @@ base de dados (o resto é do Supabase). Cifrada em repouso desde a `V34`:
 
 - [[architecture.md]] — Visão geral do sistema
 - [[database.md]] — `worksite.profile`, `worksite.revoked_token`
-- [[../management/managementapi/CLAUDE.md]] — Guia do backend
-- [[../management/managementfrontend/apps/backoffice/CLAUDE.md]] — Fluxo de autenticação no Backoffice
+- [[backend-conventions]] — Convenções e armadilhas do backend
+- [[skills/references/design/backoffice-app-shell-and-auth]] — Fluxo de autenticação no Backoffice (rotas, guards, `AuthContext`)

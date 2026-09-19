@@ -6,7 +6,7 @@
 > 1. Add entry below with name, description, and tags
 > 2. Create wikilink to the skill file
 > 3. Categorize under the right folder (`backend/`, `frontend/`, `process/`) and section
-> 4. Update last-modified date in frontmatter
+> 4. (sem frontmatter neste vault — atualiza a secção "Last Updated" no fim)
 > 5. Commit with message: `docs: add skill-<name>.md to SKILLS-INDEX`
 >
 > A **skill** is an invocable workflow (`/name`) — a checklist you run to *do* something. A **reference** (below) is a conventions document a skill *reads* while doing its work; it's never invoked on its own and has no `.claude/skills/` entry. Don't confuse the two — see [[skill-create-new-skill]] for the distinction.
@@ -281,8 +281,9 @@ docs/skills/
 
 ## Last Updated
 
-- **Date**: 2026-08-09
-- **Latest**: Added the `project-vocabulary` reference — o dicionário partilhado (Drawer vs. Modal, fatura vs. despesa, rubrica, token). Nasceu de uma confusão real: um Drawer tratado por "modal" mandava quem lê para o sub-ficheiro de design errado.
+- **Date**: 2026-09-19
+- **Latest**: `skill-add-file-upload` reescrita à volta de `construction_invoice_document` + `payment.proof_*` (a versão anterior ensinava o `/assets/{id}/banner` do Property-Management); `property_asset` e `ConstructionStagesPage` purgados de `skill-add-database-table` e `skill-frontend-design-system`; `implement-todo` Fase 7 passa a alimentar `backlog.md` e `learning.md`.
+- **Anterior (2026-08-09)**: Added the `project-vocabulary` reference — o dicionário partilhado (Drawer vs. Modal, fatura vs. despesa, rubrica, token). Nasceu de uma confusão real: um Drawer tratado por "modal" mandava quem lê para o sub-ficheiro de design errado.
 - **Anterior (2026-08-05)**: Added `skill-implement-todo` (backlog orchestration) + the three missing Backoffice design references (`forms-and-validation`, `services-and-error-handling`, `app-shell-and-auth`, all audited against this project's real code). Registered `skill-frontend-structure-brief`, which existed but was never indexed. Removed the remaining Portal/Zustand carry-overs from the skill texts — neither exists in Worksite.
 - **Next to Add**: As needed (update this index when adding)
 

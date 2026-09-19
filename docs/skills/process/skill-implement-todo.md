@@ -226,6 +226,8 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 - Resume o que foi implementado nesta ronda.
 - Lista o que ainda falta (se o âmbito era parcial, se algum item ficou de fora por dúvida genuína, ou se sobraram tarefas do plano por orçamento apertado) — e nesse último caso, diz explicitamente: "para continuar, corre `/implement-todo` outra vez e escolhe 'Retomar um plano anterior'".
 - Marca `**Estado**: concluído` no ficheiro de plano se todas as tarefas ficaram feitas; deixa `em curso` caso contrário (já deve estar correto pelos checkpoints da Fase 5). **Se ficou concluído**, move o ficheiro de `notes/roadmap/plans/` para `notes/roadmap/plans/archive/` (cria a pasta se não existir) — um plano terminado não precisa de continuar entre os planos ativos que a Fase 0 verifica, mas o histórico (âmbito, esclarecimentos, ordem seguida) fica preservado caso seja útil mais tarde.
+- **Estado da iniciativa** — atualiza a linha correspondente em `notes/roadmap/backlog.md` (estado, data, o que falta; cria a linha se a frente é nova; apaga-a se ficou ✅ sem restos). É o único sítio que diz *em que pé está cada frente* — se este passo se salta, o ficheiro volta a ficar vazio como esteve de 08-05 a 09-19.
+- **Lição de ferramenta?** — pergunta uma vez: "algo custou tempo nesta ronda que não fosse da app (extensão do Chrome, Claude Code, Excel, git, Obsidian)?". Se sim, um bullet datado em `notes/learning.md` (o que aconteceu → o que se faz diferente). Se a lição é da app, vai para `docs/`, não para lá.
 - Proposta de commit seguindo [[skill-git-commits]] — pergunta antes de qualquer `git push`, como é norma geral do resto do trabalho neste repo. O Worksite é **um único repositório git** (backend e Backoffice vivem ambos em `management/`), por isso uma ronda normal fecha com **um só commit** — não há aqui a separação por submódulo que existia no projeto de origem.
 - Se notares drift entre `notes/ideas.md` e `notes/ToDo.md`, ou que `notes/whatIveDone.md` tem entradas que não seguem o formato desta skill, menciona uma vez como aviso — não corrijas automaticamente, são ficheiros pessoais do utilizador.
 
@@ -246,6 +248,7 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 - [ ] `Final Checklist` da(s) skill(s) invocada(s) fechado por completo em cada tarefa, incluindo os itens de documentação (`docs/api.md`, `docs/database.md`, `docs/security.md`, etc.) — atualizados proativamente, não deixados para o aviso do hook de pre-commit
 - [ ] `notes/ToDo.md` atualizado por tarefa concluída (remoção pontual, não reescrita)
 - [ ] `notes/whatIveDone.md` com entrada nova por tarefa concluída
+- [ ] `notes/roadmap/backlog.md` com a linha da iniciativa atualizada; `notes/learning.md` se houve lição de ferramenta
 - [ ] Resumo final + proposta de commit, sem `git push` sem confirmação
 
 ---

@@ -23,7 +23,7 @@ existiram aqui.
 ## Deliberadamente não trazido
 
 Anúncios de imóveis (`property_asset`, `buildings`, agência/características/contactos/licenças),
-leads, banners, pagamentos, o portal público, e SSE/tempo real. Nada disto foi pedido para este
+leads, banners, o schema `payments` do PM (comissões/transações de imóveis), o portal público, e SSE/tempo real. Nada disto foi pedido para este
 projeto — são candidatos a funcionalidades futuras, não lacunas.
 
 > Cuidado ao ler código e traduções: há restos desta origem que **não** correspondem a nada neste
@@ -42,6 +42,11 @@ projeto — são candidatos a funcionalidades futuras, não lacunas.
 - **Notificações in-app** (`V20`, 2026-08-18) — ver [[api]]. Note-se a nuance: a lista acima diz
   que notificações não foram trazidas, e continua verdade quanto a SSE/push — os avisos in-app
   foram construídos aqui de raiz.
+- **Paridade com o Excel da Vilatro** (fases 1–6, 2026-09-04 → 09-18): a fatura como registo com
+  0..N documentos (`V24`–`V29`), **pagamentos** (`payment`/`invoice_payment`, `V31` — nada a ver com o
+  schema `payments` do PM, que ficou de fora), notas de crédito, quarentena (`scope`), repartição por
+  rubricas (`V32`), transferências e inconsistências (`V33`), importador/exportador `.xlsx` do vault.
+  Ver [[faturas-modelo-alvo]] (decisões) e [[excel-parity]] (contrato).
 
 ## Relacionado
 

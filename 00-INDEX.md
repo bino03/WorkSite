@@ -104,18 +104,13 @@ Add tags to notes for filtering:
 
 ---
 
-## 📋 Setup Checklist
+## 📋 Primeira vez aqui?
 
-First time here? Complete these steps:
-
-- [ ] Ler [[CLAUDE.md]] e depois este índice
-- [ ] Enable the vault-sync reminder hook: `git config core.hooksPath .githooks` (ver [[docs/vault-sync-hooks.md]])
-- [ ] Create a **new Supabase project** (do not reuse Property-Management's)
-- [ ] Create `management/managementapi/.env` from `.env.example` (ver [[docs/environment.md]])
-- [ ] Create `management/managementfrontend/apps/backoffice/.env` (ver [[docs/environment.md]])
-- [ ] Start backend: `./mvnw spring-boot:run`
-- [ ] Start frontend: `npm run dev`
-- [ ] Open Obsidian: Point to `Worksite/` folder
+1. Ler [[CLAUDE.md]] e depois este índice.
+2. Variáveis de ambiente (backend e Backoffice, projeto Supabase próprio) → [[docs/environment.md]]
+3. Arrancar, testar, build → [[docs/commands.md]]
+4. Ativar o hook: `git config core.hooksPath .githooks` → [[docs/vault-sync-hooks.md]]
+5. Obsidian: File → Open Vault → `Worksite/`
 
 ---
 
@@ -160,23 +155,6 @@ First time here? Complete these steps:
 | Search everything | **Ctrl+Shift+F** in Obsidian |
 | Find a file | **Ctrl+P** in Obsidian |
 | See connections | **Ctrl+G** (Graph View) |
-
----
-
-## 🚀 Quick Start Commands
-
-```bash
-# Backend
-cd management/managementapi
-./mvnw spring-boot:run
-
-# Frontend (separate terminal)
-cd management/managementfrontend/apps/backoffice
-npm install && npm run dev
-
-# Open in Obsidian
-# File → Open Vault → Select Worksite/
-```
 
 ---
 

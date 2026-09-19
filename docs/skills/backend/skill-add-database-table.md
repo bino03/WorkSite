@@ -30,12 +30,12 @@ Copy this block, fill it out, save it before coding:
 [ ] Any authenticated user
 [ ] Public (no auth)
 
-### 4. Related to an asset/property?
-[ ] Yes - has FK to property_asset
-[ ] No - independent
+### 4. Pertence a um projeto (obra)?
+[ ] Yes - has FK to worksite.enterprises (e cascata ao apagar a obra)
+[ ] No - global (ex.: `supplier`, `notification`)
 
 ### 5. Relations to other tables?
-(List FKs: "FK to worksite.profile, FK to worksite.property_asset")
+(List FKs: "FK to worksite.profile, FK to worksite.construction_budget_item")
 
 ### 6. Required fields?
 (field: TYPE, NOT NULL, default value)
@@ -43,7 +43,7 @@ Example:
 - name: TEXT, NOT NULL
 - value: NUMERIC(12,2)
 - state: TEXT, NOT NULL, default 'draft'
-- asset_id: UUID, FK → worksite.property_asset
+- enterprise_id: UUID, FK → worksite.enterprises
 
 ### 7. Need soft-delete (deleted_at)?
 [ ] Yes (important data that shouldn't disappear)
@@ -81,7 +81,7 @@ create table if not exists worksite.my_table (
     state       text        not null default 'draft',
     
     -- Foreign keys
-    asset_id    uuid        not null references worksite.property_asset(id) on delete cascade,
+    enterprise_id uuid      not null references worksite.enterprises(id) on delete cascade,
     owner_id    uuid        references worksite.profile(id) on delete set null
 );
 
