@@ -30,6 +30,8 @@ public class EnterpriseListDTO {
     private BigDecimal landArea;
     private Integer totalUnits;
     private BigDecimal totalInvestment;
+    /** O mesmo número que o cabeçalho da página do orçamento — é isto que a lista mostra como "Investimento". */
+    private BigDecimal budgetTotal;
     private BigDecimal currentValue;
     private String currency;
     private String constructionCompany;

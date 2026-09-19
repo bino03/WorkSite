@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +35,17 @@ public interface ConstructionBudgetItemRepository extends JpaRepository<Construc
             order by i.sortOrder asc
             """)
     List<ConstructionBudgetItem> findTreeByEnterpriseId(@Param("enterpriseId") UUID enterpriseId);
+
+    /**
+     * Rubricas vivas de várias obras de uma vez — para a lista de projetos
+     * mostrar o total do orçamento de cada uma sem ir à BD por obra.
+     */
+    @Query("""
+            select i from ConstructionBudgetItem i
+            where i.enterprise.id in :enterpriseIds
+              and i.deletedAt is null
+            """)
+    List<ConstructionBudgetItem> findLiveByEnterpriseIdIn(@Param("enterpriseIds") Collection<UUID> enterpriseIds);
 
     /** Só os irmãos vivos — usada ao reordenar (uma rubrica eliminada não conta posição). */
     @Query("""

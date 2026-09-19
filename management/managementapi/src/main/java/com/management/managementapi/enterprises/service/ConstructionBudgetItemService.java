@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -134,6 +135,59 @@ public class ConstructionBudgetItemService {
 
     private static boolean startsWithCode(String code, String needle) {
         return code != null && code.toLowerCase().startsWith(needle);
+    }
+
+    /**
+     * O {@code budgetTotal} de cada obra — o mesmo número que o cabeçalho da
+     * página do orçamento mostra, calculado pela mesma regra de rollup
+     * ({@link #rolledUpBudget}). É o que a lista de projetos mostra como
+     * "Investimento": o {@code total_investment} escrito à mão na obra divergia
+     * do orçamento importado e ninguém sabia qual era o bom.
+     *
+     * Uma obra sem rubricas não aparece no mapa.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, BigDecimal> budgetTotalsByEnterprise(Collection<UUID> enterpriseIds) {
+        if (enterpriseIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, List<ConstructionBudgetItem>> byEnterprise = new HashMap<>();
+        for (ConstructionBudgetItem item : repository.findLiveByEnterpriseIdIn(enterpriseIds)) {
+            byEnterprise.computeIfAbsent(item.getEnterprise().getId(), k -> new ArrayList<>()).add(item);
+        }
+
+        Map<UUID, BigDecimal> totals = new HashMap<>();
+        byEnterprise.forEach((enterpriseId, items) -> {
+            Map<UUID, List<ConstructionBudgetItem>> childrenByParent = groupByParent(items);
+            BigDecimal total = BigDecimal.ZERO;
+            for (ConstructionBudgetItem root : childrenByParent.getOrDefault(null, List.of())) {
+                total = total.add(rolledUpBudget(root, childrenByParent));
+            }
+            totals.put(enterpriseId, total);
+        });
+        return totals;
+    }
+
+    /**
+     * A regra de rollup do orçamento, isolada: um nó vale a soma dos filhos se
+     * algum descendente tiver preço, senão o seu próprio {@code totalPrice}.
+     * É exatamente o que o {@link #buildNode} faz para o {@code rolledUpBudget}
+     * — se um dia mudar lá, tem de mudar aqui, senão a lista de projetos e a
+     * página do orçamento voltam a mostrar números diferentes.
+     */
+    private static BigDecimal rolledUpBudget(ConstructionBudgetItem item,
+                                             Map<UUID, List<ConstructionBudgetItem>> childrenByParent) {
+        BigDecimal childSum = BigDecimal.ZERO;
+        boolean childHasPrice = false;
+        for (ConstructionBudgetItem child : childrenByParent.getOrDefault(item.getId(), List.of())) {
+            BigDecimal childRolledUp = rolledUpBudget(child, childrenByParent);
+            childSum = childSum.add(childRolledUp);
+            if (childRolledUp.signum() != 0 || child.getTotalPrice() != null) {
+                childHasPrice = true;
+            }
+        }
+        BigDecimal own = item.getTotalPrice();
+        return childHasPrice ? childSum : (own != null ? own : BigDecimal.ZERO);
     }
 
     @Transactional(readOnly = true)

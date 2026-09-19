@@ -29,6 +29,8 @@ export interface Enterprise {
   landArea?: number;
   totalUnits?: number;
   totalInvestment?: number;
+  /** O mesmo número que o cabeçalho da página do orçamento — é o que a coluna "Investimento" mostra. */
+  budgetTotal?: number | null;
   currentValue?: number;
   currency: string;
   constructionCompany?: string;
@@ -214,8 +216,8 @@ export default function EnterprisesList() {
       },
       {
         title: "Investimento",
-        dataIndex: "totalInvestment",
-        key: "totalInvestment",
+        dataIndex: "budgetTotal",
+        key: "budgetTotal",
         render: (investment: number | null, record: Enterprise) => formatCurrency(investment, record.currency),
         width: 150,
       },

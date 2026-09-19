@@ -43,6 +43,7 @@ import org.springframework.data.domain.Pageable;
 import com.management.managementapi.enterprises.mapper.EnterprisesMediaMapper;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +71,7 @@ public class EnterpriseService {
     private final ProfileRepository profileRepository;
     private final SupabaseStorageService storageService;
     private final EnterprisesMediaMapper enterprisesMediaMapper;
+    private final ConstructionBudgetItemService constructionBudgetItemService;
 
     /**
      * Obter dados básicos de um projeto (para seleção/dropdown)
@@ -139,6 +141,9 @@ public class EnterpriseService {
                         el -> el.getEnterprise().getId(),
                         Function.identity()));
 
+        // O "Investimento" da lista é o total do orçamento, não o total_investment da obra
+        Map<UUID, BigDecimal> budgetTotals = constructionBudgetItemService.budgetTotalsByEnterprise(enterpriseIds);
+
         // Mapear para DTO com localização
         return enterprises.map(enterprise -> {
             EnterpriseListDTO dto = enterpriseMapper.toListDTO(enterprise);
@@ -148,6 +153,7 @@ public class EnterpriseService {
                 EnterpriseLocationListDTO locationDTO = enterpriseMapper.toEnterpriseLocationListDTO(location);
                 dto.setLocation(locationDTO);
             }
+            dto.setBudgetTotal(budgetTotals.get(enterprise.getId()));
 
             return dto;
         });
