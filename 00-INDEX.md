@@ -12,11 +12,12 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 
 👉 **Go to [[docs/skills/SKILLS-INDEX.md]]** ← Master reference for all skills
 
-- 11 skills organized by topic (backend, frontend, process)
+- 12 skills organized by topic (backend, frontend, process)
 - Quick tags for filtering (`#backend`, `#frontend`, `#auth`, etc.)
 - Time estimates for each skill
 
 👉 **Para avançar o backlog**: [[docs/skills/process/skill-implement-todo]] (`/implement-todo`) — lê [[notes/ToDo.md]], prioriza e implementa
+👉 **Para ver uma feature a funcionar na app**: [[docs/skills/process/skill-verify-in-browser]] (`/verify-in-browser`) — a passagem em lote sobre [[notes/verificacao-browser-pendente.md]]
 
 ---
 
@@ -54,6 +55,7 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 - **Onde está o código disto?** → [[docs/code-map.md]] ← mapa domínio → ficheiros, e "onde procurar por sintoma"
 - **Comandos** → [[docs/commands.md]] ← correr, testar, build (e as armadilhas de cada um)
 - **Variáveis de ambiente** → [[docs/environment.md]]
+- **Operações** → [[docs/operations.md]] ← o que é produção, backup/restore, migração má, rotação de chave
 - **Convenções do backend** → [[docs/backend-conventions.md]]
 - **Proveniência** → [[docs/provenance.md]] ← porque é que a tabela se chama `enterprise`
 - **System Architecture** → [[docs/architecture.md]]

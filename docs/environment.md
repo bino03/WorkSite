@@ -25,8 +25,11 @@ Notas que se pagam caro por não se saberem:
 - Os parâmetros `preferQueryMode=simple&prepareThreshold=0` no `DB_URL` **não são decorativos** —
   a ligação é feita através do pooler do Supabase em modo transaction, que não suporta prepared
   statements.
-- O `SUPABASE_JWT_SECRET` é a chave HS256 com que o backend **valida** os tokens emitidos pelo
-  Supabase. Sem ele, toda a autenticação falha. Ver [[security]].
+- O `SUPABASE_JWT_SECRET` já **não** valida tokens (a validação é contra o JWKS do projeto, ES256 —
+  ver [[security]]), mas o `application.yml` continua a exigi-lo para arrancar. Fica até se limpar
+  o `SupabaseProperties`.
+- O `DB_USER` é `postgres.<project-ref>` — o role `postgres` do Supabase, que não está sujeito a RLS.
+  É a única ligação à base de dados que existe; ver [[security]] → "Modelo de confiança".
 - O `APP_FRONTEND_URL` é a base dos links que saem nos emails (convite, recuperação de
   password). O default é `http://localhost:5173`; em produção tem de apontar para o domínio
   real do Backoffice, caso contrário os links chegam a apontar para localhost.
@@ -36,7 +39,7 @@ Notas que se pagam caro por não se saberem:
 - O `APP_EMAIL_CRYPTO_KEY` cifra a password SMTP em repouso (AES-256-GCM). É **obrigatório** — sem
   ele o backend não arranca. Gerar com `openssl rand -base64 32`. Para rodar a chave existe o
   opcional `APP_EMAIL_CRYPTO_KEY_PREVIOUS` (só decifra, é a rede durante a troca) — procedimento
-  em [[security]].
+  em [[operations]].
 - `APP_BUDGET_DEADLINE_DAYS_AHEAD` (opcional, default `7`): com quantos dias de antecedência o
   job `BudgetItemDeadlineNotifierConfig` avisa os `ADMIN` do fim de uma rubrica de orçamento.
   Ver [[api]] → "Quem gera notificações".

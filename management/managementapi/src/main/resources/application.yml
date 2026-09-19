@@ -111,7 +111,7 @@ app:
   crypto:
     # Obrigatória: a app não arranca sem ela.
     email-key: ${APP_EMAIL_CRYPTO_KEY:}
-    # Opcional, só decifra — a rede durante uma rotação de chave. Ver docs/security.md.
+    # Opcional, só decifra — a rede durante uma rotação de chave. Ver docs/operations.md.
     email-key-previous: ${APP_EMAIL_CRYPTO_KEY_PREVIOUS:}
 
   notifications:

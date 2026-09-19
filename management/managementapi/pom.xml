@@ -290,6 +290,22 @@
           </excludes>
         </configuration>
       </plugin>
+
+      <!--
+        ManagementApiApplicationTests levanta o contexto inteiro: liga à base de dados
+        real do .env e aplica migrações Flyway pendentes. Fora do `./mvnw test` por
+        defeito; corre-se de propósito com -Dtest=ManagementApiApplicationTests
+        (o -Dtest ignora estes excludes). Ver docs/commands.md → "Testes".
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/ManagementApiApplicationTests.java</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

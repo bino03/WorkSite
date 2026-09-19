@@ -4,7 +4,24 @@
 
 **Time**: Part of component creation
 
-> 📐 See also [[code-best-practices]] for general naming/error-handling conventions, and [[frontend-visual-consistency]] for verified design tokens, drawer sizing, and known visual drift to avoid repeating.
+> 📐 See also [[code-best-practices]] for the language-agnostic principles (naming, dead code, comments, secrets) and the pre-commit checklist, and [[frontend-visual-consistency]] for verified design tokens, drawer sizing, and known visual drift to avoid repeating. **This file is the single home of the frontend rules** — since 2026-09-19 `code-best-practices` no longer has a frontend section.
+
+---
+
+## Regras de base (frontend)
+
+The eight rules every Backoffice change obeys, each pointing at the section of this file that details it. Read these first; the rest of the file is the *how*.
+
+1. **Strict mode always on** — no `any` without an explicit justification in a comment.
+2. **Naming** → "Naming Conventions" below (components `PascalCase`, hooks `use*`, services `*Service`).
+3. **No try/catch in services** — errors bubble to the component, which hands them to the centralized `ErrorHandler` → "Service Layer", "Error Handling", and [[skill-frontend-error-handling]].
+4. **One service file per domain**, pure API-call functions, no UI logic inside → "Service Layer".
+5. **Forms are always Zod + React Hook Form** — never validation scattered in `if`s → "Forms".
+6. **Every free-text field restricts characters** (allow-list regex), not just length; the frontend is never more permissive than the backend — required in the DTO is required in Zod, only backend-optional fields are a question for the user → "Forms".
+7. **Field visibility by role is always asked**, and never solved only in the frontend — the backend DTO filters first → "Visibilidade de campos por role" and [[skill-permissions-and-auth]].
+8. **Colors, drawer widths, Tailwind tokens and icons come from [[frontend-visual-consistency]]** (a router to the `design/` sub-file for the area you're touching) — never invent a value when a token or convention exists.
+
+And one that is not a rule of code: **test in the browser before calling it done** — type-check and lint do not replace running the real flow ([[verificacao-browser-pendente]] batches the checks when the session cannot open Chrome).
 
 ---
 
@@ -288,7 +305,7 @@ export function PropertyCard({ property }: Props) {
 
 ## Related Skills
 
-- [[code-best-practices]] — General code quality rules
+- [[code-best-practices]] — Language-agnostic principles, backend rules and the pre-commit checklist (the frontend rules live here, not there)
 - [[frontend-visual-consistency]] — Router to verified design tokens and known drift in the Backoffice
 - [[skill-frontend-integration-guide]] — How backend integrates with this
 - [[skill-frontend-error-handling]] — Error handling details

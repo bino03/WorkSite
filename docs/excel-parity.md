@@ -407,9 +407,78 @@ cuja soma não bate com o total, vários métodos de pagamento na mesma fatura.
 A verificação é a mesma do sentido contrário: importar o ficheiro exportado em `dryRun` tem de dar
 **zero diferenças**. Para o orçamento esse round-trip **já é teste automático**
 (`BudgetExcelExportServiceTest`: mesma árvore, mesmo total, incluindo "Alternativa …", sub-título e
-nota); para a "Despesas" fica para quando o `DespesasExcelImportService` existir.
+nota); para a "Despesas" também, desde 2026-09-17 (`DespesasExcelImportRoundTripTest`, ver acima).
 
-## 10. Como se mantém
+## 10. Runbook: passar uma obra do Excel para a app (e de volta)
+
+A sequência real com que as 3 obras entraram a 2026-09-17/18 (ver [[../notes/whatIveDone]]), escrita
+para não ter de ser reconstruída do work log. Cada passo diz o que fazer na UI e qual o endpoint por
+trás — é o mesmo caminho, e o segundo é o que se usa quando a extensão do Chrome está a conduzir.
+
+**Antes de começar**: backend em `:8080` e Backoffice em `:5173` ([[commands]]), sessão `ADMIN`, e um
+backup ([[operations]] → "Backup") — a importação grava em transação e faz rollback se os totais não
+baterem, mas uma obra apagada por engano não volta sozinha.
+
+### 10.1 Excel → app
+
+1. **Criar a obra** na lista de projetos com `slug` = nome da pasta do vault (`Vila Petrus`,
+   `Vila Aleu`, `Villa Atrium`). O slug é o que o exportador usa no nome do ficheiro e o que liga a
+   obra à pasta — sem ele a exportação inventa um (§2).
+2. **Importar o orçamento primeiro** — página do orçamento → "Importar Excel" → `Orçamento inicial`
+   (`POST /construction-budget/enterprise/{id}/import?dryRun=true`, depois `dryRun=false`). É
+   pré-requisito: a "Despesas" refere rubricas pelo `code` e o importador **nunca as cria**
+   (rubrica inexistente = erro por linha). Ler os avisos do `dryRun`: códigos repetidos (`8.2`, `13.2.1`
+   no Petrus) entram sem índice e corrigem-se no Excel, não na app; a diferença de cêntimos no total só
+   avisa.
+3. **`dryRun` da "Despesas"** — página das faturas da obra → "Importar Excel" → `Despesas - <Obra>.xlsx`
+   (`POST /construction-invoices/import-excel?scope=PROJECT&enterpriseId=&dryRun=true`). Ler o cartão
+   por esta ordem: (a) **erros por linha** bloqueiam — corrigir no Excel e voltar a largar o ficheiro;
+   (b) Σ linhas vs TOTAL da `TabelaDespesas` tem de bater ao cêntimo; (c) **perguntas**: NC sem
+   origem reconhecível → escolher a fatura (ex.: NC 1502 → `FT FA.A/31025`), observações iguais com
+   data de pagamento → "um só pagamento?" (ex.: as 9 da DuplaDiabólika); (d) avisos: fatura totalmente
+   anulada por NC perde o pagamento (`fullyCreditedInvoiceLosesItsPayment`), linhas só com descrição
+   saltam, "Imprimir fatura" sem valor entra com total nulo (por rever).
+4. **Gravar** — o mesmo modal, "Importar N faturas" (`dryRun=false`, as respostas na parte `answers`).
+   Tudo numa transação; se `INVOICE_046`, nada ficou. **Conferir na BD** antes de seguir: nº de
+   faturas, Σ líquida e nº de liquidadas iguais ao painel do Vilatro (`SELECT count(*), sum(...)`
+   por `enterprise_id`, ou o cartão da página das faturas).
+5. **Anexar os documentos de `Faturas\Lançadas\`** — não está no importador. Por cada ficheiro,
+   `POST /construction-invoices/{id}/documents` (o "Juntar documento" na galeria do detalhe da fatura), fazendo
+   corresponder o nº sanitizado no nome do ficheiro (2.º token) ao `invoice_number` sem pontuação —
+   alguns só batem por sufixo (`FTFAC2026-134` vs `FAC2026/134`). O QR preenche o NIF e o fornecedor
+   que o Excel não tinha; avisos "o QR traz `T01 L1601/2111`, a fatura tem `T01 16/2111`" são o Excel a
+   abreviar, não erro. Recibos, proformas e orçamentos **não** se anexam (não são faturas). Um ficheiro
+   igual a outro já na fatura dá `INVOICE_012` — é o checksum a funcionar.
+6. **`Despesas da empresa.xlsx`** entra pelo mesmo modal na página "Despesas da empresa"
+   (`scope=COMPANY`, sem rubricas). **`Faturas por identificar.xlsx`** ainda não entra (`INVOICE_047`
+   — item da fase 6 em `notes/ToDo.md`).
+
+### 10.2 App → Excel
+
+1. Página do orçamento → "Exportar Excel" → escolher folhas (`GET …/export/summary` mostra o que vai
+   sair e os avisos: sem slug, obra de teste, despesa em rubrica eliminada, repartição que não soma,
+   vários métodos de pagamento na mesma fatura) → download (`GET …/export?sheets=BUDGET,EXPENSES,COMPARISON`).
+2. O ficheiro chama-se `Despesas - <slug>.xlsx` e substitui o da pasta da obra no vault. A pasta
+   `Faturas\Lançadas\` renomeada (§7) ainda não sai no zip — item da fase 6.
+3. Prova: importar o ficheiro exportado em `dryRun` tem de dar zero erros e zero perguntas (é o que o
+   `DespesasExcelImportRoundTripTest` faz em CI; à mão serve para confirmar um caso novo).
+
+### 10.3 Armadilhas de sessão (todas aconteceram)
+
+- **Obras de teste**: uma obra `is_test` só grava a partir de um ficheiro `TESTE - …` (`INVOICE_045`);
+  faturas já existentes aparecem como duplicados — é o comportamento certo, não um bug. Obra de teste
+  apaga-se **faturas primeiro (NC antes das origens), obra depois**.
+- **Dados de desenvolvimento com números reais** (a "Vila Sol" tinha os do Petrus) bloqueiam a
+  importação por duplicado global (§5) — apagar antes, não contornar.
+- **Extensão do Chrome**: só faz `file_upload` de ficheiros dentro do repo (copiar para uma pasta
+  temporária em `notes/`, git-ignored, e apagar no fim); lotes de documentos < 10 MB; a página reinicia
+  a meio e perde o estado JS (voltar a carregar os ficheiros); o token expira numa sessão longa (3 × 401
+  seguidos → `POST /auth/refresh` e repetir).
+- **Backend**: os devtools reiniciam a cada `mvnw compile`/`test` a meio de uma importação; o
+  computador a adormecer corta a ligação à BD ("I/O error… sending to the backend") — a transação faz
+  rollback, confirmar com 0 faturas antes de repetir.
+
+## 11. Como se mantém
 
 - **Mudou uma coluna, um valor permitido, ou uma decisão do Vilatro que toca dados** → atualizar este
   ficheiro, e acrescentar o item correspondente a `notes/ToDo.md` (secção "Paridade com o Excel").

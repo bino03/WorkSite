@@ -7,7 +7,7 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 1. O Backoffice chama `POST /auth/login` e o backend troca as credenciais pelo Supabase Auth.
 2. O token é devolvido em cookies HttpOnly (`access_token`, `refresh_token`).
 3. Em todos os pedidos protegidos, o `CookieJwtFilter` promove o cookie para header `Authorization: Bearer {token}` antes do filtro OAuth2 correr.
-4. O backend valida o token **localmente**, sem chamar o Supabase — usa `NimbusJwtDecoder` com algoritmo **HS256** e a chave partilhada (`SupabaseProperties` → `jwt.secret`).
+4. O backend valida o token **localmente** contra o **JWKS** do projeto (`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`, `NimbusJwtDecoder` com **ES256** — os projetos Supabase novos assinam com chave assimétrica, não com o segredo HS256 legado). O `SUPABASE_JWT_SECRET` continua a ser lido para `SupabaseProperties` mas não entra na validação.
 5. `GET /auth/me` devolve o perfil (`role`, nome, foto) a partir da tabela `worksite.profile`.
 
 ## Autorização (roles)
@@ -40,6 +40,48 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 
 Configurado via `CorsConfigurationSource` em `SecurityConfig.java` — ajustar as origens permitidas para o domínio real do Backoffice (dev: `http://localhost:5173`) e o de produção quando existir.
 
+## Modelo de confiança na base de dados
+
+**Só o backend liga à base de dados.** Tudo o resto — Backoffice, scripts, o vault Excel — passa
+por ele ou por ficheiros. É esta frase que decide o que se segue.
+
+| Quem | Liga como | A quê | Sujeito a RLS? |
+|---|---|---|---|
+| `managementapi` (única ligação) | `DB_USER=postgres.<project-ref>` — o role `postgres` do Supabase, pelo pooler em modo transaction (`:6543`) | schemas `worksite`, `settings`, `tasks` | não — `postgres` ignora RLS |
+| `managementapi` → Storage e Auth | `SUPABASE_SERVICE_ROLE_KEY` (REST, via OkHttp) | buckets `documents`, `media`; `auth.users` | n/a (chave de serviço, ignora RLS) |
+| Supabase (Auth, Storage, PostgREST) | `service_role` | os seus próprios schemas; em `worksite`/`settings` tem `GRANT ALL` da `V8` | n/a |
+| Browser, `anon`/`authenticated` via PostgREST | — | **nada**: `worksite` não está nos schemas expostos pela API do Supabase, e desde a `V37` nem `USAGE` no schema têm | — |
+
+**Não há Row Level Security, de propósito.** RLS serve para quando um cliente liga à base de dados
+com a identidade do utilizador final (o padrão Supabase: browser → PostgREST → `authenticated` +
+`auth.uid()`). Aqui nenhum utilizador final chega à base de dados: o backend liga como `postgres`,
+que a ignora, e decide quem vê o quê em Java — `@PreAuthorize` nos controllers e as verificações
+de ownership nos services ([[skill-permissions-and-auth]]). Uma policy não seria lida por
+ninguém e daria a sensação errada de que existe uma segunda linha de defesa. Se um dia um cliente
+ligar diretamente (uma app móvel via PostgREST, por exemplo), isto muda: expor o schema, dar
+grants a `authenticated` **e** escrever policies — as três coisas juntas, ou nenhuma.
+
+O que a `V37` tirou, e porquê:
+
+- `USAGE` em `worksite` a `anon` e `authenticated` (`V8`): era inerte — nunca houve tabela
+  concedida a esses roles nem o schema exposto — mas sugeria um caminho de acesso que não existe.
+- O role `worksite_expenses_ro` (`V30`): servia o `worksite-expenses`, um frontend de consulta que
+  lia a base de dados sem passar pelo backend. Foi descartado a 2026-09-06 e o role ficou em
+  produção com `LOGIN` e a password em texto claro no `.env.local` desse repo. A `V37` revoga tudo
+  e tenta o `DROP`; se falhar, avisa e o role fica sem qualquer acesso. **Foi o que aconteceu na
+  base de dados real a 2026-09-19**: `permission denied to drop objects` — no Supabase o `postgres`
+  não é superuser, e `DROP OWNED BY` exige ser membro do role (foi criado à mão antes da `V30`, não
+  pela migração). O role existe, sem `USAGE`, sem `SELECT`, sem `CONNECT`. Para o apagar de vez, no
+  SQL editor: `GRANT worksite_expenses_ro TO postgres; DROP OWNED BY worksite_expenses_ro; DROP ROLE
+  worksite_expenses_ro;` — ou Database → Roles no dashboard, se o `GRANT` também for recusado.
+
+Os grants a `service_role` (`V8`) ficam: são do próprio Supabase para as suas APIs, não um
+cliente nosso — e é com essa chave que o backend fala com o Storage e o Auth.
+
+`SecurityConfig` deixou de ter, na mesma passagem, os matchers herdados sem controller
+(`GET /open/**`, `POST /open/leads`, `POST /assets`, `POST /banners`, e os `/api/auth/*` — nenhum
+controller tem prefixo `/api`). A tabela acima é a superfície real.
+
 ## Segredos em repouso — password SMTP
 
 A password de `settings.email_providers` é a única credencial que a app guarda na sua própria
@@ -56,13 +98,8 @@ base de dados (o resto é do Supabase). Cifrada em repouso desde a `V34`:
 - Um valor sem prefixo `gcm:` é lido como texto em claro legado; `EmailProviderPasswordReEncryptRunner`
   re-cifra-o no arranque.
 
-### Rodar a chave
-
-1. `APP_EMAIL_CRYPTO_KEY_PREVIOUS` = a chave atual; `APP_EMAIL_CRYPTO_KEY` = a chave nova.
-2. Reiniciar o backend. O runner de arranque decifra cada password com a chave anterior e
-   re-grava-a cifrada com a nova.
-3. Confirmar nos logs (`SMTP: N password(s) ... re-cifradas`) e enviar um email de teste.
-4. Remover `APP_EMAIL_CRYPTO_KEY_PREVIOUS` e reiniciar.
+O procedimento para **rodar a chave** (com `APP_EMAIL_CRYPTO_KEY_PREVIOUS` como rede durante a troca)
+está em [[operations]] — é operação, não desenho.
 
 ## Outros detalhes
 
@@ -76,3 +113,4 @@ base de dados (o resto é do Supabase). Cifrada em repouso desde a `V34`:
 - [[database.md]] — `worksite.profile`, `worksite.revoked_token`
 - [[backend-conventions]] — Convenções e armadilhas do backend
 - [[skills/references/design/backoffice-app-shell-and-auth]] — Fluxo de autenticação no Backoffice (rotas, guards, `AuthContext`)
+- [[operations]] — backup/restore, migração má, rotação de chave

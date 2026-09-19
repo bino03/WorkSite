@@ -50,8 +50,7 @@ Example:
 [ ] No (physical delete is enough)
 
 ### 8. Need RLS (Row Level Security)?
-[ ] Yes - per-tenant/user data
-[ ] No - backend handles security
+[x] No — **always, in this project**: only the backend connects (as `postgres`, which bypasses RLS) and authorization lives in `@PreAuthorize` + service ownership checks. A policy would be read by nobody. See [[security]] → "Modelo de confiança na base de dados" — it also says what would have to change (expose the schema, grant `authenticated`, write policies — all three) before RLS makes sense.
 
 ### 9. Next Flyway migration number?
 Run: `ls src/main/resources/db/migration/ | tail -1`
@@ -107,18 +106,6 @@ create index if not exists idx_my_table_active
     on worksite.my_table(id) where deleted_at is null;
 ```
 
-### If you need RLS
-
-```sql
--- Enable RLS
-alter table worksite.my_table enable row level security;
-
--- Policy example: users see only their own records
-create policy my_table_user_read on worksite.my_table
-    for select using (owner_id = auth.uid());
-```
-
----
 
 ## Step 2: Run Migration in Supabase
 
@@ -308,4 +295,4 @@ create table worksite.my_table_history (
 
 - [[code-best-practices]] — General code quality rules
 - [[skill-add-backend-feature]] — Create API endpoints after table
-- [[skill-permissions-and-auth]] — Set up RLS policies if needed
+- [[skill-permissions-and-auth]] — Authorization lives here (`@PreAuthorize`, ownership), not in RLS

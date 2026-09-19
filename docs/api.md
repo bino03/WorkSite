@@ -981,16 +981,6 @@ Códigos de erro: `EMAIL_001` (não encontrado), `EMAIL_002` (nenhum configurado
 configuração não é falha de envio, e antes saíam ambos como `ERR_001` ("erro interno do servidor"),
 que não diz a ninguém que falta configurar o SMTP.
 
-## ⚠️ Regras de segurança sem controller correspondente
-
-`SecurityConfig` ainda contém regras herdadas do projeto de origem que **não têm nenhum controller neste repo**:
-
-- `GET /open/**` e `POST /open/leads` → `permitAll()` (não existe package `client/` no Worksite)
-- `POST /assets` → `hasRole("ADMIN")` (não existe `AssetController`)
-- `POST /banners` → `hasRole("ADMIN")` (não existe `BannerController`)
-
-São regras inertes hoje (nenhuma rota corresponde), mas convém limpá-las para o ficheiro refletir a superfície real da API — está registado em [[../notes/refactoring.md]]. Ver [[security.md]].
-
 ---
 
 ## Relacionado

@@ -192,7 +192,7 @@ Por tarefa, na ordem confirmada:
 4. Implementa.
 5. Testa antes de considerar a tarefa concluída — **nunca saltar este passo, mesmo em orçamento apertado**:
    - Backend: corre os testes relevantes (`./mvnw test -Dtest=...` ou a suite toda se fizer sentido) até passarem.
-   - Frontend/UI: verifica mesmo no browser, não só inspeção visual do código — conforme a regra do `CLAUDE.md` raiz.
+   - Frontend/UI: verifica mesmo no browser, não só inspeção visual do código — invoca `/verify-in-browser` ([[skill-verify-in-browser]]) **inline**, nunca num subagente. Se a sessão não consegue abrir o Chrome (ou o utilizador pediu para adiar), regista a lista de verificação em `notes/verificacao-browser-pendente.md` e marca "não verificado no browser" no plano e no `whatIveDone.md` — a verificação fica adiada, não dispensada.
 6. **Fecha o `Final Checklist` completo da(s) skill(s) invocada(s) no passo 3** — incluindo o(s) item(ns) de documentação por atualizar à mão (ex.: `docs/api.md`, `docs/database.md`, `docs/security.md`, conforme a skill). Estas skills já dizem explicitamente que o hook de pre-commit (`.githooks/pre-commit`) só avisa no momento do commit, não escreve nada — aqui a documentação é atualizada de forma proativa, no momento em que a feature é implementada, em vez de reativa. Nunca marques a tarefa como concluída com um item de documentação do checklist por fazer.
 7. Corre a Fase 6 para esta tarefa (bookkeeping completo, também nunca saltado).
 8. **Checkpoint "concluída"**: marca a tarefa como `[x]` concluída no ficheiro de plano.
@@ -216,6 +216,8 @@ Por tarefa, na ordem confirmada:
 ```
 
 Guardar o texto verbatim do ToDo importa porque vários bullets deste backlog são vagos/incompletos — o log preserva o que foi realmente decidido na Fase 3, não só o diff final.
+
+**Integration guide da feature** — se a tarefa fechou o frontend de uma feature que teve um guia gerado pela `skill-frontend-integration-guide` (`management/managementfrontend/apps/backoffice/docs/integration/<feature>-integration.md`), faz `git rm` do guia nesta mesma tarefa. É um handoff, não documentação: o que nele era verdade está agora no código e em `docs/api.md`, e as decisões no `whatIveDone.md`. Deixado lá, desatualiza-se (os três das fases 1, 2 e 5 das faturas ficaram duas semanas a descrever DTOs que já tinham mudado — apagados a 2026-09-19).
 
 ---
 
@@ -247,7 +249,7 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 - [ ] Cada tarefa testada (testes de backend a passar / UI verificada no browser) antes do bookkeeping — nunca saltado, mesmo com pouco orçamento
 - [ ] `Final Checklist` da(s) skill(s) invocada(s) fechado por completo em cada tarefa, incluindo os itens de documentação (`docs/api.md`, `docs/database.md`, `docs/security.md`, etc.) — atualizados proativamente, não deixados para o aviso do hook de pre-commit
 - [ ] `notes/ToDo.md` atualizado por tarefa concluída (remoção pontual, não reescrita)
-- [ ] `notes/whatIveDone.md` com entrada nova por tarefa concluída
+- [ ] `notes/whatIveDone.md` com entrada nova por tarefa concluída; integration guide da feature apagado (`git rm`) se a tarefa fechou o frontend
 - [ ] `notes/roadmap/backlog.md` com a linha da iniciativa atualizada; `notes/learning.md` se houve lição de ferramenta
 - [ ] Resumo final + proposta de commit, sem `git push` sem confirmação
 
@@ -265,3 +267,4 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 - [[skill-frontend-integration-guide]] — Handoff backend → frontend
 - [[skill-frontend-structure-brief]] — Documentar estrutura atual antes de um redesign
 - [[skill-git-commits]] — Formato da mensagem de commit no fecho (Fase 7)
+- [[skill-verify-in-browser]] — Verificação no browser de cada tarefa com UI (Fase 5.5), inline

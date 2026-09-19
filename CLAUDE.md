@@ -42,6 +42,7 @@ do mesmo facto divergem sempre, e nunca se sabe qual é a boa. O `.githooks/pre-
 | Onde vive o código disto? | [[docs/code-map]] |
 | Como arranco, testo, faço build? | [[docs/commands]] |
 | Que variáveis de ambiente preciso? | [[docs/environment]] |
+| Como faço backup, restore, ou desfaço uma migração má? | [[docs/operations]] |
 | Que rotas tem a API? | [[docs/api]] |
 | Como é o schema da base de dados? | [[docs/database]] |
 | Autenticação, roles, CORS? | [[docs/security]] |

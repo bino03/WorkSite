@@ -82,7 +82,7 @@ public class SecurityConfig {
             try {
                 var uid = java.util.UUID.fromString(sub);
                 profileRepo.findByAuthUserId(uid).ifPresent(p -> {
-                    var dbRole = p.getRole().name(); // ADMIN / EMPLOYEE / CLIENT
+                    var dbRole = p.getRole().name(); // ADMIN / EMPLOYEE
                     out.add(new SimpleGrantedAuthority("ROLE_" + dbRole));
                 });
             } catch (Exception ignore) {
@@ -111,16 +111,12 @@ public class SecurityConfig {
             // 🔑 regras de autorização
             .authorizeHttpRequests(auth -> auth
                 // ✅ Endpoints PÚBLICOS (sem autenticação)
-                .requestMatchers("/actuator/health", "/ping", "/api/auth/login", "/auth/login", "/api/auth/refresh", "/auth/refresh", "/api/auth/logout", "/auth/logout", "/auth/accept-invite", "/auth/forgot-password", "/auth/reset-password").permitAll()
-                .requestMatchers(HttpMethod.GET, "/open/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/open/leads").permitAll()
+                .requestMatchers("/actuator/health", "/ping", "/auth/login", "/auth/refresh", "/auth/logout", "/auth/accept-invite", "/auth/forgot-password", "/auth/reset-password").permitAll()
 
                 // 🔒 Endpoints protegidos
                 .requestMatchers(HttpMethod.POST, "/auth/admin/**").hasRole("ADMIN")
                 // Credenciais SMTP: quem as controla controla os emails que saem em nome da plataforma.
                 .requestMatchers("/settings/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/assets").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/banners").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/employees/**").hasAnyRole("ADMIN", "EMPLOYEE")
                 .requestMatchers("/auth/me").authenticated()
                 .anyRequest().authenticated()

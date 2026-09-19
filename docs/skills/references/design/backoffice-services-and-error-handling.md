@@ -99,6 +99,6 @@ listas que abrem na página errada.
 
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-error-handling]] — o padrão prescrito, `ErrorHandler`, `errorMessages.ts`
-- [[../code-best-practices]] — regras "sem try/catch nos services", "um ficheiro de serviço por domínio"
+- [[../../frontend/skill-frontend-design-system]] → "Regras de base" — as regras "sem try/catch nos services", "um ficheiro de serviço por domínio"
 - [[backoffice-app-shell-and-auth]] — `api.ts` e o refresh automático em 401
 - [[../../backend/skill-add-backend-feature]] — onde os `ErrorCode` do backend são criados

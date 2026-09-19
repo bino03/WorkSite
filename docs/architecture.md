@@ -37,14 +37,14 @@ Ao contrário do Property-Management, **não existe portal público** — esta �
 └─────────────────────────────────────┘
 ```
 
-O backend é a única fonte de verdade e o único componente com acesso direto à base de dados.
+O backend é a única fonte de verdade e o único componente com acesso direto à base de dados — desde a `V37` também no que a base de dados concede (ver [[security.md]] → "Modelo de confiança na base de dados").
 
 ## Backend — `managementapi`
 
 - **Spring Boot 3.5.6**, Java 21.
-- Persistência: **Spring Data JPA** + **PostgreSQL**, migrações geridas por **Flyway** (`src/main/resources/db/migration/`, `V1` a `V36`). Ver [[database.md]] para o schema completo.
+- Persistência: **Spring Data JPA** + **PostgreSQL**, migrações geridas por **Flyway** (`src/main/resources/db/migration/`, `V1` a `V37`). Ver [[database.md]] para o schema completo.
 - Mapeamento DTO ↔ entidade via **MapStruct 1.6.0**.
-- Autenticação: **Spring OAuth2 Resource Server** a validar JWTs emitidos pelo **Supabase** (HS256, chave partilhada). Ver [[security.md]].
+- Autenticação: **Spring OAuth2 Resource Server** a validar JWTs emitidos pelo **Supabase** contra o JWKS do projeto (ES256). Ver [[security.md]].
 - Não usa um SDK oficial do Supabase — a integração é feita por chamadas REST próprias via **OkHttp**.
 - API organizada em: auth/perfil (`/auth/**`, `/profile/**`), funcionários (`/employees/**`), projetos (`/enterprises/**`, `/enterprise-relations/**`), orçamento de obra (`/construction-budget/**`, `/construction-expenses/**`), **faturas** (`/construction-invoices/**` — registo, documentos, QR da AT, notas de crédito, classificação em rubricas, transferências, importação da folha "Despesas"), **pagamentos** (`/payments/**`), **inconsistências** (`/invoice-incidents/**`), fornecedores (`/suppliers/**`), tarefas (`/tasks/**`), notificações (`/notifications/**`), localizações (`/locations/**`), atividade (`/activities/**`) e configuração (`/settings/**`, só `ADMIN` — hoje os provedores SMTP). Lista completa em [[api]]. Todas as rotas requerem JWT válido (e em muitos casos role `ADMIN`/`EMPLOYEE`), exceto `/auth/login|refresh|logout|accept-invite|forgot-password|reset-password`.
 

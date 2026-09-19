@@ -8,14 +8,10 @@ com versões ligeiramente diferentes em cada um.
 ```bash
 ./mvnw spring-boot:run                # Arrancar (porta 8080)
 ./mvnw clean install                  # Build
-./mvnw test                           # Todos os testes
+./mvnw test                           # Todos os testes (sem BD — ver "Testes")
 ./mvnw -Dtest=NomeDoTeste test        # Uma classe só
 ./mvnw package -DskipTests            # Empacotar JAR
 ```
-
-> ⚠️ **`./mvnw test` sem `-Dtest=` dispara o `ManagementApiApplicationTests`, que levanta o
-> contexto inteiro e escreve na base de dados real.** Ao correr testes durante o
-> desenvolvimento, usar sempre `-Dtest=` com as classes que interessam.
 
 > ⚠️ **Com o `spring-boot-devtools` a correr, uma migração Flyway nova aplica-se ao primeiro
 > `mvn compile`**, não quando se decide arrancar a app: o devtools reinicia sozinho assim que o
@@ -23,6 +19,35 @@ com versões ligeiramente diferentes em cada um.
 > — a `V20` entrou na base de dados real quase duas horas antes de alguém a mandar entrar.
 
 Precisa das variáveis de ambiente — ver [[environment]].
+
+### Testes
+
+36 classes em `src/test`, em quatro grupos — o que importa é **quais ligam à base de dados**:
+
+| Grupo | Classes | Precisa de | Corre em `./mvnw test`? |
+|---|---|---|---|
+| **Contexto Spring** — `ManagementApiApplicationTests` (`@SpringBootTest`, só `contextLoads`) | 1 | o `.env` inteiro: liga à **base de dados real** e o Flyway **aplica migrações pendentes** | **Não** — excluída no `pom.xml` (surefire). Só com `-Dtest=ManagementApiApplicationTests`, de propósito |
+| **Mockito** — services, controllers e handlers com repositórios/clients mockados (`@ExtendWith(MockitoExtension)`) | 29 | nada | Sim |
+| **Unit puro** — `AtInvoiceQrServiceTest`, `InvoiceThumbnailServiceTest`, `EncryptedStringConverterTest`, `SecretCipherTest` | 4 | nada (o QR lê ficheiros de `src/test/resources`) | Sim |
+| **Probes** — `AtInvoiceQrProbeTest`, `AtInvoiceQrBatchProbeTest` | 2 | um ficheiro/pasta real por `-Dinvoice.file=` / `-Dinvoice.dir=`; sem isso ficam *skipped* | Aparecem como 2 skipped |
+
+Não há testes de slice (`@WebMvcTest`, `@DataJpaTest`) nem Testcontainers: ninguém testa SQL nem
+mapeamentos JPA — as migrações só se provam ao arrancar o backend ([[operations]] → "Migração má").
+
+```bash
+./mvnw test                                        # 35 classes, ~168 testes, ~30 s, sem BD
+./mvnw -Dtest=PaymentServiceTest test              # uma classe
+./mvnw -Dtest=ManagementApiApplicationTests test   # o contexto — só com intenção (ver acima)
+./mvnw -Dtest=AtInvoiceQrProbeTest -Dinvoice.file=C:/caminho/fatura.pdf test   # probe de um PDF real
+```
+
+> Até 2026-09-19 o `./mvnw test` corria o contexto, e isso escrevia na base de dados real sem ninguém
+> mandar (a mesma armadilha do devtools acima). A exclusão no `pom.xml` fecha esse caminho; o do
+> `mvn compile` + devtools continua aberto.
+
+**Backoffice: 0 testes.** Não há Vitest, Jest nem Testing Library no `package.json`; os únicos
+guarda-costas são o `npx tsc -b` (ver abaixo) e a verificação no browser, feita em lote a partir de
+[[../notes/verificacao-browser-pendente]].
 
 ## Backoffice — `management/managementfrontend/apps/backoffice`
 

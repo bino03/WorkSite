@@ -10,7 +10,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 
 | Reference | Description | Tags | Applies to |
 |-------|---|---|---|
-| [[code-best-practices]] | General code quality rules shared by every skill | `#quality` `#conventions` `#backend` `#frontend` | Any skill writing/reviewing code |
+| [[code-best-practices]] | Language-agnostic principles, backend rules and the pre-commit checklist (frontend rules: [[skill-frontend-design-system]] → "Regras de base") | `#quality` `#conventions` `#backend` | Any skill writing/reviewing code |
 | [[frontend-visual-consistency]] | Router → 8 sub-files in `docs/skills/references/design/` with verified tokens/drift per area | `#frontend` `#backoffice` `#design` | Any skill writing UI |
 | [[project-vocabulary]] | Dicionário partilhado — Drawer vs. Modal, fatura vs. despesa, rubrica, token | `#vocabulary` `#frontend` `#domain` | Any skill describing code to a person |
 
@@ -45,6 +45,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 | [[skill-create-new-skill]] | Plan, write, and add a new skill (or reference) to the project                        | `#process` `#documentation` `#meta` | ~30-45m            |
 | [[skill-git-commits]]      | Commit message style and conventions                                                  | `#git` `#commits` `#style`          | ~1-2m              |
 | [[skill-implement-todo]]   | Backlog (`notes/ToDo.md`) → prioridade → implementação, orquestrando as outras skills | `#process` `#backlog` `#planning`   | ~1m a várias horas |
+| [[skill-verify-in-browser]] | Ver uma feature a funcionar na app real pela extensão do Chrome — DOM + API, nunca screenshot; escrita só em obra `is_test`; inline, nunca subagente | `#process` `#browser` `#verification` | ~10m + 2-5m/item |
 
 ---
 
@@ -55,19 +56,19 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 **Database**: [[skill-add-database-table]], [[skill-add-backend-feature]]  
 **API Development**: [[skill-add-backend-feature]], [[skill-add-file-upload]], [[skill-permissions-and-auth]]  
 **Frontend**: [[skill-frontend-design-system]], [[skill-frontend-error-handling]], [[skill-frontend-integration-guide]], [[skill-frontend-structure-brief]]  
-**Process**: [[skill-create-new-skill]], [[skill-git-commits]], [[skill-implement-todo]]
+**Process**: [[skill-create-new-skill]], [[skill-git-commits]], [[skill-implement-todo]], [[skill-verify-in-browser]]
 
 ---
 
-## Total: 11 Invocable Skills + 3 References
+## Total: 12 Invocable Skills + 3 References
 
 - References: 3 (+ 8 design sub-files)
 - Backend: 4
 - Frontend: 4
-- Process: 3
+- Process: 4
 
 ---
 
-**Last Updated**: 2026-08-09
+**Last Updated**: 2026-09-19
 
 **Note**: When adding a new skill, update this file + [[docs/skills/SKILLS-INDEX.md]] + [[skill-create-new-skill.md]]. References don't get a `.claude/skills/` pointer — only skills do, see [[skill-create-new-skill]]. Files live under `docs/skills/{backend,frontend,process,references}/`.

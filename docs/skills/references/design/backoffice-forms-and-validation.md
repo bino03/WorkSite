@@ -2,7 +2,7 @@
 
 > Parte de [[../frontend-visual-consistency]]. Só Backoffice. Baseado em `ConstructionStageUpsertDrawer.tsx`, `ConstructionSubStageUpsertDrawer.tsx`, `ConstructionExpenseUpsertDrawer.tsx`, `CreateEnterpriseDrawer.tsx` (+ `create/*Section.tsx`), `enterprise/edit/Edit*Card.tsx`, `CreateEmployeeDrawer.tsx`, `TaskFormDrawer.tsx`, `TaskDetailDrawer.tsx`, `MyProfileDrawer.tsx`, `ProfileView.tsx`, `AcceptInvitePage.tsx`. Auditoria 2026-08-05, ponto 1 atualizado a 2026-09-16.
 
-O [[../../frontend/skill-frontend-design-system]] prescreve **React Hook Form + Zod** para todos os formulários (e [[../code-best-practices]] repete a regra). A auditoria mostra duas convenções a competir — e o corte não é "código antigo vs novo", é **por domínio**.
+O [[../../frontend/skill-frontend-design-system]] prescreve **React Hook Form + Zod** para todos os formulários ("Regras de base" nº 5). A auditoria mostra duas convenções a competir — e o corte não é "código antigo vs novo", é **por domínio**.
 
 ## 1. Biblioteca de formulário: RHF+Zod no domínio de construção/criação, AntD Form no resto
 
@@ -68,4 +68,4 @@ O mesmo bloco condicional está repetido campo a campo, **com markup diferente c
 - [[../../frontend/skill-frontend-design-system]] — estrutura de pastas, naming, regra RHF+Zod
 - [[backoffice-drawers-and-modals]] — Drawer vs Modal, larguras
 - [[backoffice-services-and-error-handling]] — erros vindos da API (distinto de validação de campo)
-- [[../code-best-practices]] — regra geral "Zod + React Hook Form sempre"
+- [[../../frontend/skill-frontend-design-system]] → "Regras de base" — a regra "Zod + React Hook Form sempre"

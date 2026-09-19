@@ -312,13 +312,10 @@ propõe o resto automaticamente na última linha.
 
 ## 9. Impacto no `worksite-expenses` (Next.js só-leitura)
 
-Lê diretamente `enterprises`, `construction_invoice`, `construction_expense`, `construction_budget_item`,
-`profile` com o role `worksite_expenses_ro`. Cada fase que mexa nestas tabelas tem de:
-
-- manter as colunas que ele lê, ou atualizá-lo no mesmo dia;
-- dar `SELECT` ao role nas tabelas novas que ele precise (`construction_invoice_document` na fase 1 —
-  é lá que passa a estar o ficheiro que ele abre);
-- filtrar `scope = 'PROJECT'` na lista por projeto, ou a quarentena aparece sem obra.
+> **Já não se aplica.** O `worksite-expenses` foi descartado a 2026-09-06 e o role `worksite_expenses_ro`
+> com que lia a base de dados foi revogado e apagado na `V37` (2026-09-19). Só o backend liga à base de
+> dados — ver [[security]] → "Modelo de confiança na base de dados". Fica o título para as referências
+> antigas não partirem.
 
 ## Relacionado
 

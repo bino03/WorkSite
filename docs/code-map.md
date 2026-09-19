@@ -18,15 +18,46 @@ para isso há os outros:
 
 ## Faturas de obra
 
-O documento que vem da obra: carregar, ler o QR da AT, corrigir à mão, associar a uma rubrica.
+O documento que vem da obra: carregar, ler o QR da AT, corrigir à mão, classificar em rubricas.
+Uma fatura tem um **âmbito** (`scope`, `V26`): `PROJECT` (de uma obra), `COMPANY` (despesa da
+empresa, sem obra) ou `UNIDENTIFIED` (quarentena — ainda não se sabe de quem é).
 
 | Camada | Ficheiros |
 |---|---|
 | **Entrada** | rota `/backoffice/empreendimentos/:enterpriseId/invoices` → `pages/backoffice/enterprise/EnterpriseInvoicesPage.tsx` |
-| **Frontend** | `components/invoices/` — `InvoicesList`, `InvoiceUploadDrawer` (2 fases), `InvoiceRegisterDrawer` (sem ficheiro), `InvoiceDetailDrawer` (correção manual, líquido e NC ligadas), `InvoiceDocumentGallery`, `MarkPaidDrawer` + `AggregatePaymentDrawer` (fase 2), `CreditNoteDrawer` (fase 3), `BudgetItemPickerModal`, `invoiceNumber.ts` (tipo + série), `invoiceFormSchema.ts`/`paymentFormSchema.ts`/`creditNoteFormSchema.ts` · `components/construction/InvoicePreviewModal.tsx` · `services/invoiceService.ts` + `services/paymentService.ts` · `types/invoice.ts` |
-| **Backend** | `enterprises/controller/ConstructionInvoiceController` · `service/ConstructionInvoiceService` (o núcleo — upload, duplicados, correção) · `AtInvoiceQrService` + `WeChatQrCodeService` (leitura do QR) · `InvoiceThumbnailService` · `InvoiceCompressionService` · `repository/ConstructionInvoiceRepository` |
-| **Base de dados** | `worksite.construction_invoice` — `V16`, `V17` (ATCUD único), `V18` (checksum) |
-| **Detalhe** | [[api.md]] → "Faturas de obra" · [[database.md]] |
+| **Classificar** | rota `/backoffice/empreendimentos/:enterpriseId/classify` → `pages/backoffice/enterprise/ClassifyInvoicesPage.tsx` (botão "Classificar" na página das faturas): repartir a fatura por rubricas (`V32`) · `components/invoices/RubricSearchField.tsx` · sugestão em `GET /construction-invoices/{id}/rubric-suggestion` |
+| **Fora das obras** | menu lateral, grupo **Faturas** (`layouts/AppLayout.tsx`): "Por identificar" → `/backoffice/invoices/unidentified` (`pages/backoffice/invoices/UnidentifiedInvoicesPage.tsx`) · "Despesas da empresa" → `/backoffice/invoices/company` (`CompanyInvoicesPage.tsx`) — as duas são o mesmo `ScopedInvoicesPage.tsx` com `scope` diferente, a ler `GET /construction-invoices/unidentified` e `/company` |
+| **Frontend** | `components/invoices/` — `InvoicesList`, `InvoiceUploadDrawer` (2 fases), `InvoiceRegisterDrawer` (sem ficheiro), `InvoiceDetailDrawer` (correção manual, líquido e NC ligadas), `InvoiceDocumentGallery`, `CreditNoteDrawer` (fase 3), `BudgetItemPickerModal`, `invoiceNumber.ts` (tipo + série), `invoiceFormSchema.ts`/`creditNoteFormSchema.ts` · `components/construction/InvoicePreviewModal.tsx` · `services/invoiceService.ts` · `types/invoice.ts` |
+| **Backend** | `enterprises/controller/ConstructionInvoiceController` · `service/ConstructionInvoiceService` (o núcleo — upload, duplicados, correção, notas de crédito, repartição, transferência) · `AtInvoiceQrService` + `WeChatQrCodeService` (leitura do QR) · `InvoiceThumbnailService` · `InvoiceCompressionService` · `DespesasExcelImportService` (fase 6) · `repository/ConstructionInvoiceRepository` |
+| **Base de dados** | `worksite.construction_invoice` — `V16`, `V17` (ATCUD único), `V18` (checksum), `V26` (`scope`), `V29` (unicidade global) · `construction_invoice_document` (o ficheiro deixa de viver na fatura) — `V24`, `V25`, `V27` (estado), `V28` (tipo) · repartição por várias rubricas — `V32` |
+| **Detalhe** | [[api.md]] → "Faturas de obra", "Notas de crédito", "Classificar faturas em rubricas" · [[database.md]] · [[faturas-modelo-alvo]] |
+
+## Pagamentos
+
+Fase 2 da paridade com o Excel: "dar como pago" é um movimento (`payment`) ligado a uma ou
+várias faturas (`invoice_payment`) — o caso normal e o pagamento agregado são o mesmo modelo.
+
+| Camada | Ficheiros |
+|---|---|
+| **Entrada** | "Marcar como paga" no `InvoiceDetailDrawer` (uma fatura) · "Registar pagamento" na barra de seleção de `EnterpriseInvoicesPage` (várias faturas, um movimento) |
+| **Frontend** | `components/invoices/MarkPaidDrawer.tsx` + `AggregatePaymentDrawer.tsx` · `paymentFormSchema.ts` · `services/paymentService.ts` · os campos `paymentStatus`/`payments` em `types/invoice.ts` |
+| **Backend** | `enterprises/controller/PaymentController` (`POST /construction-invoices/{id}/payments`, `POST /construction-invoices/payments`, `DELETE /construction-invoices/payments/{paymentId}`) · `service/PaymentService` · `model/Payment` + `InvoicePayment` (+ `InvoicePaymentId`) · `enums/PaymentMethod`, `PaymentStatus` · `dto/payment/` · `repository/PaymentRepository` + `InvoicePaymentRepository` |
+| **Base de dados** | `worksite.payment` + `invoice_payment` — `V31` |
+| **Detalhe** | [[api.md]] → "Pagamentos" · [[faturas-modelo-alvo]] §2.3 |
+
+## Inconsistências & transferências
+
+Fase 5. Mudar uma fatura de obra ou de âmbito é uma **transferência com razão** (nunca edição do
+`scope`); o que ficou por conciliar depois disso vira uma **inconsistência** — nota livre sobre
+uma ou mais faturas, aberta à mão, resolvida à mão.
+
+| Camada | Ficheiros |
+|---|---|
+| **Entrada** | menu lateral, grupo **Faturas** → "Inconsistências" → `/backoffice/invoices/incidents` (`pages/backoffice/invoices/InvoiceIncidentsPage.tsx`) · a ação "Transferir" no detalhe de uma fatura |
+| **Frontend** | `components/invoices/TransferInvoiceDrawer.tsx` + `transferFormSchema.ts` (depois de transferir, sugere abrir uma inconsistência) · `IncidentDrawer.tsx` + `incidentFormSchema.ts` + `toIncidentInvoiceRef.ts` · `services/incidentService.ts` · `types/incident.ts` |
+| **Backend** | transferência: `ConstructionInvoiceService` via `POST /construction-invoices/{id}/transfer` (`dto/invoice/request/InvoiceTransferDTO`, `response/InvoiceTransferResultDTO`) · inconsistências: `enterprises/controller/InvoiceIncidentController` (`/invoice-incidents`) · `service/InvoiceIncidentService` · `model/InvoiceIncident` · `dto/incident/` · `repository/InvoiceIncidentRepository` |
+| **Base de dados** | `worksite.invoice_incident` + `invoice_incident_invoice` — `V33` · o check `ck_invoice_scope_enterprise` de `V26` é o que impede uma fatura `COMPANY`/`UNIDENTIFIED` de ficar com obra |
+| **Detalhe** | [[api.md]] → "Transferir faturas", "Inconsistências" · [[faturas-modelo-alvo]] §4 |
 
 ## Fornecedores
 
@@ -147,6 +178,10 @@ começar a olhar.
 | o aviso de prazo de rubrica não aparece / aparece a dobrar | `BudgetItemDeadlineNotifier` — só `ITEM` vivas de obras não `completed/archived/deleted`, `end_date` em [hoje, hoje+N]; dedupe por `(recipient, type, entity)`, por isso adiar a data **não** reavisa |
 | recuperar a password não faz nada | `PasswordResetService` — o `204` do `forgot-password` é sempre igual, exista ou não a conta; confirmar no log se saiu email |
 | preciso de acrescentar um campo à fatura | migração → `ConstructionInvoice` → DTOs de `dto/invoice/` → `ConstructionInvoiceService` → `types/invoice.ts` → `InvoiceDetailDrawer` |
+| a fatura está `PARTIAL` e devia estar `PAID` (ou o contrário) | `paymentStatus` é derivado da soma de `invoice_payment.amount` vs. o líquido — `PaymentService` (registo/anulação) e `InvoicePaymentSummaryDTO`; uma NC ligada baixa o líquido |
+| a fatura não aparece na obra onde devia | olhar ao `scope`: `COMPANY`/`UNIDENTIFIED` não têm obra por construção (`ck_invoice_scope_enterprise`, `V26`) — muda-se com "Transferir" (`TransferInvoiceDrawer`), nunca pelo `PUT /{id}` |
+| a transferência não abriu uma inconsistência | não abre sozinha: `suggestIncident` no `InvoiceTransferResultDTO` só sugere, o `IncidentDrawer` é sempre à mão |
+| a fatura não deixa ser classificada / a repartição não fecha | `ClassifyInvoicesPage` — as linhas têm de somar o total da fatura (`V32`, `InvoiceSplitServiceTest` tem os casos) |
 
 ---
 

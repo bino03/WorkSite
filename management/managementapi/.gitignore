@@ -72,3 +72,6 @@ Thumbs.db
 *.tmp
 *.bak
 *~
+
+# Cópias de segurança locais (scripts/backup-storage.mjs, pg_dump) — nunca no git
+backups/

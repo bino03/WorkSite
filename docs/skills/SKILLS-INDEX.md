@@ -32,9 +32,9 @@ These are **not skills** — nothing invokes `/code-best-practices` on its own. 
 **General code quality rules shared by every skill — naming, error handling, what to test before committing**
 
 - **File**: `docs/skills/references/code-best-practices.md`
-- **Applies to**: Any skill that writes or reviews code (backend or frontend)
+- **Applies to**: Any skill that writes or reviews code — for the frontend, the language-agnostic principles and the checklist; the frontend rules themselves are in [[skill-frontend-design-system]] → "Regras de base" (merged 2026-09-19)
 - **Tags**: `#quality` `#conventions` `#backend` `#frontend` `#errors`
-- **Covers**: General principles → Backend conventions → Frontend conventions → Pre-commit checklist
+- **Covers**: General principles → Backend conventions → Pre-commit checklist
 
 ### [[frontend-visual-consistency]]
 **Router for verified visual/structural conventions in the Backoffice — points to the matching sub-file in `docs/skills/references/design/`**
@@ -191,6 +191,16 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - **Use when**: Avançar `notes/ToDo.md`, priorizar, planear sem implementar, retomar um plano a meio, ou ver o estado do backlog
 - **Nota**: não escreve código diretamente — invoca as outras skills. Lê e mantém `notes/ToDo.md`, `notes/whatIveDone.md`, `notes/ideas.md` e `notes/roadmap/plans/`
 
+### [[skill-verify-in-browser]]
+**Ver uma feature do Backoffice a funcionar na app real, pela extensão do Chrome — por DOM + API, nunca por screenshot; escrita só em obra `is_test`**
+
+- **File**: `docs/skills/process/skill-verify-in-browser.md`
+- **Time**: ~10 min a preparar a sessão + ~2-5 min por verificação
+- **Tags**: `#process` `#browser` `#verification` `#chrome-extension` `#frontend`
+- **Covers**: Lista do que verificar → arrancar app → ligar a extensão (reiniciar Chrome, `select_browser`, `/auth/me`) → obra `is_test` por `fetch` → verificar por DOM + rede → permissões por `403` → limpar (faturas primeiro, NC antes das origens) → registar em `verificacao-browser-pendente.md`
+- **Use when**: Passo 5.5 do `implement-todo` numa tarefa com UI, ou uma passagem em lote sobre `notes/verificacao-browser-pendente.md`
+- **Nota**: corre **inline**, nunca num subagente — a extensão pertence à sessão principal. Nasceu do procedimento em `notes/learning.md` (2026-09-19)
+
 ---
 
 ## By Topic
@@ -223,6 +233,7 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - [[skill-frontend-integration-guide]] — Documenting for team
 - [[skill-create-new-skill]] — How to create a new skill
 - [[skill-implement-todo]] — Levar o backlog (`notes/ToDo.md`) até código, reutilizando as skills acima
+- [[skill-verify-in-browser]] — Provar no browser real o que o `implement-todo` implementou
 
 ---
 
@@ -274,15 +285,16 @@ docs/skills/
 | References (not invocable) | 3 (+ 8 design sub-files) |
 | Backend Skills | 4 |
 | Frontend Skills | 4 |
-| Process Skills | 3 |
-| **Total Invocable Skills** | **11** |
+| Process Skills | 4 |
+| **Total Invocable Skills** | **12** |
 
 ---
 
 ## Last Updated
 
 - **Date**: 2026-09-19
-- **Latest**: `skill-add-file-upload` reescrita à volta de `construction_invoice_document` + `payment.proof_*` (a versão anterior ensinava o `/assets/{id}/banner` do Property-Management); `property_asset` e `ConstructionStagesPage` purgados de `skill-add-database-table` e `skill-frontend-design-system`; `implement-todo` Fase 7 passa a alimentar `backlog.md` e `learning.md`.
+- **Latest**: `skill-verify-in-browser` (process) — o procedimento da extensão do Chrome que vivia em `notes/learning.md` passa a ser invocável (`/verify-in-browser`) e chamado pelo `implement-todo` na Fase 5.5; a secção frontend de `code-best-practices` fundida no `skill-frontend-design-system` ("Regras de base"); regra "o integration guide apaga-se ao fechar a feature".
+- **Anterior (2026-09-19)**: `skill-add-file-upload` reescrita à volta de `construction_invoice_document` + `payment.proof_*` (a versão anterior ensinava o `/assets/{id}/banner` do Property-Management); `property_asset` e `ConstructionStagesPage` purgados de `skill-add-database-table` e `skill-frontend-design-system`; `implement-todo` Fase 7 passa a alimentar `backlog.md` e `learning.md`.
 - **Anterior (2026-08-09)**: Added the `project-vocabulary` reference — o dicionário partilhado (Drawer vs. Modal, fatura vs. despesa, rubrica, token). Nasceu de uma confusão real: um Drawer tratado por "modal" mandava quem lê para o sub-ficheiro de design errado.
 - **Anterior (2026-08-05)**: Added `skill-implement-todo` (backlog orchestration) + the three missing Backoffice design references (`forms-and-validation`, `services-and-error-handling`, `app-shell-and-auth`, all audited against this project's real code). Registered `skill-frontend-structure-brief`, which existed but was never indexed. Removed the remaining Portal/Zustand carry-overs from the skill texts — neither exists in Worksite.
 - **Next to Add**: As needed (update this index when adding)

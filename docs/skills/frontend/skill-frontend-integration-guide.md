@@ -271,8 +271,7 @@ Q: Is this the feature from this chat?
 
 **I generate the `.md` file → Automatically saved to:**
 ```
-C:\Users\jlalv\Desktop\utad\projetos\Property Management - Client Side\
-Casa-Capital---Client-Side\docs\integration\
+management\managementfrontend\apps\backoffice\docs\integration\
 property-management-integration.md
 ```
 
@@ -285,7 +284,7 @@ property-management-integration.md
 ✅ **Consistent format** — Always the same structure
 ✅ **Step-by-step** — Anyone can follow it
 ✅ **Copy-paste ready** — Code templates included
-✅ **Reusable** — Saved in docs/ for reference
+✅ **Disposable on purpose** — it lives only while the feature is being built (see "File Locations")
 
 ---
 
@@ -316,6 +315,8 @@ management\managementfrontend\apps\backoffice\docs\integration\{feature-name}-in
 ```
 
 (Relative to the repo root. There's only one frontend app, so there's no routing decision to make.)
+
+**The guide is deleted when the feature closes.** It is a handoff, not documentation: once the frontend is implemented, everything true in it lives in the code and in `docs/api.md`, and the decisions live in `notes/whatIveDone.md`. Left behind, it drifts — the three guides of the invoice phases 1, 2 and 5 sat in the folder for two weeks after their features shipped, describing DTOs that had already changed (removed 2026-09-19). So: whoever closes the feature (`skill-implement-todo`, Phase 6) runs `git rm` on the guide in the same commit that finishes the frontend. If a guide is still there, either the feature is open or someone forgot — check `whatIveDone.md` before reading it as truth.
 
 ---
 

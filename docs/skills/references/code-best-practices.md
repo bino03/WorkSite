@@ -1,6 +1,6 @@
 # Skill: Boas Práticas de Código (Transversal)
 
-**When to use**: Sempre — é a referência transversal de qualidade de código para qualquer skill (backend ou frontend)
+**When to use**: Sempre — é a referência transversal de qualidade de código para qualquer skill. As regras **do frontend** vivem em [[skill-frontend-design-system]] → "Regras de base" (desde 2026-09-19); aqui ficam os princípios que não dependem da linguagem, as regras do backend e o checklist.
 
 **Time**: Referência contínua, não é um checklist de uma vez
 
@@ -9,6 +9,8 @@
 ## Porque é que este ficheiro existe
 
 Em vez de repetir as mesmas regras de qualidade em cada skill (naming, tratamento de erros, o que testar antes de commitar), estão todas centralizadas aqui. Cada skill específica (`skill-add-backend-feature`, `skill-frontend-design-system`, etc.) foca-se no seu domínio e linka para aqui quando é relevante. Se uma regra geral mudar, muda-se **só neste ficheiro**.
+
+A secção frontend que aqui existia **fundiu-se no `skill-frontend-design-system`** a 2026-09-19: uma tarefa de UI lia quatro camadas (`code-best-practices` → `design-system` → `frontend-visual-consistency` → `design/`), e as regras daqui eram uma versão resumida das que o design-system já tinha. Agora lê-se este ficheiro pelos princípios gerais, o design-system pelas regras de frontend, e `design/` pelos valores visuais — cada facto num sítio só.
 
 ---
 
@@ -45,19 +47,6 @@ Em vez de repetir as mesmas regras de qualidade em cada skill (naming, tratament
 
 ---
 
-## Frontend (React / TypeScript)
-
-- **Strict mode sempre ligado** — evitar `any` sem justificação explícita
-- Naming detalhado em [[skill-frontend-design-system]] (componentes `PascalCase`, hooks com prefixo `use`, serviços com sufixo `Service`, etc.)
-- **Sem try/catch nos services** — o erro sobe até ao componente, que o passa ao `ErrorHandler` centralizado (ver [[skill-frontend-error-handling]])
-- **Um ficheiro de serviço por domínio**, funções puras de chamada à API (sem lógica de UI dentro)
-- Formulários sempre com **Zod + React Hook Form** — nunca validação manual dispersa por `if`s
-- **Todo o campo de texto num formulário restringe caracteres** (regex de lista branca), não só comprimento — o frontend nunca é mais permissivo que o backend: campo obrigatório no DTO é sempre obrigatório no Zod, só se pergunta ao utilizador sobre os campos que são opcionais no backend (ver [[skill-frontend-design-system]] → Forms)
-- **Visibilidade de campos por role pergunta-se sempre** (listas e formulários) e nunca se resolve só no frontend — o DTO do backend já deve filtrar o campo para quem não tem a role certa (ver [[skill-frontend-design-system]] → Visibilidade de campos por role, e [[skill-permissions-and-auth]])
-- **Testar no browser antes de dar como terminado** — type-check e lint não substituem testar o fluxo real
-- **Backoffice**: cores, larguras de drawer, tokens Tailwind e ícones seguem [[frontend-visual-consistency]] (router — aponta para o sub-file certo conforme a área que estás a tocar) — não inventar valores novos quando já existe um token/convenção estabelecida
-
----
 
 ## Checklist rápido antes de qualquer commit
 
@@ -76,7 +65,7 @@ Em vez de repetir as mesmas regras de qualidade em cada skill (naming, tratament
 - [[skill-add-database-table]] — Convenções de schema
 - [[skill-add-file-upload]] — Regras específicas de upload
 - [[skill-permissions-and-auth]] — Autorização e ownership
-- [[skill-frontend-design-system]] — Padrões de componentes React
+- [[skill-frontend-design-system]] — Padrões de componentes React **e as regras de base do frontend** (strict mode, services sem try/catch, Zod + RHF, restrição de caracteres, visibilidade por role)
 - [[frontend-visual-consistency]] — Router para tokens visuais verificados do Backoffice
 - [[skill-frontend-error-handling]] — Detalhe do `ErrorHandler`
 - [[skill-git-commits]] — Convenções de mensagens de commit

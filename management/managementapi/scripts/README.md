@@ -100,9 +100,9 @@ cascade. Por isso é que o `.sql` trata dos dois lados de uma vez:
 
 | Bucket | Quem aponta para lá | Se apagares só os ficheiros |
 |---|---|---|
-| `documents` | `worksite.construction_invoice` (`bucket` + `storage_key` + `thumbnail_key`) | faturas a apontar para o vazio |
+| `documents` | `worksite.construction_invoice_document` (`bucket` + `storage_key` + `thumbnail_key`, desde a `V24`) e `worksite.payment` (`proof_bucket` + `proof_key`, `V31`) | faturas e provas de pagamento a apontar para o vazio |
 | `media` | `worksite.enterprises_media` (uma linha por banner/foto/vídeo) | galeria e banner partidos |
-| `private` | `worksite.profile.photo_bucket` + `photo_key` | avatares partidos |
+| `private` | ninguém, desde a `V35` (as fotos de perfil saíram) | nada |
 
 Não há erro visível imediato: as URLs assinadas continuam a ser geradas, só que
 não há nada do outro lado. O passo 5 do `.sql` tem as queries para confirmar que
@@ -116,3 +116,21 @@ não ficou nada pendurado — dos dois lados.
 
 O script usa a **service role key**, que ignora RLS. Não o corras contra
 produção sem teres a certeza do prefixo que lhe deste.
+
+## Cópia de segurança do Storage
+
+O outro lado dos scripts de purga. Só lêem/enviam, nunca apagam.
+
+| Ficheiro | Trata de |
+|---|---|
+| `backup-storage.mjs` | copiar um bucket (ou todos) para `backups/storage/<data-hora>/`, com `manifest.json` |
+| `restore-storage.mjs` | devolver essa cópia ao Storage, mesma chave, objeto existente substituído |
+
+```bash
+node scripts/backup-storage.mjs                          # bucket documents
+node scripts/restore-storage.mjs --from backups/storage/<data-hora>        # simulação
+node scripts/restore-storage.mjs --from backups/storage/<data-hora> --yes
+```
+
+`backups/` está no `.gitignore`. Quando fazer, o que guardar da base de dados e como repor está
+em `docs/operations.md`.
