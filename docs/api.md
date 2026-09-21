@@ -327,6 +327,8 @@ de entrada.
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/pending-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total }` das faturas por associar (NC não entram): o contador do botão "Faturas" e o cartão "Por classificar" ao lado do "Gasto" no orçamento. Era `pending-count` (só o número) até 2026-09-18 |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/outstanding-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total, withoutTotalCount }` do que **falta pagar** nas faturas por liquidar, com os mesmos filtros da lista (todos os da tabela "Filtros da caixa de entrada", incluindo os da pesquisa avançada; `outstanding` é sempre true). `total` = Σ (total − NC − pago) sobre **todas** as faturas do filtro, não só a página; as sem total contam em `count`/`withoutTotalCount` e valem 0. É o "Falta pagar X" ao lado do filtro "Por liquidar" (2026-09-21) |
+| GET | `/construction-invoices/unidentified/outstanding-summary?q=` · `/company/outstanding-summary?q=` | `ADMIN` — o mesmo para a quarentena e as despesas da empresa |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida por NIF, sem o porquê (o `rubric-suggestion` por fatura veio substituí-lo); `204` sem histórico |
 | GET | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — única resposta com `fileUrl` |
 | PUT | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — correção manual |
@@ -514,9 +516,23 @@ ordenada por `uploadedAt` descendente:
 | `allocated` | `false` → o que está por classificar (o que o cliente abre por omissão) |
 | `needsReview` | `true` → falta a data ou o total |
 | `sentToAccountant` | `false` → o que falta enviar |
-| `atChapter` | `true` → pelo menos uma linha de repartição aponta para uma rubrica que ainda tem filhas `ITEM` (a mesma regra do `chapter` do ecrã "Classificar" — ver `BudgetItemSearchResultDTO`). Só existe aqui: as outras duas listas não têm rubrica |
+| `atChapter` | `true` → pelo menos uma linha de repartição aponta para uma rubrica que ainda tem filhas `ITEM` (a mesma regra do `chapter` do ecrã "Classificar" — ver `BudgetItemSearchResultDTO`). Só existe aqui: as outras duas listas não têm rubrica. **O Backoffice deixou de o usar** a 2026-09-21 (o botão "Ao capítulo" saiu: com o gasto de uma rubrica-pai repartido pelas filhas, lançar ao capítulo deixou de esconder dinheiro); o parâmetro fica na API, a tag "capítulo" na coluna Rubrica também |
 | `from` / `to` | intervalo de `invoiceDate` (ISO `AAAA-MM-DD`) |
 | `q` | procura no nome e NIF do fornecedor, número, ATCUD, nome do ficheiro e notas |
+| `supplierNif` | NIF exato do fornecedor (a pesquisa avançada escolhe-o do catálogo `/suppliers`) |
+| `documentType` | `INVOICE` / `CREDIT_NOTE` |
+| `documentStatus` | `ARCHIVED` / `MISSING` / `TO_PRINT` / `TO_REQUEST` |
+| `paymentStatus` | `UNPAID` (nada pago) / `PARTIAL` / `PAID` — mais fino do que `outstanding`, que junta os dois primeiros; a mesma conta (pago + NC vs. total) |
+| `allocationStatus` | `NONE` / `PROVISIONAL` (com linhas, sem total) / `PARTIAL` (Σ linhas ≠ total) / `COMPLETE` — a regra do `allocationStatus` da resposta, em SQL |
+| `minAmount` / `maxAmount` | intervalo de `totalAmount`, inclusive |
+| `budgetItemId` | rubrica **e toda a sub-árvore dela** (o serviço resolve os ids das descendentes vivas antes da query; uma rubrica de outra obra ou apagada filtra tudo, não devolve a lista inteira) |
+
+Os últimos oito são a **pesquisa avançada** do Backoffice (2026-09-21, `InvoiceFiltersModal`) e vão
+também no `GET …/outstanding-summary`, que aceita exatamente o mesmo conjunto (menos `outstanding`).
+No backend chegam todos num `InvoiceSearchFilter`. Os enums vão como texto e a query compara
+`cast(coluna as string)`: um parâmetro enum a `null` contra uma coluna `NAMED_ENUM` não tem tipo que o
+Postgres consiga inferir. O filtro de rubrica usa um flag `budgetFilter` + lista de ids, porque
+"`:lista is null`" não é fiável com coleções em JPQL (`InvoiceSearchFilterTest`).
 
 A sugestão de rubrica é a que as faturas deste fornecedor costumam levar **neste projeto**. É
 o que transforma a associação num clique a partir da segunda fatura do mesmo fornecedor.
@@ -754,7 +770,11 @@ remaining, overBudget}]`. Aceita código (`4.2`) ou texto (`betão`); o `path` c
 real. Rubricas que não aceitam despesas não aparecem; `chapter: true` assinala que ainda tem
 sub-rubricas por baixo — classificar ao capítulo é legítimo, mas fica assinalado. **`q` vazio ou
 omitido devolve os capítulos** (2026-09-17) — é o estado inicial do campo de pesquisa do ecrã
-"Classificar", que antes ficava em branco até se escrever alguma coisa.
+"Classificar", que antes ficava em branco até se escrever alguma coisa. **Um `q` só de dígitos e
+pontos é pesquisa por código: prefixo no mesmo nível** (2026-09-21) — `2` dá a `2` e a `20` (não a
+`2.1`, a `20.1` nem a `12`), `2.` dá as filhas diretas da `2`, `2.1` dá a `2.1` e a `2.10`; é o que
+"ver sub-rubricas ›" assume ao escrever `2.`. Antes era `contains` e `2` trazia a árvore inteira.
+Texto continua a procurar em toda a árvore (`BudgetItemSearchTest`).
 
 ## Transferir faturas (`ConstructionInvoiceController`)
 
@@ -785,6 +805,14 @@ repartição, pagamentos ou NC (os casos em que vale a pena propor registar uma 
 
 **Em "Por identificar", preencher a obra É transferir** — o Backoffice abre o mesmo fluxo com
 `targetScope` fixo em `PROJECT`.
+
+**"Outra rubrica desta obra" no drawer de transferir NÃO é uma transferência** (desde 2026-09-21): o
+`TransferInvoiceDrawer` mostra esse quarto destino só numa fatura de obra, e ao confirmar chama
+`POST /{id}/expenses/split` com **uma linha** (`amount = totalAmount`) — substitui a repartição inteira e
+serve a fatura já associada (o `allocate` recusava com `INVOICE_004`) e a que ainda não está. Não pede
+razão, não escreve no `activity_log`, não gera `suggestIncident` e **não toca nas NC ligadas** (ficam com
+a repartição delas — só a transferência de obra as arrasta). A rubrica escolhe-se com o
+`RubricSearchField` do ecrã de classificação.
 
 O **detalhe da fatura** (`GET /construction-invoices/{id}`) ganhou `transfers[]`:
 `{ transferredAt, fromScope, fromEnterpriseId, fromEnterpriseName, toScope, toEnterpriseId,

@@ -98,6 +98,8 @@ Por cada item da lista do Step 0, o mesmo par:
 - **Ação**: pela UI quando é isso que se está a verificar (um botão, uma drawer, um filtro) — `navigate` + `read_page`/`find` para chegar lá, `javascript_tool` para clicar por seletor (`document.querySelector(...).click()`) em vez de coordenadas. Para preparar dados (criar faturas, pagamentos, rubricas), pela API com `fetch` — é mais rápido e não é o que se está a testar.
 - **Prova**: o que mudou, lido do DOM (`read_page` / `get_page_text`, ou `document.querySelectorAll` no `javascript_tool`) **e** da API (`fetch` ao `GET` correspondente). Os dois têm de concordar; quando não concordam, o bug é quase sempre a lista que não recarrega ([[code-map]] → "por sintoma").
 
+  Exceção: **abrir/fechar de modais e dropdowns decide-se por screenshot**, e o "Aplicar"/"Cancelar" clica-se com o rato (`computer` → `left_click` com `ref`), não por `element.click()` — com a janela do Chrome sem foco a animação de saída do AntD nunca acaba e o DOM diz "aberto" para sempre (ver [[learning]] 2026-09-21). Popups presos fecham-se com `key Escape` antes do passo seguinte.
+
 Registar por item: ✅ / 🔴 com o que se esperava vs. o que apareceu, e o erro da consola ou da rede (`read_console_messages` com `pattern`, `read_network_requests`) se houver. Uma 🔴 vai para `notes/ToDo.md` como bullet ⚠️ com esse detalhe — não se corrige a meio da passagem, senão a passagem nunca acaba.
 
 Chamadas longas (importações, exportações) ficam assíncronas em `window.__x = fetch(...)` e lêem-se depois; se a página recarregar entretanto, repetir — o backend é transacional, a chamada anterior ou entrou inteira ou não entrou.
@@ -118,7 +120,7 @@ Se houve obra de teste, apagar **pela ordem certa** — a ordem errada deixa lix
 
 1. Faturas da obra: **notas de crédito primeiro** (têm origem), depois as outras — `DELETE /construction-invoices/{id}` por cada uma (`GET /construction-invoices/enterprise/{id}` dá a lista; os pagamentos e documentos vão com elas).
 2. A obra: `DELETE /enterprises/{id}` (soft delete).
-3. Confirmar: `GET /enterprises/{id}` → `404`, e a pasta `notes/tmp-browser/` apagada se existiu.
+3. Confirmar: `GET /enterprises/{id}` → `200` com `status: "deleted"` (é soft delete, não 404) e a obra fora de `GET /enterprises`; a pasta `notes/tmp-browser/` apagada se existiu.
 
 Não deixar a obra "para a próxima" — a última que ficou (`Vila Teste Claude`, 2026-09-18) acabou por ser apagada à mão com 20 faturas de desenvolvimento dentro, e os números reais que lá estavam bloquearam uma importação por duplicado.
 
@@ -141,7 +143,7 @@ Não deixar a obra "para a próxima" — a última que ficou (`Vila Teste Claude
 - [ ] Nenhuma escrita na BD fora de uma obra `is_test`
 - [ ] Cada item provado por DOM **e** API, não por screenshot
 - [ ] Permissões provadas por `403` na API, não por botão escondido
-- [ ] Obra de teste apagada (faturas primeiro, NC antes das origens), `GET` → `404`; `notes/tmp-browser/` apagada
+- [ ] Obra de teste apagada (faturas primeiro, NC antes das origens), `GET` → `status: "deleted"`; `notes/tmp-browser/` apagada
 - [ ] [[verificacao-browser-pendente]] atualizado; 🔴 no `ToDo.md`; lição de ferramenta no [[learning]]
 - [ ] Corrido inline — nunca delegado a um subagente
 
