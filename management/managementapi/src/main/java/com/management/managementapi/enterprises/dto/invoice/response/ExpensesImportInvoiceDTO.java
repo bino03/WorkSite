@@ -13,6 +13,8 @@ import java.util.List;
  * @param creditNoteOrigin {@code key} da fatura de origem, quando já se sabe
  * @param manualExpense    linha "Despesa registada à mão na app, sem fatura." —
  *                         entra como despesa solta, não como fatura
+ * @param transferTo       só na quarentena: para onde a fatura segue depois de entrar (nome da obra
+ *                         ou "Despesas da empresa"), quando a coluna "Empreendimento" está preenchida
  * @param lines            uma por linha do Excel: rubrica + valor
  */
 public record ExpensesImportInvoiceDTO(
@@ -36,6 +38,9 @@ public record ExpensesImportInvoiceDTO(
         String supplierName,
         String supplierNif,
         boolean duplicate,
+        String possibleEnterprises,
+        String askWhom,
+        String transferTo,
         List<Line> lines
 ) {
     public record Line(int excelRow, String rubricCode, String rubricLabel, BigDecimal amount) {}

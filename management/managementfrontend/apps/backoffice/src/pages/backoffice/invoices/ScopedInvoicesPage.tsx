@@ -175,12 +175,9 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         </div>
         {isAdmin() && (
           <Space>
-            {/* A quarentena tem outra tabela no vault (TabelaPorIdentificar) — ainda não se importa. */}
-            {scope === "COMPANY" && (
-              <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
-                Importar Excel
-              </Button>
-            )}
+            <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
+              Importar Excel
+            </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
               Registar sem ficheiro
             </Button>
@@ -281,14 +278,12 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onCreated={reload}
       />
 
-      {scope === "COMPANY" && (
-        <ExpensesImportModal
-          open={importOpen}
-          scope="COMPANY"
-          onClose={() => setImportOpen(false)}
-          onImported={reload}
-        />
-      )}
+      <ExpensesImportModal
+        open={importOpen}
+        scope={scope}
+        onClose={() => setImportOpen(false)}
+        onImported={reload}
+      />
 
       <InvoicePreviewModal
         open={previewInvoice !== null}

@@ -566,6 +566,11 @@ export interface ExpensesImportInvoice {
   supplierName: string | null;
   supplierNif: string | null;
   duplicate: boolean;
+  /** Só na quarentena: as colunas "Obras possíveis" e "Perguntar a" da folha "Por identificar". */
+  possibleEnterprises: string | null;
+  askWhom: string | null;
+  /** Só na quarentena: para onde segue depois de entrar (nome da obra ou "Despesas da empresa"), quando "Empreendimento" está preenchido. */
+  transferTo: string | null;
   lines: ExpensesImportLine[];
 }
 
@@ -577,6 +582,8 @@ export interface ExpensesImportResult {
   invoiceCount: number;
   creditNoteCount: number;
   manualExpenseCount: number;
+  /** Quantas faturas da quarentena são transferidas logo para a obra/empresa da coluna "Empreendimento". */
+  transferredCount: number;
   paidCount: number;
   partiallyPaidCount: number;
   unpaidCount: number;

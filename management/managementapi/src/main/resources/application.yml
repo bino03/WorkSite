@@ -53,6 +53,12 @@ spring:
       max-request-size: 25MB
       file-size-threshold: 2MB
 
+  mvc:
+    async:
+      # O zip da pasta de uma obra (GET …/export/zip) escreve-se em streaming — dezenas
+      # de MB vindos do Storage um a um; o limite de 30 s do Tomcat cortava-o a meio.
+      request-timeout: 10m
+
 server:
   port: 8080
   tomcat:

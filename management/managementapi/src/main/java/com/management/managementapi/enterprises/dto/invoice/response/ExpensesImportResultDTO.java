@@ -16,6 +16,7 @@ import java.util.List;
  * @param warnings        o que entrou com aproximações (data de pagamento presumida, método "Outro", …)
  * @param questions       o que só a pessoa sabe responder (NC ↔ fatura de origem, pagamentos agregados);
  *                        a gravação exige-as todas respondidas em {@code answers}
+ * @param transferredCount quantas faturas da quarentena seguem logo para a obra (ou empresa) da coluna "Empreendimento"
  * @param invoices        as faturas tal como vão entrar, já agrupadas por nº
  */
 public record ExpensesImportResultDTO(
@@ -26,6 +27,7 @@ public record ExpensesImportResultDTO(
         int invoiceCount,
         int creditNoteCount,
         int manualExpenseCount,
+        int transferredCount,
         int paidCount,
         int partiallyPaidCount,
         int unpaidCount,

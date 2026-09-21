@@ -6,6 +6,7 @@ import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteEx
 import com.management.managementapi.enterprises.dto.invoice.request.ExpensesImportAnswersDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitLineDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportInvoiceDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportIssueDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportQuestionDTO;
@@ -94,14 +95,24 @@ import java.util.stream.Collectors;
  * O {@code dryRun} devolve tudo isto sem gravar; a gravação exige zero erros,
  * todas as perguntas respondidas e os totais a bater certo (passo 9 do §9) —
  * qualquer falha anula a transação inteira.
+ *
+ * A quarentena ({@code UNIDENTIFIED}) lê a folha "Por identificar" do
+ * {@code Faturas por identificar.xlsx} (§6): as mesmas 8 colunas mais
+ * "Empreendimento", "Obras possíveis", "Perguntar a" e "Aqui desde". Uma linha
+ * com "Empreendimento" preenchido entra em quarentena e é transferida na mesma
+ * transação para essa obra (ou para as despesas da empresa), com a razão no
+ * {@code activity_log} — a app fica igual a quem tivesse feito as duas coisas à
+ * mão.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DespesasExcelImportService {
 
-    static final String SHEET_NAME = BudgetExcelExportService.SHEET_EXPENSES;
-    static final String TABLE_NAME = BudgetExcelExportService.TABLE_EXPENSES;
+    static final String SHEET_EXPENSES = BudgetExcelExportService.SHEET_EXPENSES;
+    static final String TABLE_EXPENSES = BudgetExcelExportService.TABLE_EXPENSES;
+    static final String SHEET_QUARANTINE = "Por identificar";
+    static final String TABLE_QUARANTINE = "TabelaPorIdentificar";
 
     static final String HEADER_NUMBER = "Nº Fatura";
     static final String HEADER_DATE = "Data";
@@ -114,6 +125,13 @@ public class DespesasExcelImportService {
     static final String HEADER_RUBRIC = "Rubrica";
     static final String HEADER_SUPPLIER = "Fornecedor";
     static final String HEADER_NIF = "NIF";
+    /** Só na folha "Por identificar": a obra a que a fatura afinal pertence (dropdown da folha "Listas"). */
+    static final String HEADER_TARGET = "Empreendimento";
+    static final String HEADER_POSSIBLE_ENTERPRISES = "Obras possíveis";
+    static final String HEADER_ASK_WHOM = "Perguntar a";
+    static final String HEADER_QUARANTINED_SINCE = "Aqui desde";
+    /** O valor da dropdown que manda a fatura para as despesas da empresa em vez de uma obra. */
+    static final String TARGET_COMPANY = "Despesas da empresa";
 
     private static final List<String> REQUIRED_HEADERS = List.of(
             HEADER_NUMBER, HEADER_DATE, HEADER_DESCRIPTION, HEADER_AMOUNT, HEADER_PAID,
@@ -175,8 +193,10 @@ public class DespesasExcelImportService {
         Model model = new Model(scope, enterprise);
         parse(file, model);
         resolveRubrics(model);
+        resolveTargets(model);
         group(model);
         interpretPayments(model);
+        noteQuarantinedSince(model);
         linkCreditNotes(model);
         detectDuplicates(model);
         checkTotals(model);
@@ -205,17 +225,19 @@ public class DespesasExcelImportService {
     // ── âmbito e ficheiro ─────────────────────────────────────
 
     private static Scope parseScope(String value) {
-        Scope scope;
         try {
-            scope = Scope.valueOf(value == null ? "" : value.trim().toUpperCase(Locale.ROOT));
+            return Scope.valueOf(value == null ? "" : value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new BusinessException(ErrorCode.INVOICE_SCOPE_UNKNOWN);
         }
-        // A quarentena tem outra tabela (TabelaPorIdentificar) — fica para outra ronda.
-        if (scope == Scope.UNIDENTIFIED) {
-            throw new BusinessException(ErrorCode.INVOICE_IMPORT_SCOPE);
-        }
-        return scope;
+    }
+
+    static String sheetNameFor(Scope scope) {
+        return scope == Scope.UNIDENTIFIED ? SHEET_QUARANTINE : SHEET_EXPENSES;
+    }
+
+    private static String tableNameFor(Scope scope) {
+        return scope == Scope.UNIDENTIFIED ? TABLE_QUARANTINE : TABLE_EXPENSES;
     }
 
     private Enterprise resolveEnterprise(Scope scope, UUID enterpriseId) {
@@ -249,10 +271,13 @@ public class DespesasExcelImportService {
              Workbook workbook = WorkbookFactory.create(in)) {
 
             // Pelo nome, nunca "a folha que não é o orçamento": o livro tem 4 folhas
-            // desde que o vault ganhou "Rubricas" e "Orçamento vs Gasto".
-            Sheet sheet = workbook.getSheet(SHEET_NAME);
+            // desde que o vault ganhou "Rubricas" e "Orçamento vs Gasto"; o da
+            // quarentena tem a "Por identificar" e uma "Listas" oculta.
+            String sheetName = sheetNameFor(model.scope);
+            Sheet sheet = workbook.getSheet(sheetName);
             if (sheet == null) {
-                throw new BusinessException(ErrorCode.INVOICE_IMPORT_NO_SHEET);
+                throw new BusinessException(ErrorCode.INVOICE_IMPORT_NO_SHEET,
+                        "O Excel não tem a folha \"" + sheetName + "\".");
             }
             model.sheetName = sheet.getSheetName();
 
@@ -270,7 +295,7 @@ public class DespesasExcelImportService {
             }
             model.hasRubricColumn = columns.containsKey(normalizeHeader(HEADER_RUBRIC));
 
-            int totalsRow = findTotalsRow(sheet, headerRow, columns);
+            int totalsRow = findTotalsRow(sheet, tableNameFor(model.scope), headerRow, columns);
             readRows(sheet, headerRow, totalsRow, columns, model);
             if (totalsRow >= 0) {
                 model.sheetTotal = readSheetTotal(workbook, sheet.getRow(totalsRow), columns, model);
@@ -319,13 +344,14 @@ public class DespesasExcelImportService {
     }
 
     /**
-     * A linha de totais da tabela. A {@code TabelaDespesas} sabe onde acaba;
-     * sem tabela, é a primeira linha cujo "Nº Fatura" diz TOTAL.
+     * A linha de totais da tabela. A {@code TabelaDespesas} (ou a
+     * {@code TabelaPorIdentificar}) sabe onde acaba; sem tabela, é a primeira
+     * linha cujo "Nº Fatura" diz TOTAL.
      */
-    private static int findTotalsRow(Sheet sheet, int headerRow, Map<String, Integer> columns) {
+    private static int findTotalsRow(Sheet sheet, String tableName, int headerRow, Map<String, Integer> columns) {
         if (sheet instanceof XSSFSheet xssf) {
             for (XSSFTable table : xssf.getTables()) {
-                if (TABLE_NAME.equalsIgnoreCase(table.getName()) && table.getTotalsRowCount() > 0) {
+                if (tableName.equalsIgnoreCase(table.getName()) && table.getTotalsRowCount() > 0) {
                     AreaReference area = table.getArea();
                     return area.getLastCell().getRow();
                 }
@@ -361,6 +387,12 @@ public class DespesasExcelImportService {
             line.rubricRaw = model.hasRubricColumn ? text(row, col(columns, HEADER_RUBRIC)) : null;
             line.supplierName = text(row, col(columns, HEADER_SUPPLIER));
             line.supplierNif = text(row, col(columns, HEADER_NIF));
+            if (model.scope == Scope.UNIDENTIFIED) {
+                line.targetRaw = text(row, col(columns, HEADER_TARGET));
+                line.possibleEnterprises = text(row, col(columns, HEADER_POSSIBLE_ENTERPRISES));
+                line.askWhom = text(row, col(columns, HEADER_ASK_WHOM));
+                line.quarantinedSince = date(row, col(columns, HEADER_QUARANTINED_SINCE), model, excelRow);
+            }
 
             boolean empty = line.rawNumber == null && line.date == null && line.description == null
                     && line.amount == null && line.observations == null && line.rubricRaw == null;
@@ -439,8 +471,9 @@ public class DespesasExcelImportService {
             if (line.rubricRaw == null) continue;
             line.rubricCode = normalizeRubricCode(line.rubricRaw);
             if (model.scope != Scope.PROJECT) {
-                model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
-                        "Tem rubrica \"" + line.rubricRaw + "\" mas as despesas da empresa não têm orçamento."));
+                model.errors.add(new ExpensesImportIssueDTO(line.excelRow, "Tem rubrica \"" + line.rubricRaw
+                        + "\" mas " + (model.scope == Scope.COMPANY ? "as despesas da empresa não têm" : "a quarentena não tem")
+                        + " orçamento."));
                 continue;
             }
             if (line.rubricCode == null) {
@@ -472,6 +505,38 @@ public class DespesasExcelImportService {
         if (cut > 0) code = code.substring(0, cut);
         while (code.endsWith(".")) code = code.substring(0, code.length() - 1);
         return code.matches("\\d+(\\.\\d+)*") ? code : null;
+    }
+
+    // ── destino da quarentena (§6) ────────────────────────────
+
+    /**
+     * "Empreendimento" é o valor da dropdown: o slug de uma obra (= nome da
+     * pasta do vault) ou "Despesas da empresa". Sem obra com esse slug a linha
+     * bloqueia — a obra cria-se primeiro, com o nome da pasta, como nas outras
+     * importações; nunca se cria uma obra a partir de uma célula.
+     */
+    private void resolveTargets(Model model) {
+        if (model.scope != Scope.UNIDENTIFIED) return;
+        Map<String, Optional<Enterprise>> cache = new HashMap<>();
+        for (Line line : model.lines) {
+            String target = trimToNull(line.targetRaw);
+            if (target == null) continue;
+            if (normalizeText(target).equals(normalizeText(TARGET_COMPANY))) {
+                line.targetScope = Scope.COMPANY;
+                continue;
+            }
+            Optional<Enterprise> enterprise = cache.computeIfAbsent(target, enterpriseRepository::findBySlug);
+            if (enterprise.isEmpty()) {
+                model.errors.add(new ExpensesImportIssueDTO(line.excelRow, "Não há na app nenhuma obra com o nome de pasta \""
+                        + target + "\" — crie-a primeiro, ou limpe a coluna \"" + HEADER_TARGET + "\" para a fatura ficar em quarentena."));
+            } else if (Boolean.TRUE.equals(enterprise.get().getIsTest())) {
+                model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
+                        "A obra \"" + target + "\" é de teste — uma fatura real não se transfere para lá."));
+            } else {
+                line.targetScope = Scope.PROJECT;
+                line.targetEnterprise = enterprise.get();
+            }
+        }
     }
 
     // ── agrupar por fatura ────────────────────────────────────
@@ -548,6 +613,12 @@ public class DespesasExcelImportService {
         group.observations = first.observations;
         group.supplierName = first.supplierName;
         group.supplierNif = first.supplierNif;
+        group.targetRaw = trimToNull(first.targetRaw);
+        group.targetScope = first.targetScope;
+        group.targetEnterprise = first.targetEnterprise;
+        group.possibleEnterprises = first.possibleEnterprises;
+        group.askWhom = first.askWhom;
+        group.quarantinedSince = first.quarantinedSince;
 
         BigDecimal total = BigDecimal.ZERO;
         boolean anyAmount = false;
@@ -568,6 +639,10 @@ public class DespesasExcelImportService {
                 if (line.paid != first.paid) {
                     model.errors.add(new ExpensesImportIssueDTO(line.excelRow, "A fatura " + group.number
                             + " está \"Liquidada\" numa linha e não noutra (linha " + first.excelRow + ")."));
+                }
+                if (!Objects.equals(trimToNull(line.targetRaw), group.targetRaw)) {
+                    model.errors.add(new ExpensesImportIssueDTO(line.excelRow, "A fatura " + group.number
+                            + " tem \"" + HEADER_TARGET + "\" diferente nas suas linhas (linha " + first.excelRow + ")."));
                 }
             }
         }
@@ -752,6 +827,19 @@ public class DespesasExcelImportService {
         group.aggregateId = id;
         model.aggregates.computeIfAbsent(id, k -> new Aggregate()).members.add(group);
         model.aggregates.get(id).amount = group.payment.amount;
+    }
+
+    /**
+     * "Aqui desde" não tem coluna na app ({@code created_at} é a data da
+     * importação) — fica nas notas, depois do que a Vilatro escreveu, para não
+     * se perder quanto tempo a fatura já esteve à espera.
+     */
+    private static void noteQuarantinedSince(Model model) {
+        for (Group group : model.groups) {
+            if (group.quarantinedSince == null) continue;
+            String since = "Em quarentena desde " + NOTE_DATE.format(group.quarantinedSince) + ".";
+            group.notes = group.notes == null ? since : group.notes + NOTE_SEPARATOR + since;
+        }
     }
 
     // ── notas de crédito (§3.2) ───────────────────────────────
@@ -945,6 +1033,14 @@ public class DespesasExcelImportService {
             idByKey.put(group.key, id);
             created++;
 
+            if (group.targetScope != null) {
+                // Antes das NC e dos pagamentos: a NC copia o âmbito da origem, e o
+                // transfer() apaga repartições — que uma fatura em quarentena não tem.
+                invoiceService.transfer(id, new InvoiceTransferDTO(group.targetScope.name(),
+                        group.targetEnterprise == null ? null : group.targetEnterprise.getId(),
+                        "Importação da folha \"" + SHEET_QUARANTINE + "\": a coluna \"" + HEADER_TARGET
+                                + "\" diz \"" + group.targetRaw + "\"."));
+            }
             if (group.bizdocs) {
                 markSentToAccountant(id);
             }
@@ -1032,8 +1128,8 @@ public class DespesasExcelImportService {
                 group.total,
                 group.description,
                 group.status.name(),
-                null,
-                null,
+                trimToNull(group.possibleEnterprises),
+                trimToNull(group.askWhom),
                 group.notes);
     }
 
@@ -1102,7 +1198,7 @@ public class DespesasExcelImportService {
         model.errors.sort((a, b) -> Integer.compare(a.excelRow(), b.excelRow()));
         return new ExpensesImportResultDTO(
                 dryRun, model.scope.name(), model.sheetName, model.lines.size(),
-                counts.invoices, counts.creditNotes, counts.manual,
+                counts.invoices, counts.creditNotes, counts.manual, counts.transferred,
                 counts.paid, counts.partial, counts.unpaid,
                 model.parsedTotal, model.sheetTotal, model.totalDifference,
                 model.errors, model.warnings, model.questions, invoices);
@@ -1137,7 +1233,16 @@ public class DespesasExcelImportService {
                 trimToNull(group.supplierName),
                 trimToNull(group.supplierNif),
                 group.duplicate,
+                trimToNull(group.possibleEnterprises),
+                trimToNull(group.askWhom),
+                transferLabel(group),
                 lines);
+    }
+
+    /** Para onde a fatura vai a seguir a entrar em quarentena, como a pessoa a conhece — nome da obra ou "Despesas da empresa". */
+    private static String transferLabel(Group group) {
+        if (group.targetScope == null) return null;
+        return group.targetScope == Scope.COMPANY ? TARGET_COMPANY : group.targetEnterprise.getName();
     }
 
     private static Counts counts(Model model) {
@@ -1149,6 +1254,7 @@ public class DespesasExcelImportService {
                 if (!group.skipped) counts.creditNotes++;
             } else {
                 counts.invoices++;
+                if (group.targetScope != null) counts.transferred++;
                 if (group.payment == null) {
                     counts.unpaid++;
                 } else if (group.payment.status == PaymentStatus.PARTIAL) {
@@ -1347,6 +1453,12 @@ public class DespesasExcelImportService {
         ConstructionBudgetItem rubric;
         String supplierName;
         String supplierNif;
+        String targetRaw;
+        Scope targetScope;
+        Enterprise targetEnterprise;
+        String possibleEnterprises;
+        String askWhom;
+        LocalDate quarantinedSince;
     }
 
     private static final class Group {
@@ -1365,6 +1477,12 @@ public class DespesasExcelImportService {
         String notes;
         String supplierName;
         String supplierNif;
+        String targetRaw;
+        Scope targetScope;
+        Enterprise targetEnterprise;
+        String possibleEnterprises;
+        String askWhom;
+        LocalDate quarantinedSince;
         boolean creditNote;
         String originNumber;
         String originKey;
@@ -1392,7 +1510,7 @@ public class DespesasExcelImportService {
     }
 
     private static final class Counts {
-        int invoices, creditNotes, manual, paid, partial, unpaid;
+        int invoices, creditNotes, manual, transferred, paid, partial, unpaid;
     }
 
     private static final class Model {

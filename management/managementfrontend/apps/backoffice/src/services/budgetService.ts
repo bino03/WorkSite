@@ -185,3 +185,23 @@ export async function exportWorkbook(
     fileName: fileNameFromDisposition(response.headers["content-disposition"], fallbackFileName),
   };
 }
+
+/**
+ * A pasta da obra inteira: `<slug>.zip` com o `.xlsx` e `Faturas/Lançadas/*`
+ * (os documentos das faturas, com o nome do vault) na raiz — extrai-se em
+ * `Empreendimentos\<slug>\`. Pode ter dezenas de MB; o backend escreve-o em streaming.
+ */
+export async function exportFolderZip(
+  enterpriseId: string,
+  sheets: BudgetExportSheet[],
+  fallbackFileName: string
+): Promise<DownloadedFile> {
+  const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/export/zip`, {
+    params: { sheets: sheets.join(",") },
+    responseType: "blob",
+  });
+  return {
+    blob: response.data,
+    fileName: fileNameFromDisposition(response.headers["content-disposition"], fallbackFileName),
+  };
+}

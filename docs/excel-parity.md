@@ -237,6 +237,17 @@ A exportação app → pasta produz **exatamente** a estrutura do Vilatro: `Empr
 + `Faturas\Lançadas\<ficheiros renomeados>`, na raiz da pasta. É o que permite recomeçar no Excel
 a partir da app.
 
+> ✅ **Feito a 2026-09-20** (`InvoiceDocumentsExportService`, `GET …/export/zip`, opção "Incluir documentos"
+> do modal de exportação). Como ficou: um `original_filename` que **já obedece** ao nome do vault
+> (`^\d{8}(-\d{8})?_<nº>_<resto>.<ext>`, sem espaços — os 206 documentos migrados) mantém-se tal e qual;
+> só os uploads feitos na app recebem o nome gerado — data da fatura, nº sanitizado (`\ / : * ? " < > |` →
+> `-`, traços colapsados, sem espaços), fornecedor em CamelCase só com letras ASCII e algarismos (acentos,
+> `&`, `ª` caem), `_pN` de `kind=PAGE`+`page_number`, extensão do nome original ou do MIME. `SEM-N` +
+> descrição sem nº; sem data leva a do upload, com aviso; acima de 150 caracteres corta-se o fornecedor,
+> nunca o nº. Colisões → `_2`, `_3`, listadas no resumo. Ficam de fora miniaturas e comprovativos de
+> pagamento (recibos não se arquivam na `Lançadas`). O que o vault chama "maço" (`MACO9DOCS`) não tem
+> equivalente na app — não se gera, só se preserva se já vier assim.
+
 > [!warning] `uploaded_at` perdeu a fonte no Excel (10-09-2026)
 > Até 10-09-2026 os documentos viviam em `Faturas\Lançadas\<dd-mm-aaaa>\`, e o nome da pasta **era** a data
 > em que a fatura entrou no Excel — é daí que a importação Excel → app tirava o `uploaded_at`. O utilizador
@@ -284,8 +295,8 @@ cópias em conflito; não há `.xlsx` a proteger).
 > ✅ **Feito a 2026-09-17** (`POST /construction-invoices/import-excel`, ver [[api.md]] → "Importar a
 > folha "Despesas" do Excel"). O que segue é o contrato **como ficou implementado**. O passo 7 (documentos
 > de `Faturas\Lançadas\`) não está no importador — foi feito à parte na migração de 2026-09-18, pelo
-> endpoint de documentos, com as regras descritas no passo. Fica de fora a quarentena
-> (`Faturas por identificar.xlsx`, que tem outra tabela, `TabelaPorIdentificar`).
+> endpoint de documentos, com as regras descritas no passo. A quarentena (`Faturas por identificar.xlsx`,
+> tabela `TabelaPorIdentificar`) entra pelo mesmo endpoint desde 2026-09-20 — ver "Quarentena" abaixo.
 
 Entrada: **só o `.xlsx`** (`Despesas - <Obra>.xlsx` ou `Despesas da empresa.xlsx`), por upload; a obra vem
 no pedido (`scope=PROJECT&enterpriseId=`), não do nome do ficheiro.
@@ -355,9 +366,23 @@ cópia em `src/test/resources/excel-parity/`). O que **não** sobrevive ao round
 `Despesas da empresa\Despesas da empresa.xlsx` (desde 16-09-2026 tem a mesma `TabelaDespesas` de uma
 obra, **sem coluna `Rubrica`**) entra pelo mesmo endpoint com `scope = COMPANY`, sem passo 5. Antes de
 16-09-2026 só havia a nota `.md`; documentos anteriores a essa data podem ainda estar só descritos em
-prosa lá — não assumir que a tabela é exaustiva para o histórico. `Faturas por identificar.xlsx`
-(→ `UNIDENTIFIED`, com `Empreendimento` preenchido → transferência para essa obra) **fica para outra ronda**
-(`INVOICE_047`).
+prosa lá — não assumir que a tabela é exaustiva para o histórico.
+
+**Quarentena** (`Faturas por identificar\Faturas por identificar.xlsx` → `scope = UNIDENTIFIED`, desde
+2026-09-20). Folha **`Por identificar`** (a `Listas` é oculta e só serve a dropdown), tabela
+**`TabelaPorIdentificar`**, as 8 colunas da `Despesas` — sem `Rubrica` (aqui é erro) — mais:
+
+| Coluna | App |
+|---|---|
+| `Empreendimento` (dropdown: slug de obra ou `Despesas da empresa`) | vazio → fica em quarentena. Preenchido → entra em `UNIDENTIFIED` e é **transferida na mesma transação** para essa obra (`PROJECT`) ou para `COMPANY`, com razão automática no `activity_log` — o mesmo que "preencher a obra" na app. Slug sem obra, ou obra `is_test` → erro por linha, bloqueia: criar a obra primeiro, com o nome da pasta |
+| `Fornecedor` | `supplier_name` (sem `NIF`: a quarentena não o tem) |
+| `Obras possíveis` | `possible_enterprises` |
+| `Perguntar a` | `ask_whom` |
+| `Aqui desde` | não tem coluna (`created_at` é a data da importação) → `notes` ganha "Em quarentena desde dd-mm-aaaa." a seguir ao que a Vilatro escreveu |
+
+Tudo o resto (nº, NC, `Liquidada`, `Observações`, duplicados globais, totais da tabela) é igual à
+`Despesas`. Os PDFs de `Lançadas\` juntam-se depois, um a um, como nas obras (passo 7). O que está
+em `Por lançar\` e `Não Reconhecido\` não entra — não está no Excel.
 
 ### App → Excel (exportação, fase 6)
 
@@ -450,16 +475,20 @@ baterem, mas uma obra apagada por engano não volta sozinha.
    abreviar, não erro. Recibos, proformas e orçamentos **não** se anexam (não são faturas). Um ficheiro
    igual a outro já na fatura dá `INVOICE_012` — é o checksum a funcionar.
 6. **`Despesas da empresa.xlsx`** entra pelo mesmo modal na página "Despesas da empresa"
-   (`scope=COMPANY`, sem rubricas). **`Faturas por identificar.xlsx`** ainda não entra (`INVOICE_047`
-   — item da fase 6 em `notes/ToDo.md`).
+   (`scope=COMPANY`, sem rubricas). **`Faturas por identificar.xlsx`** entra pelo mesmo modal na página
+   "Por identificar" (`scope=UNIDENTIFIED`): as linhas com `Empreendimento` preenchido são transferidas
+   logo para essa obra (o slug tem de existir na app — criar a obra primeiro) — ver §9 → "Quarentena".
+   Os PDFs de `Faturas por identificar\Lançadas\` juntam-se depois, como no passo 5.
 
 ### 10.2 App → Excel
 
 1. Página do orçamento → "Exportar Excel" → escolher folhas (`GET …/export/summary` mostra o que vai
    sair e os avisos: sem slug, obra de teste, despesa em rubrica eliminada, repartição que não soma,
    vários métodos de pagamento na mesma fatura) → download (`GET …/export?sheets=BUDGET,EXPENSES,COMPARISON`).
-2. O ficheiro chama-se `Despesas - <slug>.xlsx` e substitui o da pasta da obra no vault. A pasta
-   `Faturas\Lançadas\` renomeada (§7) ainda não sai no zip — item da fase 6.
+2. O ficheiro chama-se `Despesas - <slug>.xlsx` e substitui o da pasta da obra no vault. Com **"Incluir
+   documentos"** sai antes `<slug>.zip` (`GET …/export/zip`): o `.xlsx` + `Faturas\Lançadas\*` com o nome do
+   vault (§7) — extrair em `Empreendimentos\<slug>\` substitui a pasta inteira. Um nome em colisão fica
+   `_2`, nunca sobrepõe; o que o Storage não devolveu está em `Faturas\Lançadas\_EM-FALTA.txt`.
 3. Prova: importar o ficheiro exportado em `dryRun` tem de dar zero erros e zero perguntas (é o que o
    `DespesasExcelImportRoundTripTest` faz em CI; à mão serve para confirmar um caso novo).
 

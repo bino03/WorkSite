@@ -254,10 +254,22 @@ export interface BudgetExportSummary {
   needsReviewCount: number;
   /** Frases já em português, prontas a mostrar — não são códigos. */
   warnings: string[];
+  /** O que a opção "incluir documentos" (zip com `Faturas/Lançadas/`) vai levar. */
+  documents: DocumentsExportSummary;
 }
 
 /** Um ficheiro descarregado: os bytes e o nome que o backend lhe deu. */
 export interface DownloadedFile {
   blob: Blob;
   fileName: string;
+}
+
+/** A parte "documentos" do resumo da exportação: a pasta `Faturas/Lançadas/` do zip. */
+export interface DocumentsExportSummary {
+  documentCount: number;
+  invoicesWithoutDocument: number;
+  /** Quantos recebem um nome gerado (§7); os outros mantêm o `original_filename`, que já é o do vault. */
+  renamedCount: number;
+  /** Frases já em português — colisões `_2`, documentos sem ficheiro, faturas sem data. */
+  warnings: string[];
 }

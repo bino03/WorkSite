@@ -339,14 +339,15 @@ export async function suggestBudgetItem(
 }
 
 /**
- * Importa a folha "Despesas" do Excel do vault da Vilatro (fase 6).
+ * Importa a folha "Despesas" do Excel do vault da Vilatro (fase 6) — ou, em
+ * `UNIDENTIFIED`, a folha "Por identificar" do `Faturas por identificar.xlsx`.
  *
  * `dryRun` é `true` por omissão no backend: devolve as faturas, os erros por
  * corrigir no Excel e as perguntas que só a pessoa sabe responder, sem gravar.
  * A gravação leva as respostas na parte `answers` (JSON no mesmo multipart).
  */
 export async function importExpensesExcel(
-  scope: Exclude<InvoiceScope, "UNIDENTIFIED">,
+  scope: InvoiceScope,
   enterpriseId: string | null,
   file: File,
   dryRun = true,

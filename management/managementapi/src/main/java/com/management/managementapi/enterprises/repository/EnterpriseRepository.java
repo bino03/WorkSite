@@ -34,6 +34,8 @@ public interface EnterpriseRepository extends JpaRepository<Enterprise, UUID> {
     
     Optional<Enterprise> findByInternalReference(String internalReference);
 
+    Optional<Enterprise> findBySlug(String slug);
+
     boolean existsBySlug(String slug);
 
     boolean existsBySlugAndIdNot(String slug, UUID id);

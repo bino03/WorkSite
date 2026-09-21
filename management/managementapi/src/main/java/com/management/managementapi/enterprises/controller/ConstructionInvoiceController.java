@@ -137,8 +137,11 @@ public class ConstructionInvoiceController {
 
     /**
      * Importa a folha "Despesas" do Excel do vault da Vilatro (fase 6,
-     * docs/excel-parity.md §9) — só para uma obra ({@code scope=PROJECT} +
-     * {@code enterpriseId}) ou para as despesas da empresa ({@code COMPANY}).
+     * docs/excel-parity.md §9) — para uma obra ({@code scope=PROJECT} +
+     * {@code enterpriseId}) ou para as despesas da empresa ({@code COMPANY}) —
+     * ou a folha "Por identificar" do {@code Faturas por identificar.xlsx}
+     * ({@code UNIDENTIFIED}, §6): as linhas com "Empreendimento" preenchido são
+     * transferidas para essa obra na mesma transação.
      *
      * Por omissão corre em {@code dryRun}: devolve as faturas, os erros por
      * corrigir no Excel e as perguntas que só a pessoa sabe responder, sem gravar
@@ -162,8 +165,10 @@ public class ConstructionInvoiceController {
             authContext.currentProfileId().ifPresent(uid ->
                     activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
                             EntityType.CONSTRUCTION_INVOICE, enterpriseId,
-                            "Importação da folha \"Despesas\" (" + result.invoiceCount() + " faturas, "
-                                    + result.creditNoteCount() + " notas de crédito)", request));
+                            "Importação da folha \"" + result.sheetName() + "\" (" + result.invoiceCount() + " faturas, "
+                                    + result.creditNoteCount() + " notas de crédito"
+                                    + (result.transferredCount() > 0 ? ", " + result.transferredCount() + " transferidas" : "")
+                                    + ")", request));
         }
 
         return ResponseEntity.ok(result);

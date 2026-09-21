@@ -5,6 +5,7 @@ import com.management.managementapi.enterprises.dto.budget.request.BudgetExportS
 import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
+import com.management.managementapi.enterprises.dto.budget.response.DocumentsExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -44,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -135,15 +137,24 @@ public class BudgetExcelExportService {
     private final ConstructionExpenseRepository expenseRepository;
     private final InvoicePaymentRepository invoicePaymentRepository;
     private final PaymentService paymentService;
+    private final InvoiceDocumentsExportService documentsExportService;
 
     /** O ficheiro pronto a devolver. */
     public record ExportFile(String fileName, byte[] content) {}
+
+    /**
+     * A pasta da obra pronta a zipar: o livro na raiz e o plano dos documentos
+     * de {@code Faturas/Lançadas/}. Os bytes dos documentos não estão aqui — o
+     * {@link InvoiceDocumentsExportService#writeZip} vai buscá-los ao Storage
+     * enquanto escreve a resposta, já fora da transação.
+     */
+    public record ZipExport(String fileName, ExportFile workbook, InvoiceDocumentsExportService.Plan documents) {}
 
     // Nem `summary` nem `export` são `readOnly`: uma obra sem slug fica com um ao
     // passar por aqui (ver {@link #ensureSlug}) — é a única escrita.
     @Transactional
     public BudgetExportSummaryDTO summary(UUID enterpriseId) {
-        return load(enterpriseId).toSummary();
+        return load(enterpriseId).toSummary(documentsExportService.plan(enterpriseId).toSummary());
     }
 
     @Transactional
@@ -166,11 +177,40 @@ public class BudgetExcelExportService {
         return new ExportFile(model.fileName, write(model, sheets));
     }
 
+    /**
+     * O livro mais os documentos, na estrutura exata da pasta do vault (§7):
+     * {@code <slug>.zip} com {@code Despesas - <slug>.xlsx} e
+     * {@code Faturas/Lançadas/*} na raiz — extrai-se em
+     * {@code Empreendimentos\<slug>\} e fica igual.
+     */
+    @Transactional
+    public ZipExport exportZip(UUID enterpriseId, Set<BudgetExportSheet> requested) {
+        ExportFile workbook = export(enterpriseId, requested);
+        Enterprise enterprise = enterpriseRepository.findById(enterpriseId).orElseThrow();
+        return new ZipExport(zipFileName(enterprise), workbook, documentsExportService.plan(enterpriseId));
+    }
+
+    /** Fora de transação de propósito — corre enquanto a resposta HTTP já está a ser escrita. */
+    public void writeZip(ZipExport zip, OutputStream out) throws IOException {
+        documentsExportService.writeZip(zip.workbook().fileName(), zip.workbook().content(), zip.documents(), out);
+    }
+
     /** {@code Despesas - <slug>.xlsx}, como no vault; {@code TESTE - } à frente numa obra de teste. */
     static String fileName(Enterprise enterprise) {
-        String safe = safeName(isBlank(enterprise.getSlug()) ? enterprise.getName() : enterprise.getSlug());
-        String prefix = Boolean.TRUE.equals(enterprise.getIsTest()) ? TEST_PREFIX : "";
-        return prefix + "Despesas - " + safe + ".xlsx";
+        return testPrefix(enterprise) + "Despesas - " + folderName(enterprise) + ".xlsx";
+    }
+
+    /** {@code <slug>.zip} — o nome da pasta da obra no vault, para extrair em {@code Empreendimentos\}. */
+    static String zipFileName(Enterprise enterprise) {
+        return testPrefix(enterprise) + folderName(enterprise) + ".zip";
+    }
+
+    private static String folderName(Enterprise enterprise) {
+        return safeName(isBlank(enterprise.getSlug()) ? enterprise.getName() : enterprise.getSlug());
+    }
+
+    private static String testPrefix(Enterprise enterprise) {
+        return Boolean.TRUE.equals(enterprise.getIsTest()) ? TEST_PREFIX : "";
     }
 
     /** Sem os caracteres que o Windows recusa num nome de pasta/ficheiro; espaços e acentos ficam. */
@@ -898,7 +938,7 @@ public class BudgetExcelExportService {
             return tree != null && tree.itemCount() > 0;
         }
 
-        BudgetExportSummaryDTO toSummary() {
+        BudgetExportSummaryDTO toSummary(DocumentsExportSummaryDTO documents) {
             BigDecimal expensesTotal = rows.stream()
                     .map(ExpenseRow::amount)
                     .filter(amount -> amount != null)
@@ -911,7 +951,7 @@ public class BudgetExcelExportService {
                     tree == null ? BigDecimal.ZERO : nullToZero(tree.budgetTotal()),
                     invoiceCount, rows.size(), expensesTotal,
                     unclassifiedInvoiceCount, manualExpenseCount, creditNoteCount, partialPaymentCount,
-                    missingNumberCount, needsReviewCount, List.copyOf(warnings));
+                    missingNumberCount, needsReviewCount, List.copyOf(warnings), documents);
         }
     }
 

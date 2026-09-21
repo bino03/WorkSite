@@ -24,6 +24,7 @@ import java.util.UUID;
  * @param missingNumberCount     faturas sem nº — a coluna "Nº Fatura" fica vazia
  * @param needsReviewCount       faturas sem data ou sem total
  * @param warnings               tudo o que o utilizador deve saber antes de abrir o ficheiro
+ * @param documents              o que a opção "incluir documentos" (zip) vai levar
  */
 public record BudgetExportSummaryDTO(
         UUID enterpriseId,
@@ -43,5 +44,6 @@ public record BudgetExportSummaryDTO(
         int partialPaymentCount,
         int missingNumberCount,
         int needsReviewCount,
-        List<String> warnings
+        List<String> warnings,
+        DocumentsExportSummaryDTO documents
 ) {}

@@ -184,6 +184,7 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | POST | `/construction-budget/enterprise/{enterpriseId}/import?dryRun=&replace=` | `ADMIN` — multipart `file` (.xlsx) |
 | GET | `/construction-budget/enterprise/{enterpriseId}/export/summary` | `ADMIN` ou `EMPLOYEE` — o que a exportação vai escrever (contagens, avisos, nome do ficheiro) |
 | GET | `/construction-budget/enterprise/{enterpriseId}/export?sheets=BUDGET,EXPENSES,COMPARISON` | `ADMIN` ou `EMPLOYEE` — o `.xlsx` (binário, `Content-Disposition: attachment`) |
+| GET | `/construction-budget/enterprise/{enterpriseId}/export/zip?sheets=…` | `ADMIN` ou `EMPLOYEE` — a pasta da obra: `<slug>.zip` com o `.xlsx` e `Faturas/Lançadas/*` (documentos com o nome do vault, §7), em streaming |
 
 > 🧹 **`DELETE` passou a soft delete a 2026-09-16** (`V36`, coluna `deleted_at`). Bloqueado com
 > `BUDGET_013` se houver despesas em **qualquer** nó da sub-árvore (mover ou apagar as despesas
@@ -237,7 +238,22 @@ próprio exportador), mas o ficheiro leva o prefixo `TESTE - `. O nome vai em
 parâmetro, não o `filename=` cru. `GET …/export/summary` devolve o `BudgetExportSummaryDTO`
 (`fileName`, `hasBudget`, contagens de rubricas/faturas/linhas, `unclassifiedInvoiceCount`,
 `manualExpenseCount`, `creditNoteCount`, `partialPaymentCount`, `missingNumberCount`,
-`needsReviewCount`, `warnings`) — é o passo 2 do modal, antes do download.
+`needsReviewCount`, `warnings`, `documents`) — é o passo 2 do modal, antes do download.
+
+**Zip da pasta da obra** (`GET …/export/zip?sheets=`, desde 2026-09-20): o mesmo `sheets` e as
+mesmas regras do `/export`, mas devolve `application/zip` com o nome `[TESTE - ]<slug>.zip` e, na
+raiz, `Despesas - <slug>.xlsx` + `Faturas/Lançadas/<ficheiro>` — extrai-se em `Empreendimentos\<slug>\`
+e fica a estrutura exata do vault ([[excel-parity.md]] §7). Os nomes dos ficheiros decidem-se em
+`InvoiceDocumentsExportService.plan` (dentro da transação): um `original_filename` que **já obedeça**
+a `^\d{8}(-\d{8})?_<nº>_<resto>.<ext>` sem espaços (os 206 migrados do vault) mantém-se tal e qual;
+os outros (uploads feitos na app) recebem `<aaaammdd>_<nº sanitizado>_<FornecedorCamelCase>[_pN].<ext>`
+— sem nº é `SEM-N` + descrição, sem data é a data do upload com aviso, `_pN` vem de `kind=PAGE` +
+`page_number`, e um nome repetido fica `_2`, `_3` (nunca sobrepõe; listado nos avisos). Miniaturas e
+comprovativos de pagamento (`payment.proof_*`) ficam de fora. Os bytes vêm do Storage **um a um,
+enquanto a resposta se escreve** (`StreamingResponseBody`; `spring.mvc.async.request-timeout=10m`) —
+um documento que o Storage não devolva não aborta o download: fica de fora e listado em
+`Faturas/Lançadas/_EM-FALTA.txt` dentro do zip. `documents` no summary: `{ documentCount,
+invoicesWithoutDocument, renamedCount, warnings[] }`.
 
 ## Despesas de Construção (`ConstructionExpenseController`, `/construction-expenses`)
 
@@ -601,7 +617,7 @@ associada acompanha os novos valores.
 | `INVOICE_036` | `POST /import-excel` com ficheiro vazio |
 | `INVOICE_037` | `POST /import-excel` com ficheiro que não é `.xlsx` |
 | `INVOICE_038` | `POST /import-excel` — o POI não conseguiu ler o livro |
-| `INVOICE_039` | `POST /import-excel` — o livro não tem a folha `Despesas` |
+| `INVOICE_039` | `POST /import-excel` — o livro não tem a folha esperada: `Despesas` em `PROJECT`/`COMPANY`, `Por identificar` em `UNIDENTIFIED` |
 | `INVOICE_040` | `POST /import-excel` — sem linha de cabeçalho (procura-se a célula "Nº Fatura" nas primeiras 20 linhas) |
 | `INVOICE_041` | `POST /import-excel` — falta uma coluna obrigatória; a mensagem diz quais |
 | `INVOICE_042` | `POST /import-excel` — a folha não tem linhas |
@@ -609,7 +625,6 @@ associada acompanha os novos valores.
 | `INVOICE_044` | `POST /import-excel?dryRun=false` com `questions` por responder — nada gravado |
 | `INVOICE_045` | `POST /import-excel?dryRun=false` numa obra `is_test` com um ficheiro que não começa por `TESTE - ` |
 | `INVOICE_046` | `POST /import-excel?dryRun=false` — o que ficou gravado não bate com a folha (bug nosso, não erro do Excel); transação anulada |
-| `INVOICE_047` | `POST /import-excel` com `scope=UNIDENTIFIED` — a quarentena tem outra tabela (`TabelaPorIdentificar`), ainda não se importa |
 
 (`ENT_032` — slug de projeto duplicado — sai do `EnterpriseController`, não daqui; ver [[excel-parity.md]] §2.)
 
@@ -772,8 +787,8 @@ Serviço: `DespesasExcelImportService`. Só `ADMIN`.
 
 | Parâmetro | Notas |
 |---|---|
-| `scope` | `PROJECT` (exige `enterpriseId`) ou `COMPANY` (proíbe-o). `UNIDENTIFIED` → `INVOICE_047` |
-| `file` | multipart, o `Despesas - <Obra>.xlsx` (ou `Despesas da empresa.xlsx`). Lê **só a folha `Despesas`**, pelo nome; as colunas pelo cabeçalho normalizado (`\s+`→espaço, sem acentos, sem caixa — o "Metodo\nPagamento" real passa), nunca pela letra. `Rubrica`, `Fornecedor` e `NIF` são opcionais |
+| `scope` | `PROJECT` (exige `enterpriseId`), `COMPANY` ou `UNIDENTIFIED` (proíbem-no). Em `UNIDENTIFIED` lê o `Faturas por identificar.xlsx` — ver abaixo |
+| `file` | multipart, o `Despesas - <Obra>.xlsx` (ou `Despesas da empresa.xlsx`; na quarentena o `Faturas por identificar.xlsx`). Lê **só a folha `Despesas`** (`Por identificar` na quarentena), pelo nome; as colunas pelo cabeçalho normalizado (`\s+`→espaço, sem acentos, sem caixa — o "Metodo\nPagamento" real passa), nunca pela letra. `Rubrica`, `Fornecedor` e `NIF` são opcionais |
 | `dryRun` | `true` por omissão: devolve o relatório, nada gravado. `false` grava tudo numa transação |
 | `answers` | parte multipart JSON `{ answers: [{ questionId, value }] }` — as respostas às `questions` do `dryRun` |
 
@@ -787,10 +802,11 @@ por linha (inexistente ou título = erro); `Bizdocs` → `sentToAccountant`; a l
 "Despesa registada à mão na app, sem fatura." volta a ser uma despesa solta.
 
 **Resposta** `ExpensesImportResultDTO`: `{ dryRun, scope, sheetName, rowCount, invoiceCount,
-creditNoteCount, manualExpenseCount, paidCount, partiallyPaidCount, unpaidCount, parsedTotal,
+creditNoteCount, manualExpenseCount, transferredCount, paidCount, partiallyPaidCount, unpaidCount, parsedTotal,
 sheetTotal, totalDifference, errors[{excelRow, message}], warnings[], questions[], invoices[] }`.
 `invoices[]` é a pré-visualização (uma por fatura, com `key`, `excelRows`, `lines[{excelRow,
-rubricCode, rubricLabel, amount}]`, `paymentStatus`, `creditNoteOrigin`, `duplicate`, …).
+rubricCode, rubricLabel, amount}]`, `paymentStatus`, `creditNoteOrigin`, `duplicate`, `possibleEnterprises`,
+`askWhom`, `transferTo`, …).
 
 **Bloqueia a gravação** (`errors`, → `INVOICE_043`): rubrica inexistente/título, nº que já existe
 na app (comparado sem NIF, decisão 18 do Vilatro; obras `is_test` não contam), data ilegível, fatura liquidada
@@ -811,6 +827,20 @@ um ficheiro `TESTE - …` (o que o exportador gera para obras de teste) → sen�
 Os documentos de `Faturas\Lançadas\` **não** entram por aqui — juntam-se depois por `POST /{id}/documents`,
 um a um (a migração de 2026-09-18 fê-lo com a correspondência pelo nº no nome do ficheiro; regras em
 [[excel-parity.md]] §9, passo 7).
+
+**Quarentena** (`scope=UNIDENTIFIED`, desde 2026-09-20): o mesmo endpoint lê a folha
+`Por identificar` (tabela `TabelaPorIdentificar`) do `Faturas por identificar.xlsx` — as 8 colunas
+da `Despesas` (sem `Rubrica`: rubrica aqui é erro) mais quatro, todas opcionais:
+`Fornecedor` → `supplierName`, `Obras possíveis` → `possibleEnterprises`, `Perguntar a` → `askWhom`,
+`Aqui desde` → acrescentado a `notes` como "Em quarentena desde dd-mm-aaaa." (não há coluna própria;
+`created_at` é a data da importação). `Empreendimento` é o valor da dropdown do vault: o **slug** de
+uma obra (= nome da pasta) ou `Despesas da empresa`. Preenchido, a fatura entra em `UNIDENTIFIED` e é
+**transferida na mesma transação** (`ConstructionInvoiceService.transfer`, razão automática que cita
+a folha e a célula → `activity_log` como qualquer transferência) para essa obra ou para `COMPANY`,
+antes das NC e dos pagamentos. Slug sem obra na app, ou obra `is_test` → erro por linha (→ `INVOICE_043`
+na gravação); a obra cria-se primeiro, com o nome da pasta. O relatório traz `transferredCount` e, por
+fatura, `transferTo` (nome da obra ou "Despesas da empresa"). Os PDFs de `Faturas por identificar\Lançadas\`
+juntam-se depois, como nas obras.
 
 ## Inconsistências (`InvoiceIncidentController`, `/invoice-incidents`)
 

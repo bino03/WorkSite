@@ -300,15 +300,14 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_036': 'O ficheiro de despesas está vazio.',
   'INVOICE_037': 'O ficheiro tem de ser um Excel (.xlsx).',
   'INVOICE_038': 'Não foi possível ler o ficheiro de despesas.',
-  'INVOICE_039': 'O Excel não tem a folha "Despesas".',
+  'INVOICE_039': 'O Excel não tem a folha esperada ("Despesas" numa obra ou na empresa, "Por identificar" na quarentena).',
   'INVOICE_040': 'Não foi encontrada a linha de cabeçalho da tabela de despesas (coluna "Nº Fatura").',
-  'INVOICE_041': 'Faltam colunas obrigatórias na folha "Despesas".',
-  'INVOICE_042': 'A folha "Despesas" não tem linhas para importar.',
+  'INVOICE_041': 'Faltam colunas obrigatórias na folha de despesas.',
+  'INVOICE_042': 'A folha não tem linhas para importar.',
   'INVOICE_043': 'A importação tem erros por corrigir no Excel — nada foi gravado.',
   'INVOICE_044': 'Há perguntas da importação por responder — nada foi gravado.',
   'INVOICE_045': 'Não se importa a folha de uma obra real para uma obra de teste.',
   'INVOICE_046': 'Os totais gravados não batem certo com a folha — a importação foi anulada.',
-  'INVOICE_047': 'A importação só aceita faturas de obra ou da empresa.',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

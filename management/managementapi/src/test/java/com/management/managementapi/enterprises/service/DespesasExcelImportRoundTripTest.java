@@ -80,6 +80,7 @@ class DespesasExcelImportRoundTripTest {
     @Mock private ConstructionExpenseRepository expenseRepository;
     @Mock private InvoicePaymentRepository invoicePaymentRepository;
     @Mock private PaymentService paymentService;
+    @Mock private InvoiceDocumentsExportService documentsExportService;
     @InjectMocks private BudgetExcelExportService exportService;
 
     // ── o importador real ──

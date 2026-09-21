@@ -80,6 +80,7 @@ class BudgetExcelExportServiceTest {
     @Mock private ConstructionExpenseRepository expenseRepository;
     @Mock private InvoicePaymentRepository invoicePaymentRepository;
     @Mock private PaymentService paymentService;
+    @Mock private InvoiceDocumentsExportService documentsExportService;
 
     @InjectMocks private BudgetExcelExportService service;
 
@@ -102,6 +103,7 @@ class BudgetExcelExportServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(documentsExportService.plan(any())).thenReturn(new InvoiceDocumentsExportService.Plan(List.of(), 0, List.of()));
         enterprise = new Enterprise();
         enterprise.setId(ENTERPRISE_ID);
         enterprise.setName("Vila Teste Claude");

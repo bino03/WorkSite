@@ -303,15 +303,14 @@ public enum ErrorCode {
     INVOICE_IMPORT_EMPTY_FILE("INVOICE_036", "Ficheiro de despesas vazio"),
     INVOICE_IMPORT_INVALID_TYPE("INVOICE_037", "O ficheiro tem de ser um Excel (.xlsx)"),
     INVOICE_IMPORT_READ_ERROR("INVOICE_038", "Não foi possível ler o ficheiro de despesas"),
-    INVOICE_IMPORT_NO_SHEET("INVOICE_039", "O Excel não tem a folha \"Despesas\""),
+    INVOICE_IMPORT_NO_SHEET("INVOICE_039", "O Excel não tem a folha esperada (\"Despesas\" numa obra ou na empresa, \"Por identificar\" na quarentena)"),
     INVOICE_IMPORT_NO_HEADER("INVOICE_040", "Não foi encontrada a linha de cabeçalho da tabela de despesas (coluna \"Nº Fatura\")"),
-    INVOICE_IMPORT_MISSING_COLUMNS("INVOICE_041", "Faltam colunas obrigatórias na folha \"Despesas\""),
-    INVOICE_IMPORT_NO_ROWS("INVOICE_042", "A folha \"Despesas\" não tem linhas para importar"),
+    INVOICE_IMPORT_MISSING_COLUMNS("INVOICE_041", "Faltam colunas obrigatórias na folha de despesas"),
+    INVOICE_IMPORT_NO_ROWS("INVOICE_042", "A folha não tem linhas para importar"),
     INVOICE_IMPORT_HAS_ERRORS("INVOICE_043", "A importação tem erros por corrigir no Excel — nada foi gravado"),
     INVOICE_IMPORT_UNANSWERED("INVOICE_044", "Há perguntas da importação por responder — nada foi gravado"),
     INVOICE_IMPORT_TEST_ENTERPRISE("INVOICE_045", "Não se importa a folha de uma obra real para uma obra de teste"),
     INVOICE_IMPORT_TOTALS_MISMATCH("INVOICE_046", "Os totais gravados não batem certo com a folha — a importação foi anulada"),
-    INVOICE_IMPORT_SCOPE("INVOICE_047", "A importação só aceita faturas de obra ou da empresa"),
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================

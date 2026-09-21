@@ -40,6 +40,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -98,6 +99,31 @@ public class ConstructionBudgetItemController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .contentType(MediaType.parseMediaType(BudgetExcelExportService.CONTENT_TYPE))
                 .body(file.content());
+    }
+
+    /**
+     * A pasta da obra inteira: {@code <slug>.zip} com o {@code Despesas - <slug>.xlsx}
+     * e {@code Faturas/Lançadas/*} (os documentos das faturas com o nome do
+     * vault, §7) na raiz — extrai-se em {@code Empreendimentos\<slug>\}.
+     *
+     * O livro e os nomes decidem-se dentro da transação; os documentos vêm do
+     * Storage um a um enquanto a resposta se escreve ({@link StreamingResponseBody}),
+     * porque uma obra tem dezenas de MB deles. A mesma permissão do {@code /export}:
+     * é leitura.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/export/zip")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<StreamingResponseBody> exportZip(@PathVariable UUID enterpriseId,
+                                                           @RequestParam Set<BudgetExportSheet> sheets) {
+        BudgetExcelExportService.ZipExport zip = exportService.exportZip(enterpriseId, sheets);
+
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(zip.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(out -> exportService.writeZip(zip, out));
     }
 
     /**

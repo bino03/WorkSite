@@ -3,7 +3,7 @@ import type { FC, ReactNode } from "react";
 import { Alert, Button, Checkbox, Modal, Space, Spin, Steps, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
-import { exportWorkbook, getExportSummary } from "@/services/budgetService";
+import { exportFolderZip, exportWorkbook, getExportSummary } from "@/services/budgetService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { downloadBlob } from "@/utils/downloadBlob";
@@ -51,6 +51,10 @@ const SHEETS: SheetOption[] = [
  * escolher as folhas, e ver o que vai sair (contagens e avisos) antes de
  * descarregar. O resumo carrega-se ao abrir, porque é ele que diz se a obra
  * tem orçamento — e sem isso duas das três folhas nem se podem escolher.
+ *
+ * "Incluir documentos" troca o `.xlsx` por um `<slug>.zip` com o livro e a
+ * `Faturas/Lançadas/` (os documentos das faturas com o nome do vault, §7) —
+ * a pasta da obra tal como vive em `Empreendimentos\<slug>\`.
  */
 export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) => {
   const { t } = useTranslation();
@@ -59,11 +63,13 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
   const [summary, setSummary] = useState<BudgetExportSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [withDocuments, setWithDocuments] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setStep(0);
     setSummary(null);
+    setWithDocuments(false);
     let cancelled = false;
     setLoadingSummary(true);
     getExportSummary(enterpriseId)
@@ -113,7 +119,9 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
     if (!summary) return;
     setDownloading(true);
     try {
-      const file = await exportWorkbook(enterpriseId, selected, summary.fileName);
+      const file = withDocuments
+        ? await exportFolderZip(enterpriseId, selected, `${summary.enterpriseName}.zip`)
+        : await exportWorkbook(enterpriseId, selected, summary.fileName);
       downloadBlob(file.blob, file.fileName);
       notificationService.success("Exportação", `Ficheiro "${file.fileName}" gerado.`);
       onClose();
@@ -209,6 +217,20 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
                 message="Sem orçamento, só a folha Despesas pode ser exportada."
               />
             )}
+            <div style={{ borderTop: "1px solid var(--ind-color-divider)", paddingTop: "6.8px" }}>
+              <Checkbox
+                checked={withDocuments}
+                disabled={summary.documents.documentCount === 0}
+                onChange={(e) => setWithDocuments(e.target.checked)}
+              >
+                <span style={{ fontWeight: 600 }}>Incluir documentos (pasta da obra em .zip)</span>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  {summary.documents.documentCount === 0
+                    ? "Nenhuma fatura desta obra tem ficheiro — só o Excel."
+                    : `O Excel mais Faturas/Lançadas/ com ${summary.documents.documentCount} ficheiro(s) com o nome do vault — extrai-se em Empreendimentos\\<obra>\\.`}
+                </div>
+              </Checkbox>
+            </div>
           </>
         )}
 
@@ -219,7 +241,10 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
               <i className="ind-corner tr" />
               <i className="ind-corner bl" />
               <i className="ind-corner br" />
-              <span className="ind-card-kicker">{summary.fileName}</span>
+              <span className="ind-card-kicker">
+                {summary.fileName}
+                {withDocuments && " + Faturas/Lançadas/ (num .zip)"}
+              </span>
               <div style={{ fontSize: 12, opacity: 0.6 }}>
                 Folhas: {SHEETS.filter((s) => selected.includes(s.value)).map((s) => s.label).join(" · ")}
                 {includesComparison ? " · Rubricas" : ""}
@@ -273,6 +298,20 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
               </ul>
             )}
 
+            {withDocuments && (
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, opacity: 0.8 }}>
+                <li>
+                  {summary.documents.documentCount} documento(s) em Faturas/Lançadas/
+                  {summary.documents.renamedCount > 0 &&
+                    ` — ${summary.documents.renamedCount} com nome gerado (data_nº_Fornecedor), os outros mantêm o nome do vault`}
+                  .
+                </li>
+                {summary.documents.invoicesWithoutDocument > 0 && (
+                  <li>{summary.documents.invoicesWithoutDocument} fatura(s) sem ficheiro — não têm nada a exportar.</li>
+                )}
+              </ul>
+            )}
+
             {summary.isTest && (
               <Alert
                 type="info"
@@ -282,14 +321,14 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
               />
             )}
 
-            {summary.warnings.length > 0 && (
+            {(summary.warnings.length > 0 || (withDocuments && summary.documents.warnings.length > 0)) && (
               <Alert
                 type="warning"
                 showIcon
-                message={`${summary.warnings.length} aviso(s)`}
+                message={`${summary.warnings.length + (withDocuments ? summary.documents.warnings.length : 0)} aviso(s)`}
                 description={
-                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-                    {summary.warnings.map((w, i) => (
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, maxHeight: 160, overflowY: "auto" }}>
+                    {[...summary.warnings, ...(withDocuments ? summary.documents.warnings : [])].map((w, i) => (
                       <li key={i}>{w}</li>
                     ))}
                   </ul>

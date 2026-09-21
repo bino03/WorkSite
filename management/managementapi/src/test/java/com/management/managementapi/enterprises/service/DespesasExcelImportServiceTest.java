@@ -2,6 +2,9 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ExpensesImportAnswersDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportInvoiceDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportQuestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportResultDTO;
@@ -25,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,6 +38,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +52,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -55,7 +64,8 @@ import static org.mockito.Mockito.when;
  * "Metodo Pagamento"), os valores como a Vilatro os escreve ("x"/"X"/"Sim",
  * "IMPRIMIR", "Transferencia" sem acento, "11 643,33 €"), o agrupamento por
  * nº, as rubricas pelo índice, as perguntas que não se decidem sozinhas e a
- * verificação de totais que bloqueia. A gravação está no
+ * verificação de totais que bloqueia. A quarentena (folha "Por identificar",
+ * §6) está aqui também, leitura e gravação. A gravação da folha "Despesas" está no
  * {@link DespesasExcelImportRoundTripTest}.
  */
 @ExtendWith(MockitoExtension.class)
@@ -399,10 +409,145 @@ class DespesasExcelImportServiceTest {
                 multipart(workbook(VAULT_HEADERS, List.<Object[]>of(row("FT 1", "05/01/2026", "Gasóleo", "60,00", null, null, null, null, "8.2 — Betão")), true)),
                 true, null);
         assertThat(bad.errors()).singleElement().satisfies(e -> assertThat(e.message()).contains("não têm orçamento"));
+    }
 
+    // ── a quarentena (§6): folha "Por identificar" ──────────────
+
+    static final String[] QUARANTINE_HEADERS = {
+            "Nº Fatura", "Data", "Produto/Serviço", "Valor", "Liquidada", "Metodo Pagamento", "Bizdocs", "Observações",
+            "Empreendimento", "Fornecedor", "Obras possíveis", "Perguntar a", "Aqui desde"};
+
+    @Test
+    @DisplayName("O Excel real da quarentena entra pela folha \"Por identificar\" e pela TabelaPorIdentificar; a folha \"Despesas\" não serve")
+    void realQuarantineWorkbookParses() throws Exception {
+        byte[] content;
+        try (InputStream in = getClass().getResourceAsStream("/excel-parity/Faturas por identificar.xlsx")) {
+            content = in.readAllBytes();
+        }
+        ExpensesImportResultDTO result = service.importExpenses("UNIDENTIFIED", null,
+                new MockMultipartFile("file", "Faturas por identificar.xlsx", BudgetExcelExportService.CONTENT_TYPE, content),
+                true, null);
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.scope()).isEqualTo("UNIDENTIFIED");
+        assertThat(result.sheetName()).isEqualTo("Por identificar");
+        assertThat(result.rowCount()).isEqualTo(5);
+        assertThat(result.invoiceCount()).isEqualTo(5);
+        assertThat(result.transferredCount()).isZero(); // a coluna "Empreendimento" está vazia em todas
+        assertThat(result.sheetTotal()).isEqualByComparingTo("1046.27");
+        assertThat(result.totalDifference().abs()).isLessThanOrEqualTo(new java.math.BigDecimal("0.01"));
+        assertThat(result.paidCount()).isEqualTo(1); // só a Calinorte, pelo recibo REC2026/8
+        assertThat(result.invoices()).allSatisfy(invoice -> {
+            assertThat(invoice.supplierName()).isNotBlank();
+            assertThat(invoice.transferTo()).isNull();
+            assertThat(invoice.notes()).contains("Em quarentena desde ");
+        });
+
+        // a folha de uma obra não é a da quarentena, e vice-versa
         assertThatThrownBy(() -> service.importExpenses("UNIDENTIFIED", null, multipart(workbook(VAULT_HEADERS, List.<Object[]>of(), true)), true, null))
                 .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INVOICE_IMPORT_SCOPE);
+                .isEqualTo(ErrorCode.INVOICE_IMPORT_NO_SHEET);
+        MockMultipartFile quarantineFile = new MockMultipartFile("file", "Faturas por identificar.xlsx", BudgetExcelExportService.CONTENT_TYPE, content);
+        assertThatThrownBy(() -> service.importExpenses("COMPANY", null, quarantineFile, true, null))
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVOICE_IMPORT_NO_SHEET);
+    }
+
+    @Test
+    @DisplayName("\"Empreendimento\" resolve pelo slug da obra ou por \"Despesas da empresa\"; sem obra, ou obra de teste, bloqueia")
+    void quarantineTargetsResolveBySlug() throws Exception {
+        Enterprise test = new Enterprise();
+        test.setId(UUID.randomUUID());
+        test.setName("Obra de teste");
+        test.setSlug("Vila Teste");
+        test.setIsTest(true);
+        Enterprise petrus = enterpriseRepository.findById(ENTERPRISE_ID).orElseThrow();
+        when(enterpriseRepository.findBySlug("Vila Petrus")).thenReturn(Optional.of(petrus));
+        when(enterpriseRepository.findBySlug("Vila Teste")).thenReturn(Optional.of(test));
+        when(enterpriseRepository.findBySlug("Vila Nenhures")).thenReturn(Optional.empty());
+
+        ExpensesImportResultDTO result = service.importExpenses("UNIDENTIFIED", null, multipart(workbook("Por identificar", QUARANTINE_HEADERS, List.<Object[]>of(
+                row("FT 1", "05/01/2026", "Cimento", "10,00", null, null, null, null, "Vila Petrus", "Cimpor", null, null, LocalDate.of(2026, 9, 1)),
+                row("FT 2", "05/01/2026", "Gasóleo", "20,00", null, null, null, null, "despesas da Empresa", "Galp", null, null, null),
+                row("FT 3", "05/01/2026", "Areia", "30,00", null, null, null, "obra ao lado", null, "Areias", "Petrus ou Aleu", "Sr. Manuel", LocalDate.of(2026, 9, 2)),
+                row("FT 4", "05/01/2026", "Brita", "40,00", null, null, null, null, "Vila Nenhures", null, null, null, null),
+                row("FT 5", "05/01/2026", "Tijolo", "50,00", null, null, null, null, "Vila Teste", null, null, null, null)
+        ), true)), true, null);
+
+        assertThat(result.errors()).hasSize(2);
+        assertThat(result.errors().get(0).excelRow()).isEqualTo(5);
+        assertThat(result.errors().get(0).message()).contains("Vila Nenhures").contains("crie-a primeiro");
+        assertThat(result.errors().get(1).excelRow()).isEqualTo(6);
+        assertThat(result.errors().get(1).message()).contains("de teste");
+        assertThat(result.transferredCount()).isEqualTo(2);
+
+        assertThat(byNumber(result, "FT 1").transferTo()).isEqualTo("Vila Petrus");
+        assertThat(byNumber(result, "FT 1").notes()).isEqualTo("Em quarentena desde 01-09-2026.");
+        assertThat(byNumber(result, "FT 2").transferTo()).isEqualTo("Despesas da empresa");
+        assertThat(byNumber(result, "FT 2").notes()).isNull();
+        ExpensesImportInvoiceDTO stays = byNumber(result, "FT 3");
+        assertThat(stays.transferTo()).isNull();
+        assertThat(stays.supplierName()).isEqualTo("Areias");
+        assertThat(stays.possibleEnterprises()).isEqualTo("Petrus ou Aleu");
+        assertThat(stays.askWhom()).isEqualTo("Sr. Manuel");
+        assertThat(stays.notes()).isEqualTo("obra ao lado · Em quarentena desde 02-09-2026.");
+    }
+
+    @Test
+    @DisplayName("Gravar a quarentena regista em UNIDENTIFIED e transfere na mesma transação as linhas com \"Empreendimento\"")
+    void quarantineWriteRegistersThenTransfers() throws Exception {
+        Enterprise petrus = enterpriseRepository.findById(ENTERPRISE_ID).orElseThrow();
+        when(enterpriseRepository.findBySlug("Vila Petrus")).thenReturn(Optional.of(petrus));
+        Map<String, UUID> idByNumber = new HashMap<>();
+        Map<UUID, ConstructionInvoice> saved = new HashMap<>();
+        when(invoiceService.register(any())).thenAnswer(inv -> {
+            InvoiceRegisterDTO dto = inv.getArgument(0);
+            ConstructionInvoice entity = new ConstructionInvoice();
+            entity.setId(UUID.randomUUID());
+            entity.setInvoiceNumber(dto.invoiceNumber());
+            entity.setTotalAmount(dto.totalAmount());
+            saved.put(entity.getId(), entity);
+            idByNumber.put(dto.invoiceNumber(), entity.getId());
+            ConstructionInvoiceResponseDTO response = mock(ConstructionInvoiceResponseDTO.class);
+            when(response.id()).thenReturn(entity.getId());
+            return response;
+        });
+        when(invoiceRepository.findById(any())).thenAnswer(inv -> Optional.ofNullable(saved.get(inv.getArgument(0, UUID.class))));
+        when(invoiceRepository.sumCreditNotesFor(any())).thenReturn(BigDecimal.ZERO);
+        when(paymentService.paidSums(any())).thenReturn(Map.of());
+
+        ExpensesImportResultDTO result = service.importExpenses("UNIDENTIFIED", null, multipart(workbook("Por identificar", QUARANTINE_HEADERS, List.<Object[]>of(
+                row("FT 1", "05/01/2026", "Cimento", "10,00", null, null, null, null, "Vila Petrus", "Cimpor", null, null, null),
+                row("FT 2", "05/01/2026", "Gasóleo", "20,00", null, null, "X", null, "Despesas da empresa", "Galp", null, null, null),
+                row("FT 3", "05/01/2026", "Areia", "30,00", null, null, null, null, null, "Areias", "Petrus ou Aleu", "Sr. Manuel", null)
+        ), true)), false, null);
+
+        assertThat(result.dryRun()).isFalse();
+        assertThat(result.transferredCount()).isEqualTo(2);
+
+        ArgumentCaptor<InvoiceRegisterDTO> registered = ArgumentCaptor.captor();
+        verify(invoiceService, times(3)).register(registered.capture());
+        assertThat(registered.getAllValues()).allSatisfy(dto -> {
+            assertThat(dto.scope()).isEqualTo("UNIDENTIFIED");
+            assertThat(dto.enterpriseId()).isNull();
+        });
+        InvoiceRegisterDTO stays = registered.getAllValues().get(2);
+        assertThat(stays.supplierName()).isEqualTo("Areias");
+        assertThat(stays.possibleEnterprises()).isEqualTo("Petrus ou Aleu");
+        assertThat(stays.askWhom()).isEqualTo("Sr. Manuel");
+
+        ArgumentCaptor<InvoiceTransferDTO> transfer = ArgumentCaptor.captor();
+        verify(invoiceService).transfer(eq(idByNumber.get("FT 1")), transfer.capture());
+        assertThat(transfer.getValue().targetScope()).isEqualTo("PROJECT");
+        assertThat(transfer.getValue().targetEnterpriseId()).isEqualTo(ENTERPRISE_ID);
+        assertThat(transfer.getValue().reason()).contains("Por identificar").contains("Vila Petrus");
+        verify(invoiceService).transfer(eq(idByNumber.get("FT 2")), transfer.capture());
+        assertThat(transfer.getValue().targetScope()).isEqualTo("COMPANY");
+        assertThat(transfer.getValue().targetEnterpriseId()).isNull();
+        verify(invoiceService, never()).transfer(eq(idByNumber.get("FT 3")), any());
+
+        // o Bizdocs marca-se depois da transferência, na fatura já na obra/empresa
+        assertThat(saved.get(idByNumber.get("FT 2")).isSentToAccountant()).isTrue();
     }
 
     // ── helpers ─────────────────────────────────────────────────
@@ -425,8 +570,13 @@ class DespesasExcelImportServiceTest {
 
     /** Um livro com a folha "Despesas" e, opcionalmente, a linha TOTAL com a soma cacheada como o Excel a deixa. */
     static byte[] workbook(String[] headers, List<Object[]> rows, boolean totalsRow) throws Exception {
+        return workbook("Despesas", headers, rows, totalsRow);
+    }
+
+    /** O mesmo, com o nome da folha à escolha ("Por identificar" na quarentena). */
+    static byte[] workbook(String sheetName, String[] headers, List<Object[]> rows, boolean totalsRow) throws Exception {
         try (XSSFWorkbook wb = new XSSFWorkbook()) {
-            XSSFSheet sheet = wb.createSheet("Despesas");
+            XSSFSheet sheet = wb.createSheet(sheetName);
             header(sheet, headers);
             int r = 1;
             double sum = 0;

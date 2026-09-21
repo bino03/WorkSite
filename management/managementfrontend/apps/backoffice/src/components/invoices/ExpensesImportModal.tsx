@@ -26,8 +26,8 @@ const PAYMENT_LABEL: Record<ExpensesImportInvoice["paymentStatus"], string> = {
 
 interface Props {
   open: boolean;
-  /** `PROJECT` exige `enterpriseId`; `COMPANY` é a folha "Despesas da empresa". */
-  scope: Exclude<InvoiceScope, "UNIDENTIFIED">;
+  /** `PROJECT` exige `enterpriseId`; `COMPANY` é a folha "Despesas da empresa"; `UNIDENTIFIED` é a folha "Por identificar" da quarentena. */
+  scope: InvoiceScope;
   enterpriseId?: string;
   onClose: () => void;
   onImported: () => void;
@@ -40,6 +40,10 @@ interface Props {
  * entrar — aqui com dois degraus a mais: os **erros** (que se corrigem no Excel
  * e bloqueiam) e as **perguntas** (a que fatura pertence uma nota de crédito,
  * se várias faturas foram pagas num só movimento) que só a pessoa sabe responder.
+ *
+ * Na quarentena lê a folha "Por identificar" (§6): as linhas com "Empreendimento"
+ * preenchido entram e são transferidas logo para essa obra — a lista mostra o
+ * destino de cada uma.
  */
 export const ExpensesImportModal: FC<Props> = ({ open, scope, enterpriseId, onClose, onImported }) => {
   const { t } = useTranslation();
@@ -98,6 +102,7 @@ export const ExpensesImportModal: FC<Props> = ({ open, scope, enterpriseId, onCl
         "Importação",
         `${result.invoiceCount} faturas importadas de "${result.sheetName}"` +
           (result.creditNoteCount > 0 ? `, ${result.creditNoteCount} nota(s) de crédito` : "") +
+          (result.transferredCount > 0 ? `, ${result.transferredCount} transferida(s) para a obra indicada` : "") +
           "."
       );
       onImported();
@@ -117,7 +122,13 @@ export const ExpensesImportModal: FC<Props> = ({ open, scope, enterpriseId, onCl
       open={open}
       onCancel={onClose}
       width={620}
-      title={scope === "COMPANY" ? "Importar despesas da empresa do Excel" : "Importar despesas do Excel"}
+      title={
+        scope === "COMPANY"
+          ? "Importar despesas da empresa do Excel"
+          : scope === "UNIDENTIFIED"
+            ? "Importar faturas por identificar do Excel"
+            : "Importar despesas do Excel"
+      }
       footer={
         <Space style={{ display: "flex", justifyContent: "flex-end" }}>
           <Button onClick={onClose} disabled={importing}>
@@ -144,11 +155,17 @@ export const ExpensesImportModal: FC<Props> = ({ open, scope, enterpriseId, onCl
             <InboxOutlined style={{ fontSize: 22, color: "var(--ind-color-accent)" }} />
           </p>
           <p style={{ fontSize: 13, margin: "6px 0 0" }}>
-            {file ? file.name : "Clique ou arraste o Excel da obra (Despesas - <Obra>.xlsx)"}
+            {file
+              ? file.name
+              : scope === "UNIDENTIFIED"
+                ? "Clique ou arraste o Excel da quarentena (Faturas por identificar.xlsx)"
+                : "Clique ou arraste o Excel da obra (Despesas - <Obra>.xlsx)"}
           </p>
           <p style={{ fontSize: 11, opacity: 0.6, margin: "4px 0 0" }}>
-            Lê só a folha "Despesas" · colunas pelo nome: Nº Fatura · Data · Produto/Serviço · Valor ·
-            Liquidada · Metodo Pagamento · Bizdocs · Observações{scope === "PROJECT" ? " · Rubrica" : ""}
+            Lê só a folha "{scope === "UNIDENTIFIED" ? "Por identificar" : "Despesas"}" · colunas pelo nome: Nº
+            Fatura · Data · Produto/Serviço · Valor · Liquidada · Metodo Pagamento · Bizdocs · Observações
+            {scope === "PROJECT" && " · Rubrica"}
+            {scope === "UNIDENTIFIED" && " · Empreendimento · Fornecedor · Obras possíveis · Perguntar a · Aqui desde"}
           </p>
         </Upload.Dragger>
 
@@ -202,6 +219,12 @@ export const ExpensesImportModal: FC<Props> = ({ open, scope, enterpriseId, onCl
               {preview.manualExpenseCount > 0 && (
                 <div style={{ fontSize: 12, opacity: 0.7 }}>
                   + {preview.manualExpenseCount} despesa(s) sem fatura, lançadas direto na rubrica.
+                </div>
+              )}
+              {preview.transferredCount > 0 && (
+                <div style={{ fontSize: 12, opacity: 0.7 }}>
+                  {preview.transferredCount} com "Empreendimento" preenchido — entram e são transferidas logo para
+                  essa obra (ou para as despesas da empresa), com a razão no histórico.
                 </div>
               )}
             </div>
@@ -295,6 +318,12 @@ export const ExpensesImportModal: FC<Props> = ({ open, scope, enterpriseId, onCl
                             .map((l) => l.rubricCode)
                             .filter(Boolean)
                             .join(", ")}
+                        </span>
+                      )}
+                      {inv.transferTo && (
+                        <span style={{ color: "var(--ind-accent-700)" }}>
+                          {" → "}
+                          {inv.transferTo}
                         </span>
                       )}
                     </span>
