@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FC } from "react";
 import { Button, Input, Modal, Spin } from "antd";
-import { CloseOutlined, LeftOutlined, RightOutlined, SearchOutlined } from "@ant-design/icons";
+import { CloseOutlined, LeftOutlined, SearchOutlined } from "@ant-design/icons";
 
 import { getBudgetTree } from "@/services/budgetService";
 import { suggestBudgetItem } from "@/services/invoiceService";
@@ -23,27 +23,41 @@ interface Props {
   saving?: boolean;
 }
 
-/** Uma rubrica selecionável, já com o sítio onde vive resolvido. */
-interface PickerItem {
+/** Uma linha da lista, já com o sítio onde vive resolvido. */
+interface PickerRow {
   node: BudgetItemNode;
-  /** Rubrica de topo do ramo — o "capítulo" do passo 1. */
-  chapterId: string;
-  /** Caminho entre o capítulo e a rubrica, sem nenhum dos dois. */
+  /** Caminho entre o nível aberto e a rubrica, sem nenhum dos dois — só na pesquisa. */
   context: string;
+  /** Quantas rubricas selecionáveis há por baixo; 0 = é uma folha. */
+  subCount: number;
+}
+
+/** Uma rubrica onde se pode lançar, ou um título com rubricas lá dentro. */
+function carriesExpenses(node: BudgetItemNode): boolean {
+  return node.acceptsExpenses || node.children.some(carriesExpenses);
+}
+
+function countSelectable(node: BudgetItemNode): number {
+  return node.children.reduce(
+    (sum, child) => sum + (child.acceptsExpenses ? 1 : 0) + countSelectable(child),
+    0
+  );
 }
 
 /**
  * Escolha da rubrica onde a fatura vai ser lançada.
  *
- * Percorre-se em dois passos — capítulo primeiro, rubrica depois — porque a
- * lista plana de um orçamento real são ~200 linhas em que "Betão" aparece em
- * três capítulos diferentes e nada as distingue à vista. O capítulo dá o
- * contexto de graça e reduz a escolha final a uma dúzia de linhas; quem sabe o
- * que procura escreve na pesquisa e salta o passo.
+ * Desce-se a árvore um nível de cada vez — os capítulos, depois as filhas do
+ * que se abriu, depois as netas — como no ecrã de classificação: a `4.2.1` só
+ * aparece depois de abrir a `4.2`, e a `4.2` só depois de abrir a `4`. A
+ * versão anterior achatava o capítulo inteiro no segundo passo (`4.2`, `4.2.1`,
+ * `4.2.2`, `4.3.1`… tudo junto) e ficava confusa num orçamento real
+ * (apontado pelo utilizador a 2026-09-21). Clicar numa linha escolhe-a;
+ * "ver sub-rubricas ›" abre-a. Quem sabe o que procura escreve na pesquisa,
+ * que procura em todo o ramo aberto e salta os passos.
  *
  * A sugestão no topo é o que faz a diferença: a partir da segunda fatura do
- * mesmo fornecedor, associar continua a ser um clique, sem entrar em capítulo
- * nenhum.
+ * mesmo fornecedor, associar continua a ser um clique, sem abrir nada.
  */
 export const BudgetItemPickerModal: FC<Props> = ({
   open,
@@ -59,8 +73,8 @@ export const BudgetItemPickerModal: FC<Props> = ({
   const [query, setQuery] = useState("");
   const [suggestion, setSuggestion] = useState<BudgetItemSuggestion | null>(null);
   const [selected, setSelected] = useState<BudgetItemNode | null>(null);
-  /** Capítulo aberto. `null` é o passo 1 (a lista de capítulos). */
-  const [chapterId, setChapterId] = useState<string | null>(null);
+  /** Rubrica aberta. `null` é o topo (a lista de capítulos). */
+  const [parentId, setParentId] = useState<string | null>(null);
 
   const fetchTree = useCallback(async () => {
     setLoading(true);
@@ -78,7 +92,7 @@ export const BudgetItemPickerModal: FC<Props> = ({
     setQuery("");
     setSelected(null);
     setSuggestion(null);
-    setChapterId(null);
+    setParentId(null);
     fetchTree();
 
     if (supplierNif) {
@@ -92,76 +106,66 @@ export const BudgetItemPickerModal: FC<Props> = ({
 
   const roots = useMemo(() => tree?.roots ?? [], [tree]);
 
+  /** Do topo até à rubrica aberta, inclusive — vazio no topo. */
+  const trail = useMemo(() => (parentId ? pathTo(roots, parentId) : []), [roots, parentId]);
+  const current = trail.length > 0 ? trail[trail.length - 1] : null;
+  const level = current ? current.children : roots;
+  const searching = query.trim().length > 0;
+
   /**
-   * Só as rubricas normais aceitam despesas — espelha
-   * `BudgetRowKind.acceptsExpenses`, a mesma regra que o backend aplica em
-   * `allocate` (`EXPENSE_ITEM_NOT_EXPENSABLE`).
+   * Sem pesquisa, só as filhas diretas do nível aberto (as que levam gasto —
+   * as notas não). Com pesquisa, todas as rubricas selecionáveis do ramo, com o
+   * caminho até elas, porque "Betão" aparece em três sítios e o nome sozinho
+   * não os distingue. Só as rubricas normais aceitam despesas — espelha
+   * `BudgetRowKind.acceptsExpenses`, a regra que o backend aplica em `allocate`.
    */
-  const items = useMemo<PickerItem[]>(() => {
-    return flattenTree(roots)
-      .filter((node) => node.acceptsExpenses)
+  const rows = useMemo<PickerRow[]>(() => {
+    if (!searching) {
+      return level
+        .filter(carriesExpenses)
+        .map((node) => ({ node, context: "", subCount: countSelectable(node) }));
+    }
+    return flattenTree(level)
+      .filter((node) => node.acceptsExpenses && matchesQuery(node, query))
       .map((node) => {
-        const trail = pathTo(roots, node.id);
+        const path = pathTo(level, node.id);
         return {
           node,
-          // Uma rubrica de topo é o seu próprio capítulo.
-          chapterId: trail[0]?.id ?? node.id,
-          // Fora o capítulo (já é o título) e a própria rubrica.
-          context: trail.slice(1, -1).map((ancestor) => ancestor.name).join(" › "),
+          context: path.slice(0, -1).map((ancestor) => ancestor.name).join(" › "),
+          subCount: countSelectable(node),
         };
       });
-  }, [roots]);
+  }, [level, query, searching]);
 
-  /** Capítulos com pelo menos uma rubrica lá dentro — os vazios não levam a lado nenhum. */
-  const chapters = useMemo(
-    () =>
-      roots
-        .map((root) => ({
-          node: root,
-          count: items.filter((item) => item.chapterId === root.id).length,
-        }))
-        .filter((chapter) => chapter.count > 0),
-    [roots, items]
-  );
-
-  const visibleChapters = useMemo(
-    () => chapters.filter((chapter) => matchesQuery(chapter.node, query)),
-    [chapters, query]
-  );
-
-  const visibleItems = useMemo(
-    () =>
-      items.filter(
-        (item) => item.chapterId === chapterId && matchesQuery(item.node, query)
-      ),
-    [items, chapterId, query]
-  );
-
-  const openChapter = (id: string) => {
-    setChapterId(id);
+  const openNode = (node: BudgetItemNode) => {
+    setParentId(node.id);
     setQuery("");
   };
 
-  const backToChapters = () => {
-    setChapterId(null);
+  const goUp = () => {
+    setParentId(trail.length > 1 ? trail[trail.length - 2].id : null);
     setQuery("");
-    setSelected(null);
   };
 
-  const suggestedItem = useMemo(
-    () => items.find((item) => item.node.id === suggestion?.budgetItemId) ?? null,
-    [items, suggestion]
-  );
+  const suggestedRow = useMemo<PickerRow | null>(() => {
+    const node = flattenTree(roots).find((n) => n.id === suggestion?.budgetItemId);
+    if (!node) return null;
+    const path = pathTo(roots, node.id);
+    return {
+      node,
+      context: path.slice(0, -1).map((ancestor) => ancestor.name).join(" › "),
+      subCount: countSelectable(node),
+    };
+  }, [roots, suggestion]);
 
-  const chapterName = roots.find((root) => root.id === chapterId)?.name ?? "";
-  const onChapters = chapterId === null;
+  const atTop = current === null;
+  const hasBudget = roots.some(carriesExpenses);
 
-  const isEmpty = onChapters ? visibleChapters.length === 0 : visibleItems.length === 0;
-  const emptyMessage = onChapters
-    ? items.length === 0
-      ? "Este projeto ainda não tem orçamento importado."
-      : "Nenhuma rubrica corresponde à pesquisa."
-    : "Nenhuma sub-rubrica corresponde à pesquisa.";
+  const emptyMessage = !hasBudget
+    ? "Este projeto ainda não tem orçamento importado."
+    : searching
+      ? "Nenhuma rubrica corresponde à pesquisa."
+      : "Esta rubrica não tem sub-rubricas.";
 
   const footerLabel = selected
     ? `${selected.code ? `${selected.code} · ` : ""}${selected.name}`
@@ -205,17 +209,17 @@ export const BudgetItemPickerModal: FC<Props> = ({
           flex: "none",
         }}
       >
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h6 style={{ color: "var(--ind-accent-700)", margin: "0 0 2px" }}>Associar</h6>
-          {onChapters ? (
+          {atTop ? (
             <h2 style={{ margin: 0 }}>Escolher rubrica</h2>
           ) : (
             <>
-              <button type="button" onClick={backToChapters} style={backLinkStyle}>
+              <button type="button" onClick={goUp} style={backLinkStyle}>
                 <LeftOutlined style={{ fontSize: 12 }} />
-                Rubricas
+                {trail.length > 1 ? labelOf(trail[trail.length - 2]) : "Rubricas"}
               </button>
-              <h2 style={{ margin: 0 }}>{chapterName}</h2>
+              <h2 style={{ margin: 0 }}>{labelOf(current)}</h2>
             </>
           )}
         </div>
@@ -233,7 +237,7 @@ export const BudgetItemPickerModal: FC<Props> = ({
           minHeight: 0,
         }}
       >
-        {onChapters && suggestedItem && (
+        {atTop && !searching && suggestedRow && (
           <div
             className="ind-card ind-blueprint"
             style={{ padding: "10.2px", gap: 6, borderColor: "var(--ind-color-accent)", flex: "none" }}
@@ -244,15 +248,17 @@ export const BudgetItemPickerModal: FC<Props> = ({
             <i className="ind-corner br" />
             <span className="ind-card-kicker">Habitual deste fornecedor</span>
             <ItemRow
-              item={suggestedItem}
-              selected={selected?.id === suggestedItem.node.id}
-              onSelect={() => setSelected(suggestedItem.node)}
+              row={suggestedRow}
+              showContext
+              selected={selected?.id === suggestedRow.node.id}
+              onSelect={() => setSelected(suggestedRow.node)}
+              onOpen={null}
             />
           </div>
         )}
 
         <Input
-          placeholder={onChapters ? "Pesquisar rubrica…" : "Pesquisar sub-rubrica…"}
+          placeholder={atTop ? "Pesquisar rubrica…" : `Pesquisar em ${labelOf(current)}…`}
           prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -272,25 +278,18 @@ export const BudgetItemPickerModal: FC<Props> = ({
               paddingRight: 4,
             }}
           >
-            {onChapters
-              ? visibleChapters.map((chapter) => (
-                  <ChapterRow
-                    key={chapter.node.id}
-                    node={chapter.node}
-                    count={chapter.count}
-                    onOpen={() => openChapter(chapter.node.id)}
-                  />
-                ))
-              : visibleItems.map((item) => (
-                  <ItemRow
-                    key={item.node.id}
-                    item={item}
-                    selected={selected?.id === item.node.id}
-                    onSelect={() => setSelected(item.node)}
-                  />
-                ))}
+            {rows.map((row) => (
+              <ItemRow
+                key={row.node.id}
+                row={row}
+                showContext={searching}
+                selected={selected?.id === row.node.id}
+                onSelect={row.node.acceptsExpenses ? () => setSelected(row.node) : null}
+                onOpen={row.subCount > 0 ? () => openNode(row.node) : null}
+              />
+            ))}
 
-            {!loading && isEmpty && (
+            {!loading && rows.length === 0 && (
               <div style={{ padding: "20.4px 0", textAlign: "center" }}>
                 <p style={{ fontSize: 13, margin: 0, opacity: 0.55 }}>{emptyMessage}</p>
               </div>
@@ -331,6 +330,11 @@ export const BudgetItemPickerModal: FC<Props> = ({
   );
 };
 
+function labelOf(node: BudgetItemNode | null): string {
+  if (!node) return "";
+  return node.code ? `${node.code} ${node.name}` : node.name;
+}
+
 const backLinkStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -343,9 +347,12 @@ const backLinkStyle: CSSProperties = {
   fontSize: 12,
   fontFamily: "inherit",
   color: "var(--ind-accent-700)",
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
-/** Os números da direita — iguais nos dois passos, por isso vivem num sítio só. */
 const RowFigures: FC<{ node: BudgetItemNode }> = ({ node }) => (
   <div style={{ textAlign: "right", flex: "none", fontSize: 12 }}>
     <div>Orç. {formatCurrency(node.rolledUpBudget)}</div>
@@ -363,42 +370,55 @@ const RowTitle: FC<{ node: BudgetItemNode }> = ({ node }) => (
   </div>
 );
 
-const ChapterRow: FC<{ node: BudgetItemNode; count: number; onOpen: () => void }> = ({
-  node,
-  count,
-  onOpen,
-}) => (
-  <button type="button" className="ind-picker-row" onClick={onOpen}>
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <RowTitle node={node} />
-      <div style={{ fontSize: 11, marginTop: 2, opacity: 0.55 }}>
-        {count} sub-rubrica{count === 1 ? "" : "s"}
+/**
+ * Uma linha. Clicar escolhe (quando a rubrica aceita despesas) ou abre (um
+ * título só se pode abrir). "ver sub-rubricas ›" é um `span` dentro do botão,
+ * com `stopPropagation` para abrir não contar como escolher — o mesmo gesto do
+ * `RubricSearchField`.
+ */
+const ItemRow: FC<{
+  row: PickerRow;
+  showContext: boolean;
+  selected: boolean;
+  onSelect: (() => void) | null;
+  onOpen: (() => void) | null;
+}> = ({ row, showContext, selected, onSelect, onOpen }) => {
+  const { node, context, subCount } = row;
+  const primary = onSelect ?? onOpen ?? undefined;
+  return (
+    <button
+      type="button"
+      className="ind-picker-row"
+      aria-selected={selected}
+      onClick={primary}
+      disabled={!primary}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <RowTitle node={node} />
+        {showContext && context && (
+          <div style={{ fontSize: 11, marginTop: 2, opacity: 0.55 }}>{context}</div>
+        )}
+        {subCount > 0 && (
+          <div style={{ fontSize: 11, marginTop: 2, display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ opacity: 0.55 }}>
+              {subCount} sub-rubrica{subCount === 1 ? "" : "s"}
+            </span>
+            {onOpen && (
+              <span
+                role="link"
+                style={{ color: "var(--ind-color-accent)", cursor: "pointer" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpen();
+                }}
+              >
+                ver sub-rubricas ›
+              </span>
+            )}
+          </div>
+        )}
       </div>
-    </div>
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none" }}>
       <RowFigures node={node} />
-      <RightOutlined style={{ fontSize: 14, opacity: 0.5 }} />
-    </div>
-  </button>
-);
-
-const ItemRow: FC<{ item: PickerItem; selected: boolean; onSelect: () => void }> = ({
-  item,
-  selected,
-  onSelect,
-}) => (
-  <button
-    type="button"
-    className="ind-picker-row"
-    aria-selected={selected}
-    onClick={onSelect}
-  >
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <RowTitle node={item.node} />
-      {item.context && (
-        <div style={{ fontSize: 11, marginTop: 2, opacity: 0.55 }}>{item.context}</div>
-      )}
-    </div>
-    <RowFigures node={item.node} />
-  </button>
-);
+    </button>
+  );
+};
