@@ -3521,6 +3521,10 @@
       "submit": "Transferir",
       "success": "Fatura transferida.",
       "warning": "As despesas desta fatura nesta obra vão ser apagadas. As notas de crédito ligadas são transferidas junto.",
+      "submitRubric": "Mover",
+      "rubricSuccess": "Fatura movida para a rubrica.",
+      "rubricWarning": "A repartição atual desta fatura é substituída pela rubrica escolhida. A fatura fica na mesma obra; as notas de crédito ligadas mantêm a repartição delas.",
+      "fieldRubric": "Rubrica de destino",
       "fieldScope": "Destino",
       "fieldEnterprise": "Obra de destino",
       "fieldReason": "Razão",
@@ -3528,7 +3532,8 @@
       "scope": {
         "PROJECT": "Outra obra",
         "COMPANY": "Despesas da empresa",
-        "UNIDENTIFIED": "Por identificar"
+        "UNIDENTIFIED": "Por identificar",
+        "RUBRIC": "Outra rubrica desta obra"
       }
     },
     "payment": {

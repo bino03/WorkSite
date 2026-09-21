@@ -7,11 +7,13 @@ import { useTranslation } from "react-i18next";
 
 import { TransferInvoiceSchema } from "@/components/invoices/transferFormSchema";
 import type { TransferInvoiceForm } from "@/components/invoices/transferFormSchema";
-import { transferInvoice } from "@/services/invoiceService";
+import { splitInvoice, transferInvoice } from "@/services/invoiceService";
 import { searchEnterprises, type EnterpriseOption } from "@/services/enterpriseService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import type { ConstructionInvoice, InvoiceScope, InvoiceTransferResult } from "@/types/invoice";
+import type { BudgetItemSearchResult } from "@/types/budget";
+import { RubricSearchField } from "@/components/invoices/RubricSearchField";
 
 const { Text } = Typography;
 
@@ -35,6 +37,15 @@ const SCOPE_LABEL: Record<InvoiceScope, string> = {
  * Transfere uma fatura de âmbito/obra. A razão é obrigatória e o backend apaga
  * as despesas — o aviso e a razão são a paragem consciente, não há `useConfirm`
  * à parte. As notas de crédito ligadas seguem a fatura.
+ *
+ * Há um quarto destino que **não é** uma transferência: "outra rubrica desta
+ * obra" (pedido do utilizador a 2026-09-21). Mover dentro da mesma obra é
+ * repartir de novo — `split` com uma linha só, que substitui a repartição
+ * inteira e serve tanto a fatura já associada como a que ainda não está
+ * (`allocate` recusaria a primeira com `INVOICE_ALREADY_ALLOCATED`). Não passa
+ * pelo `transfer` do backend, por isso não pede razão nem apaga as despesas
+ * das NC ligadas. Só faz sentido numa fatura de obra — na quarentena e na
+ * empresa a opção nem aparece.
  */
 export const TransferInvoiceDrawer: FC<Props> = ({
   open,
@@ -46,6 +57,13 @@ export const TransferInvoiceDrawer: FC<Props> = ({
   const { t } = useTranslation();
   const [options, setOptions] = useState<EnterpriseOption[]>([]);
   const [searching, setSearching] = useState(false);
+  /** Destino "outra rubrica desta obra" — fora do schema, porque não é transferência. */
+  const [toRubric, setToRubric] = useState(false);
+  const [rubric, setRubric] = useState<BudgetItemSearchResult | null>(null);
+  const [moving, setMoving] = useState(false);
+
+  const canMoveWithinProject =
+    !lockToProject && invoice?.scope === "PROJECT" && !!invoice.enterpriseId;
 
   const {
     control,
@@ -64,8 +82,28 @@ export const TransferInvoiceDrawer: FC<Props> = ({
   useEffect(() => {
     if (!open) return;
     setOptions([]);
+    setToRubric(false);
+    setRubric(null);
     reset({ targetScope: "PROJECT", targetEnterpriseId: null, reason: "" });
   }, [open, reset]);
+
+  const moveToRubric = async () => {
+    if (!invoice || !rubric) return;
+    setMoving(true);
+    try {
+      // O total vai todo para a rubrica nova; sem total a linha fica provisória
+      // (a zero), como no ecrã de classificação.
+      await splitInvoice(invoice.id, [{ budgetItemId: rubric.id, amount: invoice.totalAmount }]);
+      notificationService.success(t("invoices.transfer.rubricSuccess"));
+      // A fatura não mudou de obra — os pais só precisam de recarregar.
+      onTransferred({ invoice, suggestIncident: false });
+      onClose();
+    } catch (error) {
+      ErrorHandler.handle(error);
+    } finally {
+      setMoving(false);
+    }
+  };
 
   const runSearch = async (q: string) => {
     if (q.trim().length < 2) {
@@ -117,12 +155,18 @@ export const TransferInvoiceDrawer: FC<Props> = ({
       destroyOnClose
       footer={
         <Space style={{ display: "flex", justifyContent: "flex-end" }}>
-          <Button onClick={onClose} disabled={isSubmitting}>
+          <Button onClick={onClose} disabled={isSubmitting || moving}>
             {t("common.cancel")}
           </Button>
-          <Button type="primary" onClick={onSubmit} loading={isSubmitting} disabled={!isValid}>
-            {t("invoices.transfer.submit")}
-          </Button>
+          {toRubric ? (
+            <Button type="primary" onClick={moveToRubric} loading={moving} disabled={!rubric}>
+              {t("invoices.transfer.submitRubric")}
+            </Button>
+          ) : (
+            <Button type="primary" onClick={onSubmit} loading={isSubmitting} disabled={!isValid}>
+              {t("invoices.transfer.submit")}
+            </Button>
+          )}
         </Space>
       }
     >
@@ -130,7 +174,7 @@ export const TransferInvoiceDrawer: FC<Props> = ({
         <Alert
           type="warning"
           showIcon
-          message={t("invoices.transfer.warning")}
+          message={t(toRubric ? "invoices.transfer.rubricWarning" : "invoices.transfer.warning")}
         />
 
         {!lockToProject && (
@@ -141,9 +185,21 @@ export const TransferInvoiceDrawer: FC<Props> = ({
               control={control}
               render={({ field }) => (
                 <Radio.Group
-                  {...field}
+                  value={toRubric ? "RUBRIC" : field.value}
+                  onChange={(e) => {
+                    const value = e.target.value as InvoiceScope | "RUBRIC";
+                    if (value === "RUBRIC") {
+                      setToRubric(true);
+                    } else {
+                      setToRubric(false);
+                      field.onChange(value);
+                    }
+                  }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}
                 >
+                  {canMoveWithinProject && (
+                    <Radio value="RUBRIC">{t("invoices.transfer.scope.RUBRIC")}</Radio>
+                  )}
                   <Radio value="PROJECT">{t(SCOPE_LABEL.PROJECT)}</Radio>
                   <Radio value="COMPANY">{t(SCOPE_LABEL.COMPANY)}</Radio>
                   <Radio value="UNIDENTIFIED">{t(SCOPE_LABEL.UNIDENTIFIED)}</Radio>
@@ -153,7 +209,21 @@ export const TransferInvoiceDrawer: FC<Props> = ({
           </div>
         )}
 
-        {targetScope === "PROJECT" && (
+        {toRubric && invoice?.enterpriseId && (
+          <div>
+            <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldRubric")}</label>
+            <div style={{ marginTop: 4 }}>
+              <RubricSearchField
+                enterpriseId={invoice.enterpriseId}
+                selectedId={rubric?.id}
+                onPick={setRubric}
+                autoFocus
+              />
+            </div>
+          </div>
+        )}
+
+        {!toRubric && targetScope === "PROJECT" && (
           <div>
             <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldEnterprise")}</label>
             <Controller
@@ -178,17 +248,19 @@ export const TransferInvoiceDrawer: FC<Props> = ({
           </div>
         )}
 
-        <div>
-          <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldReason")}</label>
-          <Controller
-            name="reason"
-            control={control}
-            render={({ field }) => (
-              <Input.TextArea {...field} rows={3} maxLength={1000} showCount />
-            )}
-          />
-          {fieldError(errors.reason?.message)}
-        </div>
+        {!toRubric && (
+          <div>
+            <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldReason")}</label>
+            <Controller
+              name="reason"
+              control={control}
+              render={({ field }) => (
+                <Input.TextArea {...field} rows={3} maxLength={1000} showCount />
+              )}
+            />
+            {fieldError(errors.reason?.message)}
+          </div>
+        )}
       </div>
     </Drawer>
   );

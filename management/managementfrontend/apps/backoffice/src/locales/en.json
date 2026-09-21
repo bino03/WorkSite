@@ -3490,6 +3490,10 @@
       "submit": "Transfer",
       "success": "Invoice transferred.",
       "warning": "This invoice's expenses on this project will be deleted. Linked credit notes are transferred along with it.",
+      "submitRubric": "Move",
+      "rubricSuccess": "Invoice moved to the budget item.",
+      "rubricWarning": "The invoice's current split is replaced by the chosen budget item. It stays on the same project; linked credit notes keep their own split.",
+      "fieldRubric": "Target budget item",
       "fieldScope": "Destination",
       "fieldEnterprise": "Destination project",
       "fieldReason": "Reason",
@@ -3497,7 +3501,8 @@
       "scope": {
         "PROJECT": "Another project",
         "COMPANY": "Company expenses",
-        "UNIDENTIFIED": "Unidentified"
+        "UNIDENTIFIED": "Unidentified",
+        "RUBRIC": "Another item on this project"
       }
     },
     "payment": {
