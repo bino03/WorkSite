@@ -206,6 +206,18 @@ na linha não bate certo com essa soma, e `budgetVariance` diz de quanto
 `spentTotal`, `remaining`, `percentSpent`, `overBudget`, `expenseCount`, `ownExpenseCount`,
 `missingInvoiceCount`, `pendingAccountantCount` e `pendingAccountantTotal`.
 
+O `spentTotal` desce a árvore ao contrário do orçamento (desde 2026-09-21): uma despesa lançada
+numa rubrica **com sub-rubricas** aparece repartida em **partes iguais** por elas — 15 € na `4.3`
+mostram 5 € em cada uma de `4.3.1`, `4.3.2` e `4.3.3`, e assim sucessivamente até às folhas. A
+despesa fica gravada na `4.3` (`construction_expense` não muda, e o Excel continua a vê-la só na
+`4.3`); é só a leitura que reparte, e o `spentTotal` da `4.3` volta a ser a soma das filhas, por
+isso nada conta duas vezes. Só rubricas e títulos com rubricas lá dentro recebem parte — as notas
+não. A divisão é a 2 casas e a diferença de arredondamento vai toda para a **última** filha
+(10 € por 3 → 3,33 / 3,33 / 3,34), para a soma ser exatamente o valor lançado. `expenseCount` e
+`ownExpenseCount` **não** se repartem — continuam a contar onde a despesa está. O `GET` de um nó
+isolado constrói a árvore inteira por causa disto: a parte que herda dos pais só se conhece a partir
+da raiz. (`BudgetSpentDistributionTest`.)
+
 O `BudgetTreeDTO` traz ainda `enterpriseName` — o cabeçalho da página precisa dele e sem isso
 seria uma segunda chamada a `/enterprises/{id}` só para o título. Repete os totais do projeto
 inteiro e acrescenta `overBudgetCount` / `overBudgetAmount`. Estes contam apenas as rubricas **mais acima** de cada ramo em

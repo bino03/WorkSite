@@ -201,7 +201,7 @@ public class ConstructionBudgetItemService {
 
         List<BudgetItemNodeDTO> roots = new ArrayList<>();
         for (ConstructionBudgetItem root : childrenByParent.getOrDefault(null, List.of())) {
-            roots.add(buildNode(root, childrenByParent, expensesByItem, 0));
+            roots.add(buildNode(root, childrenByParent, expensesByItem, 0, BigDecimal.ZERO));
         }
 
         BigDecimal budgetTotal = roots.stream()
@@ -243,7 +243,12 @@ public class ConstructionBudgetItemService {
                 .orElseThrow(() -> ResourceNotFoundException.budgetItem(id.toString()));
     }
 
-    /** Um nó com a sua sub-árvore e agregados — usado no GET individual. */
+    /**
+     * Um nó com a sua sub-árvore e agregados — usado no GET individual.
+     *
+     * Constrói a árvore inteira e vai buscar o nó lá dentro, em vez de o construir
+     * isolado: o gasto que lhe chega repartido dos pais só se conhece a partir da raiz.
+     */
     @Transactional(readOnly = true)
     public BudgetItemNodeDTO getNode(UUID id) {
         ConstructionBudgetItem item = getById(id);
@@ -253,7 +258,27 @@ public class ConstructionBudgetItemService {
                 groupByParent(livesOnly(repository.findTreeByEnterpriseId(enterpriseId)));
         Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(enterpriseId);
 
-        return buildNode(item, childrenByParent, expensesByItem, depthOf(item));
+        for (ConstructionBudgetItem root : childrenByParent.getOrDefault(null, List.of())) {
+            BudgetItemNodeDTO found = findNode(
+                    buildNode(root, childrenByParent, expensesByItem, 0, BigDecimal.ZERO), id);
+            if (found != null) {
+                return found;
+            }
+        }
+        throw ResourceNotFoundException.budgetItem(id.toString());
+    }
+
+    private static BudgetItemNodeDTO findNode(BudgetItemNodeDTO node, UUID id) {
+        if (node.id().equals(id)) {
+            return node;
+        }
+        for (BudgetItemNodeDTO child : node.children()) {
+            BudgetItemNodeDTO found = findNode(child, id);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     // ── escrita ───────────────────────────────────────────────
@@ -466,15 +491,31 @@ public class ConstructionBudgetItemService {
      * apenas notas de contexto — é que vale o total escrito na própria linha.
      * Somar os dois duplicaria: o Excel guarda o total do capítulo <i>e</i> o
      * detalhe das rubricas.
+     *
+     * O gasto faz o caminho inverso, de cima para baixo: uma despesa lançada
+     * numa rubrica com sub-rubricas (15 € na 4.3) aparece repartida em partes
+     * iguais por elas (5 € em cada uma de 4.3.1, 4.3.2 e 4.3.3), e assim
+     * sucessivamente até às folhas. A despesa continua gravada na 4.3 — só a
+     * leitura reparte — e o {@code spentTotal} da 4.3 volta a ser a soma das
+     * filhas, por isso nada é contado duas vezes. {@code inherited} é a parte
+     * que chega de cima a este nó.
      */
     private BudgetItemNodeDTO buildNode(ConstructionBudgetItem item,
                                         Map<UUID, List<ConstructionBudgetItem>> childrenByParent,
                                         Map<UUID, ExpenseRollup> expensesByItem,
-                                        int depth) {
+                                        int depth,
+                                        BigDecimal inherited) {
+
+        ExpenseRollup ownExpenses = expensesByItem.getOrDefault(item.getId(), ExpenseRollup.EMPTY);
+        BigDecimal pool = ownExpenses.total().add(inherited);
+
+        List<ConstructionBudgetItem> childItems = childrenByParent.getOrDefault(item.getId(), List.of());
+        Map<UUID, BigDecimal> shares = splitEvenly(pool, childItems, childrenByParent);
 
         List<BudgetItemNodeDTO> children = new ArrayList<>();
-        for (ConstructionBudgetItem child : childrenByParent.getOrDefault(item.getId(), List.of())) {
-            children.add(buildNode(child, childrenByParent, expensesByItem, depth + 1));
+        for (ConstructionBudgetItem child : childItems) {
+            children.add(buildNode(child, childrenByParent, expensesByItem, depth + 1,
+                    shares.getOrDefault(child.getId(), BigDecimal.ZERO)));
         }
 
         BigDecimal childSum = BigDecimal.ZERO;
@@ -505,8 +546,8 @@ public class ConstructionBudgetItemService {
         boolean mismatch = variance != null
                 && variance.abs().compareTo(MISMATCH_TOLERANCE) > 0;
 
-        ExpenseRollup ownExpenses = expensesByItem.getOrDefault(item.getId(), ExpenseRollup.EMPTY);
-        BigDecimal spent = childSpent.add(ownExpenses.total());
+        // Se houve por quem repartir, o gasto já está todo nas filhas; senão fica aqui.
+        BigDecimal spent = shares.isEmpty() ? childSpent.add(pool) : childSpent;
         int expenseCount = childExpenses + ownExpenses.count();
         int missingInvoice = childMissingInvoice + ownExpenses.missingInvoice();
         int pendingAccountant = childPendingAccountant + ownExpenses.pendingAccountant();
@@ -550,6 +591,49 @@ public class ConstructionBudgetItemService {
     }
 
     /**
+     * Reparte {@code pool} em partes iguais pelas filhas que podem levar gasto —
+     * rubricas, ou títulos que agrupem rubricas; as notas ficam de fora.
+     *
+     * Divide-se a 2 casas e a diferença de arredondamento vai toda para a última
+     * filha (10 € por 3 → 3,33 / 3,33 / 3,34), para a soma das partes ser
+     * exatamente o {@code pool} — um cêntimo a mais ou a menos por rubrica
+     * acumulava ao longo da árvore. Mapa vazio quando não há por quem repartir.
+     */
+    private Map<UUID, BigDecimal> splitEvenly(BigDecimal pool,
+                                              List<ConstructionBudgetItem> children,
+                                              Map<UUID, List<ConstructionBudgetItem>> childrenByParent) {
+        List<ConstructionBudgetItem> eligible = children.stream()
+                .filter(child -> carriesExpenses(child, childrenByParent))
+                .toList();
+        if (eligible.isEmpty()) {
+            return Map.of();
+        }
+
+        BigDecimal share = pool.divide(BigDecimal.valueOf(eligible.size()), 2, RoundingMode.HALF_UP);
+        Map<UUID, BigDecimal> shares = new HashMap<>();
+        BigDecimal distributed = BigDecimal.ZERO;
+        for (int i = 0; i < eligible.size() - 1; i++) {
+            shares.put(eligible.get(i).getId(), share);
+            distributed = distributed.add(share);
+        }
+        shares.put(eligible.get(eligible.size() - 1).getId(), pool.subtract(distributed));
+        return shares;
+    }
+
+    /** Uma rubrica, ou um título com pelo menos uma rubrica lá dentro. */
+    private boolean carriesExpenses(ConstructionBudgetItem item,
+                                    Map<UUID, List<ConstructionBudgetItem>> childrenByParent) {
+        if (item.getRowKind().acceptsExpenses()) {
+            return true;
+        }
+        if (item.getRowKind() == BudgetRowKind.NOTE) {
+            return false;
+        }
+        return childrenByParent.getOrDefault(item.getId(), List.of()).stream()
+                .anyMatch(child -> carriesExpenses(child, childrenByParent));
+    }
+
+    /**
      * Recolhe as rubricas em derrapagem, parando na primeira de cada ramo.
      *
      * Se um capítulo passou do orçamento, a causa está nas rubricas lá dentro —
@@ -576,16 +660,6 @@ public class ConstructionBudgetItemService {
             return null;
         }
         return part.multiply(BigDecimal.valueOf(100)).divide(whole, 2, RoundingMode.HALF_UP);
-    }
-
-    private int depthOf(ConstructionBudgetItem item) {
-        int depth = 0;
-        ConstructionBudgetItem cursor = item.getParent();
-        while (cursor != null) {
-            depth++;
-            cursor = cursor.getParent();
-        }
-        return depth;
     }
 
     // ── validações e auxiliares ───────────────────────────────
