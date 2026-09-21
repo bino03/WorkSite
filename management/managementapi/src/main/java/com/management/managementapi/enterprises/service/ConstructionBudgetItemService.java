@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Gestão da árvore de rubricas do orçamento da obra.
@@ -128,9 +129,30 @@ public class ConstructionBudgetItemService {
                 node.rolledUpBudget(), node.spentTotal(), node.remaining(), node.overBudget());
     }
 
+    /** Só dígitos e pontos, com ou sem ponto final: "2", "2.", "2.1", "20.1.". */
+    private static final Pattern CODE_QUERY = Pattern.compile("\\d+(\\.\\d+)*\\.?");
+
+    /**
+     * Uma pesquisa por código é <b>prefixo no mesmo nível</b>: "2" dá a 2 e a 20,
+     * não a 2.1 nem a 20.1; "2." dá as filhas da 2; "2.1" dá a 2.1 e a 2.10. É
+     * o que "ver sub-rubricas" já assumia ao escrever "2." — com o
+     * {@code contains} antigo, "2" trazia a árvore inteira da 2 e da 20 e ainda
+     * a 12 (apontado pelo utilizador a 2026-09-21). Texto continua a procurar
+     * em toda a árvore, pelo nome ou pelo código.
+     */
     private static boolean matches(BudgetItemNodeDTO node, String needle) {
+        if (CODE_QUERY.matcher(needle).matches()) {
+            return node.code() != null
+                    && node.code().startsWith(needle)
+                    && depthOfCode(node.code()) == depthOfCode(needle);
+        }
         return (node.code() != null && node.code().toLowerCase().contains(needle))
                 || node.name().toLowerCase().contains(needle);
+    }
+
+    /** Nível de um código pelo número de pontos: "2" → 0, "2." e "2.1" → 1, "2.1.3" → 2. */
+    private static int depthOfCode(String code) {
+        return (int) code.chars().filter(c -> c == '.').count();
     }
 
     private static boolean startsWithCode(String code, String needle) {
