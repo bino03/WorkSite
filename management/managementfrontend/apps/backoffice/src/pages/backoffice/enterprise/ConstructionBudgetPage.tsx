@@ -174,19 +174,28 @@ const ConstructionBudgetPage: FC = () => {
       {
         title: "Art.",
         dataIndex: "code",
-        width: 96,
-        render: (code: string | null, row) =>
-          row.rowKind === "NOTE" ? null : (
-            <span
-              style={{
-                fontFamily: "var(--ind-font-heading)",
-                fontWeight: 600,
-                opacity: code ? 1 : 0.35,
-              }}
-            >
-              {code ?? "—"}
+        width: 150,
+        // O código nunca parte em duas linhas — com a indentação da árvore, a
+        // "4.2.1" ficava "4.2." numa linha e "1" na outra e a hierarquia
+        // deixava de se ler (apontado pelo utilizador a 2026-09-21). O prefixo
+        // da mãe fica esbatido e só o último segmento a negrito: "4.2." + "1".
+        render: (code: string | null, row) => {
+          if (row.rowKind === "NOTE") return null;
+          if (!code) {
+            return (
+              <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, opacity: 0.35 }}>
+                —
+              </span>
+            );
+          }
+          const cut = code.lastIndexOf(".") + 1;
+          return (
+            <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, whiteSpace: "nowrap" }}>
+              {cut > 0 && <span style={{ opacity: 0.45, fontWeight: 500 }}>{code.slice(0, cut)}</span>}
+              {code.slice(cut)}
             </span>
-          ),
+          );
+        },
       },
       {
         title: "Descrição",
@@ -548,6 +557,9 @@ const ConstructionBudgetPage: FC = () => {
             expandable={{
               expandedRowKeys: expandedKeys,
               onExpandedRowsChange: (keys) => setExpandedKeys(keys as string[]),
+              // 15px por nível (o default) engolia a coluna do código ao 3.º nível;
+              // o código já diz a profundidade, o recuo só precisa de a sugerir.
+              indentSize: 10,
             }}
             onRow={(row) => ({
               onClick: () => {
