@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { Table, Input, Empty, message, Button } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import { SearchOutlined } from "@ant-design/icons";
@@ -11,7 +12,7 @@ import CreateEnterpriseDrawer from "@/components/enterprise/CreateEnterpriseDraw
 import EnterpriseViewDrawer from "@/components/enterprise/EnterpriseViewDrawer";
 import { normalizeSpringPage, type SpringPage } from "@/utils/springPage";
 import { useConfirm } from "@/context/ConfirmDialogContext";
-import { ListActions, ListActionPrimary, ListActionDanger } from "@/components/common/ListActions";
+import { ListActions, ListActionPrimary, ListActionSecondary, ListActionDanger } from "@/components/common/ListActions";
 
 // Tipos baseados na resposta da API
 export type EnterpriseStatus = 'planning' | 'under_construction' | 'completed' | 'suspended' | 'cancelled';
@@ -89,6 +90,7 @@ const formatCurrency = (value: number | null | undefined, currency: string = "EU
 
 export default function EnterprisesList() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const confirm = useConfirm();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<EnterpriseStatus | "">("");
@@ -227,13 +229,16 @@ export default function EnterprisesList() {
         render: (_: unknown, record: Enterprise) => (
           <ListActions>
             <ListActionPrimary onClick={() => handleViewEnterprise(record.id)}>Ver detalhes</ListActionPrimary>
+            <ListActionSecondary onClick={() => navigate(`/backoffice/empreendimentos/${record.id}/budget`)}>
+              Ver orçamento
+            </ListActionSecondary>
             <ListActionDanger onClick={() => confirmDelete(record)}>Eliminar</ListActionDanger>
           </ListActions>
         ),
         width: 120,
       },
     ],
-    []
+    [navigate]
   );
 
   async function fetchData(
