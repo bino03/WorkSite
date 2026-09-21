@@ -6,12 +6,18 @@ import type { ColumnsType } from "antd/es/table";
 import { FileTextOutlined, PlusOutlined } from "@ant-design/icons";
 
 import { listExpensesByBudgetItem } from "@/services/budgetService";
-import { setInvoiceSentToAccountant } from "@/services/invoiceService";
+import { batchAllocateInvoices, setInvoiceSentToAccountant } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { BudgetItemNode, ConstructionExpense } from "@/types/budget";
+import type { ConstructionInvoice } from "@/types/invoice";
+import type { IncidentInvoiceRef } from "@/types/incident";
+import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
+import IncidentDrawer from "@/components/invoices/IncidentDrawer";
+import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
+import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import { BudgetExpenseDetailDrawer } from "./BudgetExpenseDetailDrawer";
 import { BudgetExpenseFormDrawer } from "./BudgetExpenseFormDrawer";
 
@@ -30,7 +36,18 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState<ConstructionExpense[]>([]);
   const [loading, setLoading] = useState(false);
+  /** Detalhe de um gasto **sem** fatura — o único caso em que este drawer ainda serve. */
   const [detail, setDetail] = useState<ConstructionExpense | null>(null);
+  /**
+   * Uma despesa com fatura abre o mesmo detalhe da lista de faturas
+   * (`InvoiceDetailDrawer`): correção manual, líquido e NC ligadas, pagamentos,
+   * transferência, reassociar. O `BudgetExpenseDetailDrawer` só mostrava o
+   * documento e ficava aquém (apontado pelo utilizador a 2026-09-21).
+   */
+  const [invoiceDetailId, setInvoiceDetailId] = useState<string | null>(null);
+  const [reallocating, setReallocating] = useState<ConstructionInvoice | null>(null);
+  const [reallocSaving, setReallocSaving] = useState(false);
+  const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ConstructionExpense | null>(null);
 
@@ -66,6 +83,31 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
       onChanged();
     } catch (error) {
       ErrorHandler.handle(error);
+    }
+  };
+
+  const refresh = () => {
+    fetchExpenses();
+    onChanged();
+  };
+
+  /** Mover a fatura para outra rubrica — o mesmo `batchAllocate` da lista de faturas, com uma só. */
+  const handleReallocate = async (budgetItemId: string) => {
+    if (!reallocating) return;
+    setReallocSaving(true);
+    try {
+      const result = await batchAllocateInvoices([reallocating.id], budgetItemId);
+      if (result.failures.length === 0) {
+        notificationService.success("Faturas", "Fatura associada à rubrica.");
+      } else {
+        notificationService.warning("Faturas", result.failures[0]?.message ?? "Não foi possível associar.");
+      }
+      setReallocating(null);
+      refresh();
+    } catch (error) {
+      ErrorHandler.handle(error);
+    } finally {
+      setReallocSaving(false);
     }
   };
 
@@ -250,7 +292,7 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
                   pagination={false}
                   size="small"
                   onRow={(row) => ({
-                    onClick: () => setDetail(row),
+                    onClick: () => (row.invoice ? setInvoiceDetailId(row.invoice.id) : setDetail(row)),
                     style: { cursor: "pointer" },
                   })}
                   locale={{
@@ -277,6 +319,34 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
           setEditing(expense);
           setFormOpen(true);
         }}
+      />
+
+      <InvoiceDetailDrawer
+        invoiceId={invoiceDetailId}
+        open={!!invoiceDetailId}
+        onClose={() => setInvoiceDetailId(null)}
+        onChanged={refresh}
+        onAllocate={(invoice) => {
+          setInvoiceDetailId(null);
+          setReallocating(invoice);
+        }}
+        onIncidentSuggested={(invoice) => setIncidentInvoices([toIncidentInvoiceRef(invoice)])}
+      />
+
+      <BudgetItemPickerModal
+        open={reallocating !== null}
+        enterpriseId={enterpriseId}
+        supplierNif={reallocating?.supplierNif}
+        saving={reallocSaving}
+        onClose={() => setReallocating(null)}
+        onPick={(target) => handleReallocate(target.id)}
+      />
+
+      <IncidentDrawer
+        open={incidentInvoices !== null}
+        presetInvoices={incidentInvoices ?? []}
+        onClose={() => setIncidentInvoices(null)}
+        onCreated={() => setIncidentInvoices(null)}
       />
 
       <BudgetExpenseFormDrawer
