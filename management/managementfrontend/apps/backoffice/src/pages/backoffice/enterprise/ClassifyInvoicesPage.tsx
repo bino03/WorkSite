@@ -21,6 +21,7 @@ import { notificationService } from "@/services/general/notificationService";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { BudgetItemSearchResult } from "@/types/budget";
 import type { ConstructionInvoice, RubricSuggestion } from "@/types/invoice";
+import { EMPTY_INVOICE_FILTERS } from "@/types/invoice";
 
 /** Quantas faturas se trazem de uma vez — a fila é para despachar, não para paginar. */
 const QUEUE_SIZE = 50;
@@ -72,15 +73,8 @@ const ClassifyInvoicesPage: FC = () => {
     setLoading(true);
     try {
       const page = await listInvoices(enterpriseId, {
+        ...EMPTY_INVOICE_FILTERS,
         allocated: false,
-        needsReview: null,
-        outstanding: null,
-        atChapter: null,
-        sentToAccountant: null,
-        from: null,
-        to: null,
-        q: "",
-        page: 0,
         size: QUEUE_SIZE,
       });
       setQueue(page.content);

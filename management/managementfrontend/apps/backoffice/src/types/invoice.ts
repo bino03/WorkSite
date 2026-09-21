@@ -516,7 +516,62 @@ export interface InvoiceFilters {
   q: string;
   page: number;
   size: number;
+
+  // ── pesquisa avançada (2026-09-21) — todos opcionais, cumuláveis com os de cima ──
+  /** NIF exato; `supplierName` é só para mostrar o que ficou escolhido. */
+  supplierNif: string | null;
+  supplierName: string | null;
+  documentType: InvoiceDocumentType | null;
+  documentStatus: InvoiceDocumentStatus | null;
+  /** Mais fino do que `outstanding` (que junta `UNPAID` e `PARTIAL`). */
+  paymentStatus: PaymentStatus | null;
+  allocationStatus: AllocationStatus | null;
+  minAmount: number | null;
+  maxAmount: number | null;
+  /** Rubrica; o backend apanha também tudo o que está por baixo dela. `budgetItemLabel` é só para mostrar. */
+  budgetItemId: string | null;
+  budgetItemLabel: string | null;
 }
+
+/** As chaves da pesquisa avançada — o que o modal edita e o "Limpar filtros" apaga. */
+export const ADVANCED_INVOICE_FILTER_KEYS = [
+  "outstanding",
+  "sentToAccountant",
+  "from",
+  "to",
+  "supplierNif",
+  "documentType",
+  "documentStatus",
+  "paymentStatus",
+  "allocationStatus",
+  "minAmount",
+  "maxAmount",
+  "budgetItemId",
+] as const satisfies readonly (keyof InvoiceFilters)[];
+
+/** Nada ligado, primeira página — o ponto de partida de qualquer lista. `size` é a do chamador. */
+export const EMPTY_INVOICE_FILTERS: InvoiceFilters = {
+  allocated: null,
+  needsReview: null,
+  outstanding: null,
+  atChapter: null,
+  sentToAccountant: null,
+  from: null,
+  to: null,
+  q: "",
+  page: 0,
+  size: 20,
+  supplierNif: null,
+  supplierName: null,
+  documentType: null,
+  documentStatus: null,
+  paymentStatus: null,
+  allocationStatus: null,
+  minAmount: null,
+  maxAmount: null,
+  budgetItemId: null,
+  budgetItemLabel: null,
+};
 
 /* ========= Importação da folha "Despesas" do Excel (fase 6) ========= */
 
@@ -606,4 +661,15 @@ export interface ExpensesImportAnswer {
 export interface PendingInvoicesSummary {
   count: number;
   total: number;
+}
+
+/**
+ * O que ainda falta pagar nas faturas por liquidar de uma lista — calculado
+ * sobre todas as faturas do filtro, não só as da página. As sem total contam
+ * em `count` e em `withoutTotalCount`, mas valem 0 em `total`.
+ */
+export interface OutstandingInvoicesSummary {
+  count: number;
+  total: number;
+  withoutTotalCount: number;
 }

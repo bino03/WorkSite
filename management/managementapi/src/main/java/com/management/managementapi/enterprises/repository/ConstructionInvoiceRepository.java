@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -33,6 +34,19 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
      * @param atChapter      true = pelo menos uma linha de repartição aponta para uma rubrica que
      *                       ainda tem filhas {@code ITEM} (a mesma regra do ecrã "Classificar" —
      *                       ver {@code BudgetItemSearchResultDTO}), false = nenhuma, null = todas
+     *
+     * Pesquisa avançada (2026-09-21) — ver {@code InvoiceSearchFilter}:
+     * @param documentType     / {@code documentStatus} chegam como texto e comparam-se com
+     *                       {@code cast(... as string)}: um parâmetro enum a null contra uma coluna
+     *                       {@code NAMED_ENUM} não tem tipo que o Postgres consiga inferir
+     * @param paymentStatus    {@code PAID} / {@code PARTIAL} / {@code UNPAID} — a mesma conta do
+     *                       {@code outstanding}, mas a separar "nada pago" de "parte paga"
+     * @param allocationStatus a regra do {@code allocationStatus} da resposta, em SQL: sem linhas,
+     *                       com linhas e sem total, soma = total (sinal trocado numa NC), ou ≠
+     * @param budgetFilter     {@code true} restringe às faturas com alguma linha numa das
+     *                       {@code budgetItemIds} (a rubrica pedida e a sub-árvore dela, resolvida no
+     *                       serviço). Um flag à parte porque "{@code :lista is null}" não é fiável
+     *                       com coleções; a lista leva um UUID de enchimento quando está desligado
      */
     @Query("""
             select i from ConstructionInvoice i
@@ -73,6 +87,43 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                               where d.invoice = i
                                 and lower(d.originalFilename) like lower(concat('%', :q, '%')))
                    or lower(i.notes)            like lower(concat('%', :q, '%')))
+              and (:supplierNif is null or i.supplierNif = :supplierNif)
+              and (:documentType   is null or cast(i.documentType   as string) = :documentType)
+              and (:documentStatus is null or cast(i.documentStatus as string) = :documentStatus)
+              and (:minAmount is null or i.totalAmount >= :minAmount)
+              and (:maxAmount is null or i.totalAmount <= :maxAmount)
+              and (:paymentStatus is null
+                   or (i.relatedInvoiceId is null and (
+                        (:paymentStatus = 'PAID' and i.totalAmount is not null
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                >= i.totalAmount)
+                     or (:paymentStatus = 'PARTIAL' and i.totalAmount is not null
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) > 0
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                < i.totalAmount)
+                     or (:paymentStatus = 'UNPAID'
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) = 0
+                             and (i.totalAmount is null
+                                  or coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                     < i.totalAmount))
+                   )))
+              and (:allocationStatus is null
+                   or (:allocationStatus = 'NONE' and not exists (select 1 from ConstructionExpense e where e.invoice = i))
+                   or (:allocationStatus = 'PROVISIONAL' and i.totalAmount is null
+                             and exists (select 1 from ConstructionExpense e where e.invoice = i))
+                   or (:allocationStatus = 'COMPLETE' and i.totalAmount is not null
+                             and exists (select 1 from ConstructionExpense e where e.invoice = i)
+                             and coalesce((select sum(e.totalPrice) from ConstructionExpense e where e.invoice = i), 0)
+                                 = (case when i.relatedInvoiceId is null then i.totalAmount else -i.totalAmount end))
+                   or (:allocationStatus = 'PARTIAL' and i.totalAmount is not null
+                             and exists (select 1 from ConstructionExpense e where e.invoice = i)
+                             and coalesce((select sum(e.totalPrice) from ConstructionExpense e where e.invoice = i), 0)
+                                 <> (case when i.relatedInvoiceId is null then i.totalAmount else -i.totalAmount end)))
+              and (:budgetFilter = false
+                   or exists (select 1 from ConstructionExpense e
+                              where e.invoice = i and e.budgetItem.id in :budgetItemIds))
             """)
     Page<ConstructionInvoice> search(@Param("enterpriseId") UUID enterpriseId,
                                      @Param("allocated") Boolean allocated,
@@ -84,6 +135,15 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                      @Param("from") LocalDate from,
                                      @Param("to") LocalDate to,
                                      @Param("q") String q,
+                                     @Param("supplierNif") String supplierNif,
+                                     @Param("documentType") String documentType,
+                                     @Param("documentStatus") String documentStatus,
+                                     @Param("minAmount") BigDecimal minAmount,
+                                     @Param("maxAmount") BigDecimal maxAmount,
+                                     @Param("paymentStatus") String paymentStatus,
+                                     @Param("allocationStatus") String allocationStatus,
+                                     @Param("budgetFilter") boolean budgetFilter,
+                                     @Param("budgetItemIds") Collection<UUID> budgetItemIds,
                                      Pageable pageable);
 
     /**

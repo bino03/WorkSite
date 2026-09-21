@@ -17,6 +17,7 @@ import type {
   InvoiceTransferPayload,
   InvoiceTransferResult,
   InvoiceUploadResult,
+  OutstandingInvoicesSummary,
   PendingInvoicesSummary,
   RubricSuggestion,
 } from "@/types/invoice";
@@ -175,20 +176,39 @@ export async function listCompanyInvoices(
   return normalizePage(response.data);
 }
 
-export async function listInvoices(
-  enterpriseId: string,
-  filters: InvoiceFilters
-): Promise<InvoicePage> {
+/**
+ * Os filtros da lista como query string — a lista e o resumo do que falta pagar
+ * usam exatamente o mesmo, para o número bater com o que está no ecrã.
+ * `outstanding` fica de fora no resumo (o backend força-o a true).
+ */
+function invoiceFilterParams(filters: InvoiceFilters, includeOutstanding: boolean): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.allocated !== null) params.set("allocated", String(filters.allocated));
   if (filters.needsReview !== null) params.set("needsReview", String(filters.needsReview));
-  if (filters.outstanding !== null) params.set("outstanding", String(filters.outstanding));
+  if (includeOutstanding && filters.outstanding !== null)
+    params.set("outstanding", String(filters.outstanding));
   if (filters.atChapter !== null) params.set("atChapter", String(filters.atChapter));
   if (filters.sentToAccountant !== null)
     params.set("sentToAccountant", String(filters.sentToAccountant));
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
   if (filters.q.trim()) params.set("q", filters.q.trim());
+  if (filters.supplierNif) params.set("supplierNif", filters.supplierNif);
+  if (filters.documentType) params.set("documentType", filters.documentType);
+  if (filters.documentStatus) params.set("documentStatus", filters.documentStatus);
+  if (filters.paymentStatus) params.set("paymentStatus", filters.paymentStatus);
+  if (filters.allocationStatus) params.set("allocationStatus", filters.allocationStatus);
+  if (filters.minAmount !== null) params.set("minAmount", String(filters.minAmount));
+  if (filters.maxAmount !== null) params.set("maxAmount", String(filters.maxAmount));
+  if (filters.budgetItemId) params.set("budgetItemId", filters.budgetItemId);
+  return params;
+}
+
+export async function listInvoices(
+  enterpriseId: string,
+  filters: InvoiceFilters
+): Promise<InvoicePage> {
+  const params = invoiceFilterParams(filters, true);
   params.set("page", String(filters.page));
   params.set("size", String(filters.size));
 
@@ -205,6 +225,35 @@ export async function listInvoices(
  */
 export async function getPendingInvoicesSummary(enterpriseId: string): Promise<PendingInvoicesSummary> {
   const response = await api.get(`/construction-invoices/enterprise/${enterpriseId}/pending-summary`);
+  return response.data;
+}
+
+/**
+ * O que ainda falta pagar nas faturas por liquidar desta obra, com os mesmos
+ * filtros da lista — o número ao lado do filtro "Por liquidar". Sobre todas as
+ * faturas do filtro, não só a página.
+ */
+export async function getOutstandingInvoicesSummary(
+  enterpriseId: string,
+  filters: InvoiceFilters
+): Promise<OutstandingInvoicesSummary> {
+  const params = invoiceFilterParams(filters, false);
+
+  const response = await api.get(
+    `/construction-invoices/enterprise/${enterpriseId}/outstanding-summary?${params.toString()}`
+  );
+  return response.data;
+}
+
+/** O mesmo para a quarentena e as despesas da empresa. Só `ADMIN`. */
+export async function getScopedOutstandingSummary(
+  scope: "UNIDENTIFIED" | "COMPANY",
+  q?: string
+): Promise<OutstandingInvoicesSummary> {
+  const path = scope === "UNIDENTIFIED" ? "unidentified" : "company";
+  const response = await api.get(`/construction-invoices/${path}/outstanding-summary`, {
+    params: q ? { q } : undefined,
+  });
   return response.data;
 }
 

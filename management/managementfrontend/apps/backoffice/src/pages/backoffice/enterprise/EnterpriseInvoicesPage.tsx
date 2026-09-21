@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Input, Space } from "antd";
-import { ArrowLeftOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
+import { Badge, Button, Input, Space } from "antd";
+import { ArrowLeftOutlined, FilterOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
 
 import {
   batchAllocateInvoices,
   deallocateInvoice,
   deleteInvoice,
+  getOutstandingInvoicesSummary,
   listInvoices,
   getInvoice,
   setInvoiceSentToAccountant,
@@ -28,10 +29,14 @@ import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
+import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBadge";
+import { InvoiceFiltersModal } from "@/components/invoices/InvoiceFiltersModal";
+import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/invoices/invoiceFilters";
 import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
 import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
-import type { ConstructionInvoice, InvoiceFilters } from "@/types/invoice";
+import type { ConstructionInvoice, OutstandingInvoicesSummary, InvoiceFilters } from "@/types/invoice";
+import { EMPTY_INVOICE_FILTERS } from "@/types/invoice";
 import type { IncidentInvoiceRef } from "@/types/incident";
 
 /** Os filtros que se usam de facto — cada um responde a uma pergunta concreta. */
@@ -44,16 +49,13 @@ const VIEWS = [
 
 type ViewKey = (typeof VIEWS)[number]["key"];
 
+/** O "Falta pagar X" faz sentido sempre que a lista é só de faturas por liquidar. */
+const wantsOutstandingTotal = (f: InvoiceFilters) =>
+  f.outstanding === true || f.paymentStatus === "UNPAID" || f.paymentStatus === "PARTIAL";
+
 const initialFilters: InvoiceFilters = {
+  ...EMPTY_INVOICE_FILTERS,
   allocated: false,
-  needsReview: null,
-  outstanding: null,
-  atChapter: null,
-  sentToAccountant: null,
-  from: null,
-  to: null,
-  q: "",
-  page: 0,
   size: DEFAULT_PAGE_SIZE,
 };
 
@@ -80,6 +82,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
@@ -90,15 +93,23 @@ const EnterpriseInvoicesPage: FC = () => {
   /** Faturas a associar na próxima escolha de rubrica — uma ou várias. */
   const [allocating, setAllocating] = useState<ConstructionInvoice[]>([]);
   const [saving, setSaving] = useState(false);
+  /** O que falta pagar no filtro "Por liquidar" — só se pede quando o filtro está ligado. */
+  const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
 
   const fetch = useCallback(
     async (next: InvoiceFilters) => {
       if (!enterpriseId) return;
       setLoading(true);
       try {
-        const page = await listInvoices(enterpriseId, next);
+        // A soma é sobre a lista inteira, por isso vem à parte da página; sem
+        // o filtro ligado não se pede nem se mostra.
+        const [page, summary] = await Promise.all([
+          listInvoices(enterpriseId, next),
+          wantsOutstandingTotal(next) ? getOutstandingInvoicesSummary(enterpriseId, next) : Promise.resolve(null),
+        ]);
         setInvoices(page.content);
         setTotalElements(page.totalElements);
+        setOutstandingSummary(summary);
       } catch (error) {
         ErrorHandler.handle(error);
       } finally {
@@ -129,6 +140,23 @@ const EnterpriseInvoicesPage: FC = () => {
     setSelectedIds([]);
     fetch(next);
   };
+
+  /**
+   * A pesquisa avançada por cima dos separadores: um estado de classificação
+   * escolhido no modal manda no `allocated` dos separadores (senão "Por associar"
+   * + "Repartição completa" dava sempre vazio), e a vista salta para "Todas".
+   */
+  const applyAdvancedFilters = (changes: Partial<InvoiceFilters>) => {
+    if (changes.allocationStatus) {
+      setView("all");
+      applyFilters({ ...changes, allocated: null, needsReview: null });
+    } else {
+      applyFilters(changes);
+    }
+  };
+
+  const activeFilterCount = countActiveInvoiceFilters(filters);
+  const showOutstandingTotal = wantsOutstandingTotal(filters);
 
   const reload = () => {
     setSelectedIds([]);
@@ -379,21 +407,22 @@ const EnterpriseInvoicesPage: FC = () => {
         />
         <Button onClick={() => applyFilters({})}>Pesquisar</Button>
 
-        <Button
-          size="small"
-          type={filters.outstanding ? "primary" : "default"}
-          onClick={() => applyFilters({ outstanding: filters.outstanding ? null : true })}
-        >
-          Por liquidar
-        </Button>
-
-        <Button
-          size="small"
-          type={filters.atChapter ? "primary" : "default"}
-          onClick={() => applyFilters({ atChapter: filters.atChapter ? null : true })}
-        >
-          Ao capítulo
-        </Button>
+        {/* Pesquisa avançada: só o ícone com a contagem e o "Limpar" — sem chips (pedido do utilizador). */}
+        <Badge count={activeFilterCount} size="small" color="var(--ind-color-accent)">
+          <Button
+            icon={<FilterOutlined />}
+            type={activeFilterCount > 0 ? "primary" : "default"}
+            onClick={() => setFiltersOpen(true)}
+          >
+            Filtros
+          </Button>
+        </Badge>
+        {activeFilterCount > 0 && (
+          <Button type="text" size="small" onClick={() => applyFilters(clearedInvoiceFilters())}>
+            Limpar filtros
+          </Button>
+        )}
+        {showOutstandingTotal && <OutstandingTotalBadge summary={outstandingSummary} />}
 
         {allocatableSelected.length > 0 && (
           <Button type="primary" onClick={() => setAllocating(allocatableSelected)}>
@@ -520,6 +549,14 @@ const EnterpriseInvoicesPage: FC = () => {
             saving={saving}
             onClose={() => setAllocating([])}
             onPick={(item) => handleAllocate(item.id)}
+          />
+
+          <InvoiceFiltersModal
+            open={filtersOpen}
+            enterpriseId={enterpriseId}
+            filters={filters}
+            onClose={() => setFiltersOpen(false)}
+            onApply={applyAdvancedFilters}
           />
 
           <InvoicePreviewModal

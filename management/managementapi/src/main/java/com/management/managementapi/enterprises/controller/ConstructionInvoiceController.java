@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSearchFilter;
 import com.management.managementapi.enterprises.dto.invoice.request.ExpensesImportAnswersDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportResultDTO;
 import com.management.managementapi.enterprises.service.DespesasExcelImportService;
@@ -17,6 +18,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.Constructio
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -263,8 +265,63 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String supplierNif,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String documentStatus,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(required = false) String allocationStatus,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) UUID budgetItemId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return service.search(enterpriseId, allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q, pageable);
+        return service.search(enterpriseId, new InvoiceSearchFilter(
+                allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q,
+                supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
+                minAmount, maxAmount, budgetItemId), pageable);
+    }
+
+    /**
+     * O que ainda falta pagar nas faturas por liquidar desta obra, com os mesmos
+     * filtros da lista (menos {@code outstanding}, que aqui é sempre true) — o
+     * número que o filtro "Por liquidar" mostra ao lado dos resultados.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/outstanding-summary")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummary(
+            @PathVariable UUID enterpriseId,
+            @RequestParam(required = false) Boolean allocated,
+            @RequestParam(required = false) Boolean needsReview,
+            @RequestParam(required = false) Boolean sentToAccountant,
+            @RequestParam(required = false) Boolean atChapter,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String supplierNif,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String documentStatus,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(required = false) String allocationStatus,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) UUID budgetItemId) {
+        return ResponseEntity.ok(service.outstandingSummary(enterpriseId, new InvoiceSearchFilter(
+                allocated, needsReview, null, sentToAccountant, atChapter, from, to, q,
+                supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
+                minAmount, maxAmount, budgetItemId)));
+    }
+
+    @GetMapping("/unidentified/outstanding-summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummaryUnidentified(
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(service.outstandingSummaryByScope(ConstructionInvoice.Scope.UNIDENTIFIED, q));
+    }
+
+    @GetMapping("/company/outstanding-summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummaryCompany(
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(service.outstandingSummaryByScope(ConstructionInvoice.Scope.COMPANY, q));
     }
 
     /**

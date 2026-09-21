@@ -6,6 +6,7 @@ import com.management.managementapi.dto.activity.ActivityLogCreateDTO;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSearchFilter;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteExpenseLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
@@ -22,6 +23,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.DuplicateIn
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
@@ -73,7 +75,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -918,14 +922,8 @@ public class ConstructionInvoiceService {
      * o que interessa no dia-a-dia: o que entrou e ainda não foi classificado.
      */
     @Transactional(readOnly = true)
-    public Page<ConstructionInvoiceResponseDTO> search(UUID enterpriseId, Boolean allocated, Boolean needsReview,
-                                                       Boolean outstanding, Boolean sentToAccountant, Boolean atChapter,
-                                                       LocalDate from, LocalDate to,
-                                                       String q, Pageable pageable) {
-        String query = isBlank(q) ? null : q.trim();
-        Page<ConstructionInvoice> page = repository.search(
-                enterpriseId, allocated, needsReview, outstanding, sentToAccountant, atChapter, BudgetRowKind.ITEM,
-                from, to, query, pageable);
+    public Page<ConstructionInvoiceResponseDTO> search(UUID enterpriseId, InvoiceSearchFilter filter, Pageable pageable) {
+        Page<ConstructionInvoice> page = runSearch(enterpriseId, filter, pageable);
 
         // Uma query para as afetações da página toda, em vez de uma por linha.
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
@@ -940,6 +938,109 @@ public class ConstructionInvoiceService {
                 payments.getOrDefault(invoice.getId(), List.of()),
                 creditNotes.getOrDefault(invoice.getId(), List.of()),
                 false));
+    }
+
+    /**
+     * O que ainda falta pagar nas faturas por liquidar de uma obra, com os
+     * mesmos filtros da lista — para o número bater com o que está no ecrã.
+     *
+     * Reutiliza a query da lista sem paginação em vez de uma query de soma
+     * própria: a definição de "por liquidar" (pago + NC &lt; total) já vive lá,
+     * e uma segunda cópia em JPQL divergia à primeira mudança. São dezenas de
+     * faturas, não milhares.
+     */
+    @Transactional(readOnly = true)
+    public OutstandingInvoicesSummaryDTO outstandingSummary(UUID enterpriseId, InvoiceSearchFilter filter) {
+        return summarizeOutstanding(runSearch(enterpriseId, filter.onlyOutstanding(), Pageable.unpaged()).getContent());
+    }
+
+    /**
+     * A query da lista com o filtro desdobrado. A rubrica pedida vira a lista de
+     * ids da sua sub-árvore — "tudo o que foi para a 4.2" inclui a 4.2.1 e a
+     * 4.2.2, senão uma fatura repartida ao detalhe escapava ao filtro do capítulo.
+     */
+    private Page<ConstructionInvoice> runSearch(UUID enterpriseId, InvoiceSearchFilter f, Pageable pageable) {
+        List<UUID> budgetItemIds = f.budgetItemId() == null ? List.of() : subtreeIds(enterpriseId, f.budgetItemId());
+        boolean budgetFilter = f.budgetItemId() != null;
+        return repository.search(
+                enterpriseId, f.allocated(), f.needsReview(), f.outstanding(), f.sentToAccountant(), f.atChapter(),
+                BudgetRowKind.ITEM, f.from(), f.to(), isBlank(f.q()) ? null : f.q().trim(),
+                isBlank(f.supplierNif()) ? null : f.supplierNif().trim(),
+                isBlank(f.documentType()) ? null : f.documentType().trim().toUpperCase(),
+                isBlank(f.documentStatus()) ? null : f.documentStatus().trim().toUpperCase(),
+                f.minAmount(), f.maxAmount(),
+                isBlank(f.paymentStatus()) ? null : f.paymentStatus().trim().toUpperCase(),
+                isBlank(f.allocationStatus()) ? null : f.allocationStatus().trim().toUpperCase(),
+                budgetFilter,
+                // Uma rubrica que não existe filtra tudo, de propósito — não pode
+                // cair no "sem filtro" e devolver a lista inteira. O UUID de
+                // enchimento é para o `in` nunca ficar vazio.
+                budgetItemIds.isEmpty() ? List.of(new UUID(0L, 0L)) : budgetItemIds,
+                pageable);
+    }
+
+    /** A rubrica e tudo o que está por baixo dela (vivas), na obra dada; vazio se não for desta obra. */
+    private List<UUID> subtreeIds(UUID enterpriseId, UUID budgetItemId) {
+        Map<UUID, List<UUID>> childrenByParent = new HashMap<>();
+        boolean found = false;
+        for (ConstructionBudgetItem item : budgetItemRepository.findTreeByEnterpriseId(enterpriseId)) {
+            if (item.isDeleted()) {
+                continue;
+            }
+            if (item.getId().equals(budgetItemId)) {
+                found = true;
+            }
+            if (item.getParent() != null) {
+                childrenByParent.computeIfAbsent(item.getParent().getId(), k -> new ArrayList<>()).add(item.getId());
+            }
+        }
+        if (!found) {
+            return List.of();
+        }
+        List<UUID> out = new ArrayList<>();
+        Deque<UUID> pending = new ArrayDeque<>(List.of(budgetItemId));
+        while (!pending.isEmpty()) {
+            UUID id = pending.pop();
+            out.add(id);
+            pending.addAll(childrenByParent.getOrDefault(id, List.of()));
+        }
+        return out;
+    }
+
+    /** O mesmo para a quarentena e as despesas da empresa. */
+    @Transactional(readOnly = true)
+    public OutstandingInvoicesSummaryDTO outstandingSummaryByScope(ConstructionInvoice.Scope scope, String q) {
+        List<ConstructionInvoice> outstanding = repository.searchByScope(
+                scope, true, isBlank(q) ? null : q.trim(), Pageable.unpaged()).getContent();
+        return summarizeOutstanding(outstanding);
+    }
+
+    private OutstandingInvoicesSummaryDTO summarizeOutstanding(List<ConstructionInvoice> invoices) {
+        List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
+        Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
+
+        BigDecimal total = BigDecimal.ZERO;
+        long withoutTotal = 0;
+        for (ConstructionInvoice invoice : invoices) {
+            if (invoice.getTotalAmount() == null) {
+                withoutTotal++;
+                continue;
+            }
+            // Líquido − pago, a mesma conta do `toResponseDTO`.
+            BigDecimal creditNoteTotal = creditNotes.getOrDefault(invoice.getId(), List.of()).stream()
+                    .map(ConstructionInvoice::getTotalAmount)
+                    .filter(java.util.Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal paid = payments.getOrDefault(invoice.getId(), List.of()).stream()
+                    .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal remaining = invoice.getTotalAmount().subtract(creditNoteTotal).subtract(paid);
+            if (remaining.signum() > 0) {
+                total = total.add(remaining);
+            }
+        }
+        return new OutstandingInvoicesSummaryDTO(invoices.size(), total, withoutTotal);
     }
 
     /**

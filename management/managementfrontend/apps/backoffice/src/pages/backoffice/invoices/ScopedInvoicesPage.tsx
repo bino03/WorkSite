@@ -6,11 +6,11 @@ import { PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons"
 import {
   deleteInvoice,
   getInvoice,
+  getScopedOutstandingSummary,
   listCompanyInvoices,
   listUnidentifiedInvoices,
   setInvoiceSentToAccountant,
 } from "@/services/invoiceService";
-import type { InvoicePage } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,7 +24,8 @@ import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
-import type { ConstructionInvoice, InvoiceScope } from "@/types/invoice";
+import type { ConstructionInvoice, InvoiceScope, OutstandingInvoicesSummary } from "@/types/invoice";
+import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBadge";
 import type { IncidentInvoiceRef } from "@/types/incident";
 
 interface Props {
@@ -59,6 +60,8 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [query, setQuery] = useState("");
   const [outstanding, setOutstanding] = useState(false);
+  /** O que falta pagar no filtro "Por liquidar" — só se pede quando o filtro está ligado. */
+  const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
@@ -77,12 +80,14 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
           page: nextPage,
           size: nextSize,
         };
-        const list: InvoicePage =
-          scope === "UNIDENTIFIED"
-            ? await listUnidentifiedInvoices(params)
-            : await listCompanyInvoices(params);
+        // A soma é sobre a lista inteira, por isso vem à parte da página.
+        const [list, summary] = await Promise.all([
+          scope === "UNIDENTIFIED" ? listUnidentifiedInvoices(params) : listCompanyInvoices(params),
+          onlyOutstanding ? getScopedOutstandingSummary(scope, params.q) : Promise.resolve(null),
+        ]);
         setInvoices(list.content);
         setTotalElements(list.totalElements);
+        setOutstandingSummary(summary);
       } catch (error) {
         ErrorHandler.handle(error);
       } finally {
@@ -212,6 +217,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         <Button size="small" type={outstanding ? "primary" : "default"} onClick={toggleOutstanding}>
           Por liquidar
         </Button>
+        {outstanding && <OutstandingTotalBadge summary={outstandingSummary} />}
       </div>
 
       {!loading && invoices.length === 0 && (
