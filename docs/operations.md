@@ -25,6 +25,69 @@ Consequências que se pagam caro por não se saberem:
   orçamentos, faturas, pagamentos — [[excel-parity]] §9), mas não de utilizadores, tarefas,
   notificações nem definições. Uma cópia de segurança a sério é a que está abaixo.
 
+## Deploy — o que muda quando deixar de correr localmente
+
+Hoje "produção" é o parágrafo acima: o mesmo Postgres/Auth/Storage reais, mas o backend a correr
+na máquina de quem usa a app. O dia em que isto passar a correr num serviço a sério (um servidor,
+um container, uma PaaS) muda um conjunto concreto de coisas — nenhuma delas é código por escrever,
+são decisões e configuração. Levantado e testado a 2026-09-22 (roadmap completo em
+`notes/roadmap/pre-deploy-security.md`, já implementado e testado o que dava para testar sem essa
+hospedagem decidida).
+
+### A decisão que destrava o resto: onde o backend vai correr
+
+Sem isto decidido, quatro coisas ficam por afinar — todas configuráveis já, nenhuma tem valor de
+produção hardcoded no código de propósito:
+
+| Depende da hospedagem | Onde se define | Nota |
+|---|---|---|
+| Domínio real do Backoffice | `CORS_ALLOWED_ORIGINS`, `COOKIE_DOMAIN`, `APP_FRONTEND_URL` | Sem isto os links de convite/recuperação apontam para `localhost` e o CORS recusa o Backoffice real |
+| Há proxy/load balancer a terminar TLS na frente? | `server.forward-headers-strategy=native` em `application.yml` (não existe hoje) | Sem isto, `request.isSecure()` nunca vê `true` mesmo com HTTPS real a montante, e o header HSTS (já ativo por omissão no Spring Security) nunca sai |
+| Uma instância só, ou várias a escalar horizontalmente? | — | `RateLimitFilter` e `ExportRateLimitFilter` guardam o estado em **memória** (bucket4j + Caffeine). Com várias réplicas, cada uma tem o seu próprio contador — o limite efetivo multiplica-se pelo nº de réplicas. Não é um bug; se escalar, isto passa a exigir estado partilhado (Redis) ou mover o rate limiting para o proxy |
+| Mesmo projeto Supabase de hoje, ou um novo? | `DB_URL`, `SUPABASE_*` no `.env` | Mesmo projeto → migrações `V1`–`V38` já aplicadas, nada a fazer. Projeto novo → o Flyway aplica tudo de raiz no primeiro arranque (confirmar no log) |
+
+### Variáveis a preencher (produção real)
+
+Nenhuma tem valor de produção no repo, de propósito — ver [[environment]] para a lista completa
+com os defaults de dev. As que mudam mesmo:
+
+```
+COOKIE_SECURE=true                          # false só em dev
+COOKIE_DOMAIN=<domínio real>
+CORS_ALLOWED_ORIGINS=<domínio real>
+APP_FRONTEND_URL=<domínio real>
+SUPABASE_SERVICE_ROLE_KEY, DB_PASS, SUPABASE_JWT_SECRET, APP_EMAIL_CRYPTO_KEY
+                                             # pelo mecanismo de secrets da hospedagem, nunca em ficheiro versionado
+```
+
+O histórico do git já foi confirmado limpo (nenhum `.env` alguma vez commitado, `.gitignore` cobre
+`.env`/`.env.local`/`.env.*`) — 2026-09-22.
+
+### Verificado a 2026-09-22, antes de haver hospedagem
+
+- **`GET /actuator/health` dava 404** — o `pom.xml` dependia de `spring-boot-actuator` (só o
+  núcleo) em vez de `spring-boot-starter-actuator` (traz a auto-configuração que regista o
+  endpoint). Corrigido; confirmado ao vivo: `200 {"status":"UP"}`. Quase toda a hospedagem exige um
+  health-check real — sem isto, o deploy falhava logo à primeira verificação da plataforma.
+- **Bucket `documents` do Supabase Storage é privado** — confirmado de forma definitiva pela
+  própria API de Storage (`GET /storage/v1/bucket/documents` com a service role key →
+  `"public": false`), não só por inferência do comportamento do endpoint público.
+- **Headers de segurança HTTP** — `X-Frame-Options`, `X-Content-Type-Options` e CSP confirmados
+  por `curl -I` contra o backend real; HSTS já ativo por omissão (só visível sobre HTTPS real).
+- **Rate limiting** (login, forgot-password, exportações do orçamento) testado ao vivo com JWT
+  real — ver `notes/verificacao-browser-pendente.md` §19.
+
+### Só testável depois de decidir a hospedagem
+
+- **CORS** com o domínio real (hoje só testado com origens de dev).
+- **`server.forward-headers-strategy`**, se houver TLS-termination num proxy à frente.
+- **Comportamento sob carga concorrente** do `/export/zip` (streaming de documentos) — precisa de
+  produção ou staging reais para fazer sentido; `ab`/`hey` concorrente contra o endpoint, monitorizar
+  heap/threads.
+- Um **provedor SMTP real** configurado em *Definições → Provedores de email* — bloqueia convites
+  de funcionários e recuperação de password até existir; não é do roadmap de segurança, mas é
+  necessário para produção a sério.
+
 ## Cópia de segurança
 
 ### O que há para guardar
@@ -215,6 +278,7 @@ criá-los de novo no Backoffice.
 
 ## Relacionado
 
+- `notes/roadmap/pre-deploy-security.md` — o roadmap completo de segurança/performance pré-deploy (3 níveis), com o que já está feito e testado
 - [[environment]] — as variáveis que apontam para produção
 - [[commands]] — o que arranca o backend (e, com isso, toca a base de dados real)
 - [[security]] — quem liga à base de dados com que role; a cifra em repouso

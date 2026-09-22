@@ -178,9 +178,12 @@
       <scope>runtime</scope>
       <optional>true</optional>
     </dependency>
+    <!-- "spring-boot-actuator" sozinho é só o núcleo (classes Health/Endpoint) — sem a
+         auto-configuração, /actuator/health nunca é mapeado (404, não 200). Achado a testar
+         antes do deploy: quase toda a hospedagem exige um health-check real. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-actuator</artifactId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
