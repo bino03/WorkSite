@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -88,6 +89,10 @@ public class EnterpriseController {
         return ResponseEntity.ok(enterprises);
     }
 
+    // Criar/editar/apagar um projeto (e a sua galeria) passou a ADMIN-only em 2026-09-22 —
+    // era o único domínio sensível da app sem nenhum controlo de role. Leitura continua
+    // aberta a ADMIN/EMPLOYEE (default "autenticado"). Ver notes/roadmap/pre-deploy-security.md.
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<EnterpriseDTO> createEnterprise(
             @RequestPart("enterprise") String enterpriseJson,
@@ -117,6 +122,7 @@ public class EnterpriseController {
         return ResponseEntity.status(HttpStatus.CREATED).body(createdEnterprise);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<EnterpriseDTO> updateEnterprise(
             @PathVariable @NonNull UUID id,
@@ -125,6 +131,7 @@ public class EnterpriseController {
         return ResponseEntity.ok(updatedEnterprise);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEnterprise(@PathVariable @NonNull UUID id) {
         enterpriseService.delete(id);
@@ -190,6 +197,7 @@ public class EnterpriseController {
     /**
      * Adicionar múltiplas fotos à galeria
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/addPhotos")
     public ResponseEntity<List<MediaResponseDTO>> addPhotosToGallery(
             @PathVariable @NonNull UUID id,
@@ -201,6 +209,7 @@ public class EnterpriseController {
     /**
      * Upload ou atualizar banner
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/photos/banner")
     public ResponseEntity<EnterpriseFullResponseDTO> uploadOrUpdateBanner(
             @PathVariable @NonNull UUID id,
@@ -212,6 +221,7 @@ public class EnterpriseController {
     /**
      * Eliminar banner
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}/photos/banner")
     public ResponseEntity<EnterpriseFullResponseDTO> deleteBanner(@PathVariable @NonNull UUID id) {
         EnterpriseFullResponseDTO updatedEnterprise = enterpriseService.deleteBanner(id);
@@ -221,6 +231,7 @@ public class EnterpriseController {
     /**
      * Atualizar altText de uma media
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/media/{mediaId}")
     public ResponseEntity<MediaResponseDTO> updateMediaAltText(
             @PathVariable @NonNull UUID id,
@@ -234,6 +245,7 @@ public class EnterpriseController {
     /**
      * Eliminar uma media específica
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}/media/{mediaId}")
     public ResponseEntity<Void> deleteMedia(
             @PathVariable @NonNull UUID id,

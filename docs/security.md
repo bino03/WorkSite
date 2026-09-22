@@ -21,7 +21,7 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 
 | Padrão | Acesso |
 |---|---|
-| `/actuator/health`, `/ping` | público |
+| `/actuator/health` | público |
 | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/accept-invite`, `/auth/forgot-password`, `/auth/reset-password` | público |
 | `POST /auth/admin/**` | `ADMIN` |
 | `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
@@ -38,7 +38,12 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 
 ## CORS
 
-Configurado via `CorsConfigurationSource` em `SecurityConfig.java` — ajustar as origens permitidas para o domínio real do Backoffice (dev: `http://localhost:5173`) e o de produção quando existir.
+Configurado via `CorsConfigurationSource` em `SecurityConfig.java`, com as origens permitidas lidas
+de `app.security.cors.allowed-origins` (env var `CORS_ALLOWED_ORIGINS`, lista separada por vírgulas)
+— deixou de haver domínios hardcoded no código desde 2026-09-22. Sem valor de produção por omissão
+de propósito: o domínio real do Backoffice ainda não está decidido. `allowCredentials(true)` está
+ativo, por isso uma origem errada em produção dá a qualquer site acesso à sessão de um utilizador
+autenticado — ver `notes/roadmap/pre-deploy-security.md`.
 
 ## Modelo de confiança na base de dados
 
@@ -81,6 +86,16 @@ cliente nosso — e é com essa chave que o backend fala com o Storage e o Auth.
 `SecurityConfig` deixou de ter, na mesma passagem, os matchers herdados sem controller
 (`GET /open/**`, `POST /open/leads`, `POST /assets`, `POST /banners`, e os `/api/auth/*` — nenhum
 controller tem prefixo `/api`). A tabela acima é a superfície real.
+
+## Bucket `documents` — privado, por fora do código
+
+Nenhum caminho do código (faturas, comprovativos) usa `getPublicUrl()` — só `SignedUrlService`
+(TTL de 3600s). Mas se o bucket `documents` estiver marcado como **público** na dashboard do
+Supabase, isso não se vê no código nenhum: `SupabaseProperties` não guarda essa flag, é uma
+configuração só do lado do Supabase. **Confirmar manualmente antes de produção** (Storage →
+`documents` → toggle "Public" desligado), e voltar a confirmar sempre que o bucket for recriado —
+não há teste automatizado que apanhe uma regressão aqui. Checklist completa em
+`notes/verificacao-browser-pendente.md` §19.
 
 ## Segredos em repouso — password SMTP
 

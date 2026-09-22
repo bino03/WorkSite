@@ -136,14 +136,19 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | GET | `/enterprises/search` | autenticado |
 | GET | `/enterprises/{id}` | autenticado |
 | GET | `/enterprises/{id}/basic` | autenticado |
-| POST | `/enterprises` | autenticado (multipart) |
-| PUT | `/enterprises/{id}` | autenticado |
-| DELETE | `/enterprises/{id}` | autenticado |
-| POST | `/enterprises/{id}/addPhotos` | autenticado |
-| POST | `/enterprises/{id}/photos/banner` | autenticado |
-| DELETE | `/enterprises/{id}/photos/banner` | autenticado |
-| PATCH | `/enterprises/{id}/media/{mediaId}` | autenticado |
-| DELETE | `/enterprises/{id}/media/{mediaId}` | autenticado |
+| POST | `/enterprises` | `ADMIN` (multipart) |
+| PUT | `/enterprises/{id}` | `ADMIN` |
+| DELETE | `/enterprises/{id}` | `ADMIN` |
+| POST | `/enterprises/{id}/addPhotos` | `ADMIN` |
+| POST | `/enterprises/{id}/photos/banner` | `ADMIN` |
+| DELETE | `/enterprises/{id}/photos/banner` | `ADMIN` |
+| PATCH | `/enterprises/{id}/media/{mediaId}` | `ADMIN` |
+| DELETE | `/enterprises/{id}/media/{mediaId}` | `ADMIN` |
+
+> 🧹 **Escrita restringida a `ADMIN` a 2026-09-22** — até aí, `EnterpriseController` e
+> `EntrepriseRelationsController` eram os únicos controllers sensíveis da app sem nenhum
+> `@PreAuthorize`: qualquer `EMPLOYEE` podia criar, editar e **apagar** um projeto inteiro. A
+> leitura (`GET`) continua aberta a `ADMIN`/`EMPLOYEE`. Ver `notes/roadmap/pre-deploy-security.md`.
 
 > O `GET /enterprises` (`EnterpriseListDTO`) traz `budgetTotal` além do `totalInvestment`: é o
 > mesmo número que o cabeçalho da página do orçamento (`BudgetTreeDTO.budgetTotal`, mesma regra
@@ -156,11 +161,11 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 
 | Método | Rota | Acesso |
 |---|---|---|
-| POST | `/enterprise-relations/{id}/location/upsert` | autenticado |
-| DELETE | `/enterprise-relations/{id}/location` | autenticado |
-| PATCH | `/enterprise-relations/{id}/overview` | autenticado |
-| PATCH | `/enterprise-relations/{id}/dates-areas` | autenticado |
-| PATCH | `/enterprise-relations/{id}/finance` | autenticado |
+| POST | `/enterprise-relations/{id}/location/upsert` | `ADMIN` |
+| DELETE | `/enterprise-relations/{id}/location` | `ADMIN` |
+| PATCH | `/enterprise-relations/{id}/overview` | `ADMIN` |
+| PATCH | `/enterprise-relations/{id}/dates-areas` | `ADMIN` |
+| PATCH | `/enterprise-relations/{id}/finance` | `ADMIN` |
 
 > 🧹 **`constructionCompany`/`architect` mudaram do `finance` para o `overview` a 2026-09-16**
 > (`EditOverViewCardDTO`/`FinanceCardDTO`) — o Financeiro ficou só com valores e moeda; construtora e

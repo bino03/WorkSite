@@ -211,6 +211,16 @@
       <artifactId>caffeine</artifactId>
     </dependency>
 
+    <!-- Rate limiting em /auth/login e /auth/forgot-password (RateLimitFilter). Só em
+         memória — a app corre numa única instância; se um dia houver múltiplas
+         instâncias atrás de um load balancer, isto passa a exigir estado partilhado
+         (ex. Redis) ou rate limiting no proxy. -->
+    <dependency>
+      <groupId>com.bucket4j</groupId>
+      <artifactId>bucket4j-core</artifactId>
+      <version>8.10.1</version>
+    </dependency>
+
     <!-- Configuration Processor -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

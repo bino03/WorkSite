@@ -27,7 +27,7 @@ public class AccountLockFilter extends OncePerRequestFilter {
   protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
     if (!allowAuthMe) return false;
     String uri = request.getRequestURI();
-    return "/auth/me".equals(uri) || "/actuator/health".equals(uri) || "/ping".equals(uri);
+    return "/auth/me".equals(uri) || "/actuator/health".equals(uri);
   }
 
   @Override

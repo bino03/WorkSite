@@ -212,8 +212,8 @@ public class AuthController {
         }
 
         // 2. Remove cookies (usando headers)
-        response.addHeader("Set-Cookie", CookieUtil.createLogoutCookie("access_token").toString());
-        response.addHeader("Set-Cookie", CookieUtil.createLogoutCookie("refresh_token").toString());
+        response.addHeader("Set-Cookie", cookieUtil.createCleanCookie("access_token").toString());
+        response.addHeader("Set-Cookie", cookieUtil.createCleanCookie("refresh_token").toString());
 
         log.info("Logout successful - Cookies cleared");
 

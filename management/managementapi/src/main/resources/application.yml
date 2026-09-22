@@ -111,6 +111,24 @@ app:
       secure: ${COOKIE_SECURE:false}
       # Domain dos cookies (localhost em dev, seu-app.com em prod)
       domain: ${COOKIE_DOMAIN:localhost}
+    # Origens permitidas por CORS, separadas por vírgula. Sem valor de produção por
+    # omissão de propósito — o domínio real do Backoffice ainda não está decidido
+    # (ver docs/environment.md); em produção define-se CORS_ALLOWED_ORIGINS no .env.
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:5174}
+    # Rate limiting (bucket4j) em /auth/login e /auth/forgot-password — só uma
+    # instância do backend corre hoje, por isso o estado em memória chega.
+    rate-limit:
+      login:
+        max-attempts-per-account: ${RATE_LIMIT_LOGIN_ACCOUNT:5}
+        account-window-minutes: ${RATE_LIMIT_LOGIN_ACCOUNT_WINDOW_MIN:15}
+        max-requests-per-ip: ${RATE_LIMIT_LOGIN_IP:20}
+        ip-window-minutes: ${RATE_LIMIT_LOGIN_IP_WINDOW_MIN:1}
+      forgot-password:
+        max-attempts-per-account: ${RATE_LIMIT_FORGOT_ACCOUNT:3}
+        account-window-minutes: ${RATE_LIMIT_FORGOT_ACCOUNT_WINDOW_MIN:15}
+        max-requests-per-ip: ${RATE_LIMIT_FORGOT_IP:3}
+        ip-window-minutes: ${RATE_LIMIT_FORGOT_IP_WINDOW_MIN:15}
 
   # Cifra em repouso de segredos (hoje só a password SMTP de settings.email_providers).
   # AES-256-GCM. Chaves em base64 de 32 bytes — gerar com `openssl rand -base64 32`.

@@ -54,9 +54,9 @@ construction-invoices/<enterpriseId ou scope>/payments/<8 chars>_<nome>         
 ## Passo 1 — MIME e tamanhos
 
 ```java
-// PaymentService — comprovativo: imagem ou PDF, 10 MB
-private static final Set<String> PROOF_MIME = Set.of("image/jpeg", "image/png", "image/webp", "application/pdf");
-private static final long MAX_PROOF_BYTES = 10L * 1024 * 1024;
+// PaymentService — comprovativo: imagem ou PDF, 25 MB (bate com o teto global do multipart)
+private static final Set<String> PROOF_MIME = Set.of("application/pdf", "image/jpeg", "image/jpg", "image/png");
+private static final long MAX_PROOF_BYTES = 25L * 1024 * 1024;
 ```
 
 Erros: tipo não permitido → código **do domínio** quando a mensagem tem de ser específica

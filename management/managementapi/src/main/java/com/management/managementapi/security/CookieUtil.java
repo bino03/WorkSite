@@ -95,21 +95,4 @@ public class CookieUtil {
 
         return cookie.build();
     }
-
-    /**
-     * Cria um cookie de logout (alias para createCleanCookie)
-     * @param cookieName Nome do cookie a remover
-     * @return ResponseCookie com maxAge=0
-     */
-    public static ResponseCookie createLogoutCookie(String cookieName) {
-        return ResponseCookie
-            .from(cookieName, "")
-            .httpOnly(true)
-            .secure(false) // false em dev, true em prod (vem da config em produção)
-            .path("/")
-            .sameSite("Lax")
-            .maxAge(0)                         // Remove imediatamente
-            .domain("")                        // Domain vazio em localhost
-            .build();
-    }
 }

@@ -9,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -94,13 +95,30 @@ public class SecurityConfig {
         return conv;
     }
 
+    // --- Rate limiting em /auth/login e /auth/forgot-password ---
+    @Bean
+    RateLimitFilter rateLimitFilter(
+            @Value("${app.security.rate-limit.login.max-attempts-per-account}") int loginAccountMax,
+            @Value("${app.security.rate-limit.login.account-window-minutes}") int loginAccountWindowMinutes,
+            @Value("${app.security.rate-limit.login.max-requests-per-ip}") int loginIpMax,
+            @Value("${app.security.rate-limit.login.ip-window-minutes}") int loginIpWindowMinutes,
+            @Value("${app.security.rate-limit.forgot-password.max-attempts-per-account}") int forgotAccountMax,
+            @Value("${app.security.rate-limit.forgot-password.account-window-minutes}") int forgotAccountWindowMinutes,
+            @Value("${app.security.rate-limit.forgot-password.max-requests-per-ip}") int forgotIpMax,
+            @Value("${app.security.rate-limit.forgot-password.ip-window-minutes}") int forgotIpWindowMinutes) {
+        return new RateLimitFilter(
+                loginAccountMax, loginAccountWindowMinutes, loginIpMax, loginIpWindowMinutes,
+                forgotAccountMax, forgotAccountWindowMinutes, forgotIpMax, forgotIpWindowMinutes);
+    }
+
     // --- Configuração de segurança principal ---
     @Bean
     SecurityFilterChain security(HttpSecurity http,
                                  JwtDecoder decoder,
                                  JwtAuthenticationConverter authConv,
                                  ProfileRepository profileRepo,
-                                 RevokedTokenRepository revokedRepo) throws Exception {
+                                 RevokedTokenRepository revokedRepo,
+                                 RateLimitFilter rateLimitFilter) throws Exception {
         http
             // ✅ habilita CORS — vai usar o bean corsConfigurationSource() definido abaixo
             .cors(cors -> {})
@@ -111,7 +129,7 @@ public class SecurityConfig {
             // 🔑 regras de autorização
             .authorizeHttpRequests(auth -> auth
                 // ✅ Endpoints PÚBLICOS (sem autenticação)
-                .requestMatchers("/actuator/health", "/ping", "/auth/login", "/auth/refresh", "/auth/logout", "/auth/accept-invite", "/auth/forgot-password", "/auth/reset-password").permitAll()
+                .requestMatchers("/actuator/health", "/auth/login", "/auth/refresh", "/auth/logout", "/auth/accept-invite", "/auth/forgot-password", "/auth/reset-password").permitAll()
 
                 // 🔒 Endpoints protegidos
                 .requestMatchers(HttpMethod.POST, "/auth/admin/**").hasRole("ADMIN")
@@ -148,6 +166,10 @@ public class SecurityConfig {
             }
         }, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
 
+        // -1) Rate limiting em /auth/login e /auth/forgot-password (por IP e por conta)
+        http.addFilterBefore(rateLimitFilter,
+            org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
+
         // 0) Lê JWT do cookie "access_token" e adiciona ao Authorization header
         http.addFilterBefore(new CookieJwtFilter(decoder),
             org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
@@ -164,17 +186,14 @@ public class SecurityConfig {
     }
 
     // --- ✅ Configuração CORS global ---
+    // Origens configuráveis por env var (CORS_ALLOWED_ORIGINS, lista separada por vírgulas) —
+    // o domínio de produção do Backoffice ainda não está decidido, por isso não há valor de
+    // produção hardcoded aqui. Ver docs/environment.md.
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.security.cors.allowed-origins}") List<String> allowedOrigins) {
         CorsConfiguration cfg = new CorsConfiguration();
-        // Origens permitidas (dev + produção)
-        cfg.setAllowedOrigins(List.of(
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "http://localhost:5174",
-            "https://portal.minhaapp.com",
-            "https://backoffice.minhaapp.com"
-        ));
+        cfg.setAllowedOrigins(allowedOrigins);
         // Métodos permitidos
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         // Headers permitidos (precisas de Authorization para JWT!)

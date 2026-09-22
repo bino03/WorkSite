@@ -14,6 +14,7 @@ SUPABASE_ANON_KEY=<anon key>
 SUPABASE_JWT_SECRET=<jwt secret>
 COOKIE_SECURE=false
 COOKIE_DOMAIN=localhost
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:5174
 APP_FRONTEND_URL=http://localhost:5173
 APP_EMAIL_CRYPTO_KEY=<base64 de 32 bytes>
 ```
@@ -43,6 +44,15 @@ Notas que se pagam caro por não se saberem:
 - `APP_BUDGET_DEADLINE_DAYS_AHEAD` (opcional, default `7`): com quantos dias de antecedência o
   job `BudgetItemDeadlineNotifierConfig` avisa os `ADMIN` do fim de uma rubrica de orçamento.
   Ver [[api]] → "Quem gera notificações".
+- `CORS_ALLOWED_ORIGINS` (lista separada por vírgulas, default só as portas de dev): sem valor de
+  produção por omissão de propósito — o domínio real do Backoffice ainda não está decidido. Em
+  produção, preencher com o(s) domínio(s) reais (ex. `https://backoffice.worksite.pt`); nunca
+  deixar os placeholders fictícios que existiam antes hardcoded em `SecurityConfig.java`.
+- `RATE_LIMIT_LOGIN_ACCOUNT`/`_ACCOUNT_WINDOW_MIN`/`_IP`/`_IP_WINDOW_MIN` e os equivalentes
+  `RATE_LIMIT_FORGOT_*` (todos opcionais, com omissões já pensadas para produção — 5 tentativas/15min
+  por conta + 20/min por IP em `/auth/login`; 3/15min por conta e por IP em `/auth/forgot-password`,
+  mais apertado para não abrir uma via de enumeração de contas): limites do `RateLimitFilter`
+  (bucket4j, em memória — só faz sentido enquanto o backend correr numa única instância).
 
 ## Backoffice — `.env` em `management/managementfrontend/apps/backoffice/`
 

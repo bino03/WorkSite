@@ -1,6 +1,7 @@
 package com.management.managementapi.enterprises.controller;
 // TRATAMENTOS DE ERROS ✅✅
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,8 +24,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 
+// Só ADMIN: são as relações estruturais do projeto (localização, datas/áreas, financeiro,
+// overview) — sem esta anotação, EnterpriseController/EntrepriseRelationsController eram os
+// únicos controllers sensíveis sem nenhum controlo de role (ver notes/roadmap/pre-deploy-security.md).
 @RestController
 @RequestMapping("/enterprise-relations/{id}")
+@PreAuthorize("hasRole('ADMIN')")
 public class EntrepriseRelationsController {
 
     private final EnterpriseRelationsService enterpriseRelationsService;
