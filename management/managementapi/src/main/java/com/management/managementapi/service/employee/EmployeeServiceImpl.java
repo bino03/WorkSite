@@ -298,12 +298,19 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public EmployeeResponseDTO blockProfile(UUID id) {
+        // last_token_reset_at = now() é o que torna isto imediato: o AccountLockFilter recusa
+        // qualquer JWT emitido antes deste instante, a cada pedido (lido da BD, não de um claim
+        // do próprio token) — o mesmo mecanismo já usado no reset de password. Sem isto, uma
+        // conta "bloqueada" continuava com acesso total até o access token expirar sozinho (15
+        // min) ou, na prática, até bem mais tempo — nada no código sincronizava o bloqueio de
+        // volta para o Supabase Auth.
         int updated = jdbc.update("""
                 update worksite.profile
-                   set account_status = cast('blocked' as worksite.account_status_enum),
-                       updated_at     = now()
-                 where id             = :id
-                   and account_status = cast('unlocked' as worksite.account_status_enum)
+                   set account_status      = cast('blocked' as worksite.account_status_enum),
+                       last_token_reset_at = now(),
+                       updated_at          = now()
+                 where id                  = :id
+                   and account_status      = cast('unlocked' as worksite.account_status_enum)
                 """,
                 new MapSqlParameterSource("id", id));
 
@@ -343,12 +350,14 @@ public class EmployeeServiceImpl implements EmployeeService {
                     "Não pode eliminar a sua própria conta");
         }
 
+        // Mesmo raciocínio do blockProfile: corta sessões já abertas, não só logins novos.
         int updated = jdbc.update("""
                 update worksite.profile
-                   set account_status = cast('deleted' as worksite.account_status_enum),
-                       updated_at     = now()
-                 where id             = :id
-                   and account_status != cast('deleted' as worksite.account_status_enum)
+                   set account_status      = cast('deleted' as worksite.account_status_enum),
+                       last_token_reset_at = now(),
+                       updated_at          = now()
+                 where id                  = :id
+                   and account_status     != cast('deleted' as worksite.account_status_enum)
                 """,
                 new MapSqlParameterSource("id", id));
 

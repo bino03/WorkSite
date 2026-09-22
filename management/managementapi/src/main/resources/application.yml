@@ -76,12 +76,15 @@ server:
     min-response-size: 2KB
 
 logging:
+  # Seguro por omissão para produção (sem application-{profile}.yml neste projeto — ver
+  # docs/environment.md). Localmente, subir para DEBUG por variável de ambiente, nunca aqui:
+  # LOGGING_LEVEL_COM_MANAGEMENT_MANAGEMENTAPI=DEBUG (env vars têm precedência sobre este yml).
   level:
     org.springframework: INFO
-    org.hibernate.SQL: DEBUG
-    com.zaxxer.hikari.HikariConfig: DEBUG
-    org.springframework.boot.context.config: DEBUG
-    com.management.managementapi: DEBUG
+    org.hibernate.SQL: WARN
+    com.zaxxer.hikari.HikariConfig: WARN
+    org.springframework.boot.context.config: WARN
+    com.management.managementapi: INFO
   file:
     name: logs/app.log
   logback:
@@ -129,6 +132,12 @@ app:
         account-window-minutes: ${RATE_LIMIT_FORGOT_ACCOUNT_WINDOW_MIN:15}
         max-requests-per-ip: ${RATE_LIMIT_FORGOT_IP:3}
         ip-window-minutes: ${RATE_LIMIT_FORGOT_IP_WINDOW_MIN:15}
+      # Exportações do orçamento (/export, /export/zip) — por utilizador autenticado, não por
+      # IP (app interna, sem portal público; o risco é abuso/conta comprometida a repetir um
+      # pedido pesado, não bots). O zip faz streaming de todos os documentos de uma obra.
+      export:
+        max-requests-per-user: ${RATE_LIMIT_EXPORT_USER:10}
+        window-minutes: ${RATE_LIMIT_EXPORT_WINDOW_MIN:10}
 
   # Cifra em repouso de segredos (hoje só a password SMTP de settings.email_providers).
   # AES-256-GCM. Chaves em base64 de 32 bytes — gerar com `openssl rand -base64 32`.

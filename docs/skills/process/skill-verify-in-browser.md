@@ -102,6 +102,11 @@ Por cada item da lista do Step 0, o mesmo par:
 
 Registar por item: ✅ / 🔴 com o que se esperava vs. o que apareceu, e o erro da consola ou da rede (`read_console_messages` com `pattern`, `read_network_requests`) se houver. Uma 🔴 vai para `notes/ToDo.md` como bullet ⚠️ com esse detalhe — não se corrige a meio da passagem, senão a passagem nunca acaba.
 
+> **`read_network_requests` não mostra headers de resposta** (`Set-Cookie`, CORS) e o `statusCode`
+> que devolve pode divergir do que o `fetch()` da página recebeu de facto. Para inspecionar headers,
+> usar `curl -i`/`curl -D-` a partir do Bash — várias rotas (logout, `permitAll`) toleram um `curl`
+> sem sessão nenhuma, e não é preciso passar pelo browser para isto.
+
 Chamadas longas (importações, exportações) ficam assíncronas em `window.__x = fetch(...)` e lêem-se depois; se a página recarregar entretanto, repetir — o backend é transacional, a chamada anterior ou entrou inteira ou não entrou.
 
 `file_upload` **só aceita ficheiros de dentro do repo**: copiar o ficheiro para uma pasta temporária git-ignored (`notes/tmp-browser/`), carregar dali, apagar a pasta no Step 6.

@@ -42,9 +42,16 @@ public interface ConstructionExpenseRepository extends JpaRepository<Constructio
     /**
      * Todas as despesas de um projeto numa só query — alimenta os rollups da
      * árvore sem cair no N+1 que existia antes (uma chamada por sub-etapa).
+     *
+     * {@code left join fetch e.invoice}: sem isto, {@code loadExpenseRollups} (que lê
+     * {@code expense.getInvoice().isSentToAccountant()} para cada despesa) disparava uma
+     * SELECT por fatura distinta — um N+1 real a cada {@code GET
+     * /construction-budget/enterprise/{id}}, que escala com o nº de despesas com fatura, não
+     * com o nº de rubricas. {@code left} porque uma despesa lançada à mão não tem fatura.
      */
     @Query("""
             select e from ConstructionExpense e
+            left join fetch e.invoice
             where e.budgetItem.enterprise.id = :enterpriseId
             """)
     List<ConstructionExpense> findAllByEnterpriseId(@Param("enterpriseId") UUID enterpriseId);

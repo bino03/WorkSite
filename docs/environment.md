@@ -48,6 +48,11 @@ Notas que se pagam caro por não se saberem:
   produção por omissão de propósito — o domínio real do Backoffice ainda não está decidido. Em
   produção, preencher com o(s) domínio(s) reais (ex. `https://backoffice.worksite.pt`); nunca
   deixar os placeholders fictícios que existiam antes hardcoded em `SecurityConfig.java`.
+- `logging.level.*` (`application.yml`) fica em `INFO`/`WARN` por omissão desde 2026-09-22 — seguro
+  para produção mesmo sem ninguém mudar nada, já que não há `application-{profile}.yml` neste
+  projeto. Para depurar localmente com mais detalhe (SQL do Hibernate, logs da app), subir por
+  variável de ambiente em vez de editar o yml — env vars têm precedência sobre `application.yml`:
+  `LOGGING_LEVEL_COM_MANAGEMENT_MANAGEMENTAPI=DEBUG`, `LOGGING_LEVEL_ORG_HIBERNATE_SQL=DEBUG`.
 - `RATE_LIMIT_LOGIN_ACCOUNT`/`_ACCOUNT_WINDOW_MIN`/`_IP`/`_IP_WINDOW_MIN` e os equivalentes
   `RATE_LIMIT_FORGOT_*` (todos opcionais, com omissões já pensadas para produção — 5 tentativas/15min
   por conta + 20/min por IP em `/auth/login`; 3/15min por conta e por IP em `/auth/forgot-password`,

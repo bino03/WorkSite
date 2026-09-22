@@ -257,6 +257,11 @@ parâmetro, não o `filename=` cru. `GET …/export/summary` devolve o `BudgetEx
 `manualExpenseCount`, `creditNoteCount`, `partialPaymentCount`, `missingNumberCount`,
 `needsReviewCount`, `warnings`, `documents`) — é o passo 2 do modal, antes do download.
 
+**Rate limiting** (`/export` e `/export/zip`, desde 2026-09-22): por utilizador autenticado, não por
+IP — `RATE_LIMIT_EXPORT_USER` pedidos (default 10) por `RATE_LIMIT_EXPORT_WINDOW_MIN` minutos
+(default 10); acima disso, `429` com `errorCode: "ERR_011"`. `/export/summary` e a árvore normal
+ficam de fora (não fazem streaming pesado nenhum). Ver `ExportRateLimitFilter`.
+
 **Zip da pasta da obra** (`GET …/export/zip?sheets=`, desde 2026-09-20): o mesmo `sheets` e as
 mesmas regras do `/export`, mas devolve `application/zip` com o nome `[TESTE - ]<slug>.zip` e, na
 raiz, `Despesas - <slug>.xlsx` + `Faturas/Lançadas/<ficheiro>` — extrai-se em `Empreendimentos\<slug>\`

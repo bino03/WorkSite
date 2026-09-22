@@ -1,14 +1,8 @@
 package com.management.managementapi.security;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,13 +22,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.repository.RevokedTokenRepository;
 import com.management.managementapi.integrations.supabase.SupabaseProperties;
 
-@Slf4j
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -111,6 +103,14 @@ public class SecurityConfig {
                 forgotAccountMax, forgotAccountWindowMinutes, forgotIpMax, forgotIpWindowMinutes);
     }
 
+    // --- Rate limiting nas exportações do orçamento (por utilizador, não por IP) ---
+    @Bean
+    ExportRateLimitFilter exportRateLimitFilter(
+            @Value("${app.security.rate-limit.export.max-requests-per-user}") int maxRequestsPerUser,
+            @Value("${app.security.rate-limit.export.window-minutes}") int windowMinutes) {
+        return new ExportRateLimitFilter(maxRequestsPerUser, windowMinutes);
+    }
+
     // --- Configuração de segurança principal ---
     @Bean
     SecurityFilterChain security(HttpSecurity http,
@@ -118,7 +118,8 @@ public class SecurityConfig {
                                  JwtAuthenticationConverter authConv,
                                  ProfileRepository profileRepo,
                                  RevokedTokenRepository revokedRepo,
-                                 RateLimitFilter rateLimitFilter) throws Exception {
+                                 RateLimitFilter rateLimitFilter,
+                                 ExportRateLimitFilter exportRateLimitFilter) throws Exception {
         http
             // ✅ habilita CORS — vai usar o bean corsConfigurationSource() definido abaixo
             .cors(cors -> {})
@@ -126,6 +127,12 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             // 🔒 sessões desativadas (JWT = stateless)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // 🛡️ CSP mínima — API JSON pura, sem HTML servido daqui, mas protege uma resposta de
+            // erro aberta por engano no browser. X-Frame-Options/X-Content-Type-Options/HSTS já
+            // vêm por omissão do Spring Security 6, sem precisar de configuração explícita.
+            .headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+            )
             // 🔑 regras de autorização
             .authorizeHttpRequests(auth -> auth
                 // ✅ Endpoints PÚBLICOS (sem autenticação)
@@ -144,28 +151,6 @@ public class SecurityConfig {
                 .jwt(jwt -> jwt.decoder(decoder).jwtAuthenticationConverter(authConv))
             );
 
-        // DEBUG FILTER: Log de todas as requests
-        http.addFilterBefore(new OncePerRequestFilter() {
-            @Override
-            protected void doFilterInternal(
-                    HttpServletRequest request,
-                    HttpServletResponse response,
-                    FilterChain filterChain) throws ServletException, IOException {
-                log.info("===== INCOMING REQUEST =====");
-                log.info("URI: {}", request.getRequestURI());
-                log.info("Method: {}", request.getMethod());
-                log.info("Origin: {}", request.getHeader("Origin"));
-                log.info("Cookie header presente: {}",
-                        request.getHeader("Cookie") != null ? "SIM" : "NÃO");
-                if (request.getHeader("Cookie") != null) {
-                    String cookieHeader = request.getHeader("Cookie");
-                    int length = Math.min(100, cookieHeader.length());
-                    log.info("Cookie header: {}", cookieHeader.substring(0, length) + "...");
-                }
-                filterChain.doFilter(request, response);
-            }
-        }, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
-
         // -1) Rate limiting em /auth/login e /auth/forgot-password (por IP e por conta)
         http.addFilterBefore(rateLimitFilter,
             org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
@@ -177,6 +162,10 @@ public class SecurityConfig {
         // 1) Bloqueio por estado (ex.: conta bloqueada)
         http.addFilterAfter(new AccountLockFilter(profileRepo, true),
             org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
+
+        // 1b) Rate limiting nas exportações do orçamento — corre depois da autenticação,
+        // precisa do utilizador já resolvido (ver ExportRateLimitFilter)
+        http.addFilterAfter(exportRateLimitFilter, AccountLockFilter.class);
 
         // 2) Revogação de token
         http.addFilterBefore(new TokenRevocationFilter(revokedRepo),
