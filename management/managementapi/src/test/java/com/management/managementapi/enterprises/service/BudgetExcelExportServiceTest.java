@@ -256,13 +256,26 @@ class BudgetExcelExportServiceTest {
     }
 
     @Test
-    @DisplayName("O cabeçalho do orçamento é \"Rubrica\", que é o que o script do vault procura")
+    @DisplayName("O orçamento é o documento do vault: bloco da empresa com logo, depois Rubrica | Descrição | Preço total")
     void budgetSheetUsesTheVaultHeader() throws Exception {
         try (XSSFWorkbook wb = exportWorkbook(EnumSet.of(BudgetExportSheet.BUDGET))) {
-            Sheet sheet = wb.getSheet("Orçamento inicial");
-            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Rubrica");
-            assertThat(sheet.getRow(0).getCell(5).getStringCellValue()).isEqualTo("Preço total");
-            Row total = sheet.getRow(sheet.getLastRowNum());
+            XSSFSheet sheet = wb.getSheet("Orçamento inicial");
+            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("ORÇAMENTO");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("Empresa");
+            assertThat(sheet.getRow(8).getCell(0).getStringCellValue()).isEqualTo("Obra");
+            assertThat(sheet.getRow(8).getCell(1).getStringCellValue()).isEqualTo(enterprise.getName());
+            assertThat(sheet.getDrawingPatriarch().getShapes()).hasSize(1); // o logo
+
+            Row header = sheet.getRow(BudgetExcelExportService.BUDGET_HEADER_ROW);
+            assertThat(header.getCell(0).getStringCellValue()).isEqualTo("Rubrica");
+            assertThat(header.getCell(1).getStringCellValue()).isEqualTo("Descrição");
+            assertThat(header.getCell(2).getStringCellValue()).isEqualTo("Preço total");
+            // depois do cabeçalho, uma linha em branco e o primeiro capítulo, com o ponto do vault
+            assertThat(sheet.getRow(BudgetExcelExportService.BUDGET_HEADER_ROW + 2).getCell(0).getStringCellValue())
+                    .isEqualTo("1.");
+
+            // a última linha só fecha a moldura; o TOTAL está logo acima
+            Row total = sheet.getRow(sheet.getLastRowNum() - 1);
             assertThat(total.getCell(1).getStringCellValue()).isEqualTo("TOTAL");
             assertThat(wb.getNumberOfSheets()).isEqualTo(1);
         }
@@ -271,7 +284,7 @@ class BudgetExcelExportServiceTest {
     // ── "Despesas" ──────────────────────────────────────────────
 
     @Test
-    @DisplayName("A \"Despesas\" é a TabelaDespesas do vault: cabeçalhos, linha de totais e uma linha por despesa")
+    @DisplayName("A \"Despesas\" é a TabelaDespesas do vault: cabeçalhos, totais, uma linha por despesa, a mais recente primeiro")
     void expensesSheetMatchesTheVaultTable() throws Exception {
         ConstructionInvoice split = invoice("FT A/1", "2026-09-01", "100", "Casa Dolores");
         split.setSentToAccountant(true);
@@ -291,13 +304,20 @@ class BudgetExcelExportServiceTest {
             assertThat(table.getCTTable().getTotalsRowCount()).isEqualTo(1);
             assertThat(table.getArea().formatAsString()).isEqualTo("A1:K5");
 
-            Row first = sheet.getRow(1);
+            // FT A/2 é de 02-09, FT A/1 de 01-09: a mais recente vem primeiro, como no vault
+            Row newest = sheet.getRow(1);
+            assertThat(newest.getCell(0).getStringCellValue()).isEqualTo("FT A/2");
+            assertThat(newest.getCell(3).getNumericCellValue()).isEqualTo(200d);
+            assertThat(newest.getCell(4).getCellType()).isEqualTo(CellType.BLANK);
+            assertThat(newest.getCell(8).getStringCellValue()).isEmpty();
+
+            Row first = sheet.getRow(2);
             assertThat(first.getCell(0).getStringCellValue()).isEqualTo("FT A/1");
             assertThat(first.getCell(1).getLocalDateTimeCellValue().toLocalDate()).isEqualTo(LocalDate.of(2026, 9, 1));
             assertThat(first.getCell(1).getCellStyle().getDataFormatString()).isEqualTo("dd/mm/yyyy");
             assertThat(first.getCell(3).getNumericCellValue()).isEqualTo(60d);
             assertThat(first.getCell(3).getCellStyle().getDataFormatString()).isEqualTo("#,##0.00\\ \"€\"");
-            assertThat(first.getCell(4).getStringCellValue()).isEqualTo("Sim");
+            assertThat(first.getCell(4).getStringCellValue()).isEqualTo("x");
             assertThat(first.getCell(5).getStringCellValue()).isEqualTo("Transferência");
             assertThat(first.getCell(6).getStringCellValue()).isEqualTo("X");
             assertThat(first.getCell(7).getStringCellValue())
@@ -306,16 +326,10 @@ class BudgetExcelExportServiceTest {
             assertThat(first.getCell(9).getStringCellValue()).isEqualTo("Casa Dolores");
             assertThat(first.getCell(10).getStringCellValue()).isEqualTo("500000000");
 
-            Row second = sheet.getRow(2);
+            Row second = sheet.getRow(3);
             assertThat(second.getCell(0).getStringCellValue()).isEqualTo("FT A/1");
             assertThat(second.getCell(3).getNumericCellValue()).isEqualTo(40d);
             assertThat(second.getCell(8).getStringCellValue()).isEqualTo("1.2 — Desmontagem");
-
-            Row third = sheet.getRow(3);
-            assertThat(third.getCell(0).getStringCellValue()).isEqualTo("FT A/2");
-            assertThat(third.getCell(3).getNumericCellValue()).isEqualTo(200d);
-            assertThat(third.getCell(4)).isNull();
-            assertThat(third.getCell(8).getStringCellValue()).isEmpty();
 
             Row totals = sheet.getRow(4);
             assertThat(totals.getCell(0).getStringCellValue()).isEqualTo("TOTAL");
@@ -360,17 +374,17 @@ class BudgetExcelExportServiceTest {
 
             Row nc = rowWithNumber(sheet, "NC 1");
             assertThat(nc.getCell(3).getNumericCellValue()).isEqualTo(-20d);
-            assertThat(nc.getCell(4)).isNull();
+            assertThat(nc.getCell(4).getCellType()).isEqualTo(CellType.BLANK);
             assertThat(nc.getCell(7).getStringCellValue()).isEqualTo("Nota de crédito da fatura FT A/1");
 
             Row part = rowWithNumber(sheet, "FT A/2");
-            assertThat(part.getCell(4)).isNull();
-            assertThat(part.getCell(5)).isNull();
+            assertThat(part.getCell(4).getCellType()).isEqualTo(CellType.BLANK);
+            assertThat(part.getCell(5).getCellType()).isEqualTo(CellType.BLANK);
             assertThat(part.getCell(7).getStringCellValue())
                     .isEqualTo("Pago parcialmente 50,00 € por pagamento mb em 10-09-2026");
 
             Row agg = rowWithNumber(sheet, "FT A/4");
-            assertThat(agg.getCell(4).getStringCellValue()).isEqualTo("Sim");
+            assertThat(agg.getCell(4).getStringCellValue()).isEqualTo("x");
             assertThat(agg.getCell(5).getStringCellValue()).isEqualTo("Numerário");
             assertThat(agg.getCell(7).getStringCellValue())
                     .isEqualTo("Pago por numerário em 12-09-2026, 20,00 € junto com FT A/5");
@@ -378,7 +392,9 @@ class BudgetExcelExportServiceTest {
             Row print = rowWithNumber(sheet, "Imprimir fatura");
             assertThat(print.getCell(1).getCellType()).isEqualTo(CellType.BLANK);
 
-            Row manual = sheet.getRow(7);
+            // por data, da mais recente: 04-09 (×2), 03-09, 02-09, 01-09, a despesa à mão de 01-08
+            // e, sem data, a "Imprimir fatura" no fim
+            Row manual = sheet.getRow(6);
             assertThat(manual.getCell(0).getCellType()).isEqualTo(CellType.BLANK);
             assertThat(manual.getCell(3).getNumericCellValue()).isEqualTo(15d);
             assertThat(manual.getCell(8).getStringCellValue()).isEqualTo("1.1 — Montagem do estaleiro");

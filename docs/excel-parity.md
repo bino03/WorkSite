@@ -55,7 +55,7 @@ A folha `Despesas` de cada obra é uma tabela Excel chamada `TabelaDespesas`, co
 | `Data`             | `invoice_date`                                                            | `dd/mm/aaaa`. Vazia → nula                                                                                                                                                                        |
 | `Produto/Serviço`  | `description`                                                             | texto. O nome do fornecedor costuma vir no início ("Casa Dolores - …"): **não** se extrai daí — ver §3.1                                                                                          |
 | `Valor`            | `total_amount`                                                            | `numeric(14,2)`. Aceitar `11 643,33 €`, `11.643,33 €`, `11643,33` — as três formas existem. Sempre positivo; uma linha negativa é uma nota de crédito (§3.2)                                      |
-| `Liquidada`        | derivado de `payment` (§4)                                                | `x`, `X`, `Sim` → paga; vazio → não paga. Na exportação escreve-se sempre `Sim`                                                                                                                   |
+| `Liquidada`        | derivado de `payment` (§4)                                                | `x`, `X`, `Sim` → paga; vazio → não paga. Na exportação escreve-se `x`, como o vault (a formatação condicional pinta-o de verde) — era `Sim` até 2026-09-23 |
 | `Metodo Pagamento` | `payment.method`                                                          | mapa em §4                                                                                                                                                                                        |
 | `Bizdocs`          | `sent_to_accountant`                                                      | `x`/`X` → `true`; vazio → `false`. Na exportação escreve-se `X`                                                                                                                                   |
 | `Observações`      | `notes`                                                                   | texto. A prova de pagamento que hoje vive aqui ("Pago por transferência em 28-08-2026 (extrato ABANCA)") vai para `payment.reference` quando for possível separar; caso contrário fica em `notes` |
@@ -177,9 +177,12 @@ iguais letra a letra.
 > (`Rubrica | Descrição | Preço total`) — descoberto ao migrar o Vila Petrus a 2026-09-17, quando o
 > importador leu o total na coluna F e entrou tudo a zero; desde então **resolve as colunas pelo
 > cabeçalho** (`Art`/`Rubrica`, `Descrição`, `Un.`, `Quant`, `Preço Un`, `Preço total`, `Obs.`), com a
-> posição do orçamento do empreiteiro como fallback **só quando o cabeçalho não tem nomes conhecidos** — num cabeçalho reconhecido, a coluna que lá não está não existe (na folha de 3 colunas o "Preço total" ia parar a "Un." por cair na posição 2; visto e corrigido a 2026-09-18, `BudgetImportVaultLayoutTest`). A exportação escreve `Rubrica`, com as 7 colunas
-> (`Rubrica | Descrição | Un. | Quant | Preço Un | Preço total | Obs.`) e a linha `TOTAL` na coluna B —
-> um só formato que os dois lados leem. `rowKind` não tem coluna: na reimportação, sub-títulos e notas
+> posição do orçamento do empreiteiro como fallback **só quando o cabeçalho não tem nomes conhecidos** — num cabeçalho reconhecido, a coluna que lá não está não existe (na folha de 3 colunas o "Preço total" ia parar a "Un." por cair na posição 2; visto e corrigido a 2026-09-18, `BudgetImportVaultLayoutTest`). A exportação escreve a folha **como a do vault**
+> (desde 2026-09-23; antes eram 7 colunas): o bloco "ORÇAMENTO" com a empresa e o logo, Cliente/Obra/Data,
+> e o cabeçalho `Rubrica | Descrição | Preço total` na linha 11, com a linha `TOTAL` na coluna B.
+> Un., Quant, Preço Un e Obs. **não saem** — a folha do vault não os tem, e ficam guardados na app. O
+> importador encontra o cabeçalho sozinho (procura `Rubrica`/`Art` na coluna A), por isso o bloco de cima
+> não o atrapalha. `rowKind` não tem coluna: na reimportação, sub-títulos e notas
 > voltam a ser classificados pela heurística do importador (sem índice e sem números → sub-título;
 > nome entre parêntesis → nota), o que o teste de round-trip cobre.
 
@@ -391,7 +394,7 @@ em `Por lançar\` e `Não Reconhecido\` não entra — não está no Excel.
 > Fica de fora desta implementação a pasta `Faturas\Lançadas\` (§7) — só o `.xlsx`.
 
 Uma obra → um `.xlsx` (`Despesas - <slug>.xlsx`) com as folhas que o utilizador escolher, na ordem do
-vault: **"Orçamento inicial"** (7 colunas, cabeçalho `Rubrica`, `TOTAL` — ver §6), **"Despesas"**
+vault: **"Orçamento inicial"** (o documento do vault: empresa + logo, 3 colunas, `TOTAL` — ver §6), **"Despesas"**
 (`TabelaDespesas`, `TableStyleMedium2`, com as colunas de §3 **mais** `Fornecedor` e `NIF`, linha de totais
 `=SUBTOTAL(109,[Valor])`), **"Orçamento vs Gasto"** e **"Rubricas"** (`TabelaRubricas`) — estas duas
 saem juntas, **todas em fórmulas** iguais às do `gerar-orcamento-vs-gasto.ps1` (`SUMIF` por etiqueta e
@@ -399,6 +402,23 @@ por índice, `SUMPRODUCT` das faturas sem rubrica), com a dropdown da coluna `Ru
 coluna M escondida da "Rubricas", e obrigam a incluir a "Despesas" (sem `TabelaDespesas` dariam
 `#NAME?`). As duas folhas de orçamento exigem rubricas vivas; a "Despesas" sai sempre (sem faturas: só
 cabeçalho, uma linha vazia e totais a 0). Rubricas eliminadas (`deleted_at`) nunca saem.
+
+**Aspeto (2026-09-23)**: o livro é visualmente igual ao `Despesas - Vila Petrus.xlsx` do vault. O que o
+garante:
+- o **tema do Office do vault** vai embebido (`resources/excel/vilatro-theme.xml`). Sem ele, o Excel aplica o
+  tema novo e a `TableStyleMedium2` fica verde-azulada em vez de azul;
+- **"Orçamento inicial"**: o bloco da empresa com o logo (`resources/excel/vilatro-logo.jpeg`), a moldura
+  (margem grossa por fora, fina entre as colunas), os capítulos a verde `C6E0B4` com o código `1.`, letra 9 e zoom 130%.
+  Os dados da empresa estão como constantes no `BudgetExcelExportService`;
+- **"Despesas"**: cabeçalho `3A3838` com letra branca e 32 pt de altura; tudo alinhado ao topo; data ao centro;
+  observações com quebra de linha; `x` em Liquidada/Bizdocs pintado a verde `92D050` por formatação
+  condicional; linhas **por data, da mais recente para a mais antiga**; sem painéis fixos; zoom 115%; abre nesta folha;
+- **"Orçamento vs Gasto"**: cabeçalho da tabela `00B0F0` com letra branca, caixa com margens à volta dos
+  totais, barras de dados na % consumida, e vermelho acima dos 100% e no saldo negativo — as regras do
+  `gerar-orcamento-vs-gasto.ps1`.
+
+Fornecedor e NIF continuam como colunas extra no fim da "Despesas" (decisão do utilizador: o que tinha de
+ser igual era o aspeto, não as colunas).
 
 Formatos: data `dd/mm/aaaa` (célula de data, não texto); **moeda `# ##0,00 €`** — o mesmo código que a
 coluna `Valor` do vault já usa (`#,##0.00\ "€"` no ficheiro), e não o `#.##0,00 €` que este contrato dizia
@@ -417,7 +437,7 @@ General.
 | Fatura sem nº | `Nº Fatura` vazio; `TO_PRINT` → "Imprimir fatura", `TO_REQUEST` → "Pedir fatura" (§3) |
 | Rubrica sem índice ("Alternativa …") | herda a etiqueta do artigo com índice mais próximo acima — o vault faz o mesmo ao somar-lhe o valor |
 
-`Liquidada` = `Sim` só quando o estado derivado é `PAID`; `Metodo Pagamento` só nesse caso, pelo mapa
+`Liquidada` = `x` só quando o estado derivado é `PAID`; `Metodo Pagamento` só nesse caso, pelo mapa
 inverso de §4 (`OUTRO` → "Outro", que o vault não conhece — o resumo avisa). **`PARTIAL` sai por
 liquidar**: `Liquidada` vazia e a observação gerada diz `Pago parcialmente <valor> por <método> em
 dd-mm-aaaa (<referência>)`. Agregados: `Pago por <método> em dd-mm-aaaa, <valor do movimento> junto com

@@ -7,6 +7,7 @@ import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNo
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.DocumentsExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
+import com.management.managementapi.enterprises.model.BudgetRowKind;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
@@ -22,18 +23,36 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.poi.ss.SpreadsheetVersion;
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.ClientAnchor;
+import org.apache.poi.ss.usermodel.ComparisonOperator;
+import org.apache.poi.ss.usermodel.ConditionalFormattingThreshold;
 import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.DataValidation;
 import org.apache.poi.ss.usermodel.DataValidationConstraint;
 import org.apache.poi.ss.usermodel.DataValidationHelper;
+import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.AreaReference;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFConditionalFormattingRule;
+import org.apache.poi.xssf.usermodel.XSSFDataBarFormatting;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFFont;
+import org.apache.poi.xssf.usermodel.XSSFFontFormatting;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFSheetConditionalFormatting;
 import org.apache.poi.xssf.usermodel.XSSFTable;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.openxmlformats.schemas.spreadsheetml.x2006.main.CTTable;
@@ -45,7 +64,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -56,6 +77,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -101,8 +123,28 @@ public class BudgetExcelExportService {
     static final String TABLE_EXPENSES = "TabelaDespesas";
     static final String TABLE_RUBRICS = "TabelaRubricas";
 
-    static final String[] BUDGET_HEADERS =
-            {"Rubrica", "Descrição", "Un.", "Quant", "Preço Un", "Preço total", "Obs."};
+    /** A linha (0-based) do cabeçalho da "Orçamento inicial" — por baixo do bloco da empresa, como no vault. */
+    static final int BUDGET_HEADER_ROW = 10;
+    private static final int BUDGET_FONT_SIZE = 9;
+
+    private static final String COMPANY_NAME = "Vilatro Construção & Engenharia, Lda.";
+    private static final String COMPANY_ADDRESS = "Rua Engenheiro Joaquim Botelho de Lucena, nº28";
+    private static final String COMPANY_POSTCODE = "5000-705 Vila Real";
+    private static final String COMPANY_NIF = "NIF: 518849651";
+    private static final String COMPANY_EMAIL = "Email: gestao.vilatro@gmail.com";
+
+    // as cores das folhas do vault
+    private static final String COLOR_WHITE = "FFFFFF";
+    private static final String COLOR_HEADER_DARK = "3A3838";  // cabeçalho da "Despesas"
+    private static final String COLOR_CHAPTER = "C6E0B4";      // capítulos do orçamento
+    private static final String COLOR_DONE = "92D050";         // Liquidada / Bizdocs com "x"
+    private static final String COLOR_PANEL_HEADER = "00B0F0"; // cabeçalho do painel
+    private static final String COLOR_DATA_BAR = "638EC6";
+    private static final String COLOR_RED = "FF0000";
+
+    /** O tema do Office do vault — sem ele, o Excel usa o tema novo e a {@code TableStyleMedium2} muda de cor. */
+    private static final String THEME_RESOURCE = "/excel/vilatro-theme.xml";
+    private static final String LOGO_RESOURCE = "/excel/vilatro-logo.jpeg";
     static final String[] EXPENSES_HEADERS = {
             "Nº Fatura", "Data", "Produto/Serviço", "Valor", "Liquidada", "Metodo Pagamento",
             "Bizdocs", "Observações", "Rubrica", "Fornecedor", "NIF"};
@@ -352,6 +394,10 @@ public class BudgetExcelExportService {
                     "Despesa registada à mão na app, sem fatura.",
                     rubricLabelOf(expense, model), null, null));
         }
+
+        // a tabela do vault está ordenada pela Data, da mais recente para a mais antiga;
+        // a ordenação é estável, por isso as linhas de uma fatura repartida ficam juntas
+        model.rows.sort(Comparator.comparing(ExpenseRow::date, Comparator.nullsLast(Comparator.reverseOrder())));
     }
 
     private void addInvoiceRows(Model model, ConstructionInvoice invoice,
@@ -546,6 +592,7 @@ public class BudgetExcelExportService {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
+            applyVaultTheme(workbook);
             Styles styles = new Styles(workbook);
             if (sheets.contains(BudgetExportSheet.BUDGET)) {
                 writeBudgetSheet(workbook, styles, model);
@@ -562,6 +609,10 @@ public class BudgetExcelExportService {
                 workbook.setSheetOrder(SHEET_COMPARISON, workbook.getSheetIndex(SHEET_RUBRICS));
                 addRubricDropdown(expensesSheet, model, dropdownRows);
             }
+            if (expensesSheet != null) {
+                // o vault abre na "Despesas" — é a folha onde se trabalha
+                workbook.setActiveSheet(workbook.getSheetIndex(expensesSheet));
+            }
 
             workbook.setForceFormulaRecalculation(true);
             workbook.write(out);
@@ -575,63 +626,171 @@ public class BudgetExcelExportService {
 
     // "Orçamento inicial" ────────────────────────────────────
 
+    /**
+     * A folha é o documento do orçamento, tal como está no vault (Vila Petrus):
+     * "ORÇAMENTO", o bloco da empresa com o logo, Cliente/Obra/Data, e a tabela
+     * {@code Rubrica | Descrição | Preço total} numa moldura — margem grossa por
+     * fora, fina entre colunas, capítulos a verde, letra 9. Un., Quant, Preço Un
+     * e Obs. ficam na app: a folha do vault não os tem (pedido do utilizador a
+     * 2026-09-23). O importador encontra o cabeçalho sozinho, por isso o bloco de
+     * cima não o atrapalha.
+     */
     private void writeBudgetSheet(XSSFWorkbook workbook, Styles styles, Model model) {
         XSSFSheet sheet = workbook.createSheet(SHEET_BUDGET);
-        sheet.setDefaultColumnStyle(0, styles.text);
-        header(sheet, 0, BUDGET_HEADERS, styles);
+        Look base = Look.of(BUDGET_FONT_SIZE);
+        for (int c = 0; c <= 2; c++) sheet.setDefaultColumnStyle(c, styles.get(base));
+        sheet.setColumnWidth(0, width(6.66));
+        sheet.setColumnWidth(1, width(63.44));
+        sheet.setColumnWidth(2, width(10));
+        sheet.setZoom(130);
 
-        int[] rowIndex = {1};
+        Row title = sheet.createRow(1);
+        CellStyle titleStyle = styles.get(base.bold().center());
+        cell(title, 0, "ORÇAMENTO", titleStyle);
+        cell(title, 1, (String) null, titleStyle);
+        cell(title, 2, (String) null, titleStyle);
+        sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 2));
+
+        writeCompanyBlock(sheet, styles, base, model);
+
+        Look codeCol = base.center().left(BorderStyle.MEDIUM).right(BorderStyle.THIN);
+        Look textCol = base.left(BorderStyle.THIN).right(BorderStyle.THIN);
+        Look priceCol = base.center().format(FORMAT_CURRENCY).left(BorderStyle.THIN).right(BorderStyle.MEDIUM);
+
+        Row header = sheet.createRow(BUDGET_HEADER_ROW);
+        cell(header, 0, "Rubrica", styles.get(codeCol.bottom(BorderStyle.THIN)));
+        cell(header, 1, "Descrição", styles.get(textCol.bottom(BorderStyle.THIN)));
+        cell(header, 2, "Preço total", styles.get(priceCol.h(HorizontalAlignment.LEFT).bottom(BorderStyle.THIN)));
+
+        BudgetFrame frame = new BudgetFrame(
+                styles.get(codeCol), styles.get(textCol.wrap()), styles.get(textCol.bold().wrap()), styles.get(priceCol),
+                styles.get(codeCol.fill(COLOR_CHAPTER).top(BorderStyle.THIN).bottom(BorderStyle.THIN)),
+                styles.get(textCol.bold().fill(COLOR_CHAPTER).top(BorderStyle.THIN).bottom(BorderStyle.THIN)),
+                styles.get(priceCol.fill(COLOR_CHAPTER).top(BorderStyle.THIN).bottom(BorderStyle.THIN)));
+
+        int[] rowIndex = {BUDGET_HEADER_ROW + 1};
+        frameRow(sheet.createRow(rowIndex[0]++), frame); // a linha em branco a seguir ao cabeçalho
         for (BudgetItemNodeDTO root : model.tree.roots()) {
-            writeBudgetRows(sheet, root, rowIndex, styles);
+            writeBudgetRows(sheet, root, rowIndex, frame);
         }
 
-        Row total = sheet.createRow(rowIndex[0]);
-        cell(total, 1, "TOTAL", styles.bold);
-        cell(total, 5, model.tree.budgetTotal(), styles.currencyBold);
+        Row total = sheet.createRow(rowIndex[0]++);
+        cell(total, 0, (String) null, frame.chapterCode());
+        cell(total, 1, "TOTAL", frame.chapterText());
+        cell(total, 2, model.tree.budgetTotal(), frame.chapterPrice());
 
-        sheet.setColumnWidth(0, 10 * 256);
-        sheet.setColumnWidth(1, 62 * 256);
-        sheet.setColumnWidth(2, 6 * 256);
-        for (int c = 3; c <= 5; c++) sheet.setColumnWidth(c, 14 * 256);
-        sheet.setColumnWidth(6, 30 * 256);
-        sheet.createFreezePane(0, 1);
+        Row bottom = sheet.createRow(rowIndex[0]);
+        cell(bottom, 0, (String) null, styles.get(codeCol.bottom(BorderStyle.MEDIUM)));
+        cell(bottom, 1, (String) null, styles.get(base.bottom(BorderStyle.MEDIUM)));
+        cell(bottom, 2, (String) null, styles.get(priceCol.left(BorderStyle.NONE).bottom(BorderStyle.MEDIUM)));
     }
 
-    private void writeBudgetRows(XSSFSheet sheet, BudgetItemNodeDTO node, int[] rowIndex, Styles styles) {
+    /** Linhas 3 a 10: a empresa (com o logo à direita), e Cliente/Obra/Data. */
+    private void writeCompanyBlock(XSSFSheet sheet, Styles styles, Look base, Model model) {
+        String[][] lines = {
+                {"Empresa", COMPANY_NAME}, {null, COMPANY_ADDRESS}, {null, COMPANY_POSTCODE},
+                {null, COMPANY_NIF}, {null, COMPANY_EMAIL},
+                {"Cliente", null}, {"Obra", model.enterprise.getName()}, {"Data", null}};
+        int first = 2, last = first + lines.length - 1, emailRow = first + 4;
+        for (int i = 0; i < lines.length; i++) {
+            int r = first + i;
+            Look label = base.bold().center().left(BorderStyle.MEDIUM).right(BorderStyle.THIN);
+            Look value = base.h(HorizontalAlignment.LEFT).v(VerticalAlignment.CENTER).wrap();
+            Look edge = base.center().right(BorderStyle.THICK);
+            if (r == first) {
+                label = label.top(BorderStyle.MEDIUM);
+                value = value.top(BorderStyle.MEDIUM);
+                edge = edge.top(BorderStyle.THICK);
+            }
+            if (r == emailRow) {
+                label = label.bottom(BorderStyle.THIN);
+                value = value.bottom(BorderStyle.THIN);
+            }
+            if (r == last) {
+                label = label.bottom(BorderStyle.MEDIUM);
+                value = value.bottom(BorderStyle.MEDIUM);
+                edge = edge.bottom(BorderStyle.THICK);
+            }
+            Row row = sheet.createRow(r);
+            cell(row, 0, lines[i][0], styles.get(label));
+            cell(row, 1, lines[i][1], styles.get(value));
+            cell(row, 2, (String) null, styles.get(edge));
+        }
+        sheet.getRow(first).setHeightInPoints(32.25f);
+        sheet.getRow(last).setHeightInPoints(15f);
+
+        // o logo, no sítio onde está no vault: de B3 (à direita do texto) até C10
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+        XSSFClientAnchor anchor = new XSSFClientAnchor(3147646, 32240, 661473, 178045, 1, first, 2, last - 1);
+        anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_DONT_RESIZE);
+        drawing.createPicture(anchor, sheet.getWorkbook().addPicture(logo(), Workbook.PICTURE_TYPE_JPEG));
+    }
+
+    private void writeBudgetRows(XSSFSheet sheet, BudgetItemNodeDTO node, int[] rowIndex, BudgetFrame frame) {
         Row row = sheet.createRow(rowIndex[0]++);
         boolean chapter = node.depth() == 0 && !isBlank(node.code());
-        cell(row, 0, node.code(), styles.text);
-        cell(row, 1, node.name(), chapter ? styles.bold : null);
-        cell(row, 2, node.unit(), null);
-        cell(row, 3, node.quantity(), null);
-        cell(row, 4, node.unitPrice(), styles.currency);
-        cell(row, 5, node.totalPrice(), chapter ? styles.currencyBold : styles.currency);
-        cell(row, 6, node.observations(), null);
+        if (chapter) {
+            // no vault os capítulos levam o ponto no fim ("1.", "2.") — o importador tira-o
+            String code = node.code().endsWith(".") ? node.code() : node.code() + ".";
+            cell(row, 0, code, frame.chapterCode());
+            cell(row, 1, node.name(), frame.chapterText());
+            cell(row, 2, node.totalPrice(), frame.chapterPrice());
+        } else {
+            boolean heading = node.rowKind() == BudgetRowKind.HEADING || node.rowKind() == BudgetRowKind.NOTE;
+            cell(row, 0, node.code(), frame.code());
+            cell(row, 1, node.name(), heading ? frame.boldText() : frame.text());
+            cell(row, 2, node.totalPrice(), frame.price());
+        }
         for (BudgetItemNodeDTO child : node.children()) {
-            writeBudgetRows(sheet, child, rowIndex, styles);
+            writeBudgetRows(sheet, child, rowIndex, frame);
         }
     }
+
+    /** Uma linha vazia dentro da moldura. */
+    private static void frameRow(Row row, BudgetFrame frame) {
+        cell(row, 0, (String) null, frame.code());
+        cell(row, 1, (String) null, frame.text());
+        cell(row, 2, (String) null, frame.price());
+    }
+
+    private record BudgetFrame(CellStyle code, CellStyle text, CellStyle boldText, CellStyle price,
+                               CellStyle chapterCode, CellStyle chapterText, CellStyle chapterPrice) {}
 
     // "Despesas" ─────────────────────────────────────────────
 
     private XSSFSheet writeExpensesSheet(XSSFWorkbook workbook, Styles styles, Model model) {
         XSSFSheet sheet = workbook.createSheet(SHEET_EXPENSES);
-        header(sheet, 0, EXPENSES_HEADERS, styles);
+        sheet.setZoom(115);
+
+        // o aspeto é o da folha do vault: cabeçalho escuro, tudo alinhado ao topo
+        // (as observações longas partem a linha), a data ao centro
+        Row header = sheet.createRow(0);
+        header.setHeightInPoints(31.95f);
+        CellStyle headerStyle = styles.get(Look.of(11).bold().color(COLOR_WHITE).fill(COLOR_HEADER_DARK).center().wrap());
+        for (int c = 0; c < EXPENSES_HEADERS.length; c++) cell(header, c, EXPENSES_HEADERS[c], headerStyle);
+
+        Look top = Look.of(11).v(VerticalAlignment.TOP);
+        CellStyle plain = styles.get(top);
+        CellStyle text = styles.get(top.format(FORMAT_TEXT));
+        CellStyle date = styles.get(top.format(FORMAT_DATE).h(HorizontalAlignment.CENTER));
+        CellStyle money = styles.get(top.format(FORMAT_CURRENCY));
+        CellStyle notes = styles.get(top.h(HorizontalAlignment.LEFT).wrap());
+        CellStyle rubric = styles.get(top.format(FORMAT_TEXT).h(HorizontalAlignment.LEFT).wrap());
 
         int r = 1;
         for (ExpenseRow line : model.rows) {
             Row row = sheet.createRow(r++);
-            cell(row, 0, line.number(), styles.text);
-            cell(row, 1, line.date(), styles.date);
-            cell(row, 2, line.description(), null);
-            cell(row, 3, line.amount(), styles.currency);
-            cell(row, 4, line.paid() ? "Sim" : null, null);
-            cell(row, 5, line.method(), null);
-            cell(row, 6, line.bizdocs() ? "X" : null, null);
-            cell(row, 7, line.observations(), null);
-            cell(row, 8, line.rubric(), styles.text);
-            cell(row, 9, line.supplierName(), null);
-            cell(row, 10, line.supplierNif(), styles.text);
+            cell(row, 0, line.number(), text);
+            cell(row, 1, line.date(), date);
+            cell(row, 2, line.description(), plain);
+            cell(row, 3, line.amount(), money);
+            cell(row, 4, line.paid() ? "x" : null, plain);
+            cell(row, 5, line.method(), plain);
+            cell(row, 6, line.bizdocs() ? "X" : null, plain);
+            cell(row, 7, line.observations(), notes);
+            cell(row, 8, line.rubric(), rubric);
+            cell(row, 9, line.supplierName(), plain);
+            cell(row, 10, line.supplierNif(), text);
         }
         if (model.rows.isEmpty()) {
             // uma tabela do Excel precisa de pelo menos uma linha de dados entre o cabeçalho e os totais
@@ -640,12 +799,15 @@ public class BudgetExcelExportService {
 
         int totalsRow = r;
         Row totals = sheet.createRow(totalsRow);
-        cell(totals, 0, "TOTAL", styles.bold);
+        Look bold = Look.of(11).bold();
+        cell(totals, 0, "TOTAL", styles.get(bold));
+        cell(totals, 1, (String) null, styles.get(bold.h(HorizontalAlignment.CENTER)));
+        for (int c = 4; c < EXPENSES_HEADERS.length; c++) cell(totals, c, (String) null, styles.get(bold));
 
         // a tabela tem de existir antes de qualquer fórmula que a nomeie — o POI
         // resolve a referência estruturada ao escrever a fórmula
         XSSFTable table = createTable(sheet, TABLE_EXPENSES, 0, totalsRow, EXPENSES_HEADERS.length - 1, true);
-        formula(totals, 3, "SUBTOTAL(109," + TABLE_EXPENSES + "[Valor])", styles.currencyBold);
+        formula(totals, 3, "SUBTOTAL(109," + TABLE_EXPENSES + "[Valor])", styles.get(bold.format(FORMAT_CURRENCY)));
         for (CTTableColumn column : table.getCTTable().getTableColumns().getTableColumnList()) {
             if ("Valor".equals(column.getName())) {
                 column.setTotalsRowFunction(STTotalsRowFunction.SUM);
@@ -654,9 +816,18 @@ public class BudgetExcelExportService {
             }
         }
 
-        int[] widths = {20, 12, 50, 14, 10, 18, 9, 50, 40, 30, 12};
-        for (int c = 0; c < widths.length; c++) sheet.setColumnWidth(c, widths[c] * 256);
-        sheet.createFreezePane(0, 1);
+        // Liquidada e Bizdocs: o "x" pinta a célula de verde (letra da cor do fundo), como no vault
+        int lastData = Math.max(totalsRow - 1, 1);
+        XSSFSheetConditionalFormatting formatting = sheet.getSheetConditionalFormatting();
+        for (int c : new int[] {4, 6}) {
+            XSSFConditionalFormattingRule rule = formatting.createConditionalFormattingRule(ComparisonOperator.EQUAL, "\"X\"");
+            rule.createFontFormatting().setFontColor(rgb(COLOR_DONE));
+            rule.createPatternFormatting().setFillBackgroundColor(rgb(COLOR_DONE));
+            formatting.addConditionalFormatting(new CellRangeAddress[] {new CellRangeAddress(1, lastData, c, c)}, rule);
+        }
+
+        double[] widths = {20.66, 12.66, 55.66, 13.55, 14.66, 14.66, 10.33, 40.55, 28.66, 30, 14.66};
+        for (int c = 0; c < widths.length; c++) sheet.setColumnWidth(c, width(widths[c]));
         return sheet;
     }
 
@@ -715,8 +886,8 @@ public class BudgetExcelExportService {
         }
         sheet.setColumnHidden(12, true);
 
-        int[] widths = {10, 62, 6, 7, 11, 13, 13, 13, 13, 13, 40};
-        for (int c = 0; c < widths.length; c++) sheet.setColumnWidth(c, widths[c] * 256);
+        double[] widths = {10.77, 62.77, 6.77, 7.77, 11.77, 13.77, 13.77, 13.77, 13.77, 13.77, 40.77};
+        for (int c = 0; c < widths.length; c++) sheet.setColumnWidth(c, width(widths[c]));
         sheet.createFreezePane(0, 1);
         return dropdownRows;
     }
@@ -761,22 +932,29 @@ public class BudgetExcelExportService {
                 + ". O Gasto é fórmula: assim que preencheres a coluna Rubrica na folha \"" + SHEET_EXPENSES
                 + "\", isto atualiza-se sozinho.", styles.italic);
 
-        String[] kpis = {"Orçamento total", "Gasto classificado", "Por classificar", "Rubrica não reconhecida",
+        String[] kpis = {"Orçamento total", "Custo classificado", "Por classificar", "Rubrica não reconhecida",
                 "Total lançado", "% do orçamento", "Saldo"};
+        // os totais numa caixa com todas as margens, como o script do vault desenha
+        Look kpiLook = Look.of(13).bold().box(BorderStyle.THIN);
+        CellStyle kpiCurrency = styles.get(kpiLook.format(FORMAT_CURRENCY));
         Row kpiHeaderRow = sheet.createRow(kpiHeader - 1);
-        for (int i = 0; i < kpis.length; i++) cell(kpiHeaderRow, i + 1, kpis[i], styles.boldWrap);
+        CellStyle kpiHeaderStyle = styles.get(Look.of(11).bold().wrap().box(BorderStyle.THIN));
+        for (int i = 0; i < kpis.length; i++) cell(kpiHeaderRow, i + 1, kpis[i], kpiHeaderStyle);
         Row kpiRow = sheet.createRow(kpiValue - 1);
-        formula(kpiRow, 1, "C" + totalRow, styles.kpiCurrency);
-        formula(kpiRow, 2, "D" + totalRow, styles.kpiCurrency);
-        formula(kpiRow, 3, "D" + unclassifiedRow, styles.kpiCurrency);
-        formula(kpiRow, 4, "D" + unknownRow, styles.kpiCurrency);
-        formula(kpiRow, 5, "SUM(" + TABLE_EXPENSES + "[Valor])", styles.kpiCurrency);
-        formula(kpiRow, 6, "IF(B" + kpiValue + "=0,\"\",F" + kpiValue + "/B" + kpiValue + ")", styles.kpiPercent);
-        formula(kpiRow, 7, "B" + kpiValue + "-F" + kpiValue, styles.kpiCurrency);
+        formula(kpiRow, 1, "C" + totalRow, kpiCurrency);
+        formula(kpiRow, 2, "D" + totalRow, kpiCurrency);
+        formula(kpiRow, 3, "D" + unclassifiedRow, kpiCurrency);
+        formula(kpiRow, 4, "D" + unknownRow, kpiCurrency);
+        formula(kpiRow, 5, "SUM(" + TABLE_EXPENSES + "[Valor])", kpiCurrency);
+        formula(kpiRow, 6, "IF(B" + kpiValue + "=0,\"\",F" + kpiValue + "/B" + kpiValue + ")",
+                styles.get(kpiLook.format(FORMAT_PERCENT)));
+        formula(kpiRow, 7, "B" + kpiValue + "-F" + kpiValue, kpiCurrency);
 
         cell(sheet.createRow(6), 0, "POR CAPÍTULO", styles.bold);
-        header(sheet, tableHeader - 1, new String[] {"Cap", "Rubrica", "Orçamentado", "Gasto", "Saldo",
-                "% consumido", "Nº faturas"}, styles);
+        String[] tableHeaders = {"Cap", "Rubrica", "Orçamentado", "Gasto", "Saldo", "% consumido", "Nº faturas"};
+        Row tableHeaderRow = sheet.createRow(tableHeader - 1);
+        CellStyle blueHeader = styles.get(Look.of(11).bold().color(COLOR_WHITE).fill(COLOR_PANEL_HEADER));
+        for (int c = 0; c < tableHeaders.length; c++) cell(tableHeaderRow, c, tableHeaders[c], blueHeader);
 
         int r = first;
         for (RubricRow chapter : chapters) {
@@ -793,34 +971,96 @@ public class BudgetExcelExportService {
 
         int last = totalRow - 1;
         Row total = sheet.createRow(totalRow - 1);
-        cell(total, 1, "TOTAL", styles.bold);
-        formula(total, 2, "SUM(C" + first + ":C" + last + ")", styles.currencyBold);
-        formula(total, 3, "SUM(D" + first + ":D" + last + ")", styles.currencyBold);
-        formula(total, 4, "C" + totalRow + "-D" + totalRow, styles.currencyBold);
-        formula(total, 5, "IF(C" + totalRow + "=0,\"\",D" + totalRow + "/C" + totalRow + ")", styles.percent);
-        formula(total, 6, "SUM(G" + first + ":G" + last + ")", styles.bold);
+        Look totalLook = Look.of(11).bold().top(BorderStyle.THIN);
+        cell(total, 0, (String) null, styles.get(totalLook));
+        cell(total, 1, "TOTAL", styles.get(totalLook));
+        CellStyle totalCurrency = styles.get(totalLook.format(FORMAT_CURRENCY));
+        formula(total, 2, "SUM(C" + first + ":C" + last + ")", totalCurrency);
+        formula(total, 3, "SUM(D" + first + ":D" + last + ")", totalCurrency);
+        formula(total, 4, "C" + totalRow + "-D" + totalRow, totalCurrency);
+        formula(total, 5, "IF(C" + totalRow + "=0,\"\",D" + totalRow + "/C" + totalRow + ")",
+                styles.get(totalLook.format(FORMAT_PERCENT)));
+        formula(total, 6, "SUM(G" + first + ":G" + last + ")", styles.get(totalLook));
 
+        CellStyle italicCurrency = styles.get(Look.of(11).italic().format(FORMAT_CURRENCY));
         Row unclassified = sheet.createRow(unclassifiedRow - 1);
         cell(unclassified, 1, "Faturas ainda sem rubrica", styles.italic);
         formula(unclassified, 3, "SUMPRODUCT((" + TABLE_EXPENSES + "[Rubrica]=\"\")*" + TABLE_EXPENSES + "[Valor])",
-                styles.currency);
-        formula(unclassified, 6, "SUMPRODUCT(--(" + TABLE_EXPENSES + "[Rubrica]=\"\"))", null);
+                italicCurrency);
+        formula(unclassified, 6, "SUMPRODUCT(--(" + TABLE_EXPENSES + "[Rubrica]=\"\"))", styles.italic);
 
         Row unknown = sheet.createRow(unknownRow - 1);
         cell(unknown, 1, "Rubrica escrita que não existe no orçamento", styles.italic);
-        formula(unknown, 3, "SUM(" + TABLE_EXPENSES + "[Valor])-D" + totalRow + "-D" + unclassifiedRow, styles.currency);
-        formula(unknown, 6, "SUMPRODUCT(--(" + TABLE_EXPENSES + "[Rubrica]<>\"\"))-G" + totalRow, null);
+        formula(unknown, 3, "SUM(" + TABLE_EXPENSES + "[Valor])-D" + totalRow + "-D" + unclassifiedRow, italicCurrency);
+        formula(unknown, 6, "SUMPRODUCT(--(" + TABLE_EXPENSES + "[Rubrica]<>\"\"))-G" + totalRow, styles.italic);
 
         cell(sheet.createRow(unknownRow + 1), 0, "O detalhe por sub-rubrica está na folha \"" + SHEET_RUBRICS
                 + "\" — a mesma lista que alimenta a dropdown da coluna Rubrica.", styles.italic);
 
-        sheet.setColumnWidth(0, 6 * 256);
-        sheet.setColumnWidth(1, 46 * 256);
-        for (int c = 2; c <= 7; c++) sheet.setColumnWidth(c, 17 * 256);
+        // barras de dados na % consumida, vermelho acima dos 100% e no saldo negativo — as regras do script
+        XSSFSheetConditionalFormatting formatting = sheet.getSheetConditionalFormatting();
+        if (!chapters.isEmpty()) {
+            CellRangeAddress[] percent = {new CellRangeAddress(first - 1, last - 1, 5, 5)};
+            XSSFConditionalFormattingRule bar = formatting.createConditionalFormattingRule(rgb(COLOR_DATA_BAR));
+            XSSFDataBarFormatting barFormat = bar.getDataBarFormatting();
+            barFormat.getMinThreshold().setRangeType(ConditionalFormattingThreshold.RangeType.NUMBER);
+            barFormat.getMinThreshold().setValue(0d);
+            barFormat.getMaxThreshold().setRangeType(ConditionalFormattingThreshold.RangeType.NUMBER);
+            barFormat.getMaxThreshold().setValue(1d);
+            formatting.addConditionalFormatting(percent, bar);
+
+            XSSFConditionalFormattingRule over = formatting.createConditionalFormattingRule(ComparisonOperator.GT, "1");
+            XSSFFontFormatting overFont = over.createFontFormatting();
+            overFont.setFontColor(rgb(COLOR_RED));
+            overFont.setFontStyle(false, true);
+            formatting.addConditionalFormatting(percent, over);
+        }
+        XSSFConditionalFormattingRule negative = formatting.createConditionalFormattingRule(ComparisonOperator.LT, "0");
+        negative.createFontFormatting().setFontColor(rgb(COLOR_RED));
+        formatting.addConditionalFormatting(new CellRangeAddress[] {new CellRangeAddress(first - 1, totalRow - 1, 4, 4)},
+                negative);
+
+        sheet.setColumnWidth(0, width(6.77));
+        sheet.setColumnWidth(1, width(46.77));
+        for (int c = 2; c <= 7; c++) sheet.setColumnWidth(c, width(17.77));
+        sheet.setZoom(115);
         sheet.createFreezePane(0, first - 1);
     }
 
     // ── POI helpers ───────────────────────────────────────────
+
+    /** Troca o tema do livro pelo do vault (as cores de tema das tabelas vêm daqui). */
+    private static void applyVaultTheme(XSSFWorkbook workbook) throws IOException {
+        workbook.getStylesSource().ensureThemesTable();
+        try (InputStream in = resource(THEME_RESOURCE)) {
+            workbook.getTheme().readFrom(in);
+        }
+    }
+
+    private static byte[] logo() {
+        try (InputStream in = resource(LOGO_RESOURCE)) {
+            return in.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static InputStream resource(String path) {
+        InputStream in = BudgetExcelExportService.class.getResourceAsStream(path);
+        if (in == null) {
+            throw new IllegalStateException("Recurso em falta no classpath: " + path);
+        }
+        return in;
+    }
+
+    /** A largura de coluna tal como o Excel a mostra (nº de caracteres), nas unidades do POI. */
+    private static int width(double characters) {
+        return (int) Math.round(characters * 256);
+    }
+
+    private static XSSFColor rgb(String hex) {
+        return new XSSFColor(HexFormat.of().parseHex(hex), null);
+    }
 
     private static XSSFTable createTable(XSSFSheet sheet, String name, int firstRow, int lastRow,
                                          int lastCol, boolean withTotals) {
@@ -880,13 +1120,86 @@ public class BudgetExcelExportService {
         if (style != null) cell.setCellStyle(style);
     }
 
+    /**
+     * O aspeto de uma célula, como valor — duas células com o mesmo {@code Look}
+     * partilham o mesmo estilo no livro ({@link Styles#get}). As folhas do vault
+     * têm muitas combinações de margens (a moldura do orçamento), e criar um
+     * estilo por célula esgotava o limite do Excel.
+     */
+    record Look(int size, boolean isBold, boolean isItalic, String color, String fill, String format,
+                HorizontalAlignment h, VerticalAlignment v, boolean wraps,
+                BorderStyle left, BorderStyle right, BorderStyle top, BorderStyle bottom) {
+
+        static Look of(int size) {
+            return new Look(size, false, false, null, null, null, HorizontalAlignment.GENERAL,
+                    VerticalAlignment.BOTTOM, false, BorderStyle.NONE, BorderStyle.NONE, BorderStyle.NONE, BorderStyle.NONE);
+        }
+
+        Look bold() { return new Look(size, true, isItalic, color, fill, format, h, v, wraps, left, right, top, bottom); }
+        Look italic() { return new Look(size, isBold, true, color, fill, format, h, v, wraps, left, right, top, bottom); }
+        Look color(String rgb) { return new Look(size, isBold, isItalic, rgb, fill, format, h, v, wraps, left, right, top, bottom); }
+        Look fill(String rgb) { return new Look(size, isBold, isItalic, color, rgb, format, h, v, wraps, left, right, top, bottom); }
+        Look format(String f) { return new Look(size, isBold, isItalic, color, fill, f, h, v, wraps, left, right, top, bottom); }
+        Look h(HorizontalAlignment a) { return new Look(size, isBold, isItalic, color, fill, format, a, v, wraps, left, right, top, bottom); }
+        Look v(VerticalAlignment a) { return new Look(size, isBold, isItalic, color, fill, format, h, a, wraps, left, right, top, bottom); }
+        Look wrap() { return new Look(size, isBold, isItalic, color, fill, format, h, v, true, left, right, top, bottom); }
+        Look center() { return h(HorizontalAlignment.CENTER).v(VerticalAlignment.CENTER); }
+        Look left(BorderStyle b) { return new Look(size, isBold, isItalic, color, fill, format, h, v, wraps, b, right, top, bottom); }
+        Look right(BorderStyle b) { return new Look(size, isBold, isItalic, color, fill, format, h, v, wraps, left, b, top, bottom); }
+        Look top(BorderStyle b) { return new Look(size, isBold, isItalic, color, fill, format, h, v, wraps, left, right, b, bottom); }
+        Look bottom(BorderStyle b) { return new Look(size, isBold, isItalic, color, fill, format, h, v, wraps, left, right, top, b); }
+        Look box(BorderStyle b) { return left(b).right(b).top(b).bottom(b); }
+    }
+
     /** Os estilos partilhados do livro — o POI limita o nº de estilos, por isso criam-se uma vez. */
     private static final class Styles {
         final CellStyle bold, boldWrap, italic, title, text, textBold, date,
                 currency, currencyBold, percent, kpiCurrency, kpiPercent;
 
+        private final XSSFWorkbook workbook;
+        private final DataFormat formats;
+        private final Map<Look, CellStyle> byLook = new HashMap<>();
+        private final Map<String, XSSFFont> fonts = new HashMap<>();
+
+        CellStyle get(Look look) {
+            return byLook.computeIfAbsent(look, this::create);
+        }
+
+        private CellStyle create(Look look) {
+            XSSFCellStyle style = workbook.createCellStyle();
+            style.setFont(font(look));
+            if (look.format() != null) style.setDataFormat(formats.getFormat(look.format()));
+            if (look.fill() != null) {
+                style.setFillForegroundColor(rgb(look.fill()));
+                style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            }
+            style.setAlignment(look.h());
+            style.setVerticalAlignment(look.v());
+            style.setWrapText(look.wraps());
+            style.setBorderLeft(look.left());
+            style.setBorderRight(look.right());
+            style.setBorderTop(look.top());
+            style.setBorderBottom(look.bottom());
+            return style;
+        }
+
+        private XSSFFont font(Look look) {
+            String key = look.size() + "|" + look.isBold() + "|" + look.isItalic() + "|" + look.color();
+            return fonts.computeIfAbsent(key, k -> {
+                XSSFFont font = workbook.createFont();
+                font.setFontName("Calibri");
+                font.setFontHeightInPoints((short) look.size());
+                font.setBold(look.isBold());
+                font.setItalic(look.isItalic());
+                if (look.color() != null) font.setColor(rgb(look.color()));
+                return font;
+            });
+        }
+
         Styles(XSSFWorkbook workbook) {
+            this.workbook = workbook;
             DataFormat formats = workbook.createDataFormat();
+            this.formats = formats;
             Font boldFont = workbook.createFont();
             boldFont.setBold(true);
             Font italicFont = workbook.createFont();
