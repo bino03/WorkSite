@@ -122,7 +122,7 @@ class DespesasExcelImportRoundTripTest {
 
         when(invoiceRepository.findAllInvoiceNumbers()).thenReturn(List.of());
         when(budgetItemRepository.findByEnterpriseIdAndCode(eq(ENTERPRISE_ID), anyString()))
-                .thenAnswer(inv -> Optional.ofNullable(rubrics.get(inv.getArgument(1, String.class))));
+                .thenAnswer(inv -> Optional.ofNullable(rubrics.get(inv.getArgument(1, String.class))).stream().toList());
     }
 
     private record PaidSum(UUID invoiceId, BigDecimal amount) implements InvoicePaymentRepository.InvoicePaidSum {

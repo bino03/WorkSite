@@ -11,7 +11,7 @@ import type { BudgetItemDeleted } from "@/types/budget";
 
 interface Props {
   open: boolean;
-  enterpriseId: string;
+  budgetId: string;
   onClose: () => void;
   /** A árvore principal tem de recarregar depois de uma recuperação. */
   onRecovered: () => void;
@@ -32,7 +32,7 @@ const ROW_KIND_LABEL: Record<BudgetItemDeleted["rowKind"], string> = {
  * (`ConstructionBudgetItemPurgeConfig`, no servidor). "Recuperar" volta à mãe
  * original se ela ainda existir; ao topo caso contrário.
  */
-export const BudgetRecycleBinDrawer: FC<Props> = ({ open, enterpriseId, onClose, onRecovered }) => {
+export const BudgetRecycleBinDrawer: FC<Props> = ({ open, budgetId, onClose, onRecovered }) => {
   const [items, setItems] = useState<BudgetItemDeleted[]>([]);
   const [loading, setLoading] = useState(false);
   const [recoveringId, setRecoveringId] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export const BudgetRecycleBinDrawer: FC<Props> = ({ open, enterpriseId, onClose,
   const fetchDeleted = async () => {
     setLoading(true);
     try {
-      setItems(await listDeletedBudgetItems(enterpriseId));
+      setItems(await listDeletedBudgetItems(budgetId));
     } catch (error) {
       ErrorHandler.handle(error);
     } finally {
@@ -50,7 +50,7 @@ export const BudgetRecycleBinDrawer: FC<Props> = ({ open, enterpriseId, onClose,
 
   useEffect(() => {
     if (open) fetchDeleted();
-  }, [open, enterpriseId]);
+  }, [open, budgetId]);
 
   const recover = async (item: BudgetItemDeleted) => {
     setRecoveringId(item.id);

@@ -3,11 +3,11 @@ import type { CSSProperties, FC } from "react";
 import { Button, Input, Modal, Spin } from "antd";
 import { CloseOutlined, LeftOutlined, SearchOutlined } from "@ant-design/icons";
 
-import { getBudgetTree } from "@/services/budgetService";
+import { getBudgetTree, getLotTree, listBudgetLots } from "@/services/budgetService";
 import { suggestBudgetItem } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { formatCurrency } from "@/utils/formatters";
-import { flattenTree, matchesQuery, pathTo } from "@/components/budget/budgetTree";
+import { flattenTree, lotAsNode, matchesQuery, pathTo } from "@/components/budget/budgetTree";
 import type { BudgetItemNode, BudgetTree } from "@/types/budget";
 import type { BudgetItemSuggestion } from "@/types/invoice";
 
@@ -79,7 +79,16 @@ export const BudgetItemPickerModal: FC<Props> = ({
   const fetchTree = useCallback(async () => {
     setLoading(true);
     try {
-      setTree(await getBudgetTree(enterpriseId));
+      const lots = await listBudgetLots(enterpriseId);
+      if (lots.length <= 1) {
+        setTree(await getBudgetTree(enterpriseId));
+      } else {
+        // Vários lotes: o topo passa a ser a lista de lotes, porque os capítulos
+        // (e os códigos) repetem-se em todos. A fatura é da vila — pode ir para
+        // qualquer um.
+        const trees = await Promise.all(lots.map((lot) => getLotTree(lot.id)));
+        setTree({ ...trees[0], roots: lots.map((lot, i) => lotAsNode(lot, trees[i])) });
+      }
     } catch (error) {
       ErrorHandler.handle(error);
     } finally {

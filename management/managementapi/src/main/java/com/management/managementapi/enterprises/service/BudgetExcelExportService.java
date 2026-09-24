@@ -3,6 +3,7 @@ package com.management.managementapi.enterprises.service;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.DocumentsExportSummaryDTO;
@@ -122,6 +123,11 @@ public class BudgetExcelExportService {
     static final String SHEET_RUBRICS = "Rubricas";
     static final String TABLE_EXPENSES = "TabelaDespesas";
     static final String TABLE_RUBRICS = "TabelaRubricas";
+    /** Numa obra com vários lotes: uma folha "Orçamento - <Lote>" por lote (V39). */
+    static final String SHEET_BUDGET_LOT_PREFIX = "Orçamento - ";
+    /** Entre o lote e o índice na coluna Rubrica: "Lote A · 4.2.1 — Betão". */
+    static final String LOT_SEPARATOR = " · ";
+    private static final int SHEET_NAME_MAX = 31;
 
     /** A linha (0-based) do cabeçalho da "Orçamento inicial" — por baixo do bloco da empresa, como no vault. */
     static final int BUDGET_HEADER_ROW = 10;
@@ -151,6 +157,9 @@ public class BudgetExcelExportService {
     static final String[] RUBRICS_HEADERS = {
             "Art", "Descrição", "Cap", "Nível", "Tipo", "Orçamentado", "Gasto", "Saldo",
             "% consumido", "Nº faturas", "Etiqueta"};
+    static final String[] RUBRICS_HEADERS_LOTS = {
+            "Art", "Descrição", "Cap", "Nível", "Tipo", "Orçamentado", "Gasto", "Saldo",
+            "% consumido", "Nº faturas", "Etiqueta", "Lote"};
 
     /**
      * Os formatos escrevem-se na sintaxe invariante do ficheiro (en-US); o Excel
@@ -315,8 +324,26 @@ public class BudgetExcelExportService {
             model.warnings.add("A obra não tem orçamento — só a folha \"Despesas\" pode ser exportada.");
             return;
         }
-        for (BudgetItemNodeDTO root : tree.roots()) {
-            flatten(root, null, model);
+
+        // Uma obra com um só lote (com rubricas) sai exatamente como antes da V39.
+        List<BudgetLotDTO> lots = budgetService.listLots(enterpriseId).stream()
+                .filter(lot -> lot.itemCount() > 0)
+                .toList();
+        if (lots.size() <= 1) {
+            for (BudgetItemNodeDTO root : tree.roots()) {
+                flatten(root, null, null, model);
+            }
+            return;
+        }
+
+        model.warnings.add("Obra com " + lots.size() + " lotes — uma folha de orçamento por lote, e a coluna "
+                + "Rubrica leva o lote antes do índice (\"" + lots.get(0).name() + LOT_SEPARATOR + "4.2.1 — …\").");
+        for (BudgetLotDTO lot : lots) {
+            BudgetTreeDTO lotTree = budgetService.getBudgetTree(lot.id());
+            model.lots.add(new LotTree(lot.name(), lotTree));
+            for (BudgetItemNodeDTO root : lotTree.roots()) {
+                flatten(root, null, lot.name(), model);
+            }
         }
     }
 
@@ -327,15 +354,15 @@ public class BudgetExcelExportService {
      * artigo com índice mais próximo acima — é o que o vault também faz quando
      * soma o valor da alternativa ao artigo de cima.
      */
-    private void flatten(BudgetItemNodeDTO node, String inheritedLabel, Model model) {
+    private void flatten(BudgetItemNodeDTO node, String inheritedLabel, String lot, Model model) {
         String label = inheritedLabel;
         if (!isBlank(node.code())) {
-            label = rubricLabel(node.code(), node.name());
+            label = lotPrefix(lot) + rubricLabel(node.code(), node.name());
             int level = node.code().split("\\.").length;
             BigDecimal budgeted = nullToZero(node.rolledUpBudget());
             String kind = level == 1 ? "CAPÍTULO" : budgeted.signum() > 0 ? "ITEM" : "TÍTULO";
             model.rubrics.add(new RubricRow(node.code(), node.name(), chapterOf(node.code()),
-                    level, kind, budgeted, label));
+                    level, kind, budgeted, label, lot));
         } else if (node.acceptsExpenses() && node.ownExpenseCount() > 0) {
             model.warnings.add("A rubrica \"" + node.name() + "\" não tem índice — as suas "
                     + node.ownExpenseCount() + " despesas saem com a rubrica do artigo acima"
@@ -343,7 +370,7 @@ public class BudgetExcelExportService {
         }
         model.labelByItemId.put(node.id(), label);
         for (BudgetItemNodeDTO child : node.children()) {
-            flatten(child, label, model);
+            flatten(child, label, lot, model);
         }
     }
 
@@ -569,6 +596,21 @@ public class BudgetExcelExportService {
         return code + " — " + description;
     }
 
+    /** {@code "Lote A · "}, ou nada numa obra de um só lote. */
+    static String lotPrefix(String lot) {
+        return isBlank(lot) ? "" : lot.trim() + LOT_SEPARATOR;
+    }
+
+    /**
+     * {@code "Orçamento - Lote A"}, dentro das regras do Excel para nomes de
+     * folha: 31 caracteres, sem {@code []:*?/\}. O importador procura a folha
+     * por este nome ao importar o orçamento de um lote.
+     */
+    static String lotSheetName(String lot) {
+        String name = SHEET_BUDGET_LOT_PREFIX + lot.replaceAll("[\\[\\]:*?/\\\\]", " ").trim();
+        return name.length() > SHEET_NAME_MAX ? name.substring(0, SHEET_NAME_MAX).trim() : name;
+    }
+
     private static int chapterOf(String code) {
         String head = code.split("\\.")[0];
         return head.matches("\\d+") ? Integer.parseInt(head) : 0;
@@ -595,7 +637,13 @@ public class BudgetExcelExportService {
             applyVaultTheme(workbook);
             Styles styles = new Styles(workbook);
             if (sheets.contains(BudgetExportSheet.BUDGET)) {
-                writeBudgetSheet(workbook, styles, model);
+                if (model.lots.isEmpty()) {
+                    writeBudgetSheet(workbook, styles, model, SHEET_BUDGET, model.tree);
+                } else {
+                    for (LotTree lot : model.lots) {
+                        writeBudgetSheet(workbook, styles, model, lotSheetName(lot.name()), lot.tree());
+                    }
+                }
             }
             XSSFSheet expensesSheet = null;
             if (sheets.contains(BudgetExportSheet.EXPENSES)) {
@@ -635,8 +683,9 @@ public class BudgetExcelExportService {
      * 2026-09-23). O importador encontra o cabeçalho sozinho, por isso o bloco de
      * cima não o atrapalha.
      */
-    private void writeBudgetSheet(XSSFWorkbook workbook, Styles styles, Model model) {
-        XSSFSheet sheet = workbook.createSheet(SHEET_BUDGET);
+    private void writeBudgetSheet(XSSFWorkbook workbook, Styles styles, Model model, String sheetName,
+                                  BudgetTreeDTO tree) {
+        XSSFSheet sheet = workbook.createSheet(sheetName);
         Look base = Look.of(BUDGET_FONT_SIZE);
         for (int c = 0; c <= 2; c++) sheet.setDefaultColumnStyle(c, styles.get(base));
         sheet.setColumnWidth(0, width(6.66));
@@ -670,14 +719,14 @@ public class BudgetExcelExportService {
 
         int[] rowIndex = {BUDGET_HEADER_ROW + 1};
         frameRow(sheet.createRow(rowIndex[0]++), frame); // a linha em branco a seguir ao cabeçalho
-        for (BudgetItemNodeDTO root : model.tree.roots()) {
+        for (BudgetItemNodeDTO root : tree.roots()) {
             writeBudgetRows(sheet, root, rowIndex, frame);
         }
 
         Row total = sheet.createRow(rowIndex[0]++);
         cell(total, 0, (String) null, frame.chapterCode());
         cell(total, 1, "TOTAL", frame.chapterText());
-        cell(total, 2, model.tree.budgetTotal(), frame.chapterPrice());
+        cell(total, 2, tree.budgetTotal(), frame.chapterPrice());
 
         Row bottom = sheet.createRow(rowIndex[0]);
         cell(bottom, 0, (String) null, styles.get(codeCol.bottom(BorderStyle.MEDIUM)));
@@ -838,7 +887,10 @@ public class BudgetExcelExportService {
         XSSFSheet sheet = workbook.createSheet(SHEET_RUBRICS);
         sheet.setDefaultColumnStyle(0, styles.text);
         sheet.setDefaultColumnStyle(10, styles.text);
-        header(sheet, 0, RUBRICS_HEADERS, styles);
+        // Vários lotes: coluna "Lote" no fim (L), para as colunas de sempre não mudarem de sítio
+        boolean multiLot = !model.lots.isEmpty();
+        String[] headers = multiLot ? RUBRICS_HEADERS_LOTS : RUBRICS_HEADERS;
+        header(sheet, 0, headers, styles);
 
         int r = 1;
         for (RubricRow rubric : model.rubrics) {
@@ -857,10 +909,11 @@ public class BudgetExcelExportService {
             cell(row, 5, rubric.budgeted(), money);
 
             // Gasto: as faturas cuja Rubrica seja a etiqueta completa, ou só o índice
-            // ("4.2" / "4.2."), como o script do vault
+            // ("4.2" / "4.2."), como o script do vault. Com lotes, o índice leva o lote à frente.
+            String codeRef = multiLot ? "$L" + excelRow + "&\"" + LOT_SEPARATOR + "\"&$A" + excelRow : "$A" + excelRow;
             String matchLabel = TABLE_EXPENSES + "[Rubrica],$K" + excelRow;
-            String matchCode = TABLE_EXPENSES + "[Rubrica],$A" + excelRow;
-            String matchCodeDot = TABLE_EXPENSES + "[Rubrica],$A" + excelRow + "&\".\"";
+            String matchCode = TABLE_EXPENSES + "[Rubrica]," + codeRef;
+            String matchCodeDot = TABLE_EXPENSES + "[Rubrica]," + codeRef + "&\".\"";
             String values = "," + TABLE_EXPENSES + "[Valor]";
             formula(row, 6, "SUMIF(" + matchLabel + values + ")+SUMIF(" + matchCode + values + ")+SUMIF("
                     + matchCodeDot + values + ")", money);
@@ -869,12 +922,15 @@ public class BudgetExcelExportService {
             formula(row, 9, "COUNTIF(" + matchLabel + ")+COUNTIF(" + matchCode + ")+COUNTIF(" + matchCodeDot + ")",
                     plain);
             cell(row, 10, rubric.label(), textStyle);
+            if (multiLot) {
+                cell(row, 11, rubric.lot(), textStyle);
+            }
         }
         int lastRow = Math.max(r - 1, 1);
         if (model.rubrics.isEmpty()) {
             sheet.createRow(1);
         }
-        createTable(sheet, TABLE_RUBRICS, 0, lastRow, RUBRICS_HEADERS.length - 1, false);
+        createTable(sheet, TABLE_RUBRICS, 0, lastRow, headers.length - 1, false);
 
         // coluna auxiliar M, escondida: só capítulos e itens — um título sem preço não é sítio para uma despesa
         int dropdownRows = 0;
@@ -886,7 +942,7 @@ public class BudgetExcelExportService {
         }
         sheet.setColumnHidden(12, true);
 
-        double[] widths = {10.77, 62.77, 6.77, 7.77, 11.77, 13.77, 13.77, 13.77, 13.77, 13.77, 40.77};
+        double[] widths = {10.77, 62.77, 6.77, 7.77, 11.77, 13.77, 13.77, 13.77, 13.77, 13.77, 40.77, 14.77};
         for (int c = 0; c < widths.length; c++) sheet.setColumnWidth(c, width(widths[c]));
         sheet.createFreezePane(0, 1);
         return dropdownRows;
@@ -915,9 +971,13 @@ public class BudgetExcelExportService {
 
     private void writeComparisonSheet(XSSFWorkbook workbook, Styles styles, Model model) {
         XSSFSheet sheet = workbook.createSheet(SHEET_COMPARISON);
+        // Com lotes, o capítulo 1 existe em todos: uma linha por lote e capítulo, pela ordem dos lotes
+        boolean multiLot = !model.lots.isEmpty();
+        List<String> lotOrder = model.lots.stream().map(LotTree::name).toList();
         List<RubricRow> chapters = model.rubrics.stream()
                 .filter(rubric -> rubric.level() == 1)
-                .sorted(Comparator.comparingInt(RubricRow::chapter))
+                .sorted(Comparator.comparingInt((RubricRow rubric) -> multiLot ? lotOrder.indexOf(rubric.lot()) : 0)
+                        .thenComparingInt(RubricRow::chapter))
                 .toList();
 
         // a numeração é a do script do vault (1-based no Excel)
@@ -960,12 +1020,12 @@ public class BudgetExcelExportService {
         for (RubricRow chapter : chapters) {
             Row row = sheet.createRow(r - 1);
             cell(row, 0, BigDecimal.valueOf(chapter.chapter()), null);
-            cell(row, 1, chapter.name(), null);
+            cell(row, 1, lotPrefix(chapter.lot()) + chapter.name(), null);
             cell(row, 2, chapter.budgeted(), styles.currency);
-            formula(row, 3, "SUMIF(" + TABLE_RUBRICS + "[Cap],$A" + r + "," + TABLE_RUBRICS + "[Gasto])", styles.currency);
+            formula(row, 3, chapterSum(TABLE_RUBRICS + "[Gasto]", r, chapter), styles.currency);
             formula(row, 4, "C" + r + "-D" + r, styles.currency);
             formula(row, 5, "IF(C" + r + "=0,\"\",D" + r + "/C" + r + ")", styles.percent);
-            formula(row, 6, "SUMIF(" + TABLE_RUBRICS + "[Cap],$A" + r + "," + TABLE_RUBRICS + "[Nº faturas])", null);
+            formula(row, 6, chapterSum(TABLE_RUBRICS + "[Nº faturas]", r, chapter), null);
             r++;
         }
 
@@ -1025,6 +1085,15 @@ public class BudgetExcelExportService {
         for (int c = 2; c <= 7; c++) sheet.setColumnWidth(c, width(17.77));
         sheet.setZoom(115);
         sheet.createFreezePane(0, first - 1);
+    }
+
+    /** A soma de um capítulo no painel — com lotes, só as rubricas desse lote. */
+    private static String chapterSum(String column, int row, RubricRow chapter) {
+        if (chapter.lot() == null) {
+            return "SUMIF(" + TABLE_RUBRICS + "[Cap],$A" + row + "," + column + ")";
+        }
+        return "SUMIFS(" + column + "," + TABLE_RUBRICS + "[Cap],$A" + row + "," + TABLE_RUBRICS + "[Lote],\""
+                + chapter.lot().replace("\"", "\"\"") + "\")";
     }
 
     // ── POI helpers ───────────────────────────────────────────
@@ -1240,6 +1309,8 @@ public class BudgetExcelExportService {
         Enterprise enterprise;
         String fileName;
         BudgetTreeDTO tree;
+        /** Só numa obra com vários lotes com rubricas; vazio = um só orçamento, como antes da V39. */
+        final List<LotTree> lots = new ArrayList<>();
         final List<RubricRow> rubrics = new ArrayList<>();
         final Map<UUID, String> labelByItemId = new HashMap<>();
         final List<ExpenseRow> rows = new ArrayList<>();
@@ -1268,8 +1339,10 @@ public class BudgetExcelExportService {
         }
     }
 
+    record LotTree(String name, BudgetTreeDTO tree) {}
+
     record RubricRow(String code, String name, int chapter, int level, String kind,
-                     BigDecimal budgeted, String label) {}
+                     BigDecimal budgeted, String label, String lot) {}
 
     record ExpenseRow(String number, LocalDate date, String description, BigDecimal amount, boolean paid,
                       String method, boolean bizdocs, String observations, String rubric,

@@ -73,10 +73,13 @@ export interface BudgetTree {
  * para o capítulo.
  */
 export interface BudgetItemSearchResult {
+  budgetId: string | null;
+  /** O lote da rubrica. Com mais do que um lote no projeto, o `path` começa por ele. */
+  budgetName: string | null;
   id: string;
   code: string | null;
   name: string;
-  /** `4. Estrutura › 4.2 Lajes › 4.2.1 Betão` */
+  /** `4. Estrutura › 4.2 Lajes › 4.2.1 Betão` (ou `Lote A › 4. Estrutura › …`) */
   path: string;
   depth: number;
   /** Ainda tem sub-rubricas por baixo — classificar aqui é "ao capítulo". */
@@ -87,8 +90,22 @@ export interface BudgetItemSearchResult {
   overBudget: boolean;
 }
 
+/**
+ * Um lote (edifício) do projeto, com o seu orçamento. Uma vila pode ter vários;
+ * cada um tem a sua numeração — o `4.2.1` do Lote A não é o do Lote B.
+ */
+export interface BudgetLot {
+  id: string;
+  name: string;
+  sortOrder: number;
+  itemCount: number;
+  budgetTotal: number;
+  spentTotal: number;
+}
+
 export interface BudgetItemUpsert {
-  enterpriseId: string;
+  /** O lote — o projeto deriva dele. */
+  budgetId: string;
   parentId?: string | null;
   rowKind: BudgetRowKind;
   code?: string | null;

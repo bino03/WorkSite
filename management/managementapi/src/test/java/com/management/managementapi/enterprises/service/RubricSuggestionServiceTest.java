@@ -151,7 +151,7 @@ class RubricSuggestionServiceTest {
         when(repository.findRubricUsesBySupplier(any(), any(), any())).thenReturn(List.of());
         when(repository.findRubricCodesUsedElsewhere(eq(ENTERPRISE_ID), eq("500100200"), any()))
                 .thenReturn(List.of(codeUse("4.2.1", "Vila Petrus")));
-        when(budgetItemRepository.findByEnterpriseIdAndCode(ENTERPRISE_ID, "4.2.1"))
+        when(budgetItemRepository.findUniqueByEnterpriseIdAndCode(ENTERPRISE_ID, "4.2.1"))
                 .thenReturn(Optional.of(rubric("4.2.1", "Betão")));
 
         RubricSuggestionDTO suggestion = service.suggestRubric(INVOICE_ID).orElseThrow();
@@ -168,7 +168,7 @@ class RubricSuggestionServiceTest {
         when(repository.findRubricUsesBySupplier(any(), any(), any())).thenReturn(List.of());
         when(repository.findRubricCodesUsedElsewhere(any(), any(), any()))
                 .thenReturn(List.of(codeUse("9.9.9", "Vila Aleu")));
-        when(budgetItemRepository.findByEnterpriseIdAndCode(any(), any())).thenReturn(Optional.empty());
+        when(budgetItemRepository.findUniqueByEnterpriseIdAndCode(any(), any())).thenReturn(Optional.empty());
 
         assertThat(service.suggestRubric(INVOICE_ID)).isEmpty();
     }

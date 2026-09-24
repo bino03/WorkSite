@@ -12,7 +12,7 @@ import { ancestorsOf, buildParentTreeOptions, describeHints } from "./budgetTree
 
 interface Props {
   open: boolean;
-  enterpriseId: string;
+  budgetId: string;
   tree: BudgetTree | null;
   /** `null` = criar. */
   item: BudgetItemNode | null;
@@ -70,7 +70,7 @@ function emptyValues(defaultParentId: string | null): Values {
  */
 export const BudgetItemDrawer: FC<Props> = ({
   open,
-  enterpriseId,
+  budgetId,
   tree,
   item,
   defaultParentId = null,
@@ -125,7 +125,7 @@ export const BudgetItemDrawer: FC<Props> = ({
     }
 
     const dto: BudgetItemUpsert = {
-      enterpriseId,
+      budgetId,
       parentId: values.parentId,
       rowKind: values.rowKind,
       code: values.code.trim() || null,

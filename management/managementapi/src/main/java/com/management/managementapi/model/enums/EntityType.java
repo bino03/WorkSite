@@ -4,6 +4,7 @@ public enum EntityType {
     ENTERPRISE("enterprise"),
     USER("user"),
     BUDGET_ITEM("budget_item"),
+    CONSTRUCTION_BUDGET("construction_budget"),
     CONSTRUCTION_EXPENSE("construction_expense"),
     CONSTRUCTION_INVOICE("construction_invoice"),
     SUPPLIER("supplier"),

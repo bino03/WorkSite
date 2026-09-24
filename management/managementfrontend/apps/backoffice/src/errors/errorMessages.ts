@@ -229,11 +229,18 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'BUDGET_007': 'Rubrica-mãe não encontrada.',
   'BUDGET_008': 'A rubrica-mãe pertence a outro projeto.',
   'BUDGET_009': 'Uma rubrica não pode ficar dentro de si própria.',
-  'BUDGET_010': 'Já existe uma rubrica com este índice neste projeto.',
+  'BUDGET_010': 'Já existe uma rubrica com este índice neste lote.',
   'BUDGET_011': 'A data de fim não pode ser anterior à data de início.',
   'BUDGET_012': 'Uma rubrica não pode mudar de projeto.',
   'BUDGET_013': 'Esta rubrica (ou uma das suas sub-rubricas) tem despesas — mova-as ou apague-as primeiro.',
   'BUDGET_014': 'Esta rubrica não está eliminada.',
+
+  // ── Lotes (um orçamento por edifício) ─────────────────────────────────────
+  'BUDGET_015': 'Lote não encontrado.',
+  'BUDGET_016': 'Já existe um lote com este nome neste projeto.',
+  'BUDGET_017': 'Este lote tem despesas lançadas nas suas rubricas — mova-as ou apague-as primeiro.',
+  'BUDGET_018': 'A rubrica-mãe pertence a outro lote.',
+  'BUDGET_019': 'Uma rubrica não pode mudar de lote.',
 
   // ── Importação de orçamento (.xlsx) ───────────────────────────────────────
   'BUDGET_020': 'O ficheiro de orçamento está vazio.',
@@ -241,7 +248,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'BUDGET_022': 'Não foi possível ler o ficheiro de orçamento.',
   'BUDGET_023': 'Não foi encontrada a linha de cabeçalho (coluna "Art" ou "Rubrica") no Excel.',
   'BUDGET_024': 'O Excel não tem rubricas para importar.',
-  'BUDGET_025': 'Este projeto já tem orçamento. Elimine-o primeiro ou importe com substituição.',
+  'BUDGET_025': 'Este lote já tem orçamento. Elimine-o primeiro ou importe com substituição.',
 
   // ── Exportação para Excel ─────────────────────────────────────────────────
   'BUDGET_026': 'Escolha pelo menos uma folha para exportar.',

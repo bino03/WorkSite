@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V37`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V39`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -12,11 +12,21 @@ enterprises (projeto — nome de tabela/pacote mantido do Property-Management)
  ├── construction_invoice (o registo da fatura — dados do QR da AT + scope, N:1 → enterprises, nullable)
  │    ├── construction_invoice_document (o ficheiro, 0..N por fatura — V24)
  │    └── invoice_payment (junção N:N → payment — V31; estado UNPAID/PARTIAL/PAID é derivado)
- └── construction_budget_item (rubrica do orçamento, N:1 → enterprises)
-      └── construction_budget_item (parent_id — árvore de profundidade livre)
-           └── construction_expense (a afetação, N:1 → construction_budget_item)
-                — mesmos campos de medição da rubrica + invoice_id (nullable) + envio ao contabilista
+ └── construction_budget (o lote/edifício — um orçamento cada, V39)
+      └── construction_budget_item (rubrica do orçamento, N:1 → construction_budget; enterprise_id mantido)
+           └── construction_budget_item (parent_id — árvore de profundidade livre, sempre no mesmo lote)
+                └── construction_expense (a afetação, N:1 → construction_budget_item)
+                     — mesmos campos de medição da rubrica + invoice_id (nullable) + envio ao contabilista
 ```
+
+**`construction_budget`** (`V39`) — o **lote**: um edifício do empreendimento com o seu próprio
+orçamento (`name`, único por projeto; `sort_order`). Uma vila pode ter vários, cada um com a sua
+numeração. A migração criou um lote `"Orçamento"` em cada projeto que já tinha rubricas; um projeto
+novo não tem nenhum até se criar o primeiro. A rubrica guarda `budget_id` **e** `enterprise_id`
+(desnormalizado, para todas as verificações "rubrica da obra da fatura" e as queries por projeto
+continuarem iguais); a FK composta `(budget_id, enterprise_id) → construction_budget(id, enterprise_id)`
+impede que divirjam. Apagar um lote apaga as rubricas (cascata) — o serviço só deixa se nenhuma tiver
+despesas (`BUDGET_017`). As faturas **não** têm lote: ver [[excel-parity.md]] §6.
 
 **`construction_invoice`** e **`construction_expense`** estão separados desde a `V16` porque
 **registar e classificar são momentos diferentes**: quem chega da obra com quinze faturas
@@ -134,8 +144,8 @@ Cada rubrica espelha uma linha do Excel de orçamento:
   rubricas seguintes até ao título seguinte, por isso na árvore é o **pai** delas.
 - **`NOTE`** — nota de contexto entre parêntesis, filha da rubrica anterior.
 
-Só rubricas `ITEM` aceitam despesas. `code` é único por projeto (índice parcial
-`uq_budget_item_code`, que ignora os nulos **e** as eliminadas desde a `V36`).
+Só rubricas `ITEM` aceitam despesas. `code` é único **por lote** desde a `V39` (antes, por projeto) —
+índice parcial `uq_budget_item_code (budget_id, code)`, que ignora os nulos **e** as eliminadas desde a `V36`.
 
 Eliminação em cascata (`ON DELETE CASCADE`) em toda a cadeia, incluindo a FK
 auto-referenciada — eliminar um **projeto** continua a levar a sub-árvore e as despesas atrás,

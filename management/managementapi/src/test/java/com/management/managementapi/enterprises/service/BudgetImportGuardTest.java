@@ -1,9 +1,10 @@
 package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
-import com.management.managementapi.enterprises.repository.EnterpriseRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.security.AuthContext;
 
@@ -34,12 +35,12 @@ import static org.mockito.Mockito.when;
 class BudgetImportGuardTest {
 
     @Mock private ConstructionBudgetItemRepository repository;
-    @Mock private EnterpriseRepository enterpriseRepository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private AuthContext authContext;
 
     @InjectMocks private BudgetExcelImportService service;
 
-    private static final UUID ENTERPRISE_ID = UUID.randomUUID();
+    private static final UUID BUDGET_ID = UUID.randomUUID();
 
     private MockMultipartFile excel() {
         return new MockMultipartFile(
@@ -48,17 +49,19 @@ class BudgetImportGuardTest {
                 "conteudo-irrelevante".getBytes());
     }
 
-    private void enterpriseExists() {
-        when(enterpriseRepository.findById(ENTERPRISE_ID)).thenReturn(Optional.of(new Enterprise()));
+    private void lotExists() {
+        ConstructionBudget lot = new ConstructionBudget();
+        lot.setEnterprise(new Enterprise());
+        when(budgetRepository.findById(BUDGET_ID)).thenReturn(Optional.of(lot));
     }
 
     @Test
-    @DisplayName("Gravar sobre um projeto que já tem orçamento é recusado")
+    @DisplayName("Gravar sobre um lote que já tem orçamento é recusado")
     void refusesImportWhenBudgetAlreadyExists() {
-        enterpriseExists();
-        when(repository.existsByEnterpriseId(ENTERPRISE_ID)).thenReturn(true);
+        lotExists();
+        when(repository.existsByBudgetId(BUDGET_ID)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.importBudget(ENTERPRISE_ID, excel(), false, false))
+        assertThatThrownBy(() -> service.importBudget(BUDGET_ID, excel(), false, false))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.BUDGET_IMPORT_NOT_EMPTY);
@@ -67,11 +70,11 @@ class BudgetImportGuardTest {
     @Test
     @DisplayName("A pré-visualização (dryRun) continua a correr com orçamento existente")
     void previewIsNotBlockedByExistingBudget() {
-        enterpriseExists();
+        lotExists();
 
         // Chega ao parse e morre nos bytes falsos — o que importa é que não morre na guarda.
         BusinessException thrown = catchThrowableOfType(
-                () -> service.importBudget(ENTERPRISE_ID, excel(), true, false),
+                () -> service.importBudget(BUDGET_ID, excel(), true, false),
                 BusinessException.class);
 
         assertThat(thrown).isNotNull();

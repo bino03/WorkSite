@@ -18,8 +18,9 @@ import java.util.UUID;
  */
 public record BudgetItemUpsertDTO(
 
-        @NotNull(message = "Projeto é obrigatório")
-        UUID enterpriseId,
+        /** O lote (V39) — o projeto deriva dele. */
+        @NotNull(message = "Lote é obrigatório")
+        UUID budgetId,
 
         UUID parentId,
 

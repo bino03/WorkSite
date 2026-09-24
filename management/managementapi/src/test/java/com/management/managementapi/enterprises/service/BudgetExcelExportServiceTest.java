@@ -5,6 +5,7 @@ import com.management.managementapi.enterprises.dto.budget.request.BudgetExportS
 import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportRowDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
@@ -12,11 +13,13 @@ import com.management.managementapi.enterprises.model.BudgetRowKind;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.InvoicePaymentRepository;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.security.AuthContext;
@@ -86,6 +89,7 @@ class BudgetExcelExportServiceTest {
 
     // o importador real, para o round-trip
     @Mock private ConstructionBudgetItemRepository budgetItemRepository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private AuthContext authContext;
     @InjectMocks private BudgetExcelImportService importService;
 
@@ -223,6 +227,9 @@ class BudgetExcelExportServiceTest {
     void budgetSheetRoundTripsThroughTheImporter() throws Exception {
         BudgetExcelExportService.ExportFile file = service.export(ENTERPRISE_ID, EnumSet.of(BudgetExportSheet.BUDGET));
 
+        ConstructionBudget lot = new ConstructionBudget();
+        lot.setEnterprise(enterprise);
+        when(budgetRepository.findById(ENTERPRISE_ID)).thenReturn(Optional.of(lot));
         BudgetImportResultDTO imported = importService.importBudget(ENTERPRISE_ID,
                 new MockMultipartFile("file", file.fileName(), BudgetExcelExportService.CONTENT_TYPE, file.content()),
                 true, false);
@@ -529,6 +536,53 @@ class BudgetExcelExportServiceTest {
 
         assertThat(service.summary(ENTERPRISE_ID).warnings())
                 .anyMatch(w -> w.contains("FT A/1") && w.contains("90,00 €") && w.contains("100,00 €"));
+    }
+
+    @Test
+    @DisplayName("Obra com dois lotes: uma folha de orçamento por lote, e o lote à frente do índice na Rubrica")
+    void twoLotsExportOneBudgetSheetEachAndPrefixTheRubric() throws Exception {
+        BudgetTreeDTO lotATree = tree();
+        BudgetItemNodeDTO lotAItem = item11;
+        BudgetTreeDTO lotBTree = tree(); // mesma numeração — o 1.1 existe nos dois
+        BudgetItemNodeDTO lotBItem = item11;
+        UUID lotA = UUID.randomUUID(), lotB = UUID.randomUUID();
+        when(budgetService.listLots(ENTERPRISE_ID)).thenReturn(List.of(
+                new BudgetLotDTO(lotA, "Lote A", 0, 11, lotATree.budgetTotal(), BigDecimal.ZERO),
+                new BudgetLotDTO(lotB, "Lote B", 1, 11, lotBTree.budgetTotal(), BigDecimal.ZERO)));
+        when(budgetService.getBudgetTree(lotA)).thenReturn(lotATree);
+        when(budgetService.getBudgetTree(lotB)).thenReturn(lotBTree);
+
+        expense(invoice("FT L/1", "2026-09-01", "50", "Casa Dolores"), lotBItem, "50");
+        expense(invoice("FT L/2", "2026-09-02", "70", "Leroy"), lotAItem, "70");
+
+        try (XSSFWorkbook wb = exportWorkbook(EnumSet.of(
+                BudgetExportSheet.BUDGET, BudgetExportSheet.EXPENSES, BudgetExportSheet.COMPARISON))) {
+            assertThat(sheetNames(wb)).contains("Orçamento - Lote A", "Orçamento - Lote B")
+                    .doesNotContain("Orçamento inicial");
+
+            Sheet expenses = wb.getSheet("Despesas");
+            assertThat(rowWithNumber(expenses, "FT L/1").getCell(8).getStringCellValue())
+                    .isEqualTo("Lote B · 1.1 — Montagem do estaleiro");
+            assertThat(rowWithNumber(expenses, "FT L/2").getCell(8).getStringCellValue())
+                    .isEqualTo("Lote A · 1.1 — Montagem do estaleiro");
+
+            Sheet rubrics = wb.getSheet("Rubricas");
+            // a coluna M (escondida) é a lista da dropdown, por isso compara-se até à L
+            assertThat(headers(rubrics).subList(10, 12)).containsExactly("Etiqueta", "Lote");
+
+            // o painel separa o capítulo 1 de cada lote
+            Sheet panel = wb.getSheet("Orçamento vs Gasto");
+            List<String> chapterNames = new ArrayList<>();
+            for (int r = 8; r < 14; r++) chapterNames.add(panel.getRow(r).getCell(1).getStringCellValue());
+            assertThat(chapterNames).containsExactly("Lote A · ESTALEIRO", "Lote A · REVESTIMENTOS EXTERIORES",
+                    "Lote A · ACABAMENTOS", "Lote B · ESTALEIRO", "Lote B · REVESTIMENTOS EXTERIORES",
+                    "Lote B · ACABAMENTOS");
+            assertThat(panel.getRow(8).getCell(3).getCellFormula()).contains("SUMIFS(", "[Lote],\"Lote A\"");
+
+            // a importação do orçamento do Lote B escolhe a folha dele
+            assertThat(BudgetExcelImportService.budgetSheet(wb, "Lote B").getSheetName())
+                    .isEqualTo("Orçamento - Lote B");
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────

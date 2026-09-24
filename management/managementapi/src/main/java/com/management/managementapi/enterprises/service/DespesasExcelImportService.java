@@ -15,6 +15,7 @@ import com.management.managementapi.enterprises.dto.payment.AggregatePaymentRequ
 import com.management.managementapi.enterprises.dto.payment.AggregatePaymentResultDTO;
 import com.management.managementapi.enterprises.dto.payment.MarkPaidRequestDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -24,6 +25,7 @@ import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.model.enums.PaymentMethod;
 import com.management.managementapi.enterprises.model.enums.PaymentStatus;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
@@ -178,6 +180,7 @@ public class DespesasExcelImportService {
     private final EnterpriseRepository enterpriseRepository;
     private final ConstructionInvoiceRepository invoiceRepository;
     private final ConstructionBudgetItemRepository budgetItemRepository;
+    private final ConstructionBudgetRepository budgetRepository;
     private final ConstructionExpenseRepository expenseRepository;
     private final ConstructionInvoiceService invoiceService;
     private final PaymentService paymentService;
@@ -464,12 +467,39 @@ public class DespesasExcelImportService {
     /**
      * "8.2 — Betão" → a rubrica "8.2" desta obra. Uma rubrica que não existe é
      * erro, nunca se cria (§6); um capítulo/sub-título/nota não recebe despesas.
+     *
+     * Numa obra com vários lotes (V39) a célula diz o lote antes do índice —
+     * "Lote A · 8.2 — Betão" — e procura-se só nesse lote. Sem prefixo, um
+     * código que exista em mais do que um lote é erro: nunca se adivinha o lote.
      */
     private void resolveRubrics(Model model) {
-        Map<String, Optional<ConstructionBudgetItem>> cache = new HashMap<>();
+        Map<String, List<ConstructionBudgetItem>> cache = new HashMap<>();
+        Map<String, ConstructionBudget> lotsByName = null;
         for (Line line : model.lines) {
             if (line.rubricRaw == null) continue;
-            line.rubricCode = normalizeRubricCode(line.rubricRaw);
+            String[] lotAndRest = splitLot(line.rubricRaw);
+            line.rubricLot = lotAndRest[0];
+            line.rubricCode = normalizeRubricCode(lotAndRest[1]);
+            if (line.rubricLot != null && model.scope == Scope.PROJECT && line.rubricCode != null) {
+                if (lotsByName == null) {
+                    lotsByName = new HashMap<>();
+                    for (ConstructionBudget lot : budgetRepository
+                            .findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(model.enterprise.getId())) {
+                        lotsByName.put(normalizeText(lot.getName()), lot);
+                    }
+                }
+                ConstructionBudget lot = lotsByName.get(normalizeText(line.rubricLot));
+                if (lot == null) {
+                    model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
+                            "O lote \"" + line.rubricLot + "\" não existe nesta obra."));
+                    continue;
+                }
+                List<ConstructionBudgetItem> found = cache.computeIfAbsent(lot.getId() + "|" + line.rubricCode,
+                        key -> budgetItemRepository.findByBudgetIdAndCode(lot.getId(), line.rubricCode)
+                                .map(List::of).orElse(List.of()));
+                acceptRubric(model, line, found, " no " + line.rubricLot);
+                continue;
+            }
             if (model.scope != Scope.PROJECT) {
                 model.errors.add(new ExpensesImportIssueDTO(line.excelRow, "Tem rubrica \"" + line.rubricRaw
                         + "\" mas " + (model.scope == Scope.COMPANY ? "as despesas da empresa não têm" : "a quarentena não tem")
@@ -481,18 +511,45 @@ public class DespesasExcelImportService {
                         "Rubrica \"" + line.rubricRaw + "\" sem índice reconhecível (esperado \"<Art> — <Descrição>\")."));
                 continue;
             }
-            Optional<ConstructionBudgetItem> item = cache.computeIfAbsent(line.rubricCode,
+            List<ConstructionBudgetItem> found = cache.computeIfAbsent(line.rubricCode,
                     code -> budgetItemRepository.findByEnterpriseIdAndCode(model.enterprise.getId(), code));
-            if (item.isEmpty()) {
-                model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
-                        "A rubrica \"" + line.rubricCode + "\" não existe no orçamento desta obra."));
-            } else if (item.get().getRowKind() != BudgetRowKind.ITEM) {
-                model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
-                        "A rubrica \"" + line.rubricCode + "\" é um título — as despesas lançam-se numa rubrica."));
-            } else {
-                line.rubric = item.get();
+            acceptRubric(model, line, found, " desta obra");
+        }
+    }
+
+    private static void acceptRubric(Model model, Line line, List<ConstructionBudgetItem> found, String where) {
+        if (found.isEmpty()) {
+            model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
+                    "A rubrica \"" + line.rubricCode + "\" não existe no orçamento" + where + "."));
+        } else if (found.size() > 1) {
+            // Obra com vários lotes (V39): o "4.2.1" existe em mais do que um e a
+            // célula não diz qual. Nunca se adivinha o lote.
+            model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
+                    "A rubrica \"" + line.rubricCode + "\" existe em " + found.size()
+                            + " lotes desta obra — escreva o lote antes do índice (\"<Lote>"
+                            + BudgetExcelExportService.LOT_SEPARATOR + line.rubricCode + " — …\")."));
+        } else if (found.get(0).getRowKind() != BudgetRowKind.ITEM) {
+            model.errors.add(new ExpensesImportIssueDTO(line.excelRow,
+                    "A rubrica \"" + line.rubricCode + "\" é um título — as despesas lançam-se numa rubrica."));
+        } else {
+            line.rubric = found.get(0);
+        }
+    }
+
+    /**
+     * "Lote A · 8.2 — Betão" → {"Lote A", "8.2 — Betão"}; sem separador (ou com
+     * um índice antes dele) → {null, célula}. O separador é o da exportação.
+     */
+    static String[] splitLot(String raw) {
+        int cut = raw.indexOf(BudgetExcelExportService.LOT_SEPARATOR.trim());
+        if (cut > 0) {
+            String lot = raw.substring(0, cut).trim();
+            // "8.2 — Betão · armado": o ponto médio está na descrição, não é um lote
+            if (!lot.isEmpty() && !lot.contains("—") && !lot.matches("\\d+(\\.\\d+)*\\.?")) {
+                return new String[] {lot, raw.substring(cut + 1).trim()};
             }
         }
+        return new String[] {null, raw};
     }
 
     /** "8.2 — Betão" → "8.2" · "8.2." → "8.2" · "Betão" → null. */
@@ -1208,7 +1265,7 @@ public class DespesasExcelImportService {
         PaymentInfo payment = group.payment;
         List<ExpensesImportInvoiceDTO.Line> lines = group.lines.stream()
                 .map(line -> new ExpensesImportInvoiceDTO.Line(line.excelRow, line.rubricCode,
-                        line.rubric == null ? line.rubricRaw : BudgetExcelExportService.rubricLabel(
+                        line.rubric == null ? line.rubricRaw : BudgetExcelExportService.lotPrefix(line.rubricLot) + BudgetExcelExportService.rubricLabel(
                                 line.rubric.getCode(), line.rubric.getName()),
                         line.amount))
                 .toList();
@@ -1450,6 +1507,8 @@ public class DespesasExcelImportService {
         String observations;
         String rubricRaw;
         String rubricCode;
+        /** O lote escrito antes do índice ("Lote A · 8.2 — …"), numa obra com vários lotes. */
+        String rubricLot;
         ConstructionBudgetItem rubric;
         String supplierName;
         String supplierNif;

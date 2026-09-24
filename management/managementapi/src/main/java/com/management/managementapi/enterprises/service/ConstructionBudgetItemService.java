@@ -2,17 +2,21 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.request.BudgetLotUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSearchResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSaveResponseDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.DatePropagationHintDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.exeption.BusinessException;
@@ -55,9 +59,94 @@ public class ConstructionBudgetItemService {
     private static final BigDecimal MISMATCH_TOLERANCE = new BigDecimal("0.01");
 
     private final ConstructionBudgetItemRepository repository;
+    private final ConstructionBudgetRepository budgetRepository;
     private final ConstructionExpenseRepository expenseRepository;
     private final EnterpriseRepository enterpriseRepository;
     private final AuthContext authContext;
+
+    // ── lotes (V39) ───────────────────────────────────────────
+
+    /** Os lotes do projeto, pela ordem, cada um com o seu orçamentado e gasto. */
+    @Transactional(readOnly = true)
+    public List<BudgetLotDTO> listLots(UUID enterpriseId) {
+        enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
+
+        Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(enterpriseId);
+        Map<UUID, List<ConstructionBudgetItem>> itemsByLot = new HashMap<>();
+        for (ConstructionBudgetItem item : livesOnly(repository.findTreeByEnterpriseId(enterpriseId))) {
+            itemsByLot.computeIfAbsent(item.getBudgetId(), k -> new ArrayList<>()).add(item);
+        }
+
+        List<BudgetLotDTO> lots = new ArrayList<>();
+        for (ConstructionBudget lot : budgetRepository.findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(enterpriseId)) {
+            List<ConstructionBudgetItem> items = itemsByLot.getOrDefault(lot.getId(), List.of());
+            BigDecimal budgeted = BigDecimal.ZERO;
+            BigDecimal spent = BigDecimal.ZERO;
+            for (BudgetItemNodeDTO root : buildRoots(items, expensesByItem)) {
+                budgeted = budgeted.add(root.rolledUpBudget());
+                spent = spent.add(root.spentTotal());
+            }
+            lots.add(new BudgetLotDTO(lot.getId(), lot.getName(), lot.getSortOrder(), items.size(),
+                    budgeted, spent));
+        }
+        return lots;
+    }
+
+    public BudgetLotDTO createLot(UUID enterpriseId, BudgetLotUpsertDTO dto) {
+        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
+        String name = dto.name().trim();
+        if (budgetRepository.existsByEnterpriseIdAndNameIgnoreCase(enterpriseId, name)) {
+            throw new BusinessException(ErrorCode.BUDGET_LOT_DUPLICATE_NAME);
+        }
+
+        ConstructionBudget lot = new ConstructionBudget();
+        lot.setEnterprise(enterprise);
+        lot.setName(name);
+        lot.setSortOrder(dto.sortOrder() != null ? dto.sortOrder() : budgetRepository.nextSortOrder(enterpriseId));
+        authContext.currentProfileId().ifPresent(lot::setCreatedBy);
+        lot = budgetRepository.save(lot);
+        return new BudgetLotDTO(lot.getId(), lot.getName(), lot.getSortOrder(), 0, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    public BudgetLotDTO updateLot(UUID budgetId, BudgetLotUpsertDTO dto) {
+        ConstructionBudget lot = getLot(budgetId);
+        String name = dto.name().trim();
+        UUID enterpriseId = lot.getEnterprise().getId();
+        if (!name.equalsIgnoreCase(lot.getName())
+                && budgetRepository.existsByEnterpriseIdAndNameIgnoreCase(enterpriseId, name)) {
+            throw new BusinessException(ErrorCode.BUDGET_LOT_DUPLICATE_NAME);
+        }
+        lot.setName(name);
+        if (dto.sortOrder() != null) {
+            lot.setSortOrder(dto.sortOrder());
+        }
+        budgetRepository.save(lot);
+        return listLots(enterpriseId).stream()
+                .filter(l -> l.id().equals(budgetId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
+    }
+
+    /**
+     * Apaga o lote e o seu orçamento (hard delete, cascata da FK). Bloqueado se
+     * alguma rubrica do lote tiver despesas — as mesmas regras de
+     * {@code BUDGET_013}, para nunca se perder uma despesa atrás de um clique.
+     */
+    public void deleteLot(UUID budgetId) {
+        ConstructionBudget lot = getLot(budgetId);
+        if (repository.budgetHasExpenses(budgetId)) {
+            throw new BusinessException(ErrorCode.BUDGET_LOT_HAS_EXPENSES);
+        }
+        budgetRepository.delete(lot);
+    }
+
+    @Transactional(readOnly = true)
+    public ConstructionBudget getLot(UUID budgetId) {
+        return budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
+    }
 
     // ── leitura ───────────────────────────────────────────────
 
@@ -78,24 +167,36 @@ public class ConstructionBudgetItemService {
     @Transactional(readOnly = true)
     public List<BudgetItemSearchResultDTO> search(UUID enterpriseId, String query, int limit) {
         String needle = query == null ? "" : query.trim().toLowerCase();
-        List<BudgetItemNodeDTO> roots = getTree(enterpriseId).roots();
+        enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
+
+        // A pesquisa é da vila inteira — uma fatura reparte-se por rubricas de
+        // qualquer lote. Cada lote é uma árvore à parte; com mais do que um, o
+        // caminho começa pelo nome do lote, porque o 4.2.1 existe em todos.
+        Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(enterpriseId);
+        List<List<ConstructionBudgetItem>> lots =
+                groupByLot(livesOnly(repository.findTreeByEnterpriseId(enterpriseId)));
+        boolean prefixLot = lots.size() > 1;
 
         // Sem texto, a lista são os capítulos: é por onde se começa a procurar
         // quando não se sabe o código, e um campo vazio sem nada por baixo
         // parecia avariado (2026-09-17).
-        if (needle.isEmpty()) {
-            List<BudgetItemSearchResultDTO> chapters = new ArrayList<>();
-            for (BudgetItemNodeDTO root : roots) {
-                if (root.acceptsExpenses()) {
-                    chapters.add(toSearchResult(root, label(root)));
+        List<BudgetItemSearchResultDTO> results = new ArrayList<>();
+        for (List<ConstructionBudgetItem> lotItems : lots) {
+            ConstructionBudget lot = lotItems.get(0).getBudget();
+            String lotPath = prefixLot && lot != null ? lot.getName() : "";
+            for (BudgetItemNodeDTO root : buildRoots(lotItems, expensesByItem)) {
+                if (needle.isEmpty()) {
+                    if (root.acceptsExpenses()) {
+                        results.add(toSearchResult(root, join(lotPath, label(root)), lot));
+                    }
+                } else {
+                    collectMatches(root, lotPath, needle, lot, results);
                 }
             }
-            return chapters.size() > limit ? chapters.subList(0, limit) : chapters;
         }
-
-        List<BudgetItemSearchResultDTO> results = new ArrayList<>();
-        for (BudgetItemNodeDTO root : roots) {
-            collectMatches(root, "", needle, results);
+        if (needle.isEmpty()) {
+            return results.size() > limit ? results.subList(0, limit) : results;
         }
         // O código é uma resposta mais precisa do que o nome: quem escreve "4.2"
         // quer a 4.2, não a primeira rubrica cujo nome por acaso a contenha.
@@ -107,24 +208,30 @@ public class ConstructionBudgetItemService {
     }
 
     private void collectMatches(BudgetItemNodeDTO node, String parentPath, String needle,
-                                List<BudgetItemSearchResultDTO> out) {
-        String path = parentPath.isEmpty() ? label(node) : parentPath + " › " + label(node);
+                                ConstructionBudget lot, List<BudgetItemSearchResultDTO> out) {
+        String path = join(parentPath, label(node));
 
         if (node.acceptsExpenses() && matches(node, needle)) {
-            out.add(toSearchResult(node, path));
+            out.add(toSearchResult(node, path, lot));
         }
         // Continua a descer mesmo quando o pai não deu match: a sub-rubrica pode
         // dar, e é ela que interessa.
-        node.children().forEach(child -> collectMatches(child, path, needle, out));
+        node.children().forEach(child -> collectMatches(child, path, needle, lot, out));
+    }
+
+    private static String join(String parentPath, String label) {
+        return parentPath.isEmpty() ? label : parentPath + " › " + label;
     }
 
     private static String label(BudgetItemNodeDTO node) {
         return node.code() == null ? node.name() : node.code() + " " + node.name();
     }
 
-    private static BudgetItemSearchResultDTO toSearchResult(BudgetItemNodeDTO node, String path) {
+    private static BudgetItemSearchResultDTO toSearchResult(BudgetItemNodeDTO node, String path,
+                                                            ConstructionBudget lot) {
         boolean chapter = node.children().stream().anyMatch(BudgetItemNodeDTO::acceptsExpenses);
         return new BudgetItemSearchResultDTO(
+                lot == null ? null : lot.getId(), lot == null ? null : lot.getName(),
                 node.id(), node.code(), node.name(), path, node.depth(), chapter,
                 node.rolledUpBudget(), node.spentTotal(), node.remaining(), node.overBudget());
     }
@@ -212,6 +319,11 @@ public class ConstructionBudgetItemService {
         return childHasPrice ? childSum : (own != null ? own : BigDecimal.ZERO);
     }
 
+    /**
+     * O orçamento da vila inteira: as árvores de todos os lotes, lado a lado.
+     * É o que a exportação para Excel lê enquanto a folha for uma só (fase C do
+     * plano dos lotes); a página do orçamento usa o {@link #getBudgetTree}.
+     */
     @Transactional(readOnly = true)
     public BudgetTreeDTO getTree(UUID enterpriseId) {
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
@@ -219,13 +331,53 @@ public class ConstructionBudgetItemService {
 
         List<ConstructionBudgetItem> items = livesOnly(repository.findTreeByEnterpriseId(enterpriseId));
         Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(enterpriseId);
-        Map<UUID, List<ConstructionBudgetItem>> childrenByParent = groupByParent(items);
+        List<BudgetItemNodeDTO> roots = new ArrayList<>();
+        for (List<ConstructionBudgetItem> lotItems : groupByLot(items)) {
+            roots.addAll(buildRoots(lotItems, expensesByItem));
+        }
+        return toTree(enterprise, items.size(), roots);
+    }
 
+    /** A árvore de um lote — a página do orçamento. */
+    @Transactional(readOnly = true)
+    public BudgetTreeDTO getBudgetTree(UUID budgetId) {
+        ConstructionBudget lot = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
+
+        List<ConstructionBudgetItem> items = livesOnly(repository.findTreeByBudgetId(budgetId));
+        Map<UUID, ExpenseRollup> expensesByItem = loadExpenseRollups(lot.getEnterprise().getId());
+        return toTree(lot.getEnterprise(), items.size(), buildRoots(items, expensesByItem));
+    }
+
+    private List<BudgetItemNodeDTO> buildRoots(List<ConstructionBudgetItem> items,
+                                               Map<UUID, ExpenseRollup> expensesByItem) {
+        Map<UUID, List<ConstructionBudgetItem>> childrenByParent = groupByParent(items);
         List<BudgetItemNodeDTO> roots = new ArrayList<>();
         for (ConstructionBudgetItem root : childrenByParent.getOrDefault(null, List.of())) {
             roots.add(buildNode(root, childrenByParent, expensesByItem, 0, BigDecimal.ZERO));
         }
+        return roots;
+    }
 
+    /**
+     * As rubricas agrupadas por lote, pela ordem dos lotes. As árvores nunca se
+     * cruzam (a mãe está sempre no mesmo lote), por isso cada grupo é uma
+     * floresta completa.
+     */
+    private static List<List<ConstructionBudgetItem>> groupByLot(List<ConstructionBudgetItem> items) {
+        Map<UUID, List<ConstructionBudgetItem>> byLot = new LinkedHashMap<>();
+        for (ConstructionBudgetItem item : items) {
+            byLot.computeIfAbsent(item.getBudgetId(), k -> new ArrayList<>()).add(item);
+        }
+        List<List<ConstructionBudgetItem>> lots = new ArrayList<>(byLot.values());
+        lots.sort(Comparator.comparing(
+                (List<ConstructionBudgetItem> lot) -> lot.get(0).getBudget() == null
+                        ? 0 : lot.get(0).getBudget().getSortOrder(),
+                Comparator.nullsLast(Comparator.naturalOrder())));
+        return lots;
+    }
+
+    private BudgetTreeDTO toTree(Enterprise enterprise, int itemCount, List<BudgetItemNodeDTO> roots) {
         BigDecimal budgetTotal = roots.stream()
                 .map(BudgetItemNodeDTO::rolledUpBudget)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -243,13 +395,13 @@ public class ConstructionBudgetItemService {
         roots.forEach(root -> collectOverBudget(root, overBudget));
 
         return new BudgetTreeDTO(
-                enterpriseId,
+                enterprise.getId(),
                 enterprise.getName(),
                 budgetTotal,
                 spentTotal,
                 budgetTotal.subtract(spentTotal),
                 percentage(spentTotal, budgetTotal),
-                items.size(),
+                itemCount,
                 expenseCount,
                 overBudget.count,
                 overBudget.amount,
@@ -306,17 +458,18 @@ public class ConstructionBudgetItemService {
     // ── escrita ───────────────────────────────────────────────
 
     public BudgetItemSaveResponseDTO create(BudgetItemUpsertDTO dto) {
-        Enterprise enterprise = enterpriseRepository.findById(dto.enterpriseId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
+        ConstructionBudget lot = budgetRepository.findById(dto.budgetId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
 
-        ConstructionBudgetItem parent = resolveParent(dto.parentId(), enterprise.getId());
+        ConstructionBudgetItem parent = resolveParent(dto.parentId(), lot.getId());
         validateDates(dto);
-        validateCodeIsFree(enterprise.getId(), dto.code(), null);
+        validateCodeIsFree(lot.getId(), dto.code(), null);
 
         ConstructionBudgetItem item = new ConstructionBudgetItem();
-        item.setEnterprise(enterprise);
+        item.setEnterprise(lot.getEnterprise());
+        item.setBudget(lot);
         item.setParent(parent);
-        item.setSortOrder(repository.nextSortOrder(enterprise.getId(),
+        item.setSortOrder(repository.nextSortOrder(lot.getId(),
                 parent == null ? null : parent.getId()));
         authContext.currentProfileId().ifPresent(item::setCreatedBy);
         applyFields(item, dto);
@@ -329,23 +482,23 @@ public class ConstructionBudgetItemService {
 
     public BudgetItemSaveResponseDTO update(UUID id, BudgetItemUpsertDTO dto) {
         ConstructionBudgetItem item = getById(id);
-        UUID enterpriseId = item.getEnterprise().getId();
+        UUID budgetId = item.getBudgetId();
 
-        // O projeto de uma rubrica não muda. Um PUT que peça outro é rejeitado
+        // O lote de uma rubrica não muda. Um PUT que peça outro é rejeitado
         // em vez de silenciosamente ignorado, para o cliente saber que não pegou.
-        if (dto.enterpriseId() != null && !dto.enterpriseId().equals(enterpriseId)) {
-            throw new BusinessException(ErrorCode.BUDGET_ITEM_OTHER_ENTERPRISE);
+        if (dto.budgetId() != null && !dto.budgetId().equals(budgetId)) {
+            throw new BusinessException(ErrorCode.BUDGET_ITEM_OTHER_LOT);
         }
 
         validateDates(dto);
-        validateCodeIsFree(enterpriseId, dto.code(), id);
+        validateCodeIsFree(budgetId, dto.code(), id);
 
         UUID currentParentId = item.getParent() == null ? null : item.getParent().getId();
         if (!Objects.equals(currentParentId, dto.parentId())) {
-            ConstructionBudgetItem newParent = resolveParent(dto.parentId(), enterpriseId);
+            ConstructionBudgetItem newParent = resolveParent(dto.parentId(), budgetId);
             assertNoCycle(item, newParent);
             item.setParent(newParent);
-            item.setSortOrder(repository.nextSortOrder(enterpriseId, dto.parentId()));
+            item.setSortOrder(repository.nextSortOrder(budgetId, dto.parentId()));
         }
 
         applyFields(item, dto);
@@ -359,16 +512,17 @@ public class ConstructionBudgetItemService {
     public BudgetItemNodeDTO move(UUID id, UUID newParentId, Integer newSortOrder) {
         ConstructionBudgetItem item = getById(id);
         UUID enterpriseId = item.getEnterprise().getId();
+        UUID budgetId = item.getBudgetId();
 
-        ConstructionBudgetItem newParent = resolveParent(newParentId, enterpriseId);
+        ConstructionBudgetItem newParent = resolveParent(newParentId, budgetId);
         assertNoCycle(item, newParent);
         item.setParent(newParent);
         item.setSortOrder(newSortOrder != null
                 ? newSortOrder
-                : repository.nextSortOrder(enterpriseId, newParentId));
+                : repository.nextSortOrder(budgetId, newParentId));
         repository.save(item);
 
-        resequenceSiblings(enterpriseId, newParentId, item.getId(), item.getSortOrder());
+        resequenceSiblings(enterpriseId, budgetId, newParentId, item.getId(), item.getSortOrder());
         return getNode(item.getId());
     }
 
@@ -395,10 +549,10 @@ public class ConstructionBudgetItemService {
         repository.saveAll(subtree);
     }
 
-    /** As rubricas eliminadas de um projeto, mais recente primeiro — a zona de recuperação. */
+    /** As rubricas eliminadas de um lote, mais recente primeiro — a zona de recuperação. */
     @Transactional(readOnly = true)
-    public List<BudgetItemDeletedDTO> listDeleted(UUID enterpriseId) {
-        return repository.findByEnterpriseIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(enterpriseId).stream()
+    public List<BudgetItemDeletedDTO> listDeleted(UUID budgetId) {
+        return repository.findByBudgetIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(budgetId).stream()
                 .map(item -> new BudgetItemDeletedDTO(
                         item.getId(), item.getCode(), item.getName(), item.getRowKind(),
                         item.getDeletedAt(), item.getDeletedAt().plusDays(30)))
@@ -422,14 +576,14 @@ public class ConstructionBudgetItemService {
             throw new BusinessException(ErrorCode.BUDGET_ITEM_NOT_DELETED);
         }
 
-        UUID enterpriseId = item.getEnterprise().getId();
-        validateCodeIsFree(enterpriseId, item.getCode(), item.getId());
+        UUID budgetId = item.getBudgetId();
+        validateCodeIsFree(budgetId, item.getCode(), item.getId());
 
         ConstructionBudgetItem parent = item.getParent();
         boolean parentRecoverable = parent != null && !parent.isDeleted();
         if (!parentRecoverable) {
             item.setParent(null);
-            item.setSortOrder(repository.nextSortOrder(enterpriseId, null));
+            item.setSortOrder(repository.nextSortOrder(budgetId, null));
         }
 
         List<ConstructionBudgetItem> deletedSubtree = collectDeletedSubtree(item);
@@ -699,15 +853,15 @@ public class ConstructionBudgetItemService {
         item.setEndDate(dto.endDate());
     }
 
-    private ConstructionBudgetItem resolveParent(UUID parentId, UUID enterpriseId) {
+    private ConstructionBudgetItem resolveParent(UUID parentId, UUID budgetId) {
         if (parentId == null) {
             return null;
         }
         ConstructionBudgetItem parent = repository.findById(parentId)
                 .filter(candidate -> !candidate.isDeleted())
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_PARENT_NOT_FOUND));
-        if (!parent.getEnterprise().getId().equals(enterpriseId)) {
-            throw new BusinessException(ErrorCode.BUDGET_PARENT_OTHER_ENTERPRISE);
+        if (!Objects.equals(parent.getBudgetId(), budgetId)) {
+            throw new BusinessException(ErrorCode.BUDGET_PARENT_OTHER_LOT);
         }
         return parent;
     }
@@ -728,12 +882,13 @@ public class ConstructionBudgetItemService {
         }
     }
 
-    private void validateCodeIsFree(UUID enterpriseId, String code, UUID currentItemId) {
+    /** O código é único dentro do lote — o 4.2.1 repete-se legitimamente entre lotes (V39). */
+    private void validateCodeIsFree(UUID budgetId, String code, UUID currentItemId) {
         String normalized = blankToNull(code);
         if (normalized == null) {
             return;
         }
-        repository.findByEnterpriseIdAndCode(enterpriseId, normalized).ifPresent(existing -> {
+        repository.findByBudgetIdAndCode(budgetId, normalized).ifPresent(existing -> {
             if (!existing.getId().equals(currentItemId)) {
                 throw new BusinessException(ErrorCode.BUDGET_DUPLICATE_CODE);
             }
@@ -795,11 +950,15 @@ public class ConstructionBudgetItemService {
      * lugar pedia o sortOrder do irmão de baixo, empatava com ele, e o movido
      * ficava outra vez à frente (2026-09-17).
      */
-    private void resequenceSiblings(UUID enterpriseId, UUID parentId, UUID movedId, int targetOrder) {
+    private void resequenceSiblings(UUID enterpriseId, UUID budgetId, UUID parentId, UUID movedId,
+                                    int targetOrder) {
+        // As raízes são irmãs só dentro do lote: cada lote tem os seus capítulos 1, 2, 3…
         List<ConstructionBudgetItem> siblings = new ArrayList<>(
                 parentId == null
                         ? repository.findTreeByEnterpriseId(enterpriseId).stream()
-                                .filter(i -> i.getParent() == null && !i.isDeleted()).toList()
+                                .filter(i -> i.getParent() == null && !i.isDeleted()
+                                        && Objects.equals(i.getBudgetId(), budgetId))
+                                .toList()
                         : repository.findByParentIdOrderBySortOrderAsc(parentId));
 
         ConstructionBudgetItem moved = siblings.stream()

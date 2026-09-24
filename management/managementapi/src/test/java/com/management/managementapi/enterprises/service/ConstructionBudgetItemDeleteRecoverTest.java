@@ -4,9 +4,11 @@ import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.exeption.BusinessException;
@@ -48,15 +50,24 @@ import static org.mockito.Mockito.when;
 class ConstructionBudgetItemDeleteRecoverTest {
 
     @Mock private ConstructionBudgetItemRepository repository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private ConstructionExpenseRepository expenseRepository;
     @Mock private EnterpriseRepository enterpriseRepository;
     @Mock private AuthContext authContext;
 
     private ConstructionBudgetItemService service() {
-        return new ConstructionBudgetItemService(repository, expenseRepository, enterpriseRepository, authContext);
+        return new ConstructionBudgetItemService(repository, budgetRepository, expenseRepository, enterpriseRepository, authContext);
     }
 
     private static final UUID ENTERPRISE_ID = UUID.randomUUID();
+    private static final UUID BUDGET_ID = UUID.randomUUID();
+
+    private static ConstructionBudget lot() {
+        ConstructionBudget b = new ConstructionBudget();
+        b.setId(BUDGET_ID);
+        b.setName("Lote A");
+        return b;
+    }
 
     private static Enterprise enterprise() {
         Enterprise e = new Enterprise();
@@ -69,6 +80,7 @@ class ConstructionBudgetItemDeleteRecoverTest {
         ConstructionBudgetItem i = new ConstructionBudgetItem();
         i.setId(UUID.randomUUID());
         i.setEnterprise(enterprise());
+        i.setBudget(lot());
         i.setParent(parent);
         i.setRowKind(BudgetRowKind.ITEM);
         i.setCode(code);
@@ -140,7 +152,7 @@ class ConstructionBudgetItemDeleteRecoverTest {
         grandchild.setDeletedAt(deletedAt);
 
         when(repository.findById(child.getId())).thenReturn(Optional.of(child));
-        when(repository.findByEnterpriseIdAndCode(ENTERPRISE_ID, "4.1")).thenReturn(Optional.empty());
+        when(repository.findByBudgetIdAndCode(BUDGET_ID, "4.1")).thenReturn(Optional.empty());
         when(repository.findTreeByEnterpriseId(ENTERPRISE_ID)).thenReturn(List.of(parent, child, grandchild));
 
         BudgetItemNodeDTO result = service().recover(child.getId());
@@ -160,8 +172,8 @@ class ConstructionBudgetItemDeleteRecoverTest {
         child.setDeletedAt(OffsetDateTime.now().minusDays(3));
 
         when(repository.findById(child.getId())).thenReturn(Optional.of(child));
-        when(repository.findByEnterpriseIdAndCode(ENTERPRISE_ID, "4.1")).thenReturn(Optional.empty());
-        when(repository.nextSortOrder(ENTERPRISE_ID, null)).thenReturn(5);
+        when(repository.findByBudgetIdAndCode(BUDGET_ID, "4.1")).thenReturn(Optional.empty());
+        when(repository.nextSortOrder(BUDGET_ID, null)).thenReturn(5);
         when(repository.findTreeByEnterpriseId(ENTERPRISE_ID)).thenReturn(List.of(parent, child));
 
         service().recover(child.getId());
@@ -179,7 +191,7 @@ class ConstructionBudgetItemDeleteRecoverTest {
         ConstructionBudgetItem takenBySomeoneElse = item("4.1", "Outra rubrica", null);
 
         when(repository.findById(deleted.getId())).thenReturn(Optional.of(deleted));
-        when(repository.findByEnterpriseIdAndCode(ENTERPRISE_ID, "4.1"))
+        when(repository.findByBudgetIdAndCode(BUDGET_ID, "4.1"))
                 .thenReturn(Optional.of(takenBySomeoneElse));
 
         assertThatThrownBy(() -> service().recover(deleted.getId()))
@@ -220,10 +232,10 @@ class ConstructionBudgetItemDeleteRecoverTest {
         OffsetDateTime deletedAt = OffsetDateTime.now().minusDays(5);
         deleted.setDeletedAt(deletedAt);
 
-        when(repository.findByEnterpriseIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(ENTERPRISE_ID))
+        when(repository.findByBudgetIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(BUDGET_ID))
                 .thenReturn(List.of(deleted));
 
-        List<BudgetItemDeletedDTO> result = service().listDeleted(ENTERPRISE_ID);
+        List<BudgetItemDeletedDTO> result = service().listDeleted(BUDGET_ID);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).deletedAt()).isEqualTo(deletedAt);

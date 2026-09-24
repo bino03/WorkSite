@@ -101,7 +101,7 @@ class DespesasExcelImportServiceTest {
         when(invoiceRepository.findAllByEnterpriseIdForExport(ENTERPRISE_ID)).thenReturn(List.of());
         when(invoiceRepository.findAllByScopeWithoutEnterprise(any())).thenReturn(List.of());
         when(budgetItemRepository.findByEnterpriseIdAndCode(eq(ENTERPRISE_ID), anyString()))
-                .thenAnswer(inv -> Optional.ofNullable(rubrics.get(inv.getArgument(1, String.class))));
+                .thenAnswer(inv -> Optional.ofNullable(rubrics.get(inv.getArgument(1, String.class))).stream().toList());
 
         rubric("8.2", "Betão armado", BudgetRowKind.ITEM);
         rubric("13.2.1", "Portas interiores", BudgetRowKind.ITEM);
@@ -130,7 +130,7 @@ class DespesasExcelImportServiceTest {
                     item.setId(UUID.randomUUID());
                     item.setCode(inv.getArgument(1, String.class));
                     item.setName("rubrica");
-                    return Optional.of(item);
+                    return List.of(item);
                 });
 
         byte[] content;

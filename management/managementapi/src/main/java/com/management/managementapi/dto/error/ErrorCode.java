@@ -214,11 +214,18 @@ public enum ErrorCode {
     BUDGET_PARENT_NOT_FOUND("BUDGET_007", "Rubrica-mãe não encontrada"),
     BUDGET_PARENT_OTHER_ENTERPRISE("BUDGET_008", "A rubrica-mãe pertence a outro projeto"),
     BUDGET_CYCLE("BUDGET_009", "Uma rubrica não pode ficar dentro de si própria"),
-    BUDGET_DUPLICATE_CODE("BUDGET_010", "Já existe uma rubrica com este índice neste projeto"),
+    BUDGET_DUPLICATE_CODE("BUDGET_010", "Já existe uma rubrica com este índice neste lote"),
     BUDGET_INVALID_DATES("BUDGET_011", "A data de fim não pode ser anterior à data de início"),
     BUDGET_ITEM_OTHER_ENTERPRISE("BUDGET_012", "Uma rubrica não pode mudar de projeto"),
     BUDGET_ITEM_HAS_EXPENSES("BUDGET_013", "Esta rubrica (ou uma das suas sub-rubricas) tem despesas — mova-as ou apague-as primeiro"),
     BUDGET_ITEM_NOT_DELETED("BUDGET_014", "Esta rubrica não está eliminada"),
+
+    // Lotes — um orçamento por edifício (V39)
+    BUDGET_LOT_NOT_FOUND("BUDGET_015", "Lote não encontrado"),
+    BUDGET_LOT_DUPLICATE_NAME("BUDGET_016", "Já existe um lote com este nome neste projeto"),
+    BUDGET_LOT_HAS_EXPENSES("BUDGET_017", "Este lote tem despesas lançadas nas suas rubricas — mova-as ou apague-as primeiro"),
+    BUDGET_PARENT_OTHER_LOT("BUDGET_018", "A rubrica-mãe pertence a outro lote"),
+    BUDGET_ITEM_OTHER_LOT("BUDGET_019", "Uma rubrica não pode mudar de lote"),
 
     // Importação de Excel (BUDGET_02x)
     BUDGET_IMPORT_EMPTY_FILE("BUDGET_020", "Ficheiro de orçamento vazio"),
@@ -226,7 +233,7 @@ public enum ErrorCode {
     BUDGET_IMPORT_READ_ERROR("BUDGET_022", "Não foi possível ler o ficheiro de orçamento"),
     BUDGET_IMPORT_NO_HEADER("BUDGET_023", "Não foi encontrada a linha de cabeçalho (coluna \"Art\" ou \"Rubrica\") no Excel"),
     BUDGET_IMPORT_NO_ROWS("BUDGET_024", "O Excel não tem rubricas para importar"),
-    BUDGET_IMPORT_NOT_EMPTY("BUDGET_025", "O projeto já tem orçamento — elimine-o antes de importar ou use replace=true"),
+    BUDGET_IMPORT_NOT_EMPTY("BUDGET_025", "O lote já tem orçamento — elimine-o antes de importar ou use replace=true"),
 
     // Exportação para Excel (BUDGET_026-029)
     BUDGET_EXPORT_NO_SHEETS("BUDGET_026", "Escolha pelo menos uma folha para exportar"),

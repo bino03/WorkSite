@@ -16,6 +16,7 @@
     "antd": "^5.27.4",
     "axios": "^1.12.2",
     "dayjs": "^1.11.18",
+    "exceljs": "^4.4.0",
     "i18next": "^26.3.0",
     "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^0.544.0",

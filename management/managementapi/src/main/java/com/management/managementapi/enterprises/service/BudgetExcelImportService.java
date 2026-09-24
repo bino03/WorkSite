@@ -5,9 +5,9 @@ import com.management.managementapi.enterprises.dto.budget.response.BudgetImport
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportRowDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
-import com.management.managementapi.enterprises.model.Enterprise;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
-import com.management.managementapi.enterprises.repository.EnterpriseRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.security.AuthContext;
 
@@ -79,32 +79,32 @@ public class BudgetExcelImportService {
     private static final String NO_DESCRIPTION = "Sem descrição";
 
     private final ConstructionBudgetItemRepository repository;
-    private final EnterpriseRepository enterpriseRepository;
+    private final ConstructionBudgetRepository budgetRepository;
     private final AuthContext authContext;
 
     @Transactional
-    public BudgetImportResultDTO importBudget(UUID enterpriseId, MultipartFile file,
+    public BudgetImportResultDTO importBudget(UUID budgetId, MultipartFile file,
                                               boolean dryRun, boolean replace) {
 
-        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
+        ConstructionBudget lot = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
 
         validateFile(file);
 
-        if (!dryRun && !replace && repository.existsByEnterpriseId(enterpriseId)) {
+        if (!dryRun && !replace && repository.existsByBudgetId(budgetId)) {
             throw new BusinessException(ErrorCode.BUDGET_IMPORT_NOT_EMPTY);
         }
 
-        ParseResult parsed = parse(file);
+        ParseResult parsed = parse(file, lot.getName());
 
         if (!dryRun) {
             if (replace) {
-                repository.deleteAllByEnterpriseId(enterpriseId);
+                repository.deleteAllByBudgetId(budgetId);
                 repository.flush();
             }
             UUID createdBy = authContext.currentProfileId().orElse(null);
             for (Draft root : parsed.roots) {
-                persist(root, null, enterprise, createdBy);
+                persist(root, null, lot, createdBy);
             }
         }
 
@@ -123,11 +123,27 @@ public class BudgetExcelImportService {
         }
     }
 
-    private ParseResult parse(MultipartFile file) {
+    /**
+     * A folha do orçamento: num livro exportado de uma obra com vários lotes há
+     * uma {@code "Orçamento - <Lote>"} por lote, e escolhe-se a deste lote.
+     * Qualquer outro ficheiro (o do empreiteiro, o de uma obra de um só lote)
+     * continua a ser lido pela primeira folha, como sempre.
+     */
+    static Sheet budgetSheet(Workbook workbook, String lotName) {
+        if (lotName != null) {
+            Sheet own = workbook.getSheet(BudgetExcelExportService.lotSheetName(lotName));
+            if (own != null) {
+                return own;
+            }
+        }
+        return workbook.getSheetAt(0);
+    }
+
+    private ParseResult parse(MultipartFile file, String lotName) {
         try (InputStream in = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(in)) {
 
-            Sheet sheet = workbook.getSheetAt(0);
+            Sheet sheet = budgetSheet(workbook, lotName);
             ParseResult result = new ParseResult();
             result.sheetName = sheet.getSheetName();
 
@@ -377,9 +393,10 @@ public class BudgetExcelImportService {
 
     // ── persistência ──────────────────────────────────────────
 
-    private void persist(Draft draft, ConstructionBudgetItem parent, Enterprise enterprise, UUID createdBy) {
+    private void persist(Draft draft, ConstructionBudgetItem parent, ConstructionBudget lot, UUID createdBy) {
         ConstructionBudgetItem item = new ConstructionBudgetItem();
-        item.setEnterprise(enterprise);
+        item.setEnterprise(lot.getEnterprise());
+        item.setBudget(lot);
         item.setParent(parent);
         item.setRowKind(draft.kind);
         item.setCode(draft.code);
@@ -394,7 +411,7 @@ public class BudgetExcelImportService {
 
         ConstructionBudgetItem saved = repository.save(item);
         for (Draft child : draft.children) {
-            persist(child, saved, enterprise, createdBy);
+            persist(child, saved, lot, createdBy);
         }
     }
 

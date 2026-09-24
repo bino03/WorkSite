@@ -1,4 +1,45 @@
-import type { BudgetItemNode, DatePropagationHint } from "@/types/budget";
+import type { BudgetItemNode, BudgetLot, BudgetTree, DatePropagationHint } from "@/types/budget";
+
+/**
+ * Um lote como nó de topo da árvore — para os seletores de rubrica numa obra com
+ * vários lotes, onde o 4.2.1 existe em todos e só o lote os distingue. É um
+ * título (`HEADING`): não aceita despesas, abre-se para chegar às rubricas. O id
+ * leva o prefixo `lot:` para nunca colidir com o de uma rubrica.
+ */
+export function lotAsNode(lot: BudgetLot, tree: BudgetTree): BudgetItemNode {
+  return {
+    id: `lot:${lot.id}`,
+    parentId: null,
+    rowKind: "HEADING",
+    acceptsExpenses: false,
+    code: null,
+    sortOrder: lot.sortOrder,
+    depth: 0,
+    name: lot.name,
+    unit: null,
+    quantity: null,
+    unitPrice: null,
+    totalPrice: null,
+    observations: null,
+    startDate: null,
+    endDate: null,
+    rolledUpBudget: tree.budgetTotal,
+    budgetMismatch: false,
+    budgetVariance: null,
+    spentTotal: tree.spentTotal,
+    remaining: tree.remaining,
+    percentSpent: tree.percentSpent,
+    overBudget: tree.overBudgetCount > 0,
+    expenseCount: tree.expenseCount,
+    ownExpenseCount: 0,
+    missingInvoiceCount: tree.missingInvoiceCount,
+    pendingAccountantCount: tree.pendingAccountantCount,
+    pendingAccountantTotal: tree.pendingAccountantTotal,
+    createdAt: "",
+    updatedAt: "",
+    children: tree.roots.map((root) => ({ ...root, parentId: `lot:${lot.id}` })),
+  };
+}
 
 /** Percorre a árvore em profundidade, na ordem em que se lê no Excel. */
 export function flattenTree(roots: BudgetItemNode[]): BudgetItemNode[] {

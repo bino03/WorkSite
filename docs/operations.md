@@ -46,6 +46,53 @@ produção hardcoded no código de propósito:
 | Uma instância só, ou várias a escalar horizontalmente? | — | `RateLimitFilter` e `ExportRateLimitFilter` guardam o estado em **memória** (bucket4j + Caffeine). Com várias réplicas, cada uma tem o seu próprio contador — o limite efetivo multiplica-se pelo nº de réplicas. Não é um bug; se escalar, isto passa a exigir estado partilhado (Redis) ou mover o rate limiting para o proxy |
 | Mesmo projeto Supabase de hoje, ou um novo? | `DB_URL`, `SUPABASE_*` no `.env` | Mesmo projeto → migrações `V1`–`V38` já aplicadas, nada a fazer. Projeto novo → o Flyway aplica tudo de raiz no primeiro arranque (confirmar no log) |
 
+**O backend não pode ficar num domínio à parte do Backoffice** (ex. Backoffice em `worksite.pt` e
+API no subdomínio genérico da hospedagem, tipo `algo.onrender.com`). `CookieUtil.java` fixa
+`sameSite("Lax")` nos três cookies (`access_token`, `refresh_token`, limpeza) — um cookie `Lax`
+**não viaja em pedidos cross-site feitos por `fetch`/XHR** (só em navegação de topo), e é assim que
+o Axios do Backoffice fala com a API. `SameSite` compara o domínio registável (eTLD+1), não a
+origem exata, por isso dois subdomínios do mesmo domínio contam como "same-site" e o cookie viaja
+na mesma. Ou seja: só é preciso **um** domínio comprado — o backend fica num subdomínio dele (ex.
+`api.worksite.pt` a apontar por CNAME para o serviço da hospedagem), nunca no domínio "de fábrica"
+da plataforma. `COOKIE_DOMAIN` tem de ser o domínio pai partilhado (ex. `.worksite.pt`) para o
+cookie posto pela API em `api.worksite.pt` ser lido também pelo Backoffice em `app.worksite.pt`/
+`worksite.pt`.
+
+### Opções de hospedagem pesquisadas (2026-09-23)
+
+Nenhuma decisão tomada ainda — isto é o levantamento para decidir, não uma escolha feita. Preços
+de mercado mudam; confirmar no site antes de assinar.
+
+**Backend** (precisa de correr um processo Java persistente — não serve nada serverless tipo
+funções Vercel):
+
+| Serviço | Grátis? | Preço pago | Nota |
+|---|---|---|---|
+| Render | Sim, mas adormece ao fim de 15min sem tráfego (~1min a acordar) | $7/mês (sempre ativo) | Mais simples de configurar (liga ao repo, deploy automático) |
+| Railway | Só $5 de crédito único ao criar conta, sem grátis permanente | Hobby $5/mês + consumo acima disso (tipicamente $5-10/mês total) | Boa DX, ligeiramente mais caro no total que o Render |
+| Fly.io | Trial inicial, depois pay-as-you-go | Máquina mínima (256MB) ≈ $2/mês, cresce com CPU/RAM/rede | Mais barato, mas exige mais configuração manual (Dockerfile, `fly.toml`, CLI) |
+
+Qualquer um serve para uma única instância (ver tabela acima — o rate limiting em memória exige
+isso de qualquer forma).
+
+**Frontend** (só ficheiros estáticos do `vite build` — qualquer hospedagem de sites estáticos serve):
+
+- **Vercel Hobby (grátis) não pode ser usado aqui.** Os termos do Vercel definem uso comercial
+  como incluindo explicitamente **"o projeto pertencer a uma LLC ou outra entidade comercial"** —
+  o Worksite pertence à empresa, cai diretamente nessa categoria, não é zona cinzenta. A violação
+  não é só uma questão de faturação: a consequência documentada é **suspensão da conta/projeto**,
+  o que para uma ferramenta interna de uso diário é um risco real, não hipotético. Usar Vercel
+  implica o plano **Pro, $20/mês**.
+- Alternativa sem essa cláusula e sem custo: **Cloudflare Pages** (tier gratuito utilizável
+  comercialmente) — e se o domínio também for comprado na Cloudflare, fica tudo (registo, DNS,
+  frontend) no mesmo sítio.
+
+**Domínio** — ao registar via um agente do DNS.pt (ex. OVHcloud) ou noutro registrador, o NIF
+entra em dois sítios com propósitos diferentes: no registo do domínio é o **titular legal**
+(para `.pt` a DNS.pt exige NIF/NIPC válido; para `.com` não é obrigatório mas convém preencher
+para o domínio ficar em nome da empresa); na hospedagem (Vercel/Render/Railway/Cloudflare) é só
+para a **fatura** (billing/tax info nas settings de conta), sem relação com a titularidade de nada.
+
 ### Variáveis a preencher (produção real)
 
 Nenhuma tem valor de produção no repo, de propósito — ver [[environment]] para a lista completa

@@ -39,6 +39,14 @@ public class ConstructionBudgetItem extends BaseEntity {
     @JoinColumn(name = "enterprise_id")
     private Enterprise enterprise;
 
+    /**
+     * O lote a que a rubrica pertence (V39). {@code enterprise} fica ao lado,
+     * desnormalizado — a FK composta na BD garante que é o projeto do lote.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "budget_id")
+    private ConstructionBudget budget;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private ConstructionBudgetItem parent;
@@ -92,6 +100,12 @@ public class ConstructionBudgetItem extends BaseEntity {
 
     public Enterprise getEnterprise() { return enterprise; }
     public void setEnterprise(Enterprise enterprise) { this.enterprise = enterprise; }
+
+    public ConstructionBudget getBudget() { return budget; }
+    public void setBudget(ConstructionBudget budget) { this.budget = budget; }
+
+    /** Null-safe: as fixtures de teste antigas criam rubricas sem lote. */
+    public UUID getBudgetId() { return budget == null ? null : budget.getId(); }
 
     public ConstructionBudgetItem getParent() { return parent; }
     public void setParent(ConstructionBudgetItem parent) { this.parent = parent; }

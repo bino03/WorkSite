@@ -15,8 +15,8 @@ const MAX_BYTES = 25 * 1024 * 1024;
 
 interface Props {
   open: boolean;
-  enterpriseId: string;
-  /** Quantas rubricas o projeto já tem — decide se é preciso substituir. */
+  budgetId: string;
+  /** Quantas rubricas o lote já tem — decide se é preciso substituir. */
   existingItemCount: number;
   onClose: () => void;
   onImported: () => void;
@@ -24,7 +24,7 @@ interface Props {
 
 export const BudgetImportModal: FC<Props> = ({
   open,
-  enterpriseId,
+  budgetId,
   existingItemCount,
   onClose,
   onImported,
@@ -62,7 +62,7 @@ export const BudgetImportModal: FC<Props> = ({
     setPreview(null);
     setAnalysing(true);
     try {
-      setPreview(await importBudget(enterpriseId, picked, true));
+      setPreview(await importBudget(budgetId, picked, true));
     } catch (error) {
       ErrorHandler.handle(error);
       setFile(null);
@@ -75,7 +75,7 @@ export const BudgetImportModal: FC<Props> = ({
     if (!file) return;
     setImporting(true);
     try {
-      const result = await importBudget(enterpriseId, file, false, replace);
+      const result = await importBudget(budgetId, file, false, replace);
       notificationService.success(
         "Importação",
         `${result.itemCount} rubricas importadas de "${result.sheetName}".`
@@ -262,7 +262,7 @@ export const BudgetImportModal: FC<Props> = ({
               <Alert
                 type="error"
                 showIcon
-                message="Este projeto já tem orçamento"
+                message="Este lote já tem orçamento"
                 description={
                   <div style={{ fontSize: 13 }}>
                     <p style={{ margin: "0 0 6px" }}>

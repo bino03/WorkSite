@@ -7,6 +7,7 @@ import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.security.AuthContext;
@@ -40,6 +41,7 @@ import static org.mockito.Mockito.when;
 class BudgetSpentDistributionTest {
 
     @Mock private ConstructionBudgetItemRepository repository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private ConstructionExpenseRepository expenseRepository;
     @Mock private EnterpriseRepository enterpriseRepository;
     @Mock private AuthContext authContext;
@@ -174,7 +176,7 @@ class BudgetSpentDistributionTest {
     }
 
     private ConstructionBudgetItemService service() {
-        return new ConstructionBudgetItemService(repository, expenseRepository, enterpriseRepository, authContext);
+        return new ConstructionBudgetItemService(repository, budgetRepository, expenseRepository, enterpriseRepository, authContext);
     }
 
     private static BudgetItemNodeDTO find(List<BudgetItemNodeDTO> nodes, String code) {

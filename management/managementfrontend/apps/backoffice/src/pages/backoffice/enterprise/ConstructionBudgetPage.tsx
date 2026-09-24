@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Badge, Button, Empty, Input, Space, Spin, Table, Tooltip } from "antd";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Badge, Button, Empty, Input, Modal, Space, Spin, Table, Tabs, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   ArrowLeftOutlined,
@@ -18,7 +18,16 @@ import {
   UpOutlined,
 } from "@ant-design/icons";
 
-import { deleteBudgetItem, getBudgetTree, listDeletedBudgetItems, moveBudgetItem } from "@/services/budgetService";
+import {
+  createBudgetLot,
+  deleteBudgetItem,
+  deleteBudgetLot,
+  getLotTree,
+  listBudgetLots,
+  listDeletedBudgetItems,
+  moveBudgetItem,
+  renameBudgetLot,
+} from "@/services/budgetService";
 import { getPendingInvoicesSummary } from "@/services/invoiceService";
 import type { PendingInvoicesSummary } from "@/types/invoice";
 import { ErrorHandler } from "@/errors/errorHandler";
@@ -26,7 +35,7 @@ import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { formatCurrency } from "@/utils/formatters";
-import type { BudgetItemNode, BudgetTree } from "@/types/budget";
+import type { BudgetItemNode, BudgetLot, BudgetTree } from "@/types/budget";
 import { BudgetExpensesDrawer } from "@/components/budget/BudgetExpensesDrawer";
 import { BudgetItemDrawer } from "@/components/budget/BudgetItemDrawer";
 import { BudgetMoveToModal } from "@/components/budget/BudgetMoveToModal";
@@ -43,6 +52,14 @@ const ConstructionBudgetPage: FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const confirm = useConfirm();
+
+  // Um orçamento por lote (edifício). O lote aberto vive na URL (`?lote=`), para
+  // o link da notificação de prazo e o "voltar" do browser caírem no lote certo.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [lots, setLots] = useState<BudgetLot[] | null>(null);
+  const lotId = searchParams.get("lote") ?? lots?.[0]?.id ?? null;
+  const currentLot = lots?.find((l) => l.id === lotId) ?? null;
+  const [lotModal, setLotModal] = useState<{ lot: BudgetLot | null; name: string } | null>(null);
 
   const [tree, setTree] = useState<BudgetTree | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,11 +79,27 @@ const ConstructionBudgetPage: FC = () => {
     null
   );
 
-  const fetchTree = useCallback(async () => {
+  const fetchLots = useCallback(async () => {
     if (!enterpriseId) return;
+    try {
+      setLots(await listBudgetLots(enterpriseId));
+    } catch (error) {
+      ErrorHandler.handle(error);
+    }
+  }, [enterpriseId]);
+
+  useEffect(() => {
+    fetchLots();
+  }, [fetchLots]);
+
+  const fetchTree = useCallback(async () => {
+    if (!lotId) {
+      setTree(null);
+      return;
+    }
     setLoading(true);
     try {
-      const data = await getBudgetTree(enterpriseId);
+      const data = await getLotTree(lotId);
       setTree(data);
       // Abre só os capítulos: 198 linhas abertas de uma vez não se leem.
       setExpandedKeys(data.roots.map((r) => r.id));
@@ -75,11 +108,58 @@ const ConstructionBudgetPage: FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [enterpriseId]);
+  }, [lotId]);
 
   useEffect(() => {
     fetchTree();
   }, [fetchTree]);
+
+  /** Depois de mexer nas rubricas: a árvore do lote e os totais das abas. */
+  const refresh = useCallback(() => {
+    fetchTree();
+    fetchLots();
+  }, [fetchTree, fetchLots]);
+
+  const selectLot = (id: string) => {
+    setQuery("");
+    setSearchParams({ lote: id }, { replace: true });
+  };
+
+  const saveLot = async () => {
+    if (!enterpriseId || !lotModal) return;
+    const name = lotModal.name.trim();
+    if (!name) return;
+    try {
+      const saved = lotModal.lot
+        ? await renameBudgetLot(lotModal.lot.id, name)
+        : await createBudgetLot(enterpriseId, name);
+      setLotModal(null);
+      await fetchLots();
+      selectLot(saved.id);
+    } catch (error) {
+      ErrorHandler.handle(error);
+    }
+  };
+
+  const confirmDeleteLot = (lot: BudgetLot) => {
+    confirm({
+      title: "Eliminar lote",
+      message:
+        lot.itemCount > 0
+          ? `Eliminar "${lot.name}" e as suas ${lot.itemCount} rubrica(s)? Não vai para a zona de recuperação. Só é possível se nenhuma rubrica tiver despesas.`
+          : `Eliminar "${lot.name}"? O lote não tem rubricas.`,
+      onConfirm: async () => {
+        try {
+          await deleteBudgetLot(lot.id);
+          notificationService.success("Lote", "Lote eliminado.");
+          setSearchParams({}, { replace: true });
+          fetchLots();
+        } catch (error) {
+          ErrorHandler.handle(error);
+        }
+      },
+    });
+  };
 
   useEffect(() => {
     if (!enterpriseId) return;
@@ -88,11 +168,11 @@ const ConstructionBudgetPage: FC = () => {
   }, [enterpriseId]);
 
   const refreshDeletedCount = useCallback(() => {
-    if (!enterpriseId || !isAdmin()) return;
-    listDeletedBudgetItems(enterpriseId)
+    if (!lotId || !isAdmin()) return;
+    listDeletedBudgetItems(lotId)
       .then((items) => setDeletedCount(items.length))
       .catch(() => setDeletedCount(0));
-  }, [enterpriseId, isAdmin]);
+  }, [lotId, isAdmin]);
 
   useEffect(() => {
     refreshDeletedCount();
@@ -444,6 +524,11 @@ const ConstructionBudgetPage: FC = () => {
               </Button>
             </Badge>
           )}
+          {isAdmin() && (
+            <Button icon={<PlusOutlined />} onClick={() => setLotModal({ lot: null, name: "" })}>
+              Novo lote
+            </Button>
+          )}
           {isAdmin() && tree && (
             <Button
               icon={<PlusOutlined />}
@@ -470,6 +555,53 @@ const ConstructionBudgetPage: FC = () => {
         </Space>
       </div>
 
+      {/* Um orçamento por lote. Sem lotes, o projeto ainda não tem orçamento: cria-se
+          o primeiro lote e importa-se para ele. */}
+      {lots && lots.length === 0 && (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="Este projeto ainda não tem orçamento. Crie um lote (edifício) e importe o orçamento para ele."
+          style={{ marginBottom: "20.4px" }}
+        >
+          {isAdmin() && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setLotModal({ lot: null, name: "" })}>
+              Criar lote
+            </Button>
+          )}
+        </Empty>
+      )}
+      {lots && lots.length > 0 && (
+        <Tabs
+          activeKey={lotId ?? undefined}
+          onChange={selectLot}
+          items={lots.map((lot) => ({ key: lot.id, label: lot.name }))}
+          tabBarExtraContent={
+            isAdmin() && currentLot ? (
+              <Space size={4}>
+                <Tooltip title="Renomear lote">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => setLotModal({ lot: currentLot, name: currentLot.name })}
+                  />
+                </Tooltip>
+                <Tooltip title="Eliminar lote">
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => confirmDeleteLot(currentLot)}
+                  />
+                </Tooltip>
+              </Space>
+            ) : undefined
+          }
+          style={{ marginBottom: "6.8px" }}
+        />
+      )}
+
       {/* Três números fixos; as excepções só aparecem quando existem. */}
       <div
         style={{
@@ -480,7 +612,15 @@ const ConstructionBudgetPage: FC = () => {
           flexWrap: "wrap",
         }}
       >
-        <MetricCard label="Orçamento" value={formatCurrency(totals?.budgetTotal ?? 0)} />
+        <MetricCard
+          label={lots && lots.length > 1 ? `Orçamento · ${currentLot?.name ?? ""}` : "Orçamento"}
+          value={formatCurrency(totals?.budgetTotal ?? 0)}
+          meta={
+            lots && lots.length > 1
+              ? `${formatCurrency(lots.reduce((sum, l) => sum + l.budgetTotal, 0))} nos ${lots.length} lotes`
+              : undefined
+          }
+        />
         {/* "Gasto" só conta o que já está numa rubrica; sem o resto ao lado parecia
             que o dinheiro das faturas por classificar tinha desaparecido. */}
         <MetricCard
@@ -588,19 +728,19 @@ const ConstructionBudgetPage: FC = () => {
         enterpriseId={enterpriseId ?? ""}
         open={!!expensesItem}
         onClose={() => setExpensesItem(null)}
-        onChanged={fetchTree}
+        onChanged={refresh}
       />
 
       <BudgetItemDrawer
         open={!!itemDrawer}
-        enterpriseId={enterpriseId ?? ""}
+        budgetId={lotId ?? ""}
         tree={tree}
         item={itemDrawer?.item ?? null}
         defaultParentId={itemDrawer?.parentId ?? null}
         onClose={() => setItemDrawer(null)}
         onSaved={() => {
           setItemDrawer(null);
-          fetchTree();
+          refresh();
         }}
       />
 
@@ -617,21 +757,44 @@ const ConstructionBudgetPage: FC = () => {
 
       <BudgetRecycleBinDrawer
         open={recycleBinOpen}
-        enterpriseId={enterpriseId ?? ""}
+        budgetId={lotId ?? ""}
         onClose={() => setRecycleBinOpen(false)}
         onRecovered={() => {
-          fetchTree();
+          refresh();
           refreshDeletedCount();
         }}
       />
 
       <BudgetImportModal
         open={importOpen}
-        enterpriseId={enterpriseId ?? ""}
+        budgetId={lotId ?? ""}
         existingItemCount={tree?.itemCount ?? 0}
         onClose={() => setImportOpen(false)}
-        onImported={fetchTree}
+        onImported={refresh}
       />
+
+      <Modal
+        open={!!lotModal}
+        title={lotModal?.lot ? "Renomear lote" : "Novo lote"}
+        okText={lotModal?.lot ? "Guardar" : "Criar"}
+        cancelText="Cancelar"
+        okButtonProps={{ disabled: !lotModal?.name.trim() }}
+        onOk={saveLot}
+        onCancel={() => setLotModal(null)}
+        destroyOnClose
+      >
+        <p style={{ fontSize: 12, opacity: 0.7 }}>
+          Um lote é um edifício do empreendimento, com o seu próprio orçamento e numeração.
+        </p>
+        <Input
+          autoFocus
+          placeholder="Ex.: Lote A, Moradia 2"
+          value={lotModal?.name ?? ""}
+          maxLength={80}
+          onChange={(e) => setLotModal((m) => (m ? { ...m, name: e.target.value } : m))}
+          onPressEnter={saveLot}
+        />
+      </Modal>
 
       <BudgetExportModal
         open={exportOpen}

@@ -151,11 +151,38 @@ rubricas".
 
 ## 6. Rubricas
 
-> **Decisão (2026-09-15): cada construção tem um único orçamento.** Não há versões/revisões nem tabela
-> `construction_budget` entre o projeto e as rubricas — a árvore em `construction_budget_item` é *o* orçamento da
-> obra. O nome da folha ("Orçamento inicial") não implica revisões futuras na app. Corrigir um orçamento importado
-> mal faz-se pelo CRUD de rubricas, não por substituição (decisão de 2026-08-18 mantida). O cabeçalho do Excel
-> (empreiteiro, cliente, obra, data), o `TOTAL` e as notas de condições continuam a **não** ser guardados.
+> **Decisão (2026-09-23): um orçamento por lote.** Substitui a de 2026-09-15 ("cada construção tem um único
+> orçamento"). Uma vila pode ter vários **lotes** (edifícios), cada um com o seu orçamento do empreiteiro, importado
+> à parte, e com numeração própria: o `4.2.1` do Lote A e o do Lote B são rubricas diferentes. A `V39` pôs a tabela
+> `construction_budget` (o lote) entre o projeto e as rubricas; o `code` passou a ser único **por lote**. As
+> **faturas continuam no projeto**: é a rubrica escolhida na repartição que diz de que lote é o gasto, e uma fatura
+> pode dividir-se entre lotes. Continua a não haver versões/revisões de um orçamento — corrigir um orçamento
+> importado mal faz-se pelo CRUD de rubricas (decisão de 2026-08-18 mantida). O cabeçalho do Excel (empreiteiro,
+> cliente, obra, data), o `TOTAL` e as notas de condições continuam a **não** ser guardados.
+>
+> **O contrato com lotes (2026-09-23, fase C do plano `notes/roadmap/plans/2026-09-23-lotes-orcamento.md`).**
+> Continua a haver um `.xlsx` por vila. **Uma obra com um só lote com rubricas sai e entra exatamente como antes**:
+> nada abaixo se aplica, e as três obras atuais não mudam. Com **dois ou mais lotes com rubricas**:
+>
+> | Onde | Um lote | Vários lotes |
+> |---|---|---|
+> | Folha de orçamento | `Orçamento inicial` | uma `Orçamento - <Lote>` por lote, pela ordem dos lotes (31 caracteres no máximo, sem `[]:*?/\`) |
+> | Coluna `Rubrica` da "Despesas" | `4.2.1 — Lajes` | `Lote A · 4.2.1 — Lajes` (separador ` · `, ponto médio com espaços) |
+> | `TabelaRubricas` | colunas A–K | as mesmas A–K, mais **`Lote` na coluna L**. A `Etiqueta` leva o lote, igual letra a letra à coluna `Rubrica`. A dropdown (M, escondida) continua lá |
+> | Painel "Orçamento vs Gasto" | uma linha por capítulo, `SUMIF` por `Cap` | uma linha por **lote e capítulo** (`Lote A · ESTALEIRO`), `SUMIFS` por `Cap` **e** `Lote` |
+>
+> **Ao ler a "Despesas"** (`DespesasExcelImportService.splitLot`), o que vem antes do ` · ` é o lote, se não for
+> um índice nem tiver `—` (o ponto médio pode aparecer numa descrição). Com lote, procura-se o código só nesse
+> lote, e um lote que não existe na obra é erro por linha. Sem lote, um código que exista em mais do que um lote
+> também é erro por linha: **nunca se adivinha o lote**. Tolera-se também `Lote A · 4.2` e `Lote A · 4.2.`, como
+> sem lote.
+>
+> **Ao importar o orçamento de um lote**, lê-se a folha `Orçamento - <nome do lote>` se o livro a tiver. Senão
+> lê-se a primeira folha, como sempre (o ficheiro do empreiteiro, ou o livro de uma obra de um só lote).
+>
+> **Do lado do vault da Vilatro ainda nada lê isto.** O `gerar-orcamento-vs-gasto.ps1` e a `associar-rubricas`
+> só conhecem uma "Orçamento inicial". O pedido está em `Vilatro\Início.md` → "Por fazer", e a decisão em
+> `Vilatro\Decisões.md` (28). Até o vault a cumprir, uma vila com vários lotes só se mantém pela app.
 
 | | App | Excel |
 |---|---|---|
@@ -219,8 +246,8 @@ ao artigo acima. O gerador já resolve isso e lista cada caso como aviso.
 
 **Duas anomalias reais no orçamento do Vila Petrus**, que a importação da árvore vai encontrar: o `Art`
 **`8.2` aparece em duas linhas** (falta o `8.3`) e o **`13.2.1` noutras duas** (falta o `13.1.1`). Como
-`code` é único em `construction_budget_item`, a importação tem de as **listar como erro**, nunca resolver
-sozinha.
+`code` é único dentro do lote em `construction_budget_item`, a importação tem de as **listar como erro**, nunca
+resolver sozinha.
 
 Rubricas `HEADING` e `NOTE` (sem `Art`) não aceitam despesas em nenhum dos lados. Uma `Rubrica` no
 Excel que não exista na árvore da obra é erro de migração, listado, nunca criado automaticamente.

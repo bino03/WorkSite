@@ -36,6 +36,14 @@ public interface ConstructionBudgetItemRepository extends JpaRepository<Construc
             """)
     List<ConstructionBudgetItem> findTreeByEnterpriseId(@Param("enterpriseId") UUID enterpriseId);
 
+    /** A árvore de um só lote — o mesmo contrato do {@link #findTreeByEnterpriseId} (inclui eliminadas). */
+    @Query("""
+            select i from ConstructionBudgetItem i
+            where i.budget.id = :budgetId
+            order by i.sortOrder asc
+            """)
+    List<ConstructionBudgetItem> findTreeByBudgetId(@Param("budgetId") UUID budgetId);
+
     /**
      * Rubricas vivas de várias obras de uma vez — para a lista de projetos
      * mostrar o total do orçamento de cada uma sem ir à BD por obra.
@@ -61,45 +69,80 @@ public interface ConstructionBudgetItemRepository extends JpaRepository<Construc
      */
     @Query("""
             select i from ConstructionBudgetItem i
+            where i.budget.id = :budgetId and i.code = :code and i.deletedAt is null
+            """)
+    Optional<ConstructionBudgetItem> findByBudgetIdAndCode(@Param("budgetId") UUID budgetId,
+                                                           @Param("code") String code);
+
+    /**
+     * O mesmo código em todos os lotes do projeto. Desde a V39 os códigos
+     * repetem-se entre lotes, por isso é uma lista: quem só aceita uma resposta
+     * inequívoca (sugestões, Excel de um só lote) trata o "mais do que uma".
+     */
+    @Query("""
+            select i from ConstructionBudgetItem i
             where i.enterprise.id = :enterpriseId and i.code = :code and i.deletedAt is null
             """)
-    Optional<ConstructionBudgetItem> findByEnterpriseIdAndCode(@Param("enterpriseId") UUID enterpriseId,
-                                                               @Param("code") String code);
+    List<ConstructionBudgetItem> findByEnterpriseIdAndCode(@Param("enterpriseId") UUID enterpriseId,
+                                                           @Param("code") String code);
+
+    /** A rubrica com este código no projeto, só se for inequívoca (um só lote a tem). */
+    default Optional<ConstructionBudgetItem> findUniqueByEnterpriseIdAndCode(UUID enterpriseId, String code) {
+        List<ConstructionBudgetItem> found = findByEnterpriseIdAndCode(enterpriseId, code);
+        return found.size() == 1 ? Optional.of(found.get(0)) : Optional.empty();
+    }
 
     boolean existsByParentId(UUID parentId);
 
     /** Tem pelo menos uma filha deste tipo? Usado pelo filtro "ao capítulo" das faturas. */
     boolean existsByParentIdAndRowKind(UUID parentId, BudgetRowKind rowKind);
 
-    /** Só conta as vivas — um projeto com tudo eliminado é tratado como sem orçamento (importação). */
+    /** Só conta as vivas — um lote com tudo eliminado é tratado como sem orçamento (importação). */
     @Query("""
             select count(i) > 0 from ConstructionBudgetItem i
-            where i.enterprise.id = :enterpriseId and i.deletedAt is null
+            where i.budget.id = :budgetId and i.deletedAt is null
             """)
-    boolean existsByEnterpriseId(@Param("enterpriseId") UUID enterpriseId);
+    boolean existsByBudgetId(@Param("budgetId") UUID budgetId);
 
-    /** As rubricas eliminadas de um projeto — a zona de recuperação. */
-    List<ConstructionBudgetItem> findByEnterpriseIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(UUID enterpriseId);
+    /** Há despesas lançadas em alguma rubrica do lote (vivas ou eliminadas)? Bloqueia apagar o lote. */
+    @Query("""
+            select count(e) > 0 from ConstructionExpense e
+            where e.budgetItem.budget.id = :budgetId
+            """)
+    boolean budgetHasExpenses(@Param("budgetId") UUID budgetId);
 
     /**
-     * Apaga o orçamento inteiro de um projeto numa só instrução — a FK
+     * As rubricas eliminadas de um lote — a zona de recuperação. Com {@code @Query}
+     * e não pelo nome do método: o getter {@code getBudgetId()} da entidade faz o
+     * Spring Data ler "BudgetId" como atributo, que não existe, e o arranque falha.
+     */
+    @Query("""
+            select i from ConstructionBudgetItem i
+            where i.budget.id = :budgetId and i.deletedAt is not null
+            order by i.deletedAt desc
+            """)
+    List<ConstructionBudgetItem> findByBudgetIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(@Param("budgetId") UUID budgetId);
+
+    /**
+     * Apaga o orçamento inteiro de um lote numa só instrução — a FK
      * auto-referenciada tem {@code on delete cascade}, por isso o Postgres
      * trata da sub-árvore (e das despesas) sozinho. Hard delete de propósito
      * (não passa pelo soft delete): é a reimportação a substituir tudo, não
-     * uma eliminação normal a acontecer no ecrã.
+     * uma eliminação normal a acontecer no ecrã. Os outros lotes do projeto
+     * não são tocados.
      */
     @Modifying
-    @Query("delete from ConstructionBudgetItem i where i.enterprise.id = :enterpriseId")
-    void deleteAllByEnterpriseId(@Param("enterpriseId") UUID enterpriseId);
+    @Query("delete from ConstructionBudgetItem i where i.budget.id = :budgetId")
+    void deleteAllByBudgetId(@Param("budgetId") UUID budgetId);
 
-    /** Próxima posição livre entre os irmãos vivos — usada ao criar/mover uma rubrica. */
+    /** Próxima posição livre entre os irmãos vivos do lote — usada ao criar/mover uma rubrica. */
     @Query("""
             select coalesce(max(i.sortOrder), -1) + 1 from ConstructionBudgetItem i
-            where i.enterprise.id = :enterpriseId
+            where i.budget.id = :budgetId
               and ((:parentId is null and i.parent is null) or i.parent.id = :parentId)
               and i.deletedAt is null
             """)
-    int nextSortOrder(@Param("enterpriseId") UUID enterpriseId, @Param("parentId") UUID parentId);
+    int nextSortOrder(@Param("budgetId") UUID budgetId, @Param("parentId") UUID parentId);
 
     /**
      * Rubricas vivas cujo prazo termina na janela {@code [from, to]}, em obras

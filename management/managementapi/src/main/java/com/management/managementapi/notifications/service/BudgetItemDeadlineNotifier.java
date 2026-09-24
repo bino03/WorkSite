@@ -71,7 +71,8 @@ public class BudgetItemDeadlineNotifier {
                         Notification.TYPE_BUDGET_ITEM_DEADLINE,
                         "Prazo de rubrica a terminar",
                         descreve(item, today),
-                        "/backoffice/empreendimentos/" + item.getEnterprise().getId() + "/budget",
+                        "/backoffice/empreendimentos/" + item.getEnterprise().getId() + "/budget"
+                                + (item.getBudgetId() == null ? "" : "?lote=" + item.getBudgetId()),
                         item.getId());
                 created++;
             }

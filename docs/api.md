@@ -174,19 +174,24 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 ## Orçamento de Construção (`ConstructionBudgetItemController`, `/construction-budget`)
 
 Árvore de rubricas do orçamento de obra (profundidade livre via `parentId`) — ver
-[[database.md]] para o modelo e o significado de `rowKind`.
+[[database.md]] para o modelo e o significado de `rowKind`. Desde a `V39` um projeto tem **vários orçamentos, um por lote** (edifício): a árvore, a importação e a zona de recuperação são por lote (`budgetId`); a árvore do projeto (`/enterprise/{id}`) e a pesquisa (`/enterprise/{id}/search`) continuam a cobrir a vila inteira.
 
 | Método | Rota | Acesso |
 |---|---|---|
-| GET | `/construction-budget/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — árvore completa com agregados |
+| GET | `/construction-budget/enterprise/{enterpriseId}/budgets` | `ADMIN` ou `EMPLOYEE` — os lotes, com `budgetTotal`/`spentTotal`/`itemCount` de cada |
+| POST | `/construction-budget/enterprise/{enterpriseId}/budgets` | `ADMIN` — criar lote `{name}` (`BUDGET_016` se o nome se repetir no projeto) |
+| PATCH | `/construction-budget/budgets/{budgetId}` | `ADMIN` — renomear/reordenar `{name, sortOrder?}` |
+| DELETE | `/construction-budget/budgets/{budgetId}` | `ADMIN` — apaga o lote e as rubricas (hard delete); `BUDGET_017` se alguma tiver despesas |
+| GET | `/construction-budget/budgets/{budgetId}/tree` | `ADMIN` ou `EMPLOYEE` — a árvore de um lote com agregados (a página do orçamento) |
+| GET | `/construction-budget/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — a vila inteira: as árvores de todos os lotes lado a lado (a exportação e o seletor de rubricas) |
 | GET | `/construction-budget/items/{id}` | `ADMIN` ou `EMPLOYEE` — um nó e a sua sub-árvore |
 | POST | `/construction-budget/items` | `ADMIN` |
 | PUT | `/construction-budget/items/{id}` | `ADMIN` |
 | PATCH | `/construction-budget/items/{id}/move?parentId=&sortOrder=` | `ADMIN` — reordenar / mudar de rubrica-mãe. `sortOrder` é a **posição final** entre os irmãos vivos (0 = primeira; omitido = último) — desde 2026-09-17, antes era "antes de quem tiver esse sortOrder" e o "Descer" não mexia |
 | DELETE | `/construction-budget/items/{id}` | `ADMIN` — soft delete da sub-árvore (ver abaixo) |
-| GET | `/construction-budget/enterprise/{enterpriseId}/deleted` | `ADMIN` — a zona de recuperação |
+| GET | `/construction-budget/budgets/{budgetId}/deleted` | `ADMIN` — a zona de recuperação do lote |
 | PATCH | `/construction-budget/items/{id}/recover` | `ADMIN` — repõe a rubrica e a sub-árvore eliminada junto |
-| POST | `/construction-budget/enterprise/{enterpriseId}/import?dryRun=&replace=` | `ADMIN` — multipart `file` (.xlsx) |
+| POST | `/construction-budget/budgets/{budgetId}/import?dryRun=&replace=` | `ADMIN` — multipart `file` (.xlsx), lê a 1.ª folha; `replace` só apaga **este** lote |
 | GET | `/construction-budget/enterprise/{enterpriseId}/export/summary` | `ADMIN` ou `EMPLOYEE` — o que a exportação vai escrever (contagens, avisos, nome do ficheiro) |
 | GET | `/construction-budget/enterprise/{enterpriseId}/export?sheets=BUDGET,EXPENSES,COMPARISON` | `ADMIN` ou `EMPLOYEE` — o `.xlsx` (binário, `Content-Disposition: attachment`) |
 | GET | `/construction-budget/enterprise/{enterpriseId}/export/zip?sheets=…` | `ADMIN` ou `EMPLOYEE` — a pasta da obra: `<slug>.zip` com o `.xlsx` e `Faturas/Lançadas/*` (documentos com o nome do vault, §7), em streaming |
@@ -774,7 +779,7 @@ errorCode, message}] }`. **Melhor esforço**, à imagem do upload que já é por
 fatura que outro separador entretanto classificou não faz perder as outras quatro.
 
 **Procurar rubrica** — `GET /construction-budget/enterprise/{enterpriseId}/search?q=&limit=20`
-(`ADMIN` ou `EMPLOYEE`) → `[{id, code, name, path, depth, chapter, rolledUpBudget, spentTotal,
+(`ADMIN` ou `EMPLOYEE`) → `[{budgetId, budgetName, id, code, name, path, depth, chapter, rolledUpBudget, spentTotal,
 remaining, overBudget}]`. Aceita código (`4.2`) ou texto (`betão`); o `path` completo
 (`4. Estrutura › 4.2 Lajes › 4.2.1 Betão`) é o que distingue os três "Betão" de um orçamento
 real. Rubricas que não aceitam despesas não aparecem; `chapter: true` assinala que ainda tem
@@ -784,7 +789,7 @@ omitido devolve os capítulos** (2026-09-17) — é o estado inicial do campo de
 pontos é pesquisa por código: prefixo no mesmo nível** (2026-09-21) — `2` dá a `2` e a `20` (não a
 `2.1`, a `20.1` nem a `12`), `2.` dá as filhas diretas da `2`, `2.1` dá a `2.1` e a `2.10`; é o que
 "ver sub-rubricas ›" assume ao escrever `2.`. Antes era `contains` e `2` trazia a árvore inteira.
-Texto continua a procurar em toda a árvore (`BudgetItemSearchTest`).
+Texto continua a procurar em toda a árvore (`BudgetItemSearchTest`). Procura em **todos os lotes** da vila; com mais do que um, o `path` começa pelo nome do lote (`Lote A › 4. Estrutura › …`), porque o `4.2.1` existe em todos (`BudgetLotsTest`).
 
 ## Transferir faturas (`ConstructionInvoiceController`)
 

@@ -18,8 +18,12 @@ import java.util.UUID;
  * @param chapter   a rubrica ainda tem descendentes que aceitam despesas — quem
  *                  classificar aqui está a classificar "ao capítulo", o que é
  *                  legítimo mas assinalável (docs/faturas-modelo-alvo.md §7)
+ * @param budgetName o lote da rubrica; o {@code path} só começa por ele quando o
+ *                  projeto tem mais do que um lote (V39)
  */
 public record BudgetItemSearchResultDTO(
+        UUID budgetId,
+        String budgetName,
         UUID id,
         String code,
         String name,

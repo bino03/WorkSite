@@ -9,17 +9,50 @@ import type {
   BudgetItemSaveResponse,
   BudgetItemSearchResult,
   BudgetItemUpsert,
+  BudgetLot,
   BudgetTree,
   ConstructionExpense,
   ConstructionExpenseUpsert,
   DownloadedFile,
 } from "@/types/budget";
 
+/* ========= Lotes (um orçamento por edifício) ========= */
+
+export async function listBudgetLots(enterpriseId: string): Promise<BudgetLot[]> {
+  const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/budgets`);
+  return response.data;
+}
+
+export async function createBudgetLot(enterpriseId: string, name: string): Promise<BudgetLot> {
+  const response = await api.post(`/construction-budget/enterprise/${enterpriseId}/budgets`, { name });
+  return response.data;
+}
+
+export async function renameBudgetLot(budgetId: string, name: string): Promise<BudgetLot> {
+  const response = await api.patch(`/construction-budget/budgets/${budgetId}`, { name });
+  return response.data;
+}
+
+/** Apaga o lote e o seu orçamento. Recusa com `BUDGET_017` se houver despesas nas rubricas. */
+export async function deleteBudgetLot(budgetId: string): Promise<void> {
+  await api.delete(`/construction-budget/budgets/${budgetId}`);
+}
+
 /* ========= Árvore de rubricas ========= */
 
-/** Devolve a árvore completa (~200 nós) numa só chamada — não há paginação por nível. */
+/**
+ * O orçamento da vila inteira — as árvores de todos os lotes lado a lado, numa
+ * só chamada. Para a página do orçamento, que mostra um lote de cada vez,
+ * {@link getLotTree}.
+ */
 export async function getBudgetTree(enterpriseId: string): Promise<BudgetTree> {
   const response = await api.get(`/construction-budget/enterprise/${enterpriseId}`);
+  return response.data;
+}
+
+/** A árvore de um lote (~200 nós) numa só chamada — não há paginação por nível. */
+export async function getLotTree(budgetId: string): Promise<BudgetTree> {
+  const response = await api.get(`/construction-budget/budgets/${budgetId}/tree`);
   return response.data;
 }
 
@@ -84,9 +117,9 @@ export async function deleteBudgetItem(id: string): Promise<void> {
   await api.delete(`/construction-budget/items/${id}`);
 }
 
-/** As rubricas eliminadas de um projeto, mais recente primeiro — a zona de recuperação. */
-export async function listDeletedBudgetItems(enterpriseId: string): Promise<BudgetItemDeleted[]> {
-  const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/deleted`);
+/** As rubricas eliminadas de um lote, mais recente primeiro — a zona de recuperação. */
+export async function listDeletedBudgetItems(budgetId: string): Promise<BudgetItemDeleted[]> {
+  const response = await api.get(`/construction-budget/budgets/${budgetId}/deleted`);
   return response.data;
 }
 
@@ -100,17 +133,17 @@ export async function recoverBudgetItem(id: string): Promise<BudgetItemNode> {
  * Importa um orçamento em .xlsx.
  *
  * `dryRun` é `true` por omissão no backend: devolve o que seria criado, sem gravar.
- * A gravação exige `replace` quando o projeto já tem orçamento.
+ * A gravação exige `replace` quando o lote já tem orçamento; `replace` só apaga este lote.
  */
 export async function importBudget(
-  enterpriseId: string,
+  budgetId: string,
   file: File,
   dryRun = true,
   replace = false
 ): Promise<BudgetImportResult> {
   const form = new FormData();
   form.append("file", file);
-  const response = await api.post(`/construction-budget/enterprise/${enterpriseId}/import`, form, {
+  const response = await api.post(`/construction-budget/budgets/${budgetId}/import`, form, {
     params: { dryRun, replace },
     headers: { "Content-Type": "multipart/form-data" },
   });

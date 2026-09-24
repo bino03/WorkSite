@@ -2,9 +2,10 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportRowDTO;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
-import com.management.managementapi.enterprises.repository.EnterpriseRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.security.AuthContext;
 
 import org.apache.poi.ss.usermodel.Row;
@@ -41,16 +42,22 @@ import static org.mockito.Mockito.when;
 class BudgetImportAlternativeTest {
 
     @Mock private ConstructionBudgetItemRepository repository;
-    @Mock private EnterpriseRepository enterpriseRepository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private AuthContext authContext;
 
     @InjectMocks private BudgetExcelImportService service;
 
     private static final UUID ENTERPRISE_ID = UUID.randomUUID();
 
+    private static ConstructionBudget lotOf(Enterprise enterprise) {
+        ConstructionBudget lot = new ConstructionBudget();
+        lot.setEnterprise(enterprise);
+        return lot;
+    }
+
     private BudgetImportResultDTO parsePreview() {
-        when(enterpriseRepository.findById(ENTERPRISE_ID))
-                .thenReturn(Optional.of(new Enterprise()));
+        when(budgetRepository.findById(ENTERPRISE_ID))
+                .thenReturn(Optional.of(lotOf(new Enterprise())));
         return service.importBudget(ENTERPRISE_ID, buildWorkbook(), true, false);
     }
 

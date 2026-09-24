@@ -1123,9 +1123,11 @@ public class ConstructionInvoiceService {
         return repository.findRubricCodesUsedElsewhere(enterpriseId, supplierNif, PageRequest.of(0, 3))
                 .stream()
                 // A obra-alvo pode não ter o código; nesse caso passa-se ao
-                // seguinte em vez de desistir — daí pedir 3 e não 1.
+                // seguinte em vez de desistir — daí pedir 3 e não 1. Numa obra com
+                // vários lotes o código pode existir em mais do que um: aí não se
+                // adivinha o lote, passa-se também ao seguinte.
                 .flatMap(use -> budgetItemRepository
-                        .findByEnterpriseIdAndCode(enterpriseId, use.getCode())
+                        .findUniqueByEnterpriseIdAndCode(enterpriseId, use.getCode())
                         .filter(item -> item.getRowKind().acceptsExpenses())
                         .map(item -> new RubricSuggestionDTO(
                                 item.getId(), item.getCode(), item.getName(),

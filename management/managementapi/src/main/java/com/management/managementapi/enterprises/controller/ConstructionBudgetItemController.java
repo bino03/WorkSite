@@ -2,6 +2,8 @@ package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.request.BudgetLotUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
@@ -61,12 +63,69 @@ public class ConstructionBudgetItemController {
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
 
+    // ── lotes (V39) ───────────────────────────────────────────
+
+    @GetMapping("/enterprise/{enterpriseId}/budgets")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<List<BudgetLotDTO>> listLots(@PathVariable UUID enterpriseId) {
+        return ResponseEntity.ok(service.listLots(enterpriseId));
+    }
+
+    @PostMapping("/enterprise/{enterpriseId}/budgets")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BudgetLotDTO> createLot(@PathVariable UUID enterpriseId,
+                                                  @Valid @RequestBody BudgetLotUpsertDTO dto,
+                                                  HttpServletRequest request) {
+        BudgetLotDTO lot = service.createLot(enterpriseId, dto);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_BUDGET, lot.id(), lot.name(), request));
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(lot);
+    }
+
+    @PatchMapping("/budgets/{budgetId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BudgetLotDTO> updateLot(@PathVariable UUID budgetId,
+                                                  @Valid @RequestBody BudgetLotUpsertDTO dto,
+                                                  HttpServletRequest request) {
+        BudgetLotDTO lot = service.updateLot(budgetId, dto);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_BUDGET, budgetId, lot.name(), null, request));
+
+        return ResponseEntity.ok(lot);
+    }
+
+    @DeleteMapping("/budgets/{budgetId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteLot(@PathVariable UUID budgetId, HttpServletRequest request) {
+        String name = service.getLot(budgetId).getName();
+        service.deleteLot(budgetId);
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logDelete(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_BUDGET, budgetId, name, request));
+
+        return ResponseEntity.noContent().build();
+    }
+
     // ── leitura ───────────────────────────────────────────────
 
+    /** O orçamento da vila inteira — todos os lotes lado a lado. */
     @GetMapping("/enterprise/{enterpriseId}")
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
     public ResponseEntity<BudgetTreeDTO> getTree(@PathVariable UUID enterpriseId) {
         return ResponseEntity.ok(service.getTree(enterpriseId));
+    }
+
+    /** A árvore de um lote — a página do orçamento. */
+    @GetMapping("/budgets/{budgetId}/tree")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<BudgetTreeDTO> getBudgetTree(@PathVariable UUID budgetId) {
+        return ResponseEntity.ok(service.getBudgetTree(budgetId));
     }
 
     // ── exportação para Excel ─────────────────────────────────
@@ -148,11 +207,11 @@ public class ConstructionBudgetItemController {
         return ResponseEntity.ok(service.getNode(id));
     }
 
-    /** A zona de recuperação: rubricas eliminadas (soft delete) desta obra, mais recente primeiro. */
-    @GetMapping("/enterprise/{enterpriseId}/deleted")
+    /** A zona de recuperação: rubricas eliminadas (soft delete) deste lote, mais recente primeiro. */
+    @GetMapping("/budgets/{budgetId}/deleted")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<BudgetItemDeletedDTO>> getDeleted(@PathVariable UUID enterpriseId) {
-        return ResponseEntity.ok(service.listDeleted(enterpriseId));
+    public ResponseEntity<List<BudgetItemDeletedDTO>> getDeleted(@PathVariable UUID budgetId) {
+        return ResponseEntity.ok(service.listDeleted(budgetId));
     }
 
     // ── escrita ───────────────────────────────────────────────
@@ -213,23 +272,24 @@ public class ConstructionBudgetItemController {
      *
      * Por omissão corre em {@code dryRun}: devolve o que <i>seria</i> criado,
      * com avisos, sem gravar nada. Só com {@code dryRun=false} é que grava, e
-     * aí exige {@code replace=true} se o projeto já tiver orçamento.
+     * aí exige {@code replace=true} se o lote já tiver orçamento. O
+     * {@code replace} só apaga este lote — os outros do projeto ficam.
      */
-    @PostMapping(value = "/enterprise/{enterpriseId}/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/budgets/{budgetId}/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BudgetImportResultDTO> importBudget(
-            @PathVariable UUID enterpriseId,
+            @PathVariable UUID budgetId,
             @RequestPart("file") MultipartFile file,
             @RequestParam(defaultValue = "true") boolean dryRun,
             @RequestParam(defaultValue = "false") boolean replace,
             HttpServletRequest request) {
 
-        BudgetImportResultDTO result = importService.importBudget(enterpriseId, file, dryRun, replace);
+        BudgetImportResultDTO result = importService.importBudget(budgetId, file, dryRun, replace);
 
         if (!dryRun) {
             authContext.currentProfileId().ifPresent(uid ->
                     activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
-                            EntityType.BUDGET_ITEM, enterpriseId,
+                            EntityType.CONSTRUCTION_BUDGET, budgetId,
                             "Importação de orçamento (" + result.itemCount() + " rubricas)", request));
         }
 
