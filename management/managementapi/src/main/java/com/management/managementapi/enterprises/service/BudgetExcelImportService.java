@@ -87,6 +87,7 @@ public class BudgetExcelImportService {
                                               boolean dryRun, boolean replace) {
 
         ConstructionBudget lot = budgetRepository.findById(budgetId)
+                .filter(l -> l.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
 
         validateFile(file);

@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -38,6 +39,9 @@ public class ConstructionBudget extends BaseEntity {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
     public Enterprise getEnterprise() { return enterprise; }
     public void setEnterprise(Enterprise enterprise) { this.enterprise = enterprise; }
 
@@ -49,4 +53,7 @@ public class ConstructionBudget extends BaseEntity {
 
     public UUID getCreatedBy() { return createdBy; }
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
+
+    public OffsetDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(OffsetDateTime deletedAt) { this.deletedAt = deletedAt; }
 }

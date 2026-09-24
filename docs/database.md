@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V39`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V40`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -20,12 +20,15 @@ enterprises (projeto — nome de tabela/pacote mantido do Property-Management)
 ```
 
 **`construction_budget`** (`V39`) — o **lote**: um edifício do empreendimento com o seu próprio
-orçamento (`name`, único por projeto; `sort_order`). Uma vila pode ter vários, cada um com a sua
-numeração. A migração criou um lote `"Orçamento"` em cada projeto que já tinha rubricas; um projeto
-novo não tem nenhum até se criar o primeiro. A rubrica guarda `budget_id` **e** `enterprise_id`
-(desnormalizado, para todas as verificações "rubrica da obra da fatura" e as queries por projeto
-continuarem iguais); a FK composta `(budget_id, enterprise_id) → construction_budget(id, enterprise_id)`
-impede que divirjam. Apagar um lote apaga as rubricas (cascata) — o serviço só deixa se nenhuma tiver
+orçamento (`name`, único por projeto entre os lotes vivos; `sort_order`). Uma vila pode ter vários,
+cada um com a sua numeração. A migração criou um lote `"Orçamento"` em cada projeto que já tinha
+rubricas; um projeto novo não tem nenhum até se criar o primeiro. A rubrica guarda `budget_id` **e**
+`enterprise_id` (desnormalizado, para todas as verificações "rubrica da obra da fatura" e as queries
+por projeto continuarem iguais); a FK composta `(budget_id, enterprise_id) → construction_budget(id, enterprise_id)`
+impede que divirjam. Soft delete (`deleted_at`, `V40`) em vez do hard delete original da `V39` — apagar
+um lote arrasta as rubricas que ainda lhe restarem vivas para a mesma marca de tempo (a filtragem por
+`deleted_at` que já existe em toda a árvore/pesquisa/totais esconde-as sem precisar de saber nada sobre
+lotes); sem zona de recuperação dedicada, reverte-se na BD. Bloqueado se alguma rubrica do lote tiver
 despesas (`BUDGET_017`). As faturas **não** têm lote: ver [[excel-parity.md]] §6.
 
 **`construction_invoice`** e **`construction_expense`** estão separados desde a `V16` porque

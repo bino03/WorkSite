@@ -165,12 +165,40 @@ class BudgetLotsTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.BUDGET_LOT_HAS_EXPENSES);
         verify(budgetRepository, never()).delete(any());
+        verify(budgetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Apagar um lote sem despesas é soft delete — o lote e as suas rubricas vivas")
+    void deletingALotWithoutExpensesSoftDeletesItAndItsItems() {
+        ConstructionBudgetItem chapter = item(lotA, null, "1", "Estaleiro", null);
+        ConstructionBudgetItem leaf = item(lotA, chapter, "1.1", "Montagem", "100");
+        when(repository.budgetHasExpenses(lotA.getId())).thenReturn(false);
+        when(repository.findTreeByBudgetId(lotA.getId())).thenReturn(List.of(chapter, leaf));
+        when(repository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service().deleteLot(lotA.getId());
+
+        assertThat(lotA.getDeletedAt()).isNotNull();
+        assertThat(chapter.getDeletedAt()).isNotNull();
+        assertThat(leaf.getDeletedAt()).isNotNull();
+        verify(budgetRepository, never()).delete(any());
+        verify(budgetRepository).save(lotA);
+    }
+
+    @Test
+    @DisplayName("Um lote eliminado deixa de aparecer na lista de lotes do projeto")
+    void deletedLotDisappearsFromListing() {
+        lotB.setDeletedAt(java.time.OffsetDateTime.now());
+        item(lotA, null, "1", "Estaleiro", "100");
+
+        assertThat(service().listLots(ENTERPRISE_ID)).extracting(BudgetLotDTO::name).containsExactly("Lote A");
     }
 
     @Test
     @DisplayName("Nome de lote repetido no projeto é recusado")
     void duplicateLotNameIsRejected() {
-        when(budgetRepository.existsByEnterpriseIdAndNameIgnoreCase(ENTERPRISE_ID, "Lote A")).thenReturn(true);
+        when(budgetRepository.existsByEnterpriseIdAndNameIgnoreCaseAndDeletedAtIsNull(ENTERPRISE_ID, "Lote A")).thenReturn(true);
 
         assertThatThrownBy(() -> service().createLot(ENTERPRISE_ID,
                 new BudgetLotUpsertDTO(" Lote A ", null)))

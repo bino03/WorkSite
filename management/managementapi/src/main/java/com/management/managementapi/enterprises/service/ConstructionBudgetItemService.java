@@ -80,6 +80,9 @@ public class ConstructionBudgetItemService {
 
         List<BudgetLotDTO> lots = new ArrayList<>();
         for (ConstructionBudget lot : budgetRepository.findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(enterpriseId)) {
+            if (lot.getDeletedAt() != null) {
+                continue;
+            }
             List<ConstructionBudgetItem> items = itemsByLot.getOrDefault(lot.getId(), List.of());
             BigDecimal budgeted = BigDecimal.ZERO;
             BigDecimal spent = BigDecimal.ZERO;
@@ -97,7 +100,7 @@ public class ConstructionBudgetItemService {
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
         String name = dto.name().trim();
-        if (budgetRepository.existsByEnterpriseIdAndNameIgnoreCase(enterpriseId, name)) {
+        if (budgetRepository.existsByEnterpriseIdAndNameIgnoreCaseAndDeletedAtIsNull(enterpriseId, name)) {
             throw new BusinessException(ErrorCode.BUDGET_LOT_DUPLICATE_NAME);
         }
 
@@ -115,7 +118,7 @@ public class ConstructionBudgetItemService {
         String name = dto.name().trim();
         UUID enterpriseId = lot.getEnterprise().getId();
         if (!name.equalsIgnoreCase(lot.getName())
-                && budgetRepository.existsByEnterpriseIdAndNameIgnoreCase(enterpriseId, name)) {
+                && budgetRepository.existsByEnterpriseIdAndNameIgnoreCaseAndDeletedAtIsNull(enterpriseId, name)) {
             throw new BusinessException(ErrorCode.BUDGET_LOT_DUPLICATE_NAME);
         }
         lot.setName(name);
@@ -130,21 +133,34 @@ public class ConstructionBudgetItemService {
     }
 
     /**
-     * Apaga o lote e o seu orçamento (hard delete, cascata da FK). Bloqueado se
-     * alguma rubrica do lote tiver despesas — as mesmas regras de
+     * Elimina o lote (soft delete, V40) e, com ele, as rubricas que ainda lhe
+     * restarem vivas — arrasta-as para a mesma marca de tempo, para que toda a
+     * filtragem por {@code deletedAt} que já existe (árvore, pesquisa, totais,
+     * unicidade do código) as esconda sem precisar de saber nada sobre lotes.
+     * Bloqueado se alguma rubrica do lote tiver despesas — as mesmas regras de
      * {@code BUDGET_013}, para nunca se perder uma despesa atrás de um clique.
+     * Sem zona de recuperação dedicada: reverte-se na BD, como um lote nunca
+     * devia mesmo precisar.
      */
     public void deleteLot(UUID budgetId) {
         ConstructionBudget lot = getLot(budgetId);
         if (repository.budgetHasExpenses(budgetId)) {
             throw new BusinessException(ErrorCode.BUDGET_LOT_HAS_EXPENSES);
         }
-        budgetRepository.delete(lot);
+
+        OffsetDateTime now = OffsetDateTime.now();
+        lot.setDeletedAt(now);
+        budgetRepository.save(lot);
+
+        List<ConstructionBudgetItem> liveItems = livesOnly(repository.findTreeByBudgetId(budgetId));
+        liveItems.forEach(item -> item.setDeletedAt(now));
+        repository.saveAll(liveItems);
     }
 
     @Transactional(readOnly = true)
     public ConstructionBudget getLot(UUID budgetId) {
         return budgetRepository.findById(budgetId)
+                .filter(lot -> lot.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
     }
 
@@ -342,6 +358,7 @@ public class ConstructionBudgetItemService {
     @Transactional(readOnly = true)
     public BudgetTreeDTO getBudgetTree(UUID budgetId) {
         ConstructionBudget lot = budgetRepository.findById(budgetId)
+                .filter(l -> l.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
 
         List<ConstructionBudgetItem> items = livesOnly(repository.findTreeByBudgetId(budgetId));
@@ -459,6 +476,7 @@ public class ConstructionBudgetItemService {
 
     public BudgetItemSaveResponseDTO create(BudgetItemUpsertDTO dto) {
         ConstructionBudget lot = budgetRepository.findById(dto.budgetId())
+                .filter(l -> l.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
 
         ConstructionBudgetItem parent = resolveParent(dto.parentId(), lot.getId());

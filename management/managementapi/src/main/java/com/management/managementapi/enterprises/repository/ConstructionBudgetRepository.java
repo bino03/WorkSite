@@ -15,7 +15,7 @@ public interface ConstructionBudgetRepository extends JpaRepository<Construction
 
     List<ConstructionBudget> findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(UUID enterpriseId);
 
-    boolean existsByEnterpriseIdAndNameIgnoreCase(UUID enterpriseId, String name);
+    boolean existsByEnterpriseIdAndNameIgnoreCaseAndDeletedAtIsNull(UUID enterpriseId, String name);
 
     @Query("""
             select coalesce(max(b.sortOrder), -1) + 1 from ConstructionBudget b
