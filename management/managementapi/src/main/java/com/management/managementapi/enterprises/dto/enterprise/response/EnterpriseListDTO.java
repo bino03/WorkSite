@@ -3,8 +3,10 @@ package com.management.managementapi.enterprises.dto.enterprise.response;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
+import com.management.managementapi.enterprises.dto.budget.response.BudgetLotOptionDTO;
 import com.management.managementapi.enterprises.dto.location.EnterpriseLocationListDTO;
 import com.management.managementapi.enterprises.model.enums.EnterPriseStatus;
 import com.management.managementapi.enterprises.model.enums.EnterPriseType;
@@ -44,4 +46,6 @@ public class EnterpriseListDTO {
     private Boolean isActive;
     private String banner;
     private EnterpriseLocationListDTO location; // ← DTO específico para location
+    /** Os lotes vivos do projeto — vazio (nunca null) sem nenhum. Para o seletor de lote ao transferir uma fatura. */
+    private List<BudgetLotOptionDTO> lots;
 }

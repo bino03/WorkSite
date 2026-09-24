@@ -9,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.management.managementapi.dto.common.location.LocationUpsertDTO;
 import com.management.managementapi.dto.common.location.LocationResponseDTO;
 import com.management.managementapi.dto.common.media.MediaResponseDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetLotOptionDTO;
 import com.management.managementapi.enterprises.dto.enterprise.CreateEnterpriseDTO;
 import com.management.managementapi.enterprises.dto.enterprise.EnterpriseDTO;
 import com.management.managementapi.enterprises.dto.enterprise.response.EnterpriseBasicDTO;
@@ -143,6 +144,9 @@ public class EnterpriseService {
 
         // O "Investimento" da lista é o total do orçamento, não o total_investment da obra
         Map<UUID, BigDecimal> budgetTotals = constructionBudgetItemService.budgetTotalsByEnterprise(enterpriseIds);
+        // Para o seletor de lote ao transferir uma fatura (só id+nome, sem o custo dos totais por lote)
+        Map<UUID, List<BudgetLotOptionDTO>> lotsByEnterprise =
+                constructionBudgetItemService.lotOptionsByEnterprise(enterpriseIds);
 
         // Mapear para DTO com localização
         return enterprises.map(enterprise -> {
@@ -154,6 +158,7 @@ public class EnterpriseService {
                 dto.setLocation(locationDTO);
             }
             dto.setBudgetTotal(budgetTotals.get(enterprise.getId()));
+            dto.setLots(lotsByEnterprise.getOrDefault(enterprise.getId(), List.of()));
 
             return dto;
         });

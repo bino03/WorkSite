@@ -3527,8 +3527,10 @@
       "fieldRubric": "Rubrica de destino",
       "fieldScope": "Destino",
       "fieldEnterprise": "Obra de destino",
+      "fieldLot": "Lote (opcional)",
       "fieldReason": "Razão",
       "enterprisePlaceholder": "Escrever para procurar a obra…",
+      "lotPlaceholder": "Escolher um lote para classificar logo a seguir…",
       "scope": {
         "PROJECT": "Outra obra",
         "COMPANY": "Despesas da empresa",

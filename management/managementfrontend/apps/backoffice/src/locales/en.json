@@ -3496,8 +3496,10 @@
       "fieldRubric": "Target budget item",
       "fieldScope": "Destination",
       "fieldEnterprise": "Destination project",
+      "fieldLot": "Lot (optional)",
       "fieldReason": "Reason",
       "enterprisePlaceholder": "Type to search for the project…",
+      "lotPlaceholder": "Pick a lot to classify right after…",
       "scope": {
         "PROJECT": "Another project",
         "COMPANY": "Company expenses",

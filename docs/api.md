@@ -156,6 +156,12 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 > projetos mostra como "Investimento" desde 2026-09-18. O `totalInvestment` escrito à mão na obra
 > divergia do orçamento importado; fica só no cartão Financeiro da edição. `null` numa obra sem
 > rubricas.
+>
+> Desde 2026-09-24, o mesmo DTO traz também `lots` (`BudgetLotOptionDTO[]`, só `id`+`name`, sem os
+> números do orçamento) — vazio (nunca `null`) numa obra sem lotes. É o que alimenta o seletor de
+> lote no `TransferInvoiceDrawer`: depois de escolher a obra de destino, se ela tiver lotes, escolhe-se
+> também um (opcional) — é só um atalho de UX (abre logo o `BudgetItemPickerModal` já dentro desse
+> lote), a transferência em si não muda nem grava o lote em lado nenhum.
 
 ### Relações do projeto (`EntrepriseRelationsController`, `/enterprise-relations/{id}`)
 

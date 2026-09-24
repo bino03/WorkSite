@@ -179,15 +179,29 @@ export async function deleteEnterprise(id: string): Promise<void> {
   await api.delete(`/enterprises/${id}`);
 }
 
-export interface EnterpriseOption {
+export interface EnterpriseLotOption {
   id: string;
   name: string;
 }
 
+export interface EnterpriseOption {
+  id: string;
+  name: string;
+  /** Os lotes vivos do projeto — só vem de `searchEnterprises`; outras fontes de `EnterpriseOption` (ex. `Task.enterprise`) não o têm. */
+  lots?: EnterpriseLotOption[];
+}
+
 /**
- * Pesquisa leve de projetos (id + nome) — usada em pickers, ex. ligar uma tarefa a um projeto
+ * Pesquisa leve de projetos (id + nome + lotes) — usada em pickers, ex. ligar uma
+ * tarefa a um projeto, ou escolher o destino ao transferir uma fatura.
  */
 export async function searchEnterprises(q: string, size = 10): Promise<EnterpriseOption[]> {
   const { data } = await api.get(`/enterprises`, { params: { q, page: 0, size } });
-  return (data?.content ?? []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name }));
+  return (data?.content ?? []).map(
+    (e: { id: string; name: string; lots?: EnterpriseLotOption[] }) => ({
+      id: e.id,
+      name: e.name,
+      lots: e.lots ?? [],
+    })
+  );
 }

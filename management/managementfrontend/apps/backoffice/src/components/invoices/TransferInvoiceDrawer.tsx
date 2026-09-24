@@ -23,8 +23,13 @@ interface Props {
   /** Fluxo da quarentena: "atribuir uma obra" é transferir, com o âmbito fixo em `PROJECT`. */
   lockToProject?: boolean;
   onClose: () => void;
-  /** Depois de transferir — o pai fecha o detalhe, recarrega, e trata do `suggestIncident`. */
-  onTransferred: (result: InvoiceTransferResult) => void;
+  /**
+   * Depois de transferir — o pai fecha o detalhe, recarrega, e trata do
+   * `suggestIncident`. `targetLotId` só vem preenchido se o destino tiver
+   * lotes e o utilizador tiver escolhido um — é um atalho de UX (o pai pode
+   * abrir logo a classificação nesse lote), a transferência em si não muda.
+   */
+  onTransferred: (result: InvoiceTransferResult, targetLotId?: string | null) => void;
 }
 
 const SCOPE_LABEL: Record<InvoiceScope, string> = {
@@ -61,6 +66,8 @@ export const TransferInvoiceDrawer: FC<Props> = ({
   const [toRubric, setToRubric] = useState(false);
   const [rubric, setRubric] = useState<BudgetItemSearchResult | null>(null);
   const [moving, setMoving] = useState(false);
+  /** O lote do destino, só quando este tem mais do que um — atalho de UX (ver `onTransferred`). */
+  const [targetLotId, setTargetLotId] = useState<string | null>(null);
 
   const canMoveWithinProject =
     !lockToProject && invoice?.scope === "PROJECT" && !!invoice.enterpriseId;
@@ -78,12 +85,20 @@ export const TransferInvoiceDrawer: FC<Props> = ({
   });
 
   const targetScope = watch("targetScope");
+  const targetEnterpriseId = watch("targetEnterpriseId");
+  const targetLots = options.find((o) => o.id === targetEnterpriseId)?.lots ?? [];
+
+  // O lote só faz sentido para o empreendimento escolhido — muda de obra, esquece o lote.
+  useEffect(() => {
+    setTargetLotId(null);
+  }, [targetEnterpriseId]);
 
   useEffect(() => {
     if (!open) return;
     setOptions([]);
     setToRubric(false);
     setRubric(null);
+    setTargetLotId(null);
     reset({ targetScope: "PROJECT", targetEnterpriseId: null, reason: "" });
   }, [open, reset]);
 
@@ -132,7 +147,7 @@ export const TransferInvoiceDrawer: FC<Props> = ({
       notificationService.success(t("invoices.transfer.success"));
       // Se `suggestIncident`, o pai (`InvoiceDetailDrawer` → página) abre o
       // `IncidentDrawer` já com esta fatura.
-      onTransferred(result);
+      onTransferred(result, values.targetScope === "PROJECT" ? targetLotId : null);
       onClose();
     } catch (error) {
       ErrorHandler.handle(error);
@@ -245,6 +260,20 @@ export const TransferInvoiceDrawer: FC<Props> = ({
               )}
             />
             {fieldError(errors.targetEnterpriseId?.message)}
+          </div>
+        )}
+
+        {!toRubric && targetScope === "PROJECT" && targetEnterpriseId && targetLots.length > 0 && (
+          <div>
+            <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldLot")}</label>
+            <Select
+              allowClear
+              value={targetLotId ?? undefined}
+              onChange={(value) => setTargetLotId(value ?? null)}
+              placeholder={t("invoices.transfer.lotPlaceholder")}
+              style={{ width: "100%", marginTop: 4 }}
+              options={targetLots.map((lot) => ({ value: lot.id, label: lot.name }))}
+            />
           </div>
         )}
 

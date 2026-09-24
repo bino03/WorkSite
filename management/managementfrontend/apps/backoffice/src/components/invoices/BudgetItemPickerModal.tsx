@@ -18,6 +18,12 @@ interface Props {
   count?: number;
   /** NIF do fornecedor; com ele consegue-se sugerir a rubrica de sempre. */
   supplierNif?: string | null;
+  /**
+   * Abre já dentro deste lote (vindo, por exemplo, da escolha feita ao
+   * transferir a fatura) — poupa o passo de o escolher outra vez numa obra
+   * com vários. Sem efeito com um só lote (ou nenhum).
+   */
+  initialLotId?: string | null;
   onClose: () => void;
   onPick: (item: BudgetItemNode) => void;
   saving?: boolean;
@@ -64,6 +70,7 @@ export const BudgetItemPickerModal: FC<Props> = ({
   enterpriseId,
   count = 1,
   supplierNif,
+  initialLotId,
   onClose,
   onPick,
   saving,
@@ -101,7 +108,10 @@ export const BudgetItemPickerModal: FC<Props> = ({
     setQuery("");
     setSelected(null);
     setSuggestion(null);
-    setParentId(null);
+    // Sem lote inicial, ou com um só lote (onde não há nó de lote nenhum para
+    // abrir), `pathTo` não encontra o id e cai no topo sozinho — seguro nos
+    // dois casos.
+    setParentId(initialLotId ?? null);
     fetchTree();
 
     if (supplierNif) {
@@ -111,7 +121,7 @@ export const BudgetItemPickerModal: FC<Props> = ({
         .then(setSuggestion)
         .catch(() => setSuggestion(null));
     }
-  }, [open, enterpriseId, supplierNif, fetchTree]);
+  }, [open, enterpriseId, supplierNif, initialLotId, fetchTree]);
 
   const roots = useMemo(() => tree?.roots ?? [], [tree]);
 

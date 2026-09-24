@@ -5,6 +5,7 @@ import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUps
 import com.management.managementapi.enterprises.dto.budget.request.BudgetLotUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
+import com.management.managementapi.enterprises.dto.budget.response.BudgetLotOptionDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSearchResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSaveResponseDTO;
@@ -311,6 +312,24 @@ public class ConstructionBudgetItemService {
             totals.put(enterpriseId, total);
         });
         return totals;
+    }
+
+    /**
+     * Os lotes vivos de várias obras de uma vez, só id+nome — para a lista de
+     * projetos oferecer o seletor de lote ao transferir uma fatura, sem pagar o
+     * custo de calcular o orçamento/gasto de cada um.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, List<BudgetLotOptionDTO>> lotOptionsByEnterprise(Collection<UUID> enterpriseIds) {
+        if (enterpriseIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, List<BudgetLotOptionDTO>> byEnterprise = new LinkedHashMap<>();
+        for (ConstructionBudget lot : budgetRepository.findByEnterpriseIdInAndDeletedAtIsNullOrderBySortOrderAsc(enterpriseIds)) {
+            byEnterprise.computeIfAbsent(lot.getEnterprise().getId(), k -> new ArrayList<>())
+                    .add(new BudgetLotOptionDTO(lot.getId(), lot.getName()));
+        }
+        return byEnterprise;
     }
 
     /**

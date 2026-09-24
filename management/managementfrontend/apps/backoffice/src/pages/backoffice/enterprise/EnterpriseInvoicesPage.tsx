@@ -92,6 +92,13 @@ const EnterpriseInvoicesPage: FC = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   /** Faturas a associar na próxima escolha de rubrica — uma ou várias. */
   const [allocating, setAllocating] = useState<ConstructionInvoice[]>([]);
+  /**
+   * A obra a que pertence o picker aberto — normalmente esta página, mas uma
+   * fatura acabada de transferir para outra obra (com lote escolhido) abre o
+   * picker já apontado ao destino, não a esta.
+   */
+  const [allocatingEnterpriseId, setAllocatingEnterpriseId] = useState<string | null>(null);
+  const [allocatingLotId, setAllocatingLotId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   /** O que falta pagar no filtro "Por liquidar" — só se pede quando o filtro está ligado. */
   const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
@@ -209,6 +216,8 @@ const EnterpriseInvoicesPage: FC = () => {
         );
       }
       setAllocating([]);
+      setAllocatingEnterpriseId(null);
+      setAllocatingLotId(null);
       reload();
     } catch (error) {
       ErrorHandler.handle(error);
@@ -459,7 +468,11 @@ const EnterpriseInvoicesPage: FC = () => {
         }}
         onView={handleView}
         onImageClick={handleImageClick}
-        onAllocate={(invoice) => setAllocating([invoice])}
+        onAllocate={(invoice) => {
+          setAllocatingEnterpriseId(null);
+          setAllocatingLotId(null);
+          setAllocating([invoice]);
+        }}
         onDeallocate={handleDeallocate}
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
@@ -501,6 +514,8 @@ const EnterpriseInvoicesPage: FC = () => {
             onChanged={reload}
             onAllocate={(invoice) => {
               setDetailId(null);
+              setAllocatingEnterpriseId(null);
+              setAllocatingLotId(null);
               setAllocating([invoice]);
             }}
             onIncidentSuggested={(invoice) =>
@@ -512,11 +527,17 @@ const EnterpriseInvoicesPage: FC = () => {
             open={transferInvoice !== null}
             invoice={transferInvoice}
             onClose={() => setTransferInvoice(null)}
-            onTransferred={(result) => {
+            onTransferred={(result, targetLotId) => {
               setTransferInvoice(null);
               reload();
               if (result.suggestIncident) {
                 setIncidentInvoices([toIncidentInvoiceRef(result.invoice)]);
+              } else if (targetLotId && result.invoice.enterpriseId) {
+                // Atalho de UX: o lote escolhido na transferência abre logo o
+                // picker apontado à obra de destino, já dentro desse lote.
+                setAllocatingEnterpriseId(result.invoice.enterpriseId);
+                setAllocatingLotId(targetLotId);
+                setAllocating([result.invoice]);
               }
             }}
           />
@@ -537,7 +558,8 @@ const EnterpriseInvoicesPage: FC = () => {
 
           <BudgetItemPickerModal
             open={allocating.length > 0}
-            enterpriseId={enterpriseId}
+            enterpriseId={allocatingEnterpriseId ?? enterpriseId}
+            initialLotId={allocatingLotId}
             count={allocating.length}
             // Só sugere com um fornecedor único; misturar NIFs daria uma
             // sugestão que só serviria a parte da seleção.
@@ -547,7 +569,11 @@ const EnterpriseInvoicesPage: FC = () => {
                 : null
             }
             saving={saving}
-            onClose={() => setAllocating([])}
+            onClose={() => {
+              setAllocating([]);
+              setAllocatingEnterpriseId(null);
+              setAllocatingLotId(null);
+            }}
             onPick={(item) => handleAllocate(item.id)}
           />
 
