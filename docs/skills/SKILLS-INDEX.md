@@ -181,6 +181,17 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 
 ---
 
+### [[skill-run]]
+**Arranca a app localmente — backend + Backoffice — em background, com verificação por log e health check**
+
+- **File**: `docs/skills/process/skill-run.md`
+- **Time**: ~1-2 minutos
+- **Tags**: `#process` `#local` `#backend` `#frontend` `#health-check`
+- **Covers**: Confirmar `.env` e portas livres → arrancar backend em background → arrancar frontend em background → esperar marcador de sucesso/falha no log → confirmar com `curl` → reportar URLs
+- **Use when**: Pedido para correr/arrancar/subir a app localmente, ou antes de testar/verificar uma feature na app real
+
+---
+
 ### [[skill-implement-todo]]
 **Orquestra o backlog: menu → âmbito → investigação → esclarecimento → prioridade → implementação sequencial**
 
@@ -233,6 +244,7 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - [[skill-frontend-integration-guide]] — Documenting for team
 - [[skill-create-new-skill]] — How to create a new skill
 - [[skill-implement-todo]] — Levar o backlog (`notes/ToDo.md`) até código, reutilizando as skills acima
+- [[skill-run]] — Arrancar a app localmente (backend + Backoffice), com health check
 - [[skill-verify-in-browser]] — Provar no browser real o que o `implement-todo` implementou
 
 ---
@@ -285,15 +297,16 @@ docs/skills/
 | References (not invocable) | 3 (+ 8 design sub-files) |
 | Backend Skills | 4 |
 | Frontend Skills | 4 |
-| Process Skills | 4 |
-| **Total Invocable Skills** | **12** |
+| Process Skills | 5 |
+| **Total Invocable Skills** | **13** |
 
 ---
 
 ## Last Updated
 
-- **Date**: 2026-09-19
-- **Latest**: `skill-verify-in-browser` (process) — o procedimento da extensão do Chrome que vivia em `notes/learning.md` passa a ser invocável (`/verify-in-browser`) e chamado pelo `implement-todo` na Fase 5.5; a secção frontend de `code-best-practices` fundida no `skill-frontend-design-system` ("Regras de base"); regra "o integration guide apaga-se ao fechar a feature".
+- **Date**: 2026-09-25
+- **Latest**: `skill-run` (process) — arranca backend + Backoffice localmente (`/run`), com verificação por log e health check por `curl` em vez de assumir sucesso.
+- **Anterior (2026-09-19)**: `skill-verify-in-browser` (process) — o procedimento da extensão do Chrome que vivia em `notes/learning.md` passa a ser invocável (`/verify-in-browser`) e chamado pelo `implement-todo` na Fase 5.5; a secção frontend de `code-best-practices` fundida no `skill-frontend-design-system` ("Regras de base"); regra "o integration guide apaga-se ao fechar a feature".
 - **Anterior (2026-09-19)**: `skill-add-file-upload` reescrita à volta de `construction_invoice_document` + `payment.proof_*` (a versão anterior ensinava o `/assets/{id}/banner` do Property-Management); `property_asset` e `ConstructionStagesPage` purgados de `skill-add-database-table` e `skill-frontend-design-system`; `implement-todo` Fase 7 passa a alimentar `backlog.md` e `learning.md`.
 - **Anterior (2026-08-09)**: Added the `project-vocabulary` reference — o dicionário partilhado (Drawer vs. Modal, fatura vs. despesa, rubrica, token). Nasceu de uma confusão real: um Drawer tratado por "modal" mandava quem lê para o sub-ficheiro de design errado.
 - **Anterior (2026-08-05)**: Added `skill-implement-todo` (backlog orchestration) + the three missing Backoffice design references (`forms-and-validation`, `services-and-error-handling`, `app-shell-and-auth`, all audited against this project's real code). Registered `skill-frontend-structure-brief`, which existed but was never indexed. Removed the remaining Portal/Zustand carry-overs from the skill texts — neither exists in Worksite.
