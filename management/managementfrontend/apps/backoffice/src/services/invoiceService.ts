@@ -206,11 +206,15 @@ function invoiceFilterParams(filters: InvoiceFilters, includeOutstanding: boolea
 
 export async function listInvoices(
   enterpriseId: string,
-  filters: InvoiceFilters
+  filters: InvoiceFilters,
+  // A obra ordena por `createdAt` (data de carregamento) por omissão — o
+  // backend já aceita o `sort` do Spring `Pageable`, só faltava expô-lo.
+  sort?: { field: string; order: "asc" | "desc" }
 ): Promise<InvoicePage> {
   const params = invoiceFilterParams(filters, true);
   params.set("page", String(filters.page));
   params.set("size", String(filters.size));
+  if (sort) params.set("sort", `${sort.field},${sort.order}`);
 
   const response = await api.get(
     `/construction-invoices/enterprise/${enterpriseId}?${params.toString()}`

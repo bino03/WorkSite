@@ -77,6 +77,8 @@ const EnterpriseInvoicesPage: FC = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
   const [view, setView] = useState<ViewKey>("pending");
+  /** `null` = ordem por omissão do backend (data de carregamento, mais recente primeiro). */
+  const [sortOrder, setSortOrder] = useState<"ascend" | "descend" | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -104,14 +106,18 @@ const EnterpriseInvoicesPage: FC = () => {
   const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
 
   const fetch = useCallback(
-    async (next: InvoiceFilters) => {
+    async (next: InvoiceFilters, sort: "ascend" | "descend" | null) => {
       if (!enterpriseId) return;
       setLoading(true);
       try {
         // A soma é sobre a lista inteira, por isso vem à parte da página; sem
         // o filtro ligado não se pede nem se mostra.
         const [page, summary] = await Promise.all([
-          listInvoices(enterpriseId, next),
+          listInvoices(
+            enterpriseId,
+            next,
+            sort ? { field: "invoiceDate", order: sort === "ascend" ? "asc" : "desc" } : undefined
+          ),
           wantsOutstandingTotal(next) ? getOutstandingInvoicesSummary(enterpriseId, next) : Promise.resolve(null),
         ]);
         setInvoices(page.content);
@@ -127,7 +133,7 @@ const EnterpriseInvoicesPage: FC = () => {
   );
 
   useEffect(() => {
-    fetch(filters);
+    fetch(filters, sortOrder);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enterpriseId]);
 
@@ -135,17 +141,26 @@ const EnterpriseInvoicesPage: FC = () => {
   // fornecedor de faturas que estão nesta lista — sem isto os nomes novos só
   // apareciam ao recarregar a página.
   useEffect(() => {
-    const reload = () => fetch(filters);
+    const reload = () => fetch(filters, sortOrder);
     window.addEventListener(SUPPLIERS_CHANGED_EVENT, reload);
     return () => window.removeEventListener(SUPPLIERS_CHANGED_EVENT, reload);
-  }, [fetch, filters]);
+  }, [fetch, filters, sortOrder]);
 
   /** Qualquer mudança de filtro volta à primeira página — senão fica-se num vazio. */
   const applyFilters = (changes: Partial<InvoiceFilters>) => {
     const next = { ...filters, ...changes, page: 0 };
     setFilters(next);
     setSelectedIds([]);
-    fetch(next);
+    fetch(next, sortOrder);
+  };
+
+  /** Trocar a ordenação também volta à primeira página. */
+  const handleSortChange = (order: "ascend" | "descend" | null) => {
+    setSortOrder(order);
+    const next = { ...filters, page: 0 };
+    setFilters(next);
+    setSelectedIds([]);
+    fetch(next, order);
   };
 
   /**
@@ -167,7 +182,7 @@ const EnterpriseInvoicesPage: FC = () => {
 
   const reload = () => {
     setSelectedIds([]);
-    fetch(filters);
+    fetch(filters, sortOrder);
   };
 
   const handleView = (invoice: ConstructionInvoice) => setDetailId(invoice.id);
@@ -464,7 +479,7 @@ const EnterpriseInvoicesPage: FC = () => {
         onPageChange={(page, size) => {
           const next = { ...filters, page, size };
           setFilters(next);
-          fetch(next);
+          fetch(next, sortOrder);
         }}
         onView={handleView}
         onImageClick={handleImageClick}
@@ -477,6 +492,8 @@ const EnterpriseInvoicesPage: FC = () => {
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
         onTransfer={setTransferInvoice}
+        sortOrder={sortOrder}
+        onSortChange={handleSortChange}
       />
 
       {enterpriseId && (

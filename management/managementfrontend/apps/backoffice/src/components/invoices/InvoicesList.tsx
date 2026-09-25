@@ -51,6 +51,12 @@ interface Props {
   onSendToAccountant: (invoice: ConstructionInvoice) => void;
   onDelete: (invoice: ConstructionInvoice) => void;
   /**
+   * Ordenar por data da fatura no servidor. Sem isto (as duas listas fora de
+   * obra) a coluna "Data" fica como estava — sem seta, sem clique.
+   */
+  sortOrder?: "ascend" | "descend" | null;
+  onSortChange?: (order: "ascend" | "descend" | null) => void;
+  /**
    * Transferir de âmbito/obra. Opcional — sem isto a ação não aparece na linha
    * (o detalhe da fatura continua a ter o seu botão). Só faz sentido numa
    * `INVOICE`: uma nota de crédito segue a fatura a que está ligada.
@@ -86,6 +92,8 @@ export const InvoicesList: FC<Props> = ({
   onSendToAccountant,
   onDelete,
   onTransfer,
+  sortOrder,
+  onSortChange,
   scope = "PROJECT",
 }) => {
   const { isAdmin } = useAuth();
@@ -196,6 +204,11 @@ export const InvoicesList: FC<Props> = ({
       title: "Data",
       dataIndex: "invoiceDate",
       width: 108,
+      // Mais recente primeiro no primeiro clique, como a ordem por omissão
+      // (por data de carregamento) que esta coluna passa a substituir.
+      ...(onSortChange
+        ? { sorter: true, sortOrder: sortOrder ?? undefined, sortDirections: ["descend", "ascend"] as const }
+        : {}),
       render: (date: string | null) => (date ? formatDate(date) : "—"),
     },
     {
@@ -389,6 +402,11 @@ export const InvoicesList: FC<Props> = ({
             : undefined
         }
         onRow={(row) => ({ onClick: () => onView(row), style: { cursor: "pointer" } })}
+        onChange={(_pagination, _filters, sorter) => {
+          if (!onSortChange) return;
+          const s = Array.isArray(sorter) ? sorter[0] : sorter;
+          onSortChange((s?.order as "ascend" | "descend" | null) ?? null);
+        }}
         locale={{
           emptyText: (
             <Empty
