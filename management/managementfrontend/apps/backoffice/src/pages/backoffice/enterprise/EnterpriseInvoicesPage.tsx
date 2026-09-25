@@ -78,7 +78,9 @@ const EnterpriseInvoicesPage: FC = () => {
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
   const [view, setView] = useState<ViewKey>("pending");
   /** `null` = ordem por omissão do backend (data de carregamento, mais recente primeiro). */
-  const [sortOrder, setSortOrder] = useState<"ascend" | "descend" | null>(null);
+  const [sort, setSort] = useState<{ field: "invoiceDate" | "createdAt"; order: "ascend" | "descend" } | null>(
+    null
+  );
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -106,7 +108,10 @@ const EnterpriseInvoicesPage: FC = () => {
   const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
 
   const fetch = useCallback(
-    async (next: InvoiceFilters, sort: "ascend" | "descend" | null) => {
+    async (
+      next: InvoiceFilters,
+      sort: { field: "invoiceDate" | "createdAt"; order: "ascend" | "descend" } | null
+    ) => {
       if (!enterpriseId) return;
       setLoading(true);
       try {
@@ -116,7 +121,7 @@ const EnterpriseInvoicesPage: FC = () => {
           listInvoices(
             enterpriseId,
             next,
-            sort ? { field: "invoiceDate", order: sort === "ascend" ? "asc" : "desc" } : undefined
+            sort ? { field: sort.field, order: sort.order === "ascend" ? "asc" : "desc" } : undefined
           ),
           wantsOutstandingTotal(next) ? getOutstandingInvoicesSummary(enterpriseId, next) : Promise.resolve(null),
         ]);
@@ -133,7 +138,7 @@ const EnterpriseInvoicesPage: FC = () => {
   );
 
   useEffect(() => {
-    fetch(filters, sortOrder);
+    fetch(filters, sort);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enterpriseId]);
 
@@ -141,26 +146,30 @@ const EnterpriseInvoicesPage: FC = () => {
   // fornecedor de faturas que estão nesta lista — sem isto os nomes novos só
   // apareciam ao recarregar a página.
   useEffect(() => {
-    const reload = () => fetch(filters, sortOrder);
+    const reload = () => fetch(filters, sort);
     window.addEventListener(SUPPLIERS_CHANGED_EVENT, reload);
     return () => window.removeEventListener(SUPPLIERS_CHANGED_EVENT, reload);
-  }, [fetch, filters, sortOrder]);
+  }, [fetch, filters, sort]);
 
   /** Qualquer mudança de filtro volta à primeira página — senão fica-se num vazio. */
   const applyFilters = (changes: Partial<InvoiceFilters>) => {
     const next = { ...filters, ...changes, page: 0 };
     setFilters(next);
     setSelectedIds([]);
-    fetch(next, sortOrder);
+    fetch(next, sort);
   };
 
-  /** Trocar a ordenação também volta à primeira página. */
-  const handleSortChange = (order: "ascend" | "descend" | null) => {
-    setSortOrder(order);
-    const next = { ...filters, page: 0 };
-    setFilters(next);
+  /** Trocar a ordenação (data da fatura ou de carregamento) também volta à primeira página. */
+  const handleSortChange = (
+    field: "invoiceDate" | "createdAt" | null,
+    order: "ascend" | "descend" | null
+  ) => {
+    const next = field && order ? { field, order } : null;
+    setSort(next);
+    const nextFilters = { ...filters, page: 0 };
+    setFilters(nextFilters);
     setSelectedIds([]);
-    fetch(next, order);
+    fetch(nextFilters, next);
   };
 
   /**
@@ -182,7 +191,7 @@ const EnterpriseInvoicesPage: FC = () => {
 
   const reload = () => {
     setSelectedIds([]);
-    fetch(filters, sortOrder);
+    fetch(filters, sort);
   };
 
   const handleView = (invoice: ConstructionInvoice) => setDetailId(invoice.id);
@@ -479,7 +488,7 @@ const EnterpriseInvoicesPage: FC = () => {
         onPageChange={(page, size) => {
           const next = { ...filters, page, size };
           setFilters(next);
-          fetch(next, sortOrder);
+          fetch(next, sort);
         }}
         onView={handleView}
         onImageClick={handleImageClick}
@@ -492,7 +501,8 @@ const EnterpriseInvoicesPage: FC = () => {
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
         onTransfer={setTransferInvoice}
-        sortOrder={sortOrder}
+        sortField={sort?.field ?? null}
+        sortOrder={sort?.order ?? null}
         onSortChange={handleSortChange}
       />
 

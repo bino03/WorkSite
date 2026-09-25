@@ -51,11 +51,13 @@ interface Props {
   onSendToAccountant: (invoice: ConstructionInvoice) => void;
   onDelete: (invoice: ConstructionInvoice) => void;
   /**
-   * Ordenar por data da fatura no servidor. Sem isto (as duas listas fora de
-   * obra) a coluna "Data" fica como estava — sem seta, sem clique.
+   * Ordenar por data da fatura ou por data de carregamento, no servidor. Sem
+   * isto (as duas listas fora de obra) as colunas "Data" e "Carregada em"
+   * ficam como estavam — sem seta, sem clique.
    */
+  sortField?: "invoiceDate" | "createdAt" | null;
   sortOrder?: "ascend" | "descend" | null;
-  onSortChange?: (order: "ascend" | "descend" | null) => void;
+  onSortChange?: (field: "invoiceDate" | "createdAt" | null, order: "ascend" | "descend" | null) => void;
   /**
    * Transferir de âmbito/obra. Opcional — sem isto a ação não aparece na linha
    * (o detalhe da fatura continua a ter o seu botão). Só faz sentido numa
@@ -92,6 +94,7 @@ export const InvoicesList: FC<Props> = ({
   onSendToAccountant,
   onDelete,
   onTransfer,
+  sortField,
   sortOrder,
   onSortChange,
   scope = "PROJECT",
@@ -204,13 +207,30 @@ export const InvoicesList: FC<Props> = ({
       title: "Data",
       dataIndex: "invoiceDate",
       width: 108,
-      // Mais recente primeiro no primeiro clique, como a ordem por omissão
-      // (por data de carregamento) que esta coluna passa a substituir.
+      // Mais recente primeiro no primeiro clique. As duas colunas de data
+      // partilham o mesmo estado de ordenação — só uma tem seta de cada vez.
       ...(onSortChange
-        ? { sorter: true, sortOrder: sortOrder ?? undefined, sortDirections: ["descend", "ascend"] as const }
+        ? {
+            sorter: true,
+            sortOrder: sortField === "invoiceDate" ? sortOrder ?? undefined : undefined,
+            sortDirections: ["descend", "ascend"] as const,
+          }
         : {}),
       render: (date: string | null) => (date ? formatDate(date) : "—"),
     },
+    ...(onSortChange
+      ? ([
+          {
+            title: "Carregada em",
+            dataIndex: "createdAt",
+            width: 108,
+            sorter: true,
+            sortOrder: sortField === "createdAt" ? sortOrder ?? undefined : undefined,
+            sortDirections: ["descend", "ascend"] as const,
+            render: (value: string) => formatDate(value),
+          },
+        ] as ColumnsType<ConstructionInvoice>)
+      : []),
     {
       title: "Total",
       dataIndex: "totalAmount",
@@ -405,7 +425,8 @@ export const InvoicesList: FC<Props> = ({
         onChange={(_pagination, _filters, sorter) => {
           if (!onSortChange) return;
           const s = Array.isArray(sorter) ? sorter[0] : sorter;
-          onSortChange((s?.order as "ascend" | "descend" | null) ?? null);
+          const order = (s?.order as "ascend" | "descend" | null) ?? null;
+          onSortChange(order ? (s?.field as "invoiceDate" | "createdAt") : null, order);
         }}
         locale={{
           emptyText: (
