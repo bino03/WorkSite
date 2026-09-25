@@ -105,6 +105,19 @@ class InvoiceDocumentsExportServiceTest {
     }
 
     @Test
+    @DisplayName("Sem nome de fornecedor usa o NIF; sem nome e sem NIF cai no literal Fornecedor")
+    void fallsBackToNifThenToTheLiteral() {
+        ConstructionInvoice unknownButWithNif = invoice("FR 100", "2026-09-10", null, "Areia");
+        unknownButWithNif.setSupplierNif("518849651");
+        assertThat(name(unknownButWithNif, document(unknownButWithNif, "foto.jpg", "image/jpeg")))
+                .isEqualTo("20260910_FR100_518849651.jpg");
+
+        ConstructionInvoice noNameNoNif = invoice("FR 101", "2026-09-11", null, "Brita");
+        assertThat(name(noNameNoNif, document(noNameNoNif, "foto2.jpg", "image/jpeg")))
+                .isEqualTo("20260911_FR101_Fornecedor.jpg");
+    }
+
+    @Test
     @DisplayName("O original_filename que já é o do vault mantém-se tal e qual; os outros são gerados")
     void preservesVaultNamesAndRenamesTheRest() {
         assertThat(InvoiceDocumentsExportService.followsVaultConvention("20260617_FR2026A24-1412_Inoxtubo.pdf")).isTrue();

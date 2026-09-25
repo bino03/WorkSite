@@ -257,7 +257,7 @@ Excel que não exista na árvore da obra é erro de migração, listado, nunca c
 | Vilatro (decisão 17, revista em 10-09-2026) | App |
 |---|---|
 | `Faturas\Lançadas\` — **uma pasta só, sem subpastas de data** | nada do lado do Vilatro corresponde a `construction_invoice_document.uploaded_at` — ver o aviso abaixo |
-| `<aaaammdd>_<NºFatura>_<Fornecedor>.<ext>` — a data do documento no nome | `original_filename` guarda o nome tal como veio; a exportação **gera** este nome a partir de `invoice_date`, `invoice_number` (sanitizado: `\ / : * ? " < > \|` → `-`, sem espaços) e `supplier.name` em CamelCase |
+| `<aaaammdd>_<NºFatura>_<Fornecedor>.<ext>` — a data do documento no nome | `original_filename` guarda o nome tal como veio; a exportação **gera** este nome a partir de `invoice_date`, `invoice_number` (sanitizado: `\ / : * ? " < > \|` → `-`, sem espaços) e `supplier_name` em CamelCase — sem nome usa-se `supplier_nif`; sem nenhum dos dois, o literal `Fornecedor` (2026-09-25) |
 | `Por lançar\` = ainda não está no Excel | não existe: na app o upload **é** o lançamento |
 | `Não Reconhecido\` = a leitura falhou | fatura com QR ilegível e campos vazios, "por rever" — já existe |
 | Vários ficheiros por fatura (foto + PDF do Bizdocs; páginas separadas) | 0..N `construction_invoice_document` |

@@ -126,8 +126,11 @@ public class InvoiceDocumentsExportService {
     /**
      * {@code <aaaammdd>_<nº>_<Fornecedor>[_pN].<ext>} a partir da fatura. Sem nº
      * é {@code SEM-N} e a descrição curta no lugar do fornecedor, como o vault
-     * faz aos talões. Sem data (fatura por rever) fica a data do upload, com
-     * aviso — o campo tem de existir para a pasta se ordenar.
+     * faz aos talões. Sem nome de fornecedor usa-se o NIF (o QR só traz o NIF;
+     * sem correspondência no catálogo o nome fica por preencher) — só cai no
+     * literal {@code Fornecedor} se nem o NIF existir. Sem data (fatura por
+     * rever) fica a data do upload, com aviso — o campo tem de existir para a
+     * pasta se ordenar.
      */
     static String vaultFileName(ConstructionInvoice invoice, ConstructionInvoiceDocument document, List<String> warnings) {
         LocalDate date = invoice.getInvoiceDate();
@@ -137,9 +140,10 @@ public class InvoiceDocumentsExportService {
                     + DATE.format(date) + ").");
         }
         String number = sanitizeNumber(invoice.getInvoiceNumber());
+        String supplierLabel = isBlank(invoice.getSupplierName()) ? invoice.getSupplierNif() : invoice.getSupplierName();
         String third = number == null
                 ? camelCase(invoice.getDescription(), NO_SUPPLIER)
-                : camelCase(invoice.getSupplierName(), NO_SUPPLIER);
+                : camelCase(supplierLabel, NO_SUPPLIER);
         String page = document.getKind() == ConstructionInvoiceDocument.Kind.PAGE && document.getPageNumber() != null
                 ? "_p" + document.getPageNumber() : "";
         String extension = extensionOf(document);
