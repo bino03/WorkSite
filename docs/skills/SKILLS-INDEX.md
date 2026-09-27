@@ -202,6 +202,16 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - **Use when**: Avançar `notes/ToDo.md`, priorizar, planear sem implementar, retomar um plano a meio, ou ver o estado do backlog
 - **Nota**: não escreve código diretamente — invoca as outras skills. Lê e mantém `notes/ToDo.md`, `notes/whatIveDone.md`, `notes/ideas.md` e `notes/roadmap/plans/`
 
+### [[skill-refine-idea]]
+**Amadurece uma ideia de funcionalidade e guarda-a no sítio certo — bullet no ToDo ou entrada com contexto em `ideas.md`**
+
+- **File**: `docs/skills/process/skill-refine-idea.md`
+- **Time**: ~5-15 min
+- **Tags**: `#process` `#backlog` `#ideas` `#planning`
+- **Covers**: Qual ideia (nova ou de `ideas.md`) → ler o vault (ToDo, ideas, work log, roadmap, docs) → saídas cedo (já feito, duplicado, colide) → perguntas em bloco só sobre o que falta → teste "o que / onde / como se verifica" → texto exato confirmado → edição pontual
+- **Use when**: "Tenho uma ideia", "quero adicionar X", planear uma funcionalidade para mais tarde, ou passar uma ideia de `ideas.md` para o ToDo
+- **Nota**: não implementa — é a entrada do ciclo; o `implement-todo` é a saída e lê o bloco `> Decidido` que esta deixa. Veio do Workflow a 2026-09-27, ainda por provar
+
 ### [[skill-verify-in-browser]]
 **Ver uma feature do Backoffice a funcionar na app real, pela extensão do Chrome — por DOM + API, nunca por screenshot; escrita só em obra `is_test`**
 
@@ -243,6 +253,7 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - [[skill-git-commits]] — Clear commit messages
 - [[skill-frontend-integration-guide]] — Documenting for team
 - [[skill-create-new-skill]] — How to create a new skill
+- [[skill-refine-idea]] — Amadurecer uma ideia e guardá-la no ToDo ou em `ideas.md`, sem implementar
 - [[skill-implement-todo]] — Levar o backlog (`notes/ToDo.md`) até código, reutilizando as skills acima
 - [[skill-run]] — Arrancar a app localmente (backend + Backoffice), com health check
 - [[skill-verify-in-browser]] — Provar no browser real o que o `implement-todo` implementou
@@ -297,15 +308,16 @@ docs/skills/
 | References (not invocable) | 3 (+ 8 design sub-files) |
 | Backend Skills | 4 |
 | Frontend Skills | 4 |
-| Process Skills | 5 |
-| **Total Invocable Skills** | **13** |
+| Process Skills | 6 |
+| **Total Invocable Skills** | **14** |
 
 ---
 
 ## Last Updated
 
-- **Date**: 2026-09-25
-- **Latest**: `skill-run` (process) — arranca backend + Backoffice localmente (`/run`), com verificação por log e health check por `curl` em vez de assumir sucesso.
+- **Date**: 2026-09-27
+- **Latest**: `skill-refine-idea` (process) — a entrada do ciclo: ideia em linguagem livre → lê o vault → pergunta só o que falta → bullet no ToDo (com `> Decidido`) ou entrada com contexto em `ideas.md` (`/refine-idea`). Veio do Workflow, ainda por provar. `implement-todo` passa a ler o bloco `> Decidido` e as ideias de qualquer `> Contexto (via …)`.
+- **Anterior (2026-09-25)**: `skill-run` (process) — arranca backend + Backoffice localmente (`/run`), com verificação por log e health check por `curl` em vez de assumir sucesso.
 - **Anterior (2026-09-19)**: `skill-verify-in-browser` (process) — o procedimento da extensão do Chrome que vivia em `notes/learning.md` passa a ser invocável (`/verify-in-browser`) e chamado pelo `implement-todo` na Fase 5.5; a secção frontend de `code-best-practices` fundida no `skill-frontend-design-system` ("Regras de base"); regra "o integration guide apaga-se ao fechar a feature".
 - **Anterior (2026-09-19)**: `skill-add-file-upload` reescrita à volta de `construction_invoice_document` + `payment.proof_*` (a versão anterior ensinava o `/assets/{id}/banner` do Property-Management); `property_asset` e `ConstructionStagesPage` purgados de `skill-add-database-table` e `skill-frontend-design-system`; `implement-todo` Fase 7 passa a alimentar `backlog.md` e `learning.md`.
 - **Anterior (2026-08-09)**: Added the `project-vocabulary` reference — o dicionário partilhado (Drawer vs. Modal, fatura vs. despesa, rubrica, token). Nasceu de uma confusão real: um Drawer tratado por "modal" mandava quem lê para o sub-ficheiro de design errado.

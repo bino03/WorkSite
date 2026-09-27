@@ -35,7 +35,7 @@ Faz também, a baixo custo (leituras/greps rápidos, sem subagentes — isto ali
 
 1. **Contagem por tema**: quantos itens `- [ ]` existem em cada secção temática do `ToDo.md`. Se o ficheiro não tiver nenhum item (só a secção "How to Use"), guarda esse facto — afeta que opções fazem sentido no menu.
 2. **Planos por retomar**: lista `notes/roadmap/plans/` (pode não existir ainda — nesse caso não há nada a retomar). Qualquer ficheiro com `**Estado**: em curso` é candidato a retoma.
-3. **Ideias com contexto já recolhido**: grep rápido a `notes/ideas.md` por `> Contexto (via implement-todo`. Guarda quantas encontraste (não precisas de as ler todas agora, só confirmar que existem e quantas).
+3. **Ideias com contexto já recolhido**: grep rápido a `notes/ideas.md` por `> Contexto (via ` (deixadas por esta skill ou pelo [[skill-refine-idea]]). Guarda quantas encontraste (não precisas de as ler todas agora, só confirmar que existem e quantas).
 4. **Últimas entradas do work log**: as 1-3 entradas mais recentes de `notes/whatIveDone.md` (só os títulos `## AAAA-MM-DD — ...`, não o conteúdo todo).
 
 ---
@@ -77,7 +77,7 @@ Se "Implementar" ou "Só planear" (diretamente no menu 1.0, ou a partir de "Ver 
 
 **Se "Só um item específico"**: imprime a lista atual do ToDo numerada (é texto que já tens em mãos, sem custo) e pergunta por intervalo(s) numérico(s) como opções (ex.: "#1-3" · "#4-6" · "#7-9 + soltos").
 
-Guarda o resultado como a lista de bullets exatos (texto verbatim) em âmbito para as fases seguintes. Nada fora deste âmbito é tocado.
+Guarda o resultado como a lista de bullets exatos (texto verbatim) em âmbito para as fases seguintes — **com o bloco `> Decidido (via refine-idea, …)`** indentado por baixo, se o tiverem: é esclarecimento já obtido, entra no plano e nas Fases 2-3. Nada fora deste âmbito é tocado.
 
 ### 1.2 — Orçamento da sessão (só se "Implementar")
 
@@ -132,7 +132,7 @@ Isto mantém o contexto principal barato — quem orquestra nunca lê os ficheir
 
 Junta os `Open Questions` de todos os relatórios da Fase 2. Pergunta tudo de uma vez via `AskUserQuestion` — se couberem em 4 perguntas, uma chamada só; se ultrapassar, várias chamadas **agrupadas por tema**, mas sempre completas antes de avançar para a Fase 4.
 
-Neste backlog há vários bullets escritos em nota rápida, que quase de certeza vão precisar de esclarecimento — por exemplo, quais os campos/rubricas de orçamento de uma construção (o utilizador referiu um Excel como fonte), como se calcula assiduidade/férias, ou o que conta como "entrada de funcionário". A Fase 2 pode sugerir candidatos se encontrar um modelo parcial no código, **mas não pode inventar requisitos de negócio** — pergunta.
+Neste backlog há vários bullets escritos em nota rápida, que quase de certeza vão precisar de esclarecimento — por exemplo, quais os campos/rubricas de orçamento de uma construção (o utilizador referiu um Excel como fonte), como se calcula assiduidade/férias, ou o que conta como "entrada de funcionário". A Fase 2 pode sugerir candidatos se encontrar um modelo parcial no código, **mas não pode inventar requisitos de negócio** — pergunta. Não voltes a perguntar o que um bloco `> Decidido` já responde; um ⚠️ lá dentro é pergunta a fazer aqui.
 
 **Se o utilizador não souber responder a uma pergunta** (a ideia ainda não amadureceu, não é só falta de investigação): oferece mover esse item para `notes/ideas.md` com o contexto já recolhido, em vez de o deixar preso no ToDo — inclui isto como uma das opções da própria pergunta (ex.: "Ainda não sei — mover para ideas.md com o que já descobri"). Formato exato a acrescentar em `ideas.md`:
 
@@ -203,7 +203,7 @@ Por tarefa, na ordem confirmada:
 
 ## Fase 6: Bookkeeping por tarefa concluída
 
-**`notes/ToDo.md`** — remove a linha exata do bullet implementado com uma edição pontual (nunca reescrevas o ficheiro todo). Para bullets que fazem parte de um grupo temático maior, remove só o bullet implementado, deixa os irmãos por implementar intactos.
+**`notes/ToDo.md`** — remove a linha exata do bullet implementado (e o bloco `> Decidido` indentado por baixo dela, se existir) com uma edição pontual (nunca reescrevas o ficheiro todo). Para bullets que fazem parte de um grupo temático maior, remove só o bullet implementado, deixa os irmãos por implementar intactos.
 
 **`notes/whatIveDone.md`** — acrescenta (nunca sobrescrever) uma entrada no formato:
 
@@ -257,6 +257,7 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 
 ## Related Skills
 
+- [[skill-refine-idea]] — A entrada do ToDo: amadurece uma ideia e escreve o bullet (com `> Decidido`) que esta skill consome
 - [[code-best-practices]] — Lido pelas skills invocadas na Fase 5, não repetido aqui
 - [[skill-add-backend-feature]] — Novo endpoint/feature backend
 - [[skill-add-database-table]] — Nova tabela
