@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Table, Input, Empty, message, Button } from "antd";
@@ -10,6 +10,8 @@ import { deleteEnterprise } from "@/services/enterpriseService";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/config/pagination";
 import CreateEnterpriseDrawer from "@/components/enterprise/CreateEnterpriseDrawer";
 import EnterpriseViewDrawer from "@/components/enterprise/EnterpriseViewDrawer";
+import EnterpriseContextMenu from "@/components/enterprise/EnterpriseContextMenu";
+import { BudgetExportModal } from "@/components/budget/BudgetExportModal";
 import { normalizeSpringPage, type SpringPage } from "@/utils/springPage";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { ListActions, ListActionPrimary, ListActionSecondary, ListActionDanger } from "@/components/common/ListActions";
@@ -110,6 +112,21 @@ export default function EnterprisesList() {
   const [enterpriseDrawerOpen, setEnterpriseDrawerOpen] = useState(false);
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [exportEnterpriseId, setExportEnterpriseId] = useState<string | null>(null);
+
+  // Menu de contexto (botão direito) — mesmo padrão do EmployeeContextMenu.
+  const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number; record: Enterprise | null }>({
+    visible: false, x: 0, y: 0, record: null,
+  });
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, record: Enterprise) => {
+    e.preventDefault();
+    setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, record });
+  }, []);
+
+  const closeCtxMenu = useCallback(() => {
+    setCtxMenu((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const handleViewEnterprise = (id: string) => {
     setSelectedEnterpriseId(id);
@@ -340,6 +357,10 @@ export default function EnterprisesList() {
           dataSource={data}
           loading={loading}
           onChange={onTableChange}
+          onRow={(record) => ({
+            onContextMenu: (e) => handleContextMenu(e, record),
+            style: { cursor: 'context-menu' },
+          })}
           pagination={pagination}
           scroll={{ x: 800 }}
           locale={{
@@ -361,6 +382,26 @@ export default function EnterprisesList() {
         enterpriseId={selectedEnterpriseId || undefined}
         onClose={handleCloseDrawer}
         onUpdated={handleUpdated}
+      />
+      {exportEnterpriseId && (
+        <BudgetExportModal
+          open={!!exportEnterpriseId}
+          enterpriseId={exportEnterpriseId}
+          onClose={() => setExportEnterpriseId(null)}
+        />
+      )}
+
+      <EnterpriseContextMenu
+        visible={ctxMenu.visible}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        record={ctxMenu.record}
+        onClose={closeCtxMenu}
+        onViewDetails={handleViewEnterprise}
+        onViewBudget={(id) => navigate(`/backoffice/empreendimentos/${id}/budget`)}
+        onViewInvoices={(id) => navigate(`/backoffice/empreendimentos/${id}/invoices`)}
+        onExport={setExportEnterpriseId}
+        onDelete={confirmDelete}
       />
     </div>
   );
