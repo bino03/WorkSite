@@ -300,12 +300,9 @@ const EditEnterpriseGalleryCard: React.FC<Props> = ({ data, onSave, onCancel }) 
 
       notificationService.success(t('enterpriseEdit.bannerUpdated'));
 
-      const updatedEnterprise = response.data.enterprise || {
-        ...data,
-        bannerUrl: response.data.bannerUrl
-      };
-
-      onSave(updatedEnterprise);
+      // O endpoint devolve o EnterpriseFullResponseDTO já atualizado (com o
+      // novo banner assinado) — não um envelope { enterprise, bannerUrl }.
+      onSave(response.data);
       handleCancelEdit();
 
     } catch (error) {
