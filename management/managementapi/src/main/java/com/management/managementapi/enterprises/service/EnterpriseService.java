@@ -2,10 +2,13 @@ package com.management.managementapi.enterprises.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.common.location.LocationUpsertDTO;
 import com.management.managementapi.dto.common.location.LocationResponseDTO;
 import com.management.managementapi.dto.common.media.MediaResponseDTO;
@@ -78,6 +81,7 @@ public class EnterpriseService {
      * Obter dados básicos de um projeto (para seleção/dropdown)
      */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.ENTERPRISES)
     public EnterpriseBasicDTO findBasicById(@NonNull UUID id) {
         log.info("Fetching basic enterprise data with id: {}", id);
 
@@ -97,6 +101,7 @@ public class EnterpriseService {
      * Listar dados básicos de todos os projetos ativos (para seleção/dropdown)
      */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.ENTERPRISES)
     public List<EnterpriseBasicDTO> findAllBasic() {
         log.info("Fetching all basic enterprise data");
 
@@ -119,6 +124,7 @@ public class EnterpriseService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.ENTERPRISES)
     public Page<EnterpriseListDTO> findAll(@NonNull Pageable pageable, @Nullable String search) {
         Page<Enterprise> enterprises;
 
@@ -166,6 +172,7 @@ public class EnterpriseService {
 
     // MOSTRAR TODOS OS PROJETOS ATIVOS
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.ENTERPRISES)
     public List<EnterpriseResponseDTO> findAllActive() {
         log.info("Fetching all active enterprises");
         List<Enterprise> enterprises = enterpriseRepository.findByIsActiveTrue();
@@ -173,6 +180,7 @@ public class EnterpriseService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.ENTERPRISES)
     public EnterpriseFullResponseDTO findById(@NonNull UUID id) {
         log.info("Fetching enterprise with id: {}", id);
 
@@ -237,6 +245,7 @@ public class EnterpriseService {
 
     // CRIAR UM NOVO PROJETO
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public EnterpriseDTO create(CreateEnterpriseDTO createEnterpriseDTO) {
         log.info("Creating new enterprise: {}", createEnterpriseDTO.getName());
 
@@ -283,6 +292,7 @@ public class EnterpriseService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public void addLocationToEnterprise(@NonNull UUID enterpriseId, @Nullable UUID existingLocationId,
             @Nullable LocationUpsertDTO newLocationData) {
         log.info("Adding location to enterprise: {}", enterpriseId);
@@ -323,6 +333,7 @@ public class EnterpriseService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public void addMedia(@NonNull UUID enterpriseId, List<EnterpriseMediaDTO> mediaList) {
         log.info("Adding {} media items to enterprise: {}", mediaList.size(), enterpriseId);
 
@@ -398,6 +409,7 @@ public class EnterpriseService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public EnterpriseDTO update(@NonNull UUID id, EnterpriseDTO enterpriseDTO) {
         log.info("Updating enterprise with id: {}", id);
 
@@ -420,6 +432,7 @@ public class EnterpriseService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public void delete(@NonNull UUID id) {
         log.info("Soft deleting enterprise with id: {}", id);
 
@@ -434,6 +447,7 @@ public class EnterpriseService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.ENTERPRISES)
     public List<EnterpriseDTO> findByName(@NonNull String name) {
         log.info("Searching enterprises by name: {}", name);
         List<Enterprise> enterprises = enterpriseRepository.findActiveByNameContaining(name);
@@ -492,6 +506,7 @@ public class EnterpriseService {
      * Adicionar múltiplas fotos à galeria de um projeto
      */
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public List<MediaResponseDTO> addPhotosToGallery(@NonNull UUID enterpriseId, List<MultipartFile> photos) {
         log.info("Adding {} photos to enterprise gallery: {}", photos.size(), enterpriseId);
 
@@ -545,6 +560,7 @@ public class EnterpriseService {
      * Upload ou atualizar o banner de um projeto
      */
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public EnterpriseFullResponseDTO uploadOrUpdateBanner(@NonNull UUID enterpriseId, MultipartFile bannerFile) {
         log.info("Uploading/updating banner for enterprise: {}", enterpriseId);
 
@@ -608,6 +624,7 @@ public class EnterpriseService {
      * Eliminar o banner de um projeto
      */
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public EnterpriseFullResponseDTO deleteBanner(@NonNull UUID enterpriseId) {
         log.info("Deleting banner for enterprise: {}", enterpriseId);
 
@@ -645,6 +662,7 @@ public class EnterpriseService {
      * Atualizar o altText de uma media
      */
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public MediaResponseDTO updateMediaAltText(@NonNull UUID enterpriseId, @NonNull UUID mediaId, String altText) {
         log.info("Updating altText for media {} in enterprise {}", mediaId, enterpriseId);
 
@@ -667,6 +685,7 @@ public class EnterpriseService {
      * Eliminar uma media específica
      */
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public void deleteMedia(@NonNull UUID enterpriseId, @NonNull UUID mediaId) {
         log.info("Deleting media {} from enterprise {}", mediaId, enterpriseId);
 

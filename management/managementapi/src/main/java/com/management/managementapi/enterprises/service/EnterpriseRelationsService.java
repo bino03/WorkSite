@@ -4,8 +4,10 @@ package com.management.managementapi.enterprises.service;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
+import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.common.location.LocationUpsertDTO;
 import com.management.managementapi.enterprises.dto.enterprise.EnterpriseLocationDTO;
 import com.management.managementapi.enterprises.dto.enterprise.edit.DatesAndAreasCardDTO;
@@ -96,6 +98,7 @@ public class EnterpriseRelationsService {
     // MÉTODO UPSERT LOCATION - ATUALIZADO E CORRIGIDO
     @Transactional
     @SuppressWarnings("null")
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
 public EnterpriseLocationDTO upsertLocation(@NonNull UUID enterpriseId, LocationUpsertDTO dto) {
     log.info("Upserting location for enterprise: {}", enterpriseId);
 
@@ -180,6 +183,7 @@ private EnterpriseLocationDTO convertToEnterpriseLocationDTO(EnterprisesLocation
     }
 
     // REMOVER A ASSOCIAÇÃO ENTRE UMA ENTERPRISE E UMA LOCALIZAÇÃO
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public void removeLocation(@NonNull UUID enterpriseId) {
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
                 .orElseThrow(() -> ResourceNotFoundException.enterprise(enterpriseId.toString()));
@@ -205,6 +209,7 @@ private static String normalizeSlug(String slug) {
     return trimmed.isEmpty() ? null : trimmed;
 }
 
+@CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
 public EditOverViewCardDTO updateOverview(@NonNull UUID id, EditOverViewCardDTO dto) {
         // Buscar a empresa pelo ID
         Enterprise enterprise = enterpriseRepository.findById(id)
@@ -265,6 +270,7 @@ public EditOverViewCardDTO updateOverview(@NonNull UUID id, EditOverViewCardDTO 
 
 
     @SuppressWarnings("null")
+    @CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
     public DatesAndAreasCardDTO updateDatesAndAreas(@NonNull UUID id, DatesAndAreasCardDTO dto) {
     // Buscar a empresa pelo ID
     Enterprise enterprise = enterpriseRepository.findById(id)
@@ -302,6 +308,7 @@ private DatesAndAreasCardDTO convertToDatesAndAreasDTO(Enterprise enterprise) {
 } 
 
 @SuppressWarnings("null")
+@CacheEvict(cacheNames = CacheConfig.ENTERPRISES, allEntries = true)
 public FinanceCardDTO updateFinance(@NonNull UUID id, FinanceCardDTO dto) {
     // Buscar a empresa pelo ID
     Enterprise enterprise = enterpriseRepository.findById(id)

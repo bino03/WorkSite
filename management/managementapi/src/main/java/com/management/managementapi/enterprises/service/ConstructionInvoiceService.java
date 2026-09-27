@@ -3,6 +3,7 @@ package com.management.managementapi.enterprises.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.management.managementapi.dto.activity.ActivityLogCreateDTO;
+import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
@@ -59,6 +60,7 @@ import com.management.managementapi.service.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -284,6 +286,7 @@ public class ConstructionInvoiceService {
      * confirmadas em {@code dto.expenses()} (0 ou 1 linha na fase 3); a proposta
      * calcula-se em {@link #previewCreditNoteSplit(UUID, java.math.BigDecimal)}.
      */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public ConstructionInvoiceResponseDTO createCreditNote(UUID originId, CreditNoteCreateDTO dto) {
         ConstructionInvoice origin = getById(originId);
         if (origin.getDocumentType() != ConstructionInvoice.DocumentType.INVOICE) {
@@ -413,6 +416,7 @@ public class ConstructionInvoiceService {
      * criação, e as somas por obra usam o valor por fatura. Ver
      * docs/faturas-modelo-alvo.md §4.
      */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public InvoiceTransferResultDTO transfer(UUID id, InvoiceTransferDTO dto) {
         ConstructionInvoice invoice = getById(id);
         if (invoice.getDocumentType() == ConstructionInvoice.DocumentType.CREDIT_NOTE) {
@@ -789,6 +793,7 @@ public class ConstructionInvoiceService {
      * Não toca no ficheiro nem na miniatura; para trocar a digitalização é
      * {@link #replaceFile}.
      */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public InvoiceUploadResultDTO rescan(UUID id) {
         ConstructionInvoice invoice = getById(id);
 
@@ -1157,6 +1162,7 @@ public class ConstructionInvoiceService {
 
     // ── edição ────────────────────────────────────────────────
 
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public ConstructionInvoice update(UUID id, ConstructionInvoiceUpsertDTO dto) {
         ConstructionInvoice invoice = getById(id);
 
@@ -1225,6 +1231,7 @@ public class ConstructionInvoiceService {
     }
 
     /** Marca (ou desmarca) a fatura como enviada para a contabilidade. */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public ConstructionInvoice setSentToAccountant(UUID id, boolean sent) {
         ConstructionInvoice invoice = getById(id);
 
@@ -1263,6 +1270,7 @@ public class ConstructionInvoiceService {
             invoice.setDocumentStatus(ConstructionInvoice.DocumentStatus.MISSING);
         }
     }
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public void delete(UUID id) {
         ConstructionInvoice invoice = getById(id);
         deleteDocuments(invoice);
@@ -1279,6 +1287,7 @@ public class ConstructionInvoiceService {
      * É aqui — e só aqui — que a data e o total passam a ser obrigatórios: a
      * despesa exige ambos, e é dela que sai o gasto real da rubrica.
      */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public ConstructionExpense allocate(UUID invoiceId, UUID budgetItemId) {
         ConstructionInvoice invoice = getById(invoiceId);
 
@@ -1334,6 +1343,7 @@ public class ConstructionInvoiceService {
      * utilizador não ajudava, mas uma fatura repartida a menos deixa dinheiro
      * fora do orçamento sem ninguém dar por isso.
      */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public List<ConstructionExpense> split(UUID invoiceId, List<InvoiceSplitLineDTO> lines) {
         ConstructionInvoice invoice = getById(invoiceId);
 
@@ -1383,6 +1393,7 @@ public class ConstructionInvoiceService {
      * Apanhar a exceção aqui é seguro porque o {@code allocate} valida <b>antes</b>
      * de gravar seja o que for: nenhuma falha deixa a transação meio escrita.
      */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public BatchAllocateResultDTO batchAllocate(List<UUID> invoiceIds, UUID budgetItemId) {
         int succeeded = 0;
         List<BatchAllocateResultDTO.Failure> failures = new ArrayList<>();
@@ -1422,6 +1433,7 @@ public class ConstructionInvoiceService {
     }
 
     /** Desfaz a associação: apaga <b>todas</b> as linhas e devolve a fatura à caixa de entrada. */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public ConstructionInvoice deallocate(UUID invoiceId) {
         ConstructionInvoice invoice = getById(invoiceId);
         List<ConstructionExpense> allocations = findAllocations(invoiceId);

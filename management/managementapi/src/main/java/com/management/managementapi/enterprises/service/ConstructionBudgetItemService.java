@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetLotUpsertDTO;
@@ -26,6 +27,8 @@ import com.management.managementapi.security.AuthContext;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,6 +72,7 @@ public class ConstructionBudgetItemService {
 
     /** Os lotes do projeto, pela ordem, cada um com o seu orçamentado e gasto. */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.BUDGET_TREE)
     public List<BudgetLotDTO> listLots(UUID enterpriseId) {
         enterpriseRepository.findById(enterpriseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
@@ -97,6 +101,7 @@ public class ConstructionBudgetItemService {
         return lots;
     }
 
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public BudgetLotDTO createLot(UUID enterpriseId, BudgetLotUpsertDTO dto) {
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
@@ -114,6 +119,7 @@ public class ConstructionBudgetItemService {
         return new BudgetLotDTO(lot.getId(), lot.getName(), lot.getSortOrder(), 0, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public BudgetLotDTO updateLot(UUID budgetId, BudgetLotUpsertDTO dto) {
         ConstructionBudget lot = getLot(budgetId);
         String name = dto.name().trim();
@@ -143,6 +149,7 @@ public class ConstructionBudgetItemService {
      * Sem zona de recuperação dedicada: reverte-se na BD, como um lote nunca
      * devia mesmo precisar.
      */
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public void deleteLot(UUID budgetId) {
         ConstructionBudget lot = getLot(budgetId);
         if (repository.budgetHasExpenses(budgetId)) {
@@ -182,6 +189,7 @@ public class ConstructionBudgetItemService {
      * capítulo é legítimo (§7), e o resultado di-lo em {@code chapter}.
      */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.BUDGET_TREE)
     public List<BudgetItemSearchResultDTO> search(UUID enterpriseId, String query, int limit) {
         String needle = query == null ? "" : query.trim().toLowerCase();
         enterpriseRepository.findById(enterpriseId)
@@ -360,6 +368,7 @@ public class ConstructionBudgetItemService {
      * plano dos lotes); a página do orçamento usa o {@link #getBudgetTree}.
      */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.BUDGET_TREE)
     public BudgetTreeDTO getTree(UUID enterpriseId) {
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
@@ -375,6 +384,7 @@ public class ConstructionBudgetItemService {
 
     /** A árvore de um lote — a página do orçamento. */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.BUDGET_TREE)
     public BudgetTreeDTO getBudgetTree(UUID budgetId) {
         ConstructionBudget lot = budgetRepository.findById(budgetId)
                 .filter(l -> l.getDeletedAt() == null)
@@ -460,6 +470,7 @@ public class ConstructionBudgetItemService {
      * isolado: o gasto que lhe chega repartido dos pais só se conhece a partir da raiz.
      */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.BUDGET_TREE)
     public BudgetItemNodeDTO getNode(UUID id) {
         ConstructionBudgetItem item = getById(id);
         UUID enterpriseId = item.getEnterprise().getId();
@@ -493,6 +504,7 @@ public class ConstructionBudgetItemService {
 
     // ── escrita ───────────────────────────────────────────────
 
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public BudgetItemSaveResponseDTO create(BudgetItemUpsertDTO dto) {
         ConstructionBudget lot = budgetRepository.findById(dto.budgetId())
                 .filter(l -> l.getDeletedAt() == null)
@@ -517,6 +529,7 @@ public class ConstructionBudgetItemService {
         return new BudgetItemSaveResponseDTO(getNode(item.getId()), hints);
     }
 
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public BudgetItemSaveResponseDTO update(UUID id, BudgetItemUpsertDTO dto) {
         ConstructionBudgetItem item = getById(id);
         UUID budgetId = item.getBudgetId();
@@ -546,6 +559,7 @@ public class ConstructionBudgetItemService {
     }
 
     /** Reordena entre irmãos e/ou muda de rubrica-mãe. */
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public BudgetItemNodeDTO move(UUID id, UUID newParentId, Integer newSortOrder) {
         ConstructionBudgetItem item = getById(id);
         UUID enterpriseId = item.getEnterprise().getId();
@@ -572,6 +586,7 @@ public class ConstructionBudgetItemService {
      * atrás de uma eliminação. A purga real (hard delete) só acontece 30 dias
      * depois, por job agendado — ver {@code ConstructionBudgetItemPurgeConfig}.
      */
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public void delete(UUID id) {
         ConstructionBudgetItem item = getById(id);
         List<ConstructionBudgetItem> subtree = collectSubtree(item);
@@ -606,6 +621,7 @@ public class ConstructionBudgetItemService {
      * rubrica — nesse caso {@code BUDGET_DUPLICATE_CODE}, tal como uma
      * criação normal.
      */
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
     public BudgetItemNodeDTO recover(UUID id) {
         ConstructionBudgetItem item = repository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.budgetItem(id.toString()));

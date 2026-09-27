@@ -80,10 +80,39 @@ legível, o original fica intacto em Storage — a melhor hipótese para revisã
 ## URLs de fotos nas respostas da API
 
 Sempre que um endpoint devolve um URL de foto/media, **gerar um signed URL do Supabase** —
-`SignedUrlService.resolve(bucket, storageKey)` é o sítio canónico: cacheia por 50 min (a
+`SignedUrlService.resolve(bucket, storageKey)` é o sítio canónico: cacheia por 45 min (a
 assinatura vale 1h), tira a `/` inicial da chave e devolve `null` em vez de lançar se não houver
 ficheiro ou a chamada falhar. Nunca devolver a chave guardada em cru, e nunca reimplementar este
 try/catch por endpoint — é o que `SignedUrlService` já faz.
+
+## Cache em memória (`CacheConfig`)
+
+`CacheConfig` regista um único `CaffeineCacheManager` (TTL 45 min, 5000 entradas) partilhado por
+todos os caches da app — `signedUrls` (acima), `enterprises` (`GET /enterprises` e variantes:
+`EnterpriseService.findAll/findAllActive/findById/findBasicById/findAllBasic/findByName`, motivado
+pelo rollup do orçamento que `findAll` recalcula do zero a cada pedido) e `budgetTree` (a árvore do
+orçamento de construção: `ConstructionBudgetItemService.getTree/getBudgetTree/search/getNode/
+listLots`, que reconstroem rollups, gasto e faturas pendentes do zero em todos os GETs).
+
+O evict é sempre `@CacheEvict(allEntries = true)`, nunca por chave: produção corre numa só
+instância com pouco tráfego simultâneo, por isso limpar a família inteira a cada escrita relevante
+é mais simples e mais seguro do que arriscar esquecer uma chave composta espalhada por vários
+serviços. Qualquer escrita que mude o que estes endpoints devolvem tem de evictar a família certa:
+
+- `enterprises` — `EnterpriseService`/`EnterpriseRelationsService`, e `ConstructionBudgetItemService`
+  (lotes e rubricas, porque `findAll` soma `budgetTotalsByEnterprise` e `lotOptionsByEnterprise`).
+- `budgetTree` — os mesmos métodos de lotes/rubricas de `ConstructionBudgetItemService` (evictam as
+  duas famílias de uma vez), `BudgetExcelImportService.importBudget` (só quando não é `dryRun`),
+  `ConstructionExpenseService` (create/update/delete), `ConstructionInvoiceService`
+  (createCreditNote/transfer/rescan/update/setSentToAccountant/allocate/split/batchAllocate/
+  deallocate/delete — qualquer coisa que crie, mude ou apague uma despesa, ou mude
+  `sentToAccountant`) e `PaymentService` (markAsPaid/registerAggregate/delete, por precaução —
+  hoje não mudam nenhum campo que a árvore devolva, mas o custo de um evict a mais é baixo).
+
+Um método público que chama outro método público **da mesma classe** (`batchAllocate` → `allocate`,
+por exemplo) não passa pelo proxy de cache nessa chamada interna — por isso a anotação tem de ir no
+método que é a fronteira externa real (o controller chama-o), nunca só no método interno que ele
+invoca.
 
 ```java
 public String resolve(String bucket, String storageKey) {

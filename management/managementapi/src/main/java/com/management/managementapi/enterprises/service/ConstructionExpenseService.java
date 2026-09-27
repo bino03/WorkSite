@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.expense.request.ConstructionExpenseUpsertDTO;
 import com.management.managementapi.enterprises.dto.expense.response.ConstructionExpenseResponseDTO;
@@ -21,6 +22,7 @@ import com.management.managementapi.security.AuthContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -129,6 +131,7 @@ public class ConstructionExpenseService {
      * Lançamento feito à mão, sem documento. Uma despesa com fatura entra pela
      * caixa de entrada — ver {@code ConstructionInvoiceService.allocate}.
      */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public ConstructionExpense create(ConstructionExpenseUpsertDTO dto) {
         ConstructionExpense expense = new ConstructionExpense();
         expense.setBudgetItem(resolveBudgetItem(dto.budgetItemId()));
@@ -138,6 +141,7 @@ public class ConstructionExpenseService {
         return repository.save(expense);
     }
 
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public ConstructionExpense update(UUID id, ConstructionExpenseUpsertDTO dto) {
         ConstructionExpense expense = getById(id);
 
@@ -157,6 +161,7 @@ public class ConstructionExpenseService {
         return repository.save(expense);
     }
 
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public void delete(UUID id) {
         // A fatura fica: apagar o lançamento devolve-a à caixa de entrada, que é
         // o que se quer quando a classificação estava errada.

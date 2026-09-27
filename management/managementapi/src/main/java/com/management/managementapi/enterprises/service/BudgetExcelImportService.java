@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportRowDTO;
@@ -20,6 +21,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -83,6 +85,8 @@ public class BudgetExcelImportService {
     private final AuthContext authContext;
 
     @Transactional
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE },
+            allEntries = true, condition = "!#dryRun")
     public BudgetImportResultDTO importBudget(UUID budgetId, MultipartFile file,
                                               boolean dryRun, boolean replace) {
 

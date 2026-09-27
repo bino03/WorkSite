@@ -19,10 +19,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.payment.AggregatePaymentRequestDTO;
 import com.management.managementapi.enterprises.dto.payment.AggregatePaymentResultDTO;
@@ -131,6 +133,7 @@ public class PaymentService {
 
     // ── marcar uma fatura como paga ──────────────────────────────
 
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public PaymentResponseDTO markAsPaid(UUID invoiceId, MarkPaidRequestDTO dto, MultipartFile proof) {
         ConstructionInvoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> ResourceNotFoundException.constructionInvoice(invoiceId.toString()));
@@ -160,6 +163,7 @@ public class PaymentService {
 
     // ── pagamento agregado (N faturas, 1 movimento) ──────────────
 
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public AggregatePaymentResultDTO registerAggregate(AggregatePaymentRequestDTO dto, MultipartFile proof) {
         List<UUID> ids = dto.invoiceIds() == null ? List.of()
                 : dto.invoiceIds().stream().distinct().toList();
@@ -232,6 +236,7 @@ public class PaymentService {
     // ── anular ──────────────────────────────────────────────────
 
     /** Apaga o pagamento e repõe as faturas. Devolve o que foi apagado, para o log. */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
     public PaymentResponseDTO delete(UUID paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_PAYMENT_NOT_FOUND));
