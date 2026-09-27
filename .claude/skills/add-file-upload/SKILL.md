@@ -1,6 +1,6 @@
 ---
 name: add-file-upload
-description: File/photo upload pattern with Supabase Storage — MIME/size validation, storage key naming convention, signed URL generation, entity fields (bucket+key, never store raw URL or file bytes). Use when adding file, photo, or document upload to a backend feature.
+description: Padrão de upload de ficheiros/fotos com Supabase Storage — validação de MIME e tamanho, convenção de nomes das chaves de storage, geração de URLs assinados, campos na entidade (bucket+key, nunca o URL cru nem os bytes do ficheiro). Usar ao acrescentar upload de ficheiros, fotos ou documentos a uma feature do backend.
 ---
 
 Before writing any code, also read `${CLAUDE_PROJECT_DIR}/docs/skills/references/code-best-practices.md` — apply it to the validation, service, and controller code this skill produces.

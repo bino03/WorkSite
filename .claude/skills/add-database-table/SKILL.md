@@ -1,6 +1,6 @@
 ---
 name: add-database-table
-description: Create a new PostgreSQL table in the backend — planning questionnaire, Flyway migration SQL template (with soft-delete/RLS variants), JPA entity, EntityType enum, Repository. Use when creating a new database table or schema change in management/managementapi.
+description: Criar uma tabela PostgreSQL nova no backend — questionário de planeamento, template SQL da migração Flyway (com variantes de soft-delete/RLS), entidade JPA, enum EntityType, Repository. Usar ao criar uma tabela ou alterar o schema em management/managementapi.
 ---
 
 Before writing any SQL or Java, also read `${CLAUDE_PROJECT_DIR}/docs/skills/references/code-best-practices.md` — apply it to the migration SQL, the JPA entity, and the repository this skill produces.

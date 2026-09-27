@@ -1,6 +1,6 @@
 ---
 name: add-backend-feature
-description: Complete CRUD checklist for adding a new REST endpoint/feature to the Spring Boot backend (management/managementapi) — ErrorCodes, DTOs, Repository, MapStruct mapper, Service, Controller, SecurityConfig, EntityType, response status codes. Use when adding a new resource or feature to the backend API.
+description: Checklist completo para acrescentar um endpoint/feature REST ao backend Spring Boot (management/managementapi) — ErrorCodes, DTOs, Repository, mapper MapStruct, Service, Controller, SecurityConfig, EntityType, códigos de estado da resposta. Usar ao acrescentar um recurso ou feature à API do backend.
 ---
 
 Before writing any code, also read `${CLAUDE_PROJECT_DIR}/docs/skills/references/code-best-practices.md` — it's a reference, not a skill, but every line of code this skill produces (DTOs, Service, Controller, etc.) should follow it.

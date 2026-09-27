@@ -1,6 +1,6 @@
 ---
 name: frontend-error-handling
-description: Centralized frontend error handling — flat errorCode → PT message map mirroring the backend's ErrorCode.java 1:1, optional per-domain enums for type-safe references, ErrorHandler.handle() (auto-detects fieldErrors for validation display), notification patterns. Use when a React component makes an API call and needs error handling or validation error display.
+description: Tratamento de erros centralizado no frontend — mapa plano errorCode → mensagem PT, espelho 1:1 do ErrorCode.java do backend, enums opcionais por domínio para referências type-safe, ErrorHandler.handle() (deteta fieldErrors para mostrar erros de validação), padrões de notificação. Usar quando um componente React chama a API e precisa de tratar erros ou mostrar erros de validação.
 ---
 
 Before writing any code, also read `${CLAUDE_PROJECT_DIR}/docs/skills/references/code-best-practices.md` (the language-agnostic principles) and the "Regras de base" section of `${CLAUDE_PROJECT_DIR}/docs/skills/frontend/skill-frontend-design-system.md` (the frontend rules: no try/catch in services, `ErrorHandler` in the component) — apply both to the error-handling code this skill produces.

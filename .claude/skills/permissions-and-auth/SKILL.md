@@ -1,6 +1,6 @@
 ---
 name: permissions-and-auth
-description: Authorization and access control implementation — @PreAuthorize on controllers, ownership validation in services, createdBy field, IDOR prevention, ForbiddenException, query-level filtering by role. Use when adding or reviewing access control on backend endpoints.
+description: Implementação de autorização e controlo de acesso — @PreAuthorize nos controllers, validação de ownership nos services, campo createdBy, prevenção de IDOR, ForbiddenException, filtragem por role ao nível da query. Usar ao acrescentar ou rever o controlo de acesso de endpoints do backend.
 ---
 
 Before writing any code, also read `${CLAUDE_PROJECT_DIR}/docs/skills/references/code-best-practices.md` — apply it to the authorization code this skill produces.

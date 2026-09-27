@@ -1,6 +1,6 @@
 ---
 name: frontend-integration-guide
-description: Generate a frontend integration doc for a backend feature (API contract, component architecture, code templates, testing checklist) and auto-save it to the Backoffice's docs/integration folder. Use when a backend feature just got built and needs to be handed off for frontend implementation.
+description: Gerar um doc de integração frontend para uma feature do backend (contrato da API, arquitetura de componentes, templates de código, checklist de testes) e gravá-lo na pasta docs/integration do Backoffice. Usar quando uma feature do backend acabou de ser construída e tem de passar para a implementação no frontend.
 ---
 
 Before generating the doc, also read `${CLAUDE_PROJECT_DIR}/docs/skills/references/code-best-practices.md` (the language-agnostic principles), the "Regras de base" section of `${CLAUDE_PROJECT_DIR}/docs/skills/frontend/skill-frontend-design-system.md` (the frontend rules the code templates must follow) and `${CLAUDE_PROJECT_DIR}/docs/skills/references/frontend-visual-consistency.md` — the latter is a router: it points to the right `docs/skills/references/design/backoffice-<area>.md` sub-file(s) for whatever UI the generated doc's code templates cover. Apply that, not invented conventions.

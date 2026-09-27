@@ -200,7 +200,7 @@ Create `.claude/skills/<name>/SKILL.md` at the **repo root** (`Worksite/.claude/
 ```markdown
 ---
 name: your-skill-name
-description: One or two sentences — what it covers AND when to use it, with concrete trigger words. This is what Claude reads to decide whether to invoke the skill, so be specific, not just a title restated.
+description: Uma ou duas frases, em pt-PT — o que cobre E quando usar ("Usar quando…"), com palavras-gatilho concretas. É o que aparece no menu `/` e o que o Claude lê para decidir se invoca a skill, por isso ser específico, não repetir só o título.
 ---
 
 Read `${CLAUDE_PROJECT_DIR}/docs/skills/<category>/skill-your-skill-name.md` in full and follow it step by step.

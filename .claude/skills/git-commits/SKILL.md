@@ -1,6 +1,6 @@
 ---
 name: git-commits
-description: Commit message style and conventions for this project — type prefixes (feat/fix/refactor/docs/chore/test/style), imperative subject, body explaining why, footer issue refs. Use before writing a commit message in this repo.
+description: Estilo e convenções das mensagens de commit deste projeto — prefixos de tipo (feat/fix/refactor/docs/chore/test/style), assunto no imperativo, corpo a explicar o porquê, referências a issues no rodapé. Usar antes de escrever uma mensagem de commit neste repo.
 ---
 
 Read `${CLAUDE_PROJECT_DIR}/docs/skills/process/skill-git-commits.md` in full and follow it when drafting the commit message.
