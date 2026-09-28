@@ -613,7 +613,7 @@ const ConstructionBudgetPage: FC = () => {
         }}
       >
         <MetricCard
-          label={lots && lots.length > 1 ? `Orçamento · ${currentLot?.name ?? ""}` : "Orçamento"}
+          label={currentLot ? `Orçamento · ${currentLot.name}` : "Orçamento"}
           value={formatCurrency(totals?.budgetTotal ?? 0)}
           meta={
             lots && lots.length > 1
