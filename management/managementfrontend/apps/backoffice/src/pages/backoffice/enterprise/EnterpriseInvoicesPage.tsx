@@ -13,6 +13,7 @@ import {
   getInvoice,
   setInvoiceSentToAccountant,
 } from "@/services/invoiceService";
+import { getEnterpriseById } from "@/services/enterpriseService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
@@ -74,6 +75,8 @@ const EnterpriseInvoicesPage: FC = () => {
 
   const [invoices, setInvoices] = useState<ConstructionInvoice[]>([]);
   const [loading, setLoading] = useState(false);
+  /** Só para o título — a lista em si nunca mistura obras, por isso não vai a cada linha. */
+  const [enterpriseName, setEnterpriseName] = useState<string | null>(null);
   const [totalElements, setTotalElements] = useState(0);
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
   const [view, setView] = useState<ViewKey>("pending");
@@ -140,6 +143,14 @@ const EnterpriseInvoicesPage: FC = () => {
   useEffect(() => {
     fetch(filters, sort);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enterpriseId]);
+
+  useEffect(() => {
+    if (!enterpriseId) return;
+    setEnterpriseName(null);
+    getEnterpriseById(enterpriseId)
+      .then((e) => setEnterpriseName(e.name))
+      .catch((error) => ErrorHandler.handle(error));
   }, [enterpriseId]);
 
   // Dar nome a um NIF (drawer de fornecedores, no cabeçalho) reescreve o
@@ -379,7 +390,12 @@ const EnterpriseInvoicesPage: FC = () => {
       >
         <div>
           <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Obra</h6>
-          <h1 style={{ margin: 0 }}>Faturas</h1>
+          <h1 style={{ margin: 0 }}>
+            Faturas
+            {enterpriseName && (
+              <span style={{ fontWeight: 400, opacity: 0.55 }}> · {enterpriseName}</span>
+            )}
+          </h1>
         </div>
         {isAdmin() && (
           <Space>
