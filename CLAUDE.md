@@ -31,6 +31,13 @@ O motivo não é estético. Havia duas cópias da tabela de rotas do Backoffice 
 do mesmo facto divergem sempre, e nunca se sabe qual é a boa. O `.githooks/pre-commit` só vigia o
 `docs/`, o que torna qualquer cópia fora de lá ainda mais frágil.
 
+## Quando uma skill, doc ou regra atrapalha
+
+O Worksite é a referência do Workflow — as skills e o processo daqui foram generalizados para a
+biblioteca de lá. Se um deles **confunde, contradiz outro, não se aplica ou falta** — mesmo a meio de
+outra tarefa — acrescenta-se uma entrada a [[notes/workflow-feedback]] (o formato está no topo), com
+**como se resolveu**. Não interromper o trabalho para isso: registar e continuar.
+
 ## Começar aqui
 
 **[[00-INDEX]]** — o índice do vault. Tudo se alcança a partir de lá.

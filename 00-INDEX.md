@@ -87,6 +87,7 @@ Personal, git-ignored. O ciclo é `ideas → ToDo → plans → whatIveDone` —
 - **Roadmap & planos** → [[notes/roadmap/README.md]]
 - **Work log** → [[notes/whatIveDone.md]]
 - **Bugs** → [[notes/bugs.md]] · **Refactoring** → [[notes/refactoring.md]] · **Learnings** → [[notes/learning.md]]
+- **Dúvidas sobre skills/docs partilhados com o Workflow** → [[notes/workflow-feedback.md]]
 
 ---
 
