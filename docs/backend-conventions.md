@@ -114,6 +114,34 @@ por exemplo) não passa pelo proxy de cache nessa chamada interna — por isso a
 método que é a fronteira externa real (o controller chama-o), nunca só no método interno que ele
 invoca.
 
+### A chave inclui o método (`CacheConfig.keyGenerator`)
+
+> ⚠️ **O `SimpleKeyGenerator` do Spring constrói a chave só a partir dos argumentos.** O nome do
+> cache é o único namespace; o método **não entra na chave**. Com vários `@Cacheable` no mesmo
+> cache — e aqui há 5 no `budgetTree` e 6 no `enterprises` — dois métodos que recebam o mesmo
+> argumento escrevem na *mesma* entrada, e o segundo a ler recebe o valor do primeiro, do tipo
+> errado.
+>
+> Por isso o `CacheConfig` implementa `CachingConfigurer` e devolve um `keyGenerator` próprio que
+> prefixa a chave com `<Classe>#<método>`. **Não é preciso (nem se deve) pôr um `key = "…"` em cada
+> método**: o gerador cobre todos, incluindo o próximo que alguém acrescente sem se lembrar disto.
+> Um `@Cacheable` com `key` explícito (só o `signedUrls`) ignora o gerador e não é afetado.
+
+Havia três colisões, todas encontradas a 2026-10-01 a partir de um export que estourava
+(`CacheKeyCollisionTest` fixa as três, e verifica primeiro que o gerador do Spring de facto colide
+em cada uma — senão o teste passaria sem testar nada):
+
+| Cache | Os dois métodos | Chave partilhada | Sintoma |
+|---|---|---|---|
+| `budgetTree` | `listLots(enterpriseId)` e `getTree(enterpriseId)` | o `enterpriseId` | `ClassCastException: ArrayList cannot be cast to BudgetTreeDTO` em `GET …/export/summary`, depois de a página do orçamento ter carregado os lotes |
+| `enterprises` | `findBasicById(id)` e `findById(id)` | o `id` | `ClassCastException` entre `GET /enterprises/{id}` e `GET /enterprises/{id}/basic` |
+| `enterprises` | `findAllBasic()` e `findAllActive()` | `SimpleKey.EMPTY` (ambos sem argumentos) | **nenhum** — as duas devolvem `List`, o cast passa por erasure e `GET /enterprises/basic` e `GET /enterprises/active` serviam em silêncio os DTOs um do outro |
+
+A terceira é a lição: **duas assinaturas iguais que devolvam tipos genéricos iguais colidem sem
+erro**. Uma colisão que estoura descobre-se; esta só se vê nos campos que chegam ao cliente. Um
+`@Cacheable` novo num cache já existente não precisa de `key`, mas precisa que este gerador
+continue lá.
+
 ```java
 public String resolve(String bucket, String storageKey) {
     if (bucket == null || storageKey == null || storageKey.isBlank()) return null;
