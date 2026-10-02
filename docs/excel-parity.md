@@ -213,6 +213,41 @@ iguais letra a letra.
 > voltam a ser classificados pela heurística do importador (sem índice e sem números → sub-título;
 > nome entre parêntesis → nota), o que o teste de round-trip cobre.
 
+> **Terceiro layout: o orçamento de empreiteiro "solto" (2026-10-01)**. Além da "Orçamento inicial" do
+> vault (3 colunas) e do orçamento de empreiteiro de 7 colunas, chegam ficheiros com template próprio.
+> O `Orçamento Estrutura 2.xls` do **Loteamento Aleu — Lote 3** falhou o upload com
+> `BUDGET_IMPORT_NO_HEADER` e trazia seis diferenças de uma vez; o importador aceita-as desde então
+> (`BudgetImportContractorLayoutTest`, com o ficheiro real em `src/test/resources/excel-parity/`):
+>
+> | O que o ficheiro faz | O que o importador faz agora |
+> |---|---|
+> | abre com uma folha de capa vazia (`0000`) e põe a tabela na 2.ª (`ORÇAMENTO`) | escolhe a **primeira folha onde reconheça um cabeçalho**, não a folha 0 |
+> | deixa a coluna A vazia como margem, tabela a começar na B | procura o cabeçalho em **qualquer coluna**, exigindo que a linha nomeie ao menos outra coluna conhecida (senão uma descrição por "Art…" passava por cabeçalho) |
+> | chama `Artº` ao índice | o índice resolve-se **por prefixo** (`art*`), não por nome exacto |
+> | chama `P.U.` ao preço unitário e `VALOR` ao total | sinónimos reconhecidos — ver o aviso abaixo |
+> | escreve os capítulos `CAP. 1`, `CAP. 2`, `CAP.3` | `normalizeCode` tira o prefixo `CAP`/`Capítulo` |
+> | separa o 3.º nível por vírgula (`1.1,1`) | a vírgula vale como ponto |
+> | fecha a tabela em `VALOR TOTAL DO ORÇAMENTO` | lista **fechada** de formas (`(valor\|montante\|soma)? total (geral\|do orçamento\|da obra\|…)`). Deliberadamente não é um "contém TOTAL": um `TOTAL DO CAPÍTULO 1` fecharia a tabela a meio e comia o resto do orçamento |
+>
+> ⚠️ **A armadilha a lembrar não é nenhuma destas, é o modo de falhar.** Das sete coisas que este
+> ficheiro expôs, só a primeira dava **erro**; as outras importavam em silêncio um orçamento errado:
+>
+> - **o nome das colunas de preço.** Um cabeçalho com `Descrição` entra no modo estrito — o que não
+>   vem pelo nome **não existe**. Com `P.U.`/`VALOR` por reconhecer, `unitPrice` e `total` ficavam a
+>   `-1` e o orçamento entrava inteiro **a zero euros**: 1,5 M€ perdidos sem um único aviso. Ao
+>   acrescentar um layout, **a primeira coisa a conferir é se o `parsedTotal` bate com o `excelTotal`** —
+>   é a única rede que apanha isto.
+> - **uma fórmula de preço arrastada para uma linha vazia.** Na linha 51 do Aleu ficou um `=F51*D51`
+>   com `0` em cache. A linha não era ignorada (o guard só dispensava `totalPrice == null`), nascia uma
+>   rubrica fantasma "Sem descrição" pendurada na 3.7, e no `leafSum` bastava um filho **ter** total —
+>   ainda que zero — para o pai passar a valer a soma dos filhos: a 3.7 devolvia 0 em vez dos seus
+>   600 €. Vale para qualquer orçamento, não só para este. Desde 2026-10-01 **um total a zero conta
+>   como não ter preço** nas duas pontas (o guard das linhas em branco e o `leafSum`), via `isZero`.
+>
+> O importador **não recalcula fórmulas**: lê o valor que o POI tem em cache e confia na sua própria
+> soma, avisando quando ela não bate com o `TOTAL` do Excel. É esse aviso que denuncia um livro
+> gravado sem recalcular — e foi por ele que a fórmula arrastada apareceu.
+
 > ✅ **Pedido 2 da decisão 26 cumprido do lado do Excel a 2026-09-08.** A coluna `Rubrica` tem agora
 > **dropdown** com as rubricas válidas da obra (capítulos + artigos com preço — 151 no Vila Petrus) e
 > escreve sempre `<Art> — <Descrição>`, exatamente a forma que a exportação da app produz. A coluna passou

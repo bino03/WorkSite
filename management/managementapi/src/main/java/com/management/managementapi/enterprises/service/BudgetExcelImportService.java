@@ -131,8 +131,10 @@ public class BudgetExcelImportService {
     /**
      * A folha do orçamento: num livro exportado de uma obra com vários lotes há
      * uma {@code "Orçamento - <Lote>"} por lote, e escolhe-se a deste lote.
-     * Qualquer outro ficheiro (o do empreiteiro, o de uma obra de um só lote)
-     * continua a ser lido pela primeira folha, como sempre.
+     * Qualquer outro ficheiro (o do empreiteiro, o de uma obra de um só lote) é
+     * lido pela primeira folha onde se reconheça uma linha de cabeçalho — e não
+     * pela folha 0 às cegas, porque há livros de empreiteiro que abrem com uma
+     * folha de capa vazia (ex. "0000") e põem a tabela só na segunda.
      */
     static Sheet budgetSheet(Workbook workbook, String lotName) {
         if (lotName != null) {
@@ -141,6 +143,14 @@ public class BudgetExcelImportService {
                 return own;
             }
         }
+        for (int s = 0; s < workbook.getNumberOfSheets(); s++) {
+            Sheet sheet = workbook.getSheetAt(s);
+            if (findHeaderRow(sheet) >= 0) {
+                return sheet;
+            }
+        }
+        // Nenhuma folha tem cabeçalho: devolve-se a primeira para o erro sair com a
+        // mensagem de sempre, em vez de um "índice fora de limites".
         return workbook.getSheetAt(0);
     }
 
@@ -173,47 +183,96 @@ public class BudgetExcelImportService {
     }
 
     /**
-     * A linha de cabeçalho é a que tem "Art" na coluna A — ou "Rubrica", que é
-     * como a folha do vault da Vilatro (e a nossa exportação) lhe chama; o
-     * script {@code gerar-orcamento-vs-gasto.ps1} só reconhece esse nome.
+     * A linha de cabeçalho é a que nomeia a coluna do índice — "Art" (ou "Artº",
+     * "Artigo") ou "Rubrica", que é como a folha do vault da Vilatro e a nossa
+     * exportação lhe chamam; o script {@code gerar-orcamento-vs-gasto.ps1} só
+     * reconhece esse nome.
+     *
+     * Procura-se em <b>qualquer</b> coluna, não só na A: há orçamentos de
+     * empreiteiro que deixam a coluna A vazia como margem e começam a tabela na B.
+     * Para não tomar por cabeçalho uma descrição que comece por "Art...", exige-se
+     * que a mesma linha nomeie ao menos outra coluna conhecida.
      */
-    private int findHeaderRow(Sheet sheet) {
+    private static int findHeaderRow(Sheet sheet) {
         int limit = Math.min(sheet.getLastRowNum(), MAX_HEADER_SCAN_ROWS);
         for (int r = sheet.getFirstRowNum(); r <= limit; r++) {
             Row row = sheet.getRow(r);
             if (row == null) continue;
-            String a = text(row, Columns.DEFAULT.code());
-            if (a == null) continue;
-            String header = a.trim().toLowerCase();
-            if (header.startsWith("art") || header.equals("rubrica")) {
+
+            boolean hasCode = false;
+            boolean corroborated = false;
+            for (Cell cell : row) {
+                String name = headerName(cell);
+                if (name == null) continue;
+                if (isCodeHeader(name)) {
+                    hasCode = true;
+                } else if (isKnownHeader(name)) {
+                    corroborated = true;
+                }
+            }
+            if (hasCode && corroborated) {
                 return r;
             }
         }
         return -1;
     }
 
+    /** O nome normalizado de uma célula de cabeçalho, ou {@code null} se não for texto. */
+    private static String headerName(Cell cell) {
+        if (cell.getCellType() != CellType.STRING) return null;
+        String name = cell.getStringCellValue().trim().toLowerCase().replaceAll("[.\\s]+$", "");
+        return name.isEmpty() ? null : name;
+    }
+
+    /** "Art", "Artº", "Art.º", "Artigo" e "Rubrica" nomeiam todos a coluna do índice. */
+    private static boolean isCodeHeader(String name) {
+        return name.startsWith("art") || name.equals("rubrica");
+    }
+
+    /** Outra coluna da tabela do orçamento, que confirma que a linha é o cabeçalho. */
+    private static boolean isKnownHeader(String name) {
+        return name.startsWith("descri")
+                || name.startsWith("quant") || name.equals("qtd")
+                || name.equals("un") || name.equals("unidade")
+                || name.startsWith("preço") || name.startsWith("preco")
+                || name.startsWith("valor") || name.equals("total")
+                || name.startsWith("p/u") || name.startsWith("p.u");
+    }
+
     /** Cada coluna pelo nome que tiver na linha de cabeçalho; num cabeçalho reconhecido, o que não aparece não existe. */
     private static Columns resolveColumns(Row header) {
         Map<String, Integer> byName = new HashMap<>();
+        int codeCol = -1;
         for (Cell cell : header) {
-            if (cell.getCellType() != CellType.STRING) continue;
-            String name = cell.getStringCellValue().trim().toLowerCase().replaceAll("[.\\s]+$", "");
+            String name = headerName(cell);
+            if (name == null) continue;
             byName.putIfAbsent(name, cell.getColumnIndex());
+            // o índice resolve-se por prefixo ("Artº", "Artigo"), não por nome exacto
+            if (codeCol < 0 && isCodeHeader(name)) {
+                codeCol = cell.getColumnIndex();
+            }
         }
         // Cabeçalho reconhecido (tem a descrição ou o preço total pelo nome): o que
         // lá não estiver **não existe** — na folha de 3 colunas do vault, cair na
         // posição por omissão punha o "Preço total" dentro de "Un.". Só um cabeçalho
         // sem nomes conhecidos usa as posições do orçamento do empreiteiro.
         boolean named = byName.keySet().stream()
-                .anyMatch(n -> n.startsWith("descri") || n.startsWith("preço total") || n.startsWith("preco total"));
+                .anyMatch(n -> n.startsWith("descri") || n.startsWith("preço total") || n.startsWith("preco total")
+                        || n.startsWith("valor") || n.equals("total"));
         Columns d = named ? Columns.ABSENT : Columns.DEFAULT;
         return new Columns(
-                first(byName, Columns.DEFAULT.code(), "art", "rubrica"),
+                codeCol >= 0 ? codeCol : d.code(),
                 first(byName, d.name(), "descrição", "descricao"),
                 first(byName, d.unit(), "un", "unidade"),
                 first(byName, d.quantity(), "quant", "quantidade", "qtd"),
-                first(byName, d.unitPrice(), "preço un", "preco un", "preço unitário", "preco unitario"),
-                first(byName, d.total(), "preço total", "preco total", "total"),
+                // "P.U." e "VALOR" são como o orçamento de alguns empreiteiros nomeia o
+                // preço unitário e o total. Sem os reconhecer, e com o cabeçalho a ser
+                // "reconhecido" por ter "Descrição", as duas colunas ficavam a -1 e o
+                // orçamento entrava inteiro a zero euros — sem erro nenhum.
+                first(byName, d.unitPrice(), "preço un", "preco un", "preço unitário", "preco unitario",
+                        "preço unit", "preco unit", "p.u", "p/u", "pu",
+                        "valor un", "valor unitário", "valor unitario"),
+                first(byName, d.total(), "preço total", "preco total", "valor total", "total", "valor"),
                 first(byName, d.observations(), "obs", "observações", "observacoes"));
     }
 
@@ -256,7 +315,13 @@ public class BudgetExcelImportService {
                 // orçamento da Villa Petrus, que juntas valem 57.570,21 €). Descartá-las
                 // furava o total, por isso entram com um nome de recurso — só se
                 // ignora a linha quando não tem índice nem preço, aí é mesmo lixo.
-                if (code == null && totalPrice == null) {
+                //
+                // Um total a **zero** conta como não ter preço: uma fórmula de preço
+                // arrastada uma linha a mais (o "=F51*D51" do Aleu Lote 3, numa linha
+                // de separação vazia) deixa a célula com 0 em cache, e a linha entrava
+                // como rubrica fantasma — que depois mascarava o preço da rubrica de
+                // cima no rollup. Ver {@link #leafSum}.
+                if (code == null && isZero(totalPrice)) {
                     if (quantity != null || unitPrice != null) {
                         result.warnings.add("Linha " + excelRow
                                 + ": ignorada — sem índice, sem descrição e sem preço total.");
@@ -472,6 +537,11 @@ public class BudgetExcelImportService {
      * Soma só as folhas com preço — mesma regra dos rollups da árvore. Somar
      * também os capítulos duplicaria, porque o Excel guarda o total do capítulo
      * na própria linha <i>e</i> o detalhe nas rubricas por baixo.
+     *
+     * Um filho que vale <b>zero</b> não conta como "o detalhe está nos filhos":
+     * contava, e então uma só linha a 0 € pendurada numa rubrica fazia o pai
+     * devolver 0 em vez do seu próprio preço — foi assim que a 3.7 do Aleu Lote 3
+     * (600 €) desapareceu do total por causa de uma fórmula arrastada.
      */
     private BigDecimal leafSum(Draft draft) {
         BigDecimal childSum = BigDecimal.ZERO;
@@ -479,7 +549,7 @@ public class BudgetExcelImportService {
         for (Draft child : draft.children) {
             BigDecimal sub = leafSum(child);
             childSum = childSum.add(sub);
-            if (sub.signum() != 0 || child.totalPrice != null) {
+            if (sub.signum() != 0 || !isZero(child.totalPrice)) {
                 childHasPrice = true;
             }
         }
@@ -543,14 +613,42 @@ public class BudgetExcelImportService {
         return null;
     }
 
+    /**
+     * A linha que fecha a tabela — abaixo dela só há notas do orçamento.
+     *
+     * Além do "TOTAL" seco, aceita-se a fórmula por extenso dos orçamentos de
+     * empreiteiro ("VALOR TOTAL DO ORÇAMENTO"): sem a reconhecer, o total entrava
+     * como se fosse mais uma rubrica e o valor da obra saía <i>a dobrar</i>, e a
+     * conferência contra o TOTAL do Excel nunca corria.
+     *
+     * A lista é deliberadamente fechada em vez de um "contém TOTAL": um
+     * "TOTAL DO CAPÍTULO 1" fecharia a tabela a meio e comia o resto do orçamento.
+     */
     private static boolean isTotalRow(String code, String name) {
-        return isBlank(code) && name != null && name.trim().equalsIgnoreCase("TOTAL");
+        if (!isBlank(code) || name == null) return false;
+        String n = name.trim().toLowerCase();
+        return n.matches("(valor|montante|soma)?\\s*total\\s*(geral|d[oa]\\s+(or[çc]amento|obra|empreitada))?");
     }
 
-    /** "1." → "1" · "4.2.1" → "4.2.1" · qualquer coisa não numérica → null. */
+    /**
+     * "1." → "1" · "4.2.1" → "4.2.1" · qualquer coisa não numérica → null.
+     *
+     * Dois dialectos de numeração que aparecem nos orçamentos de empreiteiro e que
+     * de outro modo passavam por texto — e a rubrica perdia o índice, e com ele o
+     * lugar na árvore:
+     * <ul>
+     *   <li>o capítulo escrito por extenso — {@code "CAP. 1"}, {@code "CAP.3"},
+     *       {@code "Capítulo 2"} — vale o número, senão o capítulo entrava como
+     *       sub-título, o {@code currentChapter} ficava a null e as rubricas
+     *       {@code 1.1}, {@code 2.1}… penduravam todas na raiz;</li>
+     *   <li>a vírgula como separador de nível — {@code "1.1,1"} → {@code "1.1.1"}.</li>
+     * </ul>
+     */
     private static String normalizeCode(String raw) {
         if (isBlank(raw)) return null;
         String code = raw.trim().replaceAll("\\s+", "");
+        code = code.replaceAll("(?i)^cap(?:[íi]tulo)?\\.*", "");
+        code = code.replace(',', '.');
         while (code.endsWith(".")) {
             code = code.substring(0, code.length() - 1);
         }
@@ -576,6 +674,11 @@ public class BudgetExcelImportService {
 
     private static boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
+    }
+
+    /** Sem preço ou a zero — para o Excel, uma célula vazia e um 0 valem o mesmo. */
+    private static boolean isZero(BigDecimal value) {
+        return value == null || value.signum() == 0;
     }
 
     // ── estruturas internas ───────────────────────────────────
