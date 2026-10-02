@@ -21,6 +21,8 @@ import type {
   PendingInvoicesSummary,
   RubricSuggestion,
 } from "@/types/invoice";
+import type { DocumentsExportSummary, DownloadedFile } from "@/types/budget";
+import { fileNameFromDisposition } from "@/utils/downloadBlob";
 
 export type InvoicePage = SpringPage<ConstructionInvoice>;
 
@@ -414,4 +416,51 @@ export async function importExpensesExcel(
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data;
+}
+
+/* ========= Download dos documentos (PDFs e fotos) ========= */
+
+/**
+ * Que faturas entram no zip dos documentos. O lote de uma fatura vem das
+ * rubricas onde está classificada; `UNCLASSIFIED` são as que ainda não estão
+ * associadas a rubrica nenhuma — sem essa opção, os documentos dessas faturas
+ * não saíam em zip nenhum.
+ */
+export type InvoiceDocumentsScope = "ALL" | "ASSOCIATED" | "UNCLASSIFIED" | "SELECTED";
+
+/** Quantos documentos tem um âmbito, para rotular a opção antes de descarregar. */
+export async function getDocumentsSummary(
+  enterpriseId: string,
+  scope: InvoiceDocumentsScope,
+  budgetId?: string,
+  invoiceIds?: string[]
+): Promise<DocumentsExportSummary> {
+  const response = await api.get(
+    `/construction-invoices/enterprise/${enterpriseId}/documents/summary`,
+    { params: { scope, budgetId, invoiceIds: invoiceIds?.join(",") } }
+  );
+  return response.data;
+}
+
+/**
+ * Os documentos num `.zip`, com os ficheiros na **raiz** — ao contrário do zip da
+ * pasta da obra (`exportFolderZip`), que é a estrutura do vault e os põe em
+ * `Faturas/Lançadas/`. O nome vem do `Content-Disposition` e diz o âmbito:
+ * `Faturas - <Obra>[ - <Lote> | - Por classificar].zip`.
+ */
+export async function downloadDocumentsZip(
+  enterpriseId: string,
+  scope: InvoiceDocumentsScope,
+  budgetId: string | undefined,
+  invoiceIds: string[] | undefined,
+  fallbackFileName: string
+): Promise<DownloadedFile> {
+  const response = await api.get(
+    `/construction-invoices/enterprise/${enterpriseId}/documents/zip`,
+    { params: { scope, budgetId, invoiceIds: invoiceIds?.join(",") }, responseType: "blob" }
+  );
+  return {
+    blob: response.data,
+    fileName: fileNameFromDisposition(response.headers["content-disposition"], fallbackFileName),
+  };
 }

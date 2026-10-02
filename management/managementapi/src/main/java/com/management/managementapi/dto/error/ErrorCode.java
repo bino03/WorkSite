@@ -318,6 +318,11 @@ public enum ErrorCode {
     INVOICE_IMPORT_UNANSWERED("INVOICE_044", "Há perguntas da importação por responder — nada foi gravado"),
     INVOICE_IMPORT_TEST_ENTERPRISE("INVOICE_045", "Não se importa a folha de uma obra real para uma obra de teste"),
     INVOICE_IMPORT_TOTALS_MISMATCH("INVOICE_046", "Os totais gravados não batem certo com a folha — a importação foi anulada"),
+    // Melhor recusar do que devolver um zip de 22 bytes: um download que "funciona"
+    // e vem vazio é mais difícil de perceber do que um erro (visto a 2026-10-02).
+    INVOICE_DOCUMENTS_EMPTY_SCOPE("INVOICE_047", "Não há documentos para descarregar neste âmbito"),
+    INVOICE_DOCUMENTS_NO_SELECTION("INVOICE_048", "Escolha pelo menos uma fatura na lista"),
+    INVOICE_DOCUMENTS_TOO_MANY("INVOICE_049", "Demasiadas faturas selecionadas de uma vez"),
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================

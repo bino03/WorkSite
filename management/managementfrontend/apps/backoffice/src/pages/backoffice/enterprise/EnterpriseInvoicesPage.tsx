@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge, Button, Input, Space } from "antd";
-import { ArrowLeftOutlined, FilterOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, DownloadOutlined, FilterOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
 
 import {
   batchAllocateInvoices,
@@ -24,6 +24,7 @@ import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
 import { ExpensesImportModal } from "@/components/invoices/ExpensesImportModal";
+import { InvoiceDocumentsDownloadModal } from "@/components/invoices/InvoiceDocumentsDownloadModal";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
@@ -89,6 +90,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -406,6 +408,9 @@ const EnterpriseInvoicesPage: FC = () => {
             >
               Classificar
             </Button>
+            <Button icon={<DownloadOutlined />} onClick={() => setDocumentsOpen(true)}>
+              Descarregar PDFs
+            </Button>
             <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
               Importar Excel
             </Button>
@@ -537,6 +542,18 @@ const EnterpriseInvoicesPage: FC = () => {
             enterpriseId={enterpriseId}
             onClose={() => setRegisterOpen(false)}
             onCreated={reload}
+          />
+
+          <InvoiceDocumentsDownloadModal
+            open={documentsOpen}
+            enterpriseId={enterpriseId!}
+            enterpriseName={enterpriseName ?? ""}
+            selectedInvoiceIds={selectedIds}
+            onClose={() => setDocumentsOpen(false)}
+            onGoToClassify={() => {
+              setDocumentsOpen(false);
+              navigate(`/backoffice/empreendimentos/${enterpriseId}/classify`);
+            }}
           />
 
           <ExpensesImportModal

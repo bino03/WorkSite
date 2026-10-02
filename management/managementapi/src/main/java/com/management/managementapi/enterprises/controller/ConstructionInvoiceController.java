@@ -1,5 +1,18 @@
 package com.management.managementapi.enterprises.controller;
 
+import com.management.managementapi.dto.error.ErrorCode;
+import com.management.managementapi.enterprises.dto.budget.response.DocumentsExportSummaryDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceDocumentsScope;
+import com.management.managementapi.enterprises.model.Enterprise;
+import com.management.managementapi.enterprises.repository.EnterpriseRepository;
+import com.management.managementapi.enterprises.service.ConstructionBudgetItemService;
+import com.management.managementapi.enterprises.service.InvoiceDocumentsExportService;
+import com.management.managementapi.exeption.BusinessException;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSearchFilter;
@@ -72,6 +85,9 @@ public class ConstructionInvoiceController {
 
     private final ConstructionInvoiceService service;
     private final DespesasExcelImportService importService;
+    private final InvoiceDocumentsExportService documentsExportService;
+    private final EnterpriseRepository enterpriseRepository;
+    private final ConstructionBudgetItemService budgetService;
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
 
@@ -278,6 +294,96 @@ public class ConstructionInvoiceController {
                 allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
                 minAmount, maxAmount, budgetItemId), pageable);
+    }
+
+    // ── download dos documentos (PDFs e fotos das faturas) ────
+
+    /**
+     * Quantos documentos tem cada âmbito, para o modal poder rotular as opções
+     * antes de alguém descarregar dezenas de MB. Não toca no Storage: conta pelo
+     * plano, que só lê a base de dados.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/documents/summary")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<DocumentsExportSummaryDTO> documentsSummary(
+            @PathVariable UUID enterpriseId,
+            @RequestParam(defaultValue = "ALL") InvoiceDocumentsScope scope,
+            @RequestParam(required = false) UUID budgetId,
+            @RequestParam(required = false) List<UUID> invoiceIds) {
+        checkSelection(scope, invoiceIds);
+        return ResponseEntity.ok(
+                documentsExportService.plan(enterpriseId, scope, budgetId, invoiceIds, "").toSummary());
+    }
+
+    /**
+     * O {@code SELECTED} leva os ids no query string, por isso tem de ter um teto:
+     * um URL com milhares de UUIDs bate no limite do servidor e falha com um erro
+     * que não diz nada. {@value #MAX_SELECTED_INVOICES} dá ~11 KB de URL, folgado
+     * para o Tomcat, e é mais do que uma pessoa seleciona à mão.
+     */
+    private static void checkSelection(InvoiceDocumentsScope scope, List<UUID> invoiceIds) {
+        if (scope != InvoiceDocumentsScope.SELECTED) {
+            return;
+        }
+        if (invoiceIds == null || invoiceIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVOICE_DOCUMENTS_NO_SELECTION);
+        }
+        if (invoiceIds.size() > MAX_SELECTED_INVOICES) {
+            throw new BusinessException(ErrorCode.INVOICE_DOCUMENTS_TOO_MANY);
+        }
+    }
+
+    private static final int MAX_SELECTED_INVOICES = 300;
+
+    /**
+     * Os documentos das faturas num {@code .zip}, no âmbito pedido:
+     * {@code ALL} (a obra toda), {@code LOT} (só as classificadas em rubricas desse
+     * lote, com {@code budgetId}) ou {@code UNCLASSIFIED} (as que ainda não estão
+     * associadas a rubrica nenhuma).
+     *
+     * O {@code UNCLASSIFIED} não é um extra: uma fatura sem rubrica não pertence a
+     * lote nenhum, por isso sem ele havia documentos que não saíam em zip nenhum.
+     *
+     * Os ficheiros ficam na <b>raiz</b> do zip, ao contrário do
+     * {@code /construction-budget/enterprise/{id}/export/zip}, que é a pasta da obra
+     * do vault e os põe em {@code Faturas/Lançadas/} (§7 de [[excel-parity]]). Este
+     * é um download de conveniência — o nome do zip diz o âmbito.
+     *
+     * Vai em streaming: as três obras somam ~80 MB de documentos, e o Storage
+     * descarrega-se um ficheiro de cada vez já fora da transação.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/documents/zip")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<StreamingResponseBody> documentsZip(
+            @PathVariable UUID enterpriseId,
+            @RequestParam(defaultValue = "ALL") InvoiceDocumentsScope scope,
+            @RequestParam(required = false) UUID budgetId,
+            @RequestParam(required = false) List<UUID> invoiceIds) {
+
+        checkSelection(scope, invoiceIds);
+        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
+        String lotName = scope == InvoiceDocumentsScope.ASSOCIATED && budgetId != null
+                ? budgetService.getLot(budgetId).getName()
+                : null;
+
+        InvoiceDocumentsExportService.DocumentsZip zip =
+                documentsExportService.planDocumentsOnly(enterprise, scope, budgetId, lotName, invoiceIds);
+
+        // Um zip vazio desce com 200 e 22 bytes: o browser "descarrega" e o utilizador
+        // fica sem saber se falhou. Recusar aqui é a única altura em que ainda se pode
+        // dizer porquê — depois de o streaming começar, os cabeçalhos já seguiram.
+        if (zip.plan().entries().isEmpty()) {
+            throw new BusinessException(ErrorCode.INVOICE_DOCUMENTS_EMPTY_SCOPE);
+        }
+
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(zip.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(out -> documentsExportService.writeDocumentsZip(zip.plan(), out));
     }
 
     /**

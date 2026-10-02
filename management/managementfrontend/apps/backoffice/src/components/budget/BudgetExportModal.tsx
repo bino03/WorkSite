@@ -1,20 +1,38 @@
 import { useEffect, useState } from "react";
 import type { FC, ReactNode } from "react";
-import { Alert, Button, Checkbox, Modal, Space, Spin, Steps, Tooltip } from "antd";
+import { Alert, Button, Checkbox, Modal, Radio, Select, Space, Spin, Steps, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
-import { exportFolderZip, exportWorkbook, getExportSummary } from "@/services/budgetService";
+import {
+  exportFolderZip,
+  exportLotBudget,
+  exportWorkbook,
+  getExportSummary,
+  listBudgetLots,
+} from "@/services/budgetService";
+import { getDocumentsSummary, type InvoiceDocumentsScope } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { downloadBlob } from "@/utils/downloadBlob";
 import { formatCurrency } from "@/utils/formatters";
-import type { BudgetExportSheet, BudgetExportSummary } from "@/types/budget";
+import type { BudgetExportSheet, BudgetExportSummary, BudgetLot } from "@/types/budget";
 
 interface Props {
   open: boolean;
   enterpriseId: string;
+  /**
+   * Os lotes da obra, para o download de um lote só. Opcional: a página do
+   * orçamento já os tem carregados e passa-os para não os pedir outra vez; quem
+   * abre o modal sem eles (a lista de obras) deixa o modal buscá-los.
+   */
+  lots?: BudgetLot[];
+  /** O lote aberto na página: é o que o selector traz já escolhido. */
+  currentLotId?: string | null;
   onClose: () => void;
 }
+
+/** O que se leva: a obra toda num livro, ou o orçamento de um lote só. */
+type ExportScope = "ENTERPRISE" | "LOT";
 
 interface SheetOption {
   value: BudgetExportSheet;
@@ -55,8 +73,22 @@ const SHEETS: SheetOption[] = [
  * "Incluir documentos" troca o `.xlsx` por um `<slug>.zip` com o livro e a
  * `Faturas/Lançadas/` (os documentos das faturas com o nome do vault, §7) —
  * a pasta da obra tal como vive em `Empreendimentos\<slug>\`.
+ *
+ * Em alternativa leva-se **um lote só**, num `Orçamento - <Obra> - <Lote>.xlsx`,
+ * com as **mesmas folhas** recortadas a esse lote.
+ *
+ * Esse caminho não passa pelo resumo: o resumo é da obra inteira (faturas,
+ * despesas, documentos) e os seus números não são os do lote — mostrá-lo antes de
+ * um download de um lote era enganador. Os números do lote vão logo debaixo do
+ * selector. Os documentos ficam de fora porque o `.zip` é da pasta da obra.
  */
-export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) => {
+export const BudgetExportModal: FC<Props> = ({
+  open,
+  enterpriseId,
+  lots: lotsProp,
+  currentLotId = null,
+  onClose,
+}) => {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState<BudgetExportSheet[]>(["BUDGET", "EXPENSES", "COMPARISON"]);
@@ -64,12 +96,36 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [withDocuments, setWithDocuments] = useState(false);
+  const [scope, setScope] = useState<ExportScope>("ENTERPRISE");
+  const [lotId, setLotId] = useState<string | null>(null);
+  /** `FOLLOW` = os documentos acompanham o âmbito do livro; o resto é uma escolha explícita. */
+  const [docsChoice, setDocsChoice] = useState<"FOLLOW" | InvoiceDocumentsScope>("FOLLOW");
+  const [docsCount, setDocsCount] = useState<number | null>(null);
+  /** Só se usa quando a página não passou os lotes. */
+  const [fetchedLots, setFetchedLots] = useState<BudgetLot[]>([]);
+  const lots = lotsProp ?? fetchedLots;
 
   useEffect(() => {
     if (!open) return;
     setStep(0);
     setSummary(null);
     setWithDocuments(false);
+    setScope("ENTERPRISE");
+    setDocsChoice("FOLLOW");
+    setDocsCount(null);
+    // começa no lote que está aberto na página, não no primeiro da lista
+    setLotId(currentLotId ?? lotsProp?.[0]?.id ?? null);
+    if (!lotsProp) {
+      setFetchedLots([]);
+      // falhar a lista de lotes não estraga a exportação da obra, que é o caminho
+      // principal deste modal — só desativa o "um lote só"
+      listBudgetLots(enterpriseId)
+        .then((loaded) => {
+          setFetchedLots(loaded);
+          setLotId((current) => current ?? loaded[0]?.id ?? null);
+        })
+        .catch(() => setFetchedLots([]));
+    }
     let cancelled = false;
     setLoadingSummary(true);
     getExportSummary(enterpriseId)
@@ -115,12 +171,49 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
     });
   };
 
+  const lot = lots.find((l) => l.id === lotId) ?? null;
+  const lotScope = scope === "LOT";
+
+  /**
+   * Que documentos acompanham o livro. O padrão **segue o âmbito do livro** — é a
+   * escolha que quase sempre se quer: o Excel de um lote com os PDFs desse lote, o
+   * da obra com os da obra. Pode-se trocar, e trocar para outra coisa que não
+   * "todos" tira ao zip o nome da pasta do vault, de propósito.
+   */
+  const docsScope: InvoiceDocumentsScope = docsChoice === "FOLLOW"
+    ? (lotScope ? "ASSOCIATED" : "ALL")
+    : docsChoice;
+  const docsBudgetId = docsScope === "ASSOCIATED" && lotScope ? (lotId ?? undefined) : undefined;
+
+  // quantos documentos o âmbito escolhido traz — só se pergunta quando se vão levar
+  useEffect(() => {
+    if (!open || !withDocuments) {
+      setDocsCount(null);
+      return;
+    }
+    let cancelled = false;
+    getDocumentsSummary(enterpriseId, docsScope, docsBudgetId)
+      .then((s) => {
+        if (!cancelled) setDocsCount(s.documentCount);
+      })
+      .catch(() => {
+        if (!cancelled) setDocsCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, withDocuments, enterpriseId, docsScope, docsBudgetId]);
+
   const download = async () => {
     if (!summary) return;
     setDownloading(true);
     try {
       const file = withDocuments
-        ? await exportFolderZip(enterpriseId, selected, `${summary.enterpriseName}.zip`)
+        ? await exportFolderZip(enterpriseId, selected, `${summary.enterpriseName}.zip`, {
+            docs: docsScope,
+            docsBudgetId,
+          })
         : await exportWorkbook(enterpriseId, selected, summary.fileName);
       downloadBlob(file.blob, file.fileName);
       notificationService.success("Exportação", `Ficheiro "${file.fileName}" gerado.`);
@@ -135,6 +228,33 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
   const wantsBudget = selected.includes("BUDGET") || includesComparison;
   const wantsExpenses = selected.includes("EXPENSES");
 
+  const downloadLot = async () => {
+    if (!lot) return;
+    setDownloading(true);
+    try {
+      // com documentos é um zip (livro do lote + PDFs); sem eles, só o .xlsx
+      const file = withDocuments
+        ? await exportFolderZip(
+            enterpriseId,
+            selected,
+            `${summary?.enterpriseName ?? ""} - ${lot.name}.zip`,
+            { budgetId: lot.id, docs: docsScope, docsBudgetId }
+          )
+        : await exportLotBudget(
+        lot.id,
+        selected,
+        `Orçamento - ${summary?.enterpriseName ?? ""} - ${lot.name}.xlsx`
+      );
+      downloadBlob(file.blob, file.fileName);
+      notificationService.success("Exportação", `Ficheiro "${file.fileName}" gerado.`);
+      onClose();
+    } catch (error) {
+      ErrorHandler.handle(error);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -147,13 +267,24 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
           {step === 0 ? (
             <>
               <Button onClick={onClose}>{t("common.cancel")}</Button>
-              <Button
-                type="primary"
-                onClick={() => setStep(1)}
-                disabled={loadingSummary || !summary || selected.length === 0}
-              >
-                Continuar
-              </Button>
+              {lotScope ? (
+                <Button
+                  type="primary"
+                  onClick={downloadLot}
+                  loading={downloading}
+                  disabled={!lot || lot.itemCount === 0 || selected.length === 0}
+                >
+                  Descarregar
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  onClick={() => setStep(1)}
+                  disabled={loadingSummary || !summary || selected.length === 0}
+                >
+                  Continuar
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -183,9 +314,58 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
 
         {summary && step === 0 && (
           <>
+            <Radio.Group
+              value={scope}
+              onChange={(e) => setScope(e.target.value as ExportScope)}
+              style={{ display: "flex", flexDirection: "column", gap: "6.8px" }}
+            >
+              <Radio value="ENTERPRISE">
+                <span style={{ fontWeight: 600 }}>A obra toda</span>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  Um livro com as folhas que escolheres — é o ficheiro que vai para o vault.
+                </div>
+              </Radio>
+              <Radio value="LOT" disabled={lots.length === 0}>
+                <span style={{ fontWeight: 600 }}>Um lote só</span>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  Um ficheiro por lote, com a obra e o lote no nome. As folhas são as mesmas,
+                  recortadas a esse lote.
+                </div>
+              </Radio>
+            </Radio.Group>
+
+            {lotScope && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6.8px" }}>
+                <Select
+                  value={lotId ?? undefined}
+                  onChange={setLotId}
+                  placeholder="Escolher o lote"
+                  options={lots.map((l) => ({
+                    value: l.id,
+                    label: l.itemCount === 0 ? `${l.name} (sem rubricas)` : l.name,
+                    disabled: l.itemCount === 0,
+                  }))}
+                />
+                {lot && lot.itemCount > 0 && (
+                  <div style={{ fontSize: 12, opacity: 0.6 }}>
+                    {lot.itemCount} rubrica(s) · {formatCurrency(lot.budgetTotal)} ·{" "}
+                    {`Orçamento - ${summary.enterpriseName} - ${lot.name}.xlsx`}
+                  </div>
+                )}
+                {lot && lot.itemCount === 0 && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    message="Este lote não tem rubricas — não há orçamento para exportar."
+                  />
+                )}
+              </div>
+            )}
+
             <div style={{ display: "flex", flexDirection: "column", gap: "6.8px" }}>
               {SHEETS.map((sheet) => {
-                const blocked = sheet.needsBudget && !hasBudget;
+                // no modo lote o que decide é o lote ter rubricas, não a obra
+                const blocked = sheet.needsBudget && (lotScope ? !lot || lot.itemCount === 0 : !hasBudget);
                 const forced = sheet.value === "EXPENSES" && includesComparison;
                 const box = (
                   <Checkbox
@@ -200,7 +380,9 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
                 return (
                   <div key={sheet.value}>
                     {blocked ? (
-                      <Tooltip title="Esta obra não tem orçamento.">{box}</Tooltip>
+                      <Tooltip title={lotScope ? "Este lote não tem rubricas." : "Esta obra não tem orçamento."}>
+                        {box}
+                      </Tooltip>
                     ) : forced ? (
                       <Tooltip title="Obrigatória com o painel Orçamento vs Gasto.">{box}</Tooltip>
                     ) : (
@@ -217,19 +399,62 @@ export const BudgetExportModal: FC<Props> = ({ open, enterpriseId, onClose }) =>
                 message="Sem orçamento, só a folha Despesas pode ser exportada."
               />
             )}
+            {lotScope && (
+              <Alert
+                type="info"
+                showIcon
+                message="Na Despesas e no painel entram só as rubricas deste lote — as dos outros
+                  lotes e as faturas por classificar ficam de fora, por isso o total não é o da obra."
+              />
+            )}
+
             <div style={{ borderTop: "1px solid var(--ind-color-divider)", paddingTop: "6.8px" }}>
               <Checkbox
                 checked={withDocuments}
                 disabled={summary.documents.documentCount === 0}
                 onChange={(e) => setWithDocuments(e.target.checked)}
               >
-                <span style={{ fontWeight: 600 }}>Incluir documentos (pasta da obra em .zip)</span>
+                <span style={{ fontWeight: 600 }}>Incluir os PDFs das faturas (tudo num .zip)</span>
                 <div style={{ fontSize: 12, opacity: 0.6 }}>
                   {summary.documents.documentCount === 0
                     ? "Nenhuma fatura desta obra tem ficheiro — só o Excel."
-                    : `O Excel mais Faturas/Lançadas/ com ${summary.documents.documentCount} ficheiro(s) com o nome do vault — extrai-se em Empreendimentos\\<obra>\\.`}
+                    : "O Excel mais os documentos em Faturas/Lançadas/, com o nome do vault."}
                 </div>
               </Checkbox>
+
+              {withDocuments && (
+                <div style={{ marginLeft: 24, marginTop: "6.8px", display: "flex", flexDirection: "column", gap: "6.8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, opacity: 0.7 }}>quais:</span>
+                    <Select
+                      value={docsChoice}
+                      onChange={setDocsChoice}
+                      style={{ minWidth: 280 }}
+                      options={[
+                        {
+                          value: "FOLLOW",
+                          label: lotScope
+                            ? `as do lote escolhido (${lot?.name ?? "—"})`
+                            : "todas as faturas da obra",
+                        },
+                        { value: "ALL", label: "todas as faturas da obra" },
+                        { value: "ASSOCIATED", label: "só as já associadas a rubricas" },
+                        { value: "UNCLASSIFIED", label: "só as que ainda não estão associadas" },
+                      ]}
+                    />
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.6 }}>
+                    {docsCount === null
+                      ? "A contar…"
+                      : docsCount === 0
+                        ? "Este âmbito não tem documentos — o zip vai só com o Excel."
+                        : `${docsCount} ficheiro(s).`}
+                    {!lotScope && docsChoice === "FOLLOW" && (
+                      <> Com tudo da obra, o zip é a pasta do vault (<code>&lt;obra&gt;.zip</code>).</>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

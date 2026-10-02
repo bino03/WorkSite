@@ -45,7 +45,14 @@ public class ExportRateLimitFilter extends OncePerRequestFilter {
 
     private static final List<PathPattern> PATTERNS = List.of(
             new PathPatternParser().parse("/construction-budget/enterprise/{enterpriseId}/export"),
-            new PathPatternParser().parse("/construction-budget/enterprise/{enterpriseId}/export/zip")
+            new PathPatternParser().parse("/construction-budget/enterprise/{enterpriseId}/export/zip"),
+            // o orçamento de um lote só: mais leve que os outros dois, mas é o mesmo
+            // trabalho de gerar um livro — não fica de fora do limite
+            new PathPatternParser().parse("/construction-budget/budgets/{budgetId}/export"),
+            // o zip dos documentos: é o mais pesado de todos (faz streaming de dezenas
+            // de MB do Storage), por isso é o que menos pode ficar de fora. O
+            // `/documents/summary` fica, que só lê a base de dados.
+            new PathPatternParser().parse("/construction-invoices/enterprise/{enterpriseId}/documents/zip")
     );
 
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()

@@ -1,10 +1,16 @@
 package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.enterprises.dto.budget.response.DocumentsExportSummaryDTO;
+import com.management.managementapi.dto.error.ErrorCode;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceDocumentsScope;
+import com.management.managementapi.enterprises.model.ConstructionExpense;
+import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.ConstructionInvoiceDocument;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceDocumentRepository;
+import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
+import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +24,7 @@ import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +59,7 @@ import java.util.zip.ZipOutputStream;
 public class InvoiceDocumentsExportService {
 
     static final String FOLDER = "Faturas/Lançadas/";
-    static final String MISSING_REPORT = "Faturas/Lançadas/_EM-FALTA.txt";
+    static final String MISSING_REPORT = "_EM-FALTA.txt";
     static final String NO_NUMBER = "SEM-N";
     static final String NO_SUPPLIER = "Fornecedor";
     private static final int MAX_NAME_LENGTH = 150;
@@ -71,6 +78,7 @@ public class InvoiceDocumentsExportService {
 
     private final ConstructionInvoiceRepository invoiceRepository;
     private final ConstructionInvoiceDocumentRepository documentRepository;
+    private final ConstructionExpenseRepository expenseRepository;
     private final SupabaseStorageService storageService;
 
     /** Um ficheiro do zip: o caminho lá dentro e onde está no Storage. */
@@ -85,9 +93,121 @@ public class InvoiceDocumentsExportService {
 
     // ── nomes ─────────────────────────────────────────────────
 
+    /** Todas as faturas da obra — o zip da pasta da obra, como sempre. */
     @Transactional(readOnly = true)
     public Plan plan(UUID enterpriseId) {
-        List<ConstructionInvoice> invoices = invoiceRepository.findAllByEnterpriseIdForExport(enterpriseId);
+        return plan(enterpriseId, InvoiceDocumentsScope.ALL, null, FOLDER);
+    }
+
+    /**
+     * O download só dos documentos de um âmbito: o plano com os ficheiros na raiz
+     * do zip e o nome que o zip vai ter.
+     *
+     * @param lotName o nome do lote, só para o nome do ficheiro quando o âmbito é
+     *                {@code ASSOCIATED} com lote — o filtro é pelo {@code budgetId}.
+     */
+    @Transactional(readOnly = true)
+    public DocumentsZip planDocumentsOnly(Enterprise enterprise, InvoiceDocumentsScope scope,
+                                          UUID budgetId, String lotName, List<UUID> invoiceIds) {
+        Plan plan = plan(enterprise.getId(), scope, budgetId, invoiceIds, "");
+        return new DocumentsZip(documentsZipName(enterprise, scope, budgetId, lotName, plan), plan);
+    }
+
+    /** O zip dos documentos pronto a escrever: o nome e o plano. */
+    public record DocumentsZip(String fileName, Plan plan) {}
+
+    /**
+     * {@code [TESTE - ]Faturas - <Obra><sufixo>.zip}.
+     *
+     * O nome tem de dizer o âmbito: vários zips da mesma obra na pasta de
+     * downloads, todos chamados "Faturas - Vila Aleu.zip", eram indistinguíveis.
+     */
+    static String documentsZipName(Enterprise enterprise, InvoiceDocumentsScope scope,
+                                   UUID budgetId, String lotName, Plan plan) {
+        String suffix = switch (scope == null ? InvoiceDocumentsScope.ALL : scope) {
+            case ALL -> "";
+            case UNCLASSIFIED -> " - Por classificar";
+            case SELECTED -> " - " + plan.entries().size() + " selecionadas";
+            // sem lote, o âmbito são as associadas de *todos* os lotes
+            case ASSOCIATED -> budgetId == null
+                    ? " - Associadas"
+                    : " - " + BudgetExcelExportService.safeName(lotName == null ? "Lote" : lotName);
+        };
+        return BudgetExcelExportService.testPrefix(enterprise)
+                + "Faturas - " + BudgetExcelExportService.folderName(enterprise) + suffix + ".zip";
+    }
+
+    /**
+     * O plano dos documentos de uma obra, limitado a um âmbito.
+     *
+     * O lote de uma fatura deduz-se das rubricas onde está classificada
+     * ({@code expense → budget_item → budget}), numa só query pelas despesas de
+     * todas as faturas da obra. Uma fatura repartida por rubricas de dois lotes
+     * conta para os dois.
+     *
+     * @param folder o prefixo dentro do zip. O zip da pasta da obra usa
+     *               {@code Faturas/Lançadas/}, que é a estrutura do vault (§7); um
+     *               download só dos PDFs passa {@code ""} e deixa-os na raiz — o
+     *               nome do zip já diz de que âmbito são, e inventar uma pasta
+     *               "Por classificar" no vault não era nosso para inventar.
+     */
+    @Transactional(readOnly = true)
+    public Plan plan(UUID enterpriseId, InvoiceDocumentsScope scope, UUID budgetId,
+                     List<UUID> invoiceIds, String folder) {
+        List<ConstructionInvoice> all = invoiceRepository.findAllByEnterpriseIdForExport(enterpriseId);
+        return planFor(filterByScope(all, scope, budgetId, invoiceIds), folder);
+    }
+
+    /** Conveniência para os âmbitos que não escolhem faturas à mão. */
+    @Transactional(readOnly = true)
+    public Plan plan(UUID enterpriseId, InvoiceDocumentsScope scope, UUID budgetId, String folder) {
+        return plan(enterpriseId, scope, budgetId, null, folder);
+    }
+
+    /** As faturas do âmbito pedido, pela sua classificação em rubricas. */
+    private List<ConstructionInvoice> filterByScope(List<ConstructionInvoice> invoices,
+                                                    InvoiceDocumentsScope scope, UUID budgetId,
+                                                    List<UUID> invoiceIds) {
+        if (scope == null || scope == InvoiceDocumentsScope.ALL) {
+            return invoices;
+        }
+
+        if (scope == InvoiceDocumentsScope.SELECTED) {
+            if (invoiceIds == null || invoiceIds.isEmpty()) {
+                throw new BusinessException(ErrorCode.INVOICE_DOCUMENTS_NO_SELECTION);
+            }
+            // A interseção com as faturas *desta obra* é o que impede alguém de
+            // puxar documentos de outra obra pondo ids à mão no query string: o
+            // ponto de partida é sempre `findAllByEnterpriseIdForExport`.
+            Set<UUID> wanted = new HashSet<>(invoiceIds);
+            return invoices.stream().filter(i -> wanted.contains(i.getId())).toList();
+        }
+
+        List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
+        Map<UUID, Set<UUID>> lotsByInvoice = new HashMap<>();
+        if (!ids.isEmpty()) {
+            for (ConstructionExpense expense : expenseRepository.findByInvoiceIdIn(ids)) {
+                UUID lot = expense.getBudgetItem() == null ? null : expense.getBudgetItem().getBudgetId();
+                if (lot != null) {
+                    lotsByInvoice.computeIfAbsent(expense.getInvoice().getId(), k -> new HashSet<>()).add(lot);
+                }
+            }
+        }
+
+        return invoices.stream()
+                .filter(invoice -> {
+                    Set<UUID> lots = lotsByInvoice.get(invoice.getId());
+                    boolean associated = lots != null && !lots.isEmpty();
+                    if (scope == InvoiceDocumentsScope.UNCLASSIFIED) {
+                        return !associated;
+                    }
+                    // ASSOCIATED: sem lote valem todas as associadas; com lote, só as desse
+                    return associated && (budgetId == null || lots.contains(budgetId));
+                })
+                .toList();
+    }
+
+    private Plan planFor(List<ConstructionInvoice> invoices, String folder) {
         List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
         List<ConstructionInvoiceDocument> documents = ids.isEmpty() ? List.of()
                 : documentRepository.findByInvoiceIdInOrderByUploadedAtAsc(ids);
@@ -111,7 +231,7 @@ public class InvoiceDocumentsExportService {
             if (!unique.equals(name)) {
                 warnings.add("Dois documentos ficariam com o nome \"" + name + "\" — o segundo fica \"" + unique + "\".");
             }
-            entries.add(new Entry(FOLDER + unique, document.getId(), document.getBucket(), document.getStorageKey(), !keepOriginal));
+            entries.add(new Entry(folder + unique, document.getId(), document.getBucket(), document.getStorageKey(), !keepOriginal));
         }
 
         int withoutDocument = (int) invoices.stream().filter(invoice -> !withDocument.contains(invoice.getId())).count();
@@ -217,11 +337,28 @@ public class InvoiceDocumentsExportService {
      * erro.
      */
     public void writeZip(String workbookName, byte[] workbook, Plan plan, OutputStream out) throws IOException {
+        writeEntries(workbookName, workbook, plan, out);
+    }
+
+    /**
+     * Só os documentos, sem livro nenhum — o download dos PDFs de um âmbito.
+     *
+     * O {@code _EM-FALTA.txt} continua a ser escrito quando o Storage não devolve
+     * algum: a esta altura os cabeçalhos já seguiram, não há como devolver um erro,
+     * e um zip que cala uma falta é pior do que um que a declara.
+     */
+    public void writeDocumentsZip(Plan plan, OutputStream out) throws IOException {
+        writeEntries(null, null, plan, out);
+    }
+
+    private void writeEntries(String workbookName, byte[] workbook, Plan plan, OutputStream out) throws IOException {
         List<String> missing = new ArrayList<>();
         try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
-            zip.putNextEntry(new ZipEntry(workbookName));
-            zip.write(workbook);
-            zip.closeEntry();
+            if (workbookName != null && workbook != null) {
+                zip.putNextEntry(new ZipEntry(workbookName));
+                zip.write(workbook);
+                zip.closeEntry();
+            }
 
             for (Entry entry : plan.entries()) {
                 byte[] content;
@@ -229,7 +366,10 @@ public class InvoiceDocumentsExportService {
                     content = storageService.download(entry.bucket(), entry.storageKey());
                 } catch (IOException | RuntimeException e) {
                     log.warn("Documento {} não veio do Storage para o zip: {}", entry.documentId(), e.getMessage());
-                    missing.add(entry.path().substring(FOLDER.length()) + " (documento " + entry.documentId() + ")");
+                    // o prefixo depende do âmbito (pasta do vault ou raiz), por isso
+                    // tira-se o que lá estiver em vez de assumir o `FOLDER`
+                    int slash = entry.path().lastIndexOf('/');
+                    missing.add(entry.path().substring(slash + 1) + " (documento " + entry.documentId() + ")");
                     continue;
                 }
                 zip.putNextEntry(new ZipEntry(entry.path()));
@@ -238,7 +378,10 @@ public class InvoiceDocumentsExportService {
             }
 
             if (!missing.isEmpty()) {
-                zip.putNextEntry(new ZipEntry(MISSING_REPORT));
+                // o relatório fica ao lado dos documentos, seja na pasta do vault ou na raiz
+                String first = plan.entries().isEmpty() ? FOLDER : plan.entries().get(0).path();
+                String folder = first.substring(0, first.lastIndexOf('/') + 1);
+                zip.putNextEntry(new ZipEntry(folder + MISSING_REPORT));
                 zip.write(("Documentos que o Storage não devolveu — não estão neste zip:\n"
                         + String.join("\n", missing) + "\n").getBytes(StandardCharsets.UTF_8));
                 zip.closeEntry();

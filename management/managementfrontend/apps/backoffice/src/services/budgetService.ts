@@ -1,5 +1,6 @@
 import api from "@/api";
 import { fileNameFromDisposition } from "@/utils/downloadBlob";
+import type { InvoiceDocumentsScope } from "@/services/invoiceService";
 import type {
   BudgetExportSheet,
   BudgetExportSummary,
@@ -220,6 +221,31 @@ export async function exportWorkbook(
 }
 
 /**
+ * **Um lote** num ficheiro só dele: `Orçamento - <Obra> - <Lote>.xlsx`.
+ *
+ * Aceita as mesmas folhas do `exportWorkbook`, recortadas a este lote: na
+ * "Despesas" e no painel entram só as linhas das rubricas deste lote — as dos
+ * outros lotes e as faturas por classificar ficam de fora.
+ *
+ * Existe a par do `exportWorkbook` e não em vez dele: esse é o livro da obra que
+ * alimenta o vault Excel (um ficheiro, uma folha por lote).
+ */
+export async function exportLotBudget(
+  budgetId: string,
+  sheets: BudgetExportSheet[],
+  fallbackFileName: string
+): Promise<DownloadedFile> {
+  const response = await api.get(`/construction-budget/budgets/${budgetId}/export`, {
+    params: { sheets: sheets.join(",") },
+    responseType: "blob",
+  });
+  return {
+    blob: response.data,
+    fileName: fileNameFromDisposition(response.headers["content-disposition"], fallbackFileName),
+  };
+}
+
+/**
  * A pasta da obra inteira: `<slug>.zip` com o `.xlsx` e `Faturas/Lançadas/*`
  * (os documentos das faturas, com o nome do vault) na raiz — extrai-se em
  * `Empreendimentos\<slug>\`. Pode ter dezenas de MB; o backend escreve-o em streaming.
@@ -227,10 +253,30 @@ export async function exportWorkbook(
 export async function exportFolderZip(
   enterpriseId: string,
   sheets: BudgetExportSheet[],
-  fallbackFileName: string
+  fallbackFileName: string,
+  /**
+   * Opcionais, para levar o Excel e os PDFs de uma vez. **Sem eles**, o pedido é
+   * exatamente o de sempre e devolve a pasta da obra do vault (`<slug>.zip`); com
+   * qualquer um deles o zip leva outro nome, para não se extrair por cima dela.
+   */
+  options?: {
+    /** O livro de um lote em vez do da obra. */
+    budgetId?: string;
+    /** Que documentos levar; omitir = todos, que é o que faz a pasta do vault. */
+    docs?: InvoiceDocumentsScope;
+    /** O lote dos documentos, quando `docs` é `ASSOCIATED`. */
+    docsBudgetId?: string;
+    invoiceIds?: string[];
+  }
 ): Promise<DownloadedFile> {
   const response = await api.get(`/construction-budget/enterprise/${enterpriseId}/export/zip`, {
-    params: { sheets: sheets.join(",") },
+    params: {
+      sheets: sheets.join(","),
+      budgetId: options?.budgetId,
+      docs: options?.docs,
+      docsBudgetId: options?.docsBudgetId,
+      invoiceIds: options?.invoiceIds?.join(","),
+    },
     responseType: "blob",
   });
   return {

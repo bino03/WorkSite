@@ -200,7 +200,8 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 | POST | `/construction-budget/budgets/{budgetId}/import?dryRun=&replace=` | `ADMIN` — multipart `file` (.xlsx), lê a 1.ª folha; `replace` só apaga **este** lote |
 | GET | `/construction-budget/enterprise/{enterpriseId}/export/summary` | `ADMIN` ou `EMPLOYEE` — o que a exportação vai escrever (contagens, avisos, nome do ficheiro) |
 | GET | `/construction-budget/enterprise/{enterpriseId}/export?sheets=BUDGET,EXPENSES,COMPARISON` | `ADMIN` ou `EMPLOYEE` — o `.xlsx` (binário, `Content-Disposition: attachment`) |
-| GET | `/construction-budget/enterprise/{enterpriseId}/export/zip?sheets=…` | `ADMIN` ou `EMPLOYEE` — a pasta da obra: `<slug>.zip` com o `.xlsx` e `Faturas/Lançadas/*` (documentos com o nome do vault, §7), em streaming |
+| GET | `/construction-budget/enterprise/{enterpriseId}/export/zip?sheets=…[&budgetId=&docs=&docsBudgetId=&invoiceIds=]` | `ADMIN` ou `EMPLOYEE` — a pasta da obra: `<slug>.zip` com o `.xlsx` e `Faturas/Lançadas/*` (documentos com o nome do vault, §7), em streaming. Com os parâmetros opcionais, o livro de um lote e/ou um recorte dos documentos — e **outro nome** |
+| GET | `/construction-budget/budgets/{budgetId}/export?sheets=BUDGET,EXPENSES,COMPARISON` | `ADMIN` ou `EMPLOYEE` — **um lote** em ficheiro próprio: `[TESTE - ]Orçamento - <Obra> - <Lote>.xlsx`, com as mesmas folhas do export da obra recortadas a esse lote |
 
 > 🧹 **`DELETE` passou a soft delete a 2026-09-16** (`V36`, coluna `deleted_at`). Bloqueado com
 > `BUDGET_013` se houver despesas em **qualquer** nó da sub-árvore (mover ou apagar as despesas
@@ -268,10 +269,56 @@ parâmetro, não o `filename=` cru. `GET …/export/summary` devolve o `BudgetEx
 `manualExpenseCount`, `creditNoteCount`, `partialPaymentCount`, `missingNumberCount`,
 `needsReviewCount`, `warnings`, `documents`) — é o passo 2 do modal, antes do download.
 
-**Rate limiting** (`/export` e `/export/zip`, desde 2026-09-22): por utilizador autenticado, não por
-IP — `RATE_LIMIT_EXPORT_USER` pedidos (default 10) por `RATE_LIMIT_EXPORT_WINDOW_MIN` minutos
-(default 10); acima disso, `429` com `errorCode: "ERR_011"`. `/export/summary` e a árvore normal
-ficam de fora (não fazem streaming pesado nenhum). Ver `ExportRateLimitFilter`.
+**Rate limiting** (`/export`, `/export/zip` e `/budgets/{id}/export`, desde 2026-09-22): por utilizador
+autenticado, não por IP — `RATE_LIMIT_EXPORT_USER` pedidos (default 10) por
+`RATE_LIMIT_EXPORT_WINDOW_MIN` minutos (default 10); acima disso, `429` com `errorCode: "ERR_011"`.
+`/export/summary` e a árvore normal ficam de fora (não fazem streaming pesado nenhum). Ver
+`ExportRateLimitFilter`.
+
+**Um lote em ficheiro próprio** (`GET /construction-budget/budgets/{budgetId}/export?sheets=`, desde
+2026-10-01): `[TESTE - ]Orçamento - <Obra> - <Lote>.xlsx`. Aceita o **mesmo `sheets`** do export da
+obra e as mesmas regras (`COMPARISON` arrasta `EXPENSES`; `BUDGET_EXPORT_NO_SHEETS` sem nenhuma;
+`BUDGET_EXPORT_NO_BUDGET` se o lote não tiver rubricas). Não há variante `.zip`: o zip é a pasta da obra.
+
+O ficheiro é uma **fatia** do da obra, não um formato à parte — o modelo carrega-se inteiro e
+recorta-se ao lote (`narrowToLot`), por isso o escritor é o mesmo e as folhas não podem divergir
+entre os dois exports:
+
+- a folha do orçamento é a do lote, com o nome `Orçamento - <Lote>` (logo reimportá-la para o mesmo
+  lote volta a encontrá-la pelo nome);
+- na "Despesas" e no painel entram **só as linhas das rubricas desse lote**. As dos outros lotes e as
+  faturas **por classificar** ficam de fora — não são atribuíveis ao lote — com um aviso que diz
+  quantas linhas caíram, porque o total da "Despesas" deixa de ser o da obra;
+- a coluna `Rubrica` **mantém** o prefixo `<Lote> · `, apesar de haver um só lote no ficheiro: é o que
+  mantém as linhas inequívocas se o ficheiro for reimportado numa obra com vários lotes (o
+  `DespesasExcelImportService` recusa-se a adivinhar o lote) e o que faz as `SUMIFS` do painel bater.
+  Por isso o modo "multi-lote" do escritor fica **ligado** (coluna `Lote` na `TabelaRubricas`).
+
+> Exceção: numa obra de **um só lote**, o `load` sai como antes da `V39` — não marca o lote em nada e
+> as etiquetas não levam prefixo. Aí o ficheiro do lote mantém-se no modo de um lote (folha
+> `Orçamento inicial`, sem coluna `Lote`), coerente com as etiquetas; só o **nome do ficheiro** leva o
+> lote. Filtrar pelo nome do lote nesse caso apagaria tudo — ver o ramo em `narrowToLot`.
+
+> ⚠️ Este endpoint **não substitui** o `/enterprise/{id}/export`. Esse é o livro da obra que alimenta o
+> vault Excel — um ficheiro por obra, uma folha `Orçamento - <Lote>` por lote ([[excel-parity.md]] §9) —
+> e partí-lo em ficheiros obrigaria a mudar o lado do Excel, decisão que se escreve em
+> `Vilatro\Decisões.md` e não aqui. O endpoint do lote existe **a par** dele, para o caso de levar um
+> lote só (é como os orçamentos circulam com os empreiteiros).
+
+> **Levar o Excel e os PDFs de uma vez** (desde 2026-10-02): o `/export/zip` aceita quatro
+> parâmetros **opcionais** — `budgetId` (o livro de **um lote** em vez do da obra), e `docs` +
+> `docsBudgetId` + `invoiceIds` (que documentos levar, com os mesmos âmbitos do
+> `/construction-invoices/.../documents/zip`). São duas escolhas independentes: o livro e os
+> documentos.
+>
+> ⚠️ **Sem nenhum deles — ou com `docs=ALL` — nada muda**: o pedido segue o caminho de sempre e
+> devolve a pasta da obra do vault, `<slug>.zip`, descrita a seguir. **Qualquer outra combinação
+> leva sufixo no nome** (`<slug> - Lote 3.zip`, `- Por classificar`, `- N selecionadas`,
+> `- Associadas`), porque já não é a pasta do vault e extrair duas coisas diferentes com o mesmo
+> nome por cima uma da outra é a maneira de perder a boa. Há teste a fixar as duas vias.
+>
+> **Onde ficam os documentos**: um zip que leva livro é uma pasta → `Faturas/Lançadas/`; um download
+> **só** de documentos é plano → raiz. É a única regra a decorar entre os dois endpoints.
 
 **Zip da pasta da obra** (`GET …/export/zip?sheets=`, desde 2026-09-20): o mesmo `sheets` e as
 mesmas regras do `/export`, mas devolve `application/zip` com o nome `[TESTE - ]<slug>.zip` e, na
@@ -347,6 +394,8 @@ de entrada.
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/pending-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total }` das faturas por associar (NC não entram): o contador do botão "Faturas" e o cartão "Por classificar" ao lado do "Gasto" no orçamento. Era `pending-count` (só o número) até 2026-09-18 |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/outstanding-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total, withoutTotalCount }` do que **falta pagar** nas faturas por liquidar, com os mesmos filtros da lista (todos os da tabela "Filtros da caixa de entrada", incluindo os da pesquisa avançada; `outstanding` é sempre true). `total` = Σ (total − NC − pago) sobre **todas** as faturas do filtro, não só a página; as sem total contam em `count`/`withoutTotalCount` e valem 0. É o "Falta pagar X" ao lado do filtro "Por liquidar" (2026-09-21) |
 | GET | `/construction-invoices/unidentified/outstanding-summary?q=` · `/company/outstanding-summary?q=` | `ADMIN` — o mesmo para a quarentena e as despesas da empresa |
@@ -680,6 +729,63 @@ associada acompanha os novos valores.
 Ficheiro: PDF, JPEG ou PNG, até 25 MB, bucket `documents`, chave
 `construction-invoices/{enterpriseId}/…`. A miniatura é um extra — falhar a gerá-la não custa
 a fatura, a lista cai num ícone de ficheiro.
+
+### Download dos documentos por âmbito (desde 2026-10-02)
+
+`GET …/documents/zip?scope=ALL|LOT|UNCLASSIFIED[&budgetId=]` devolve **só** os PDFs e fotos, com os
+ficheiros na **raiz** do zip e o nome a dizer o âmbito
+(`[TESTE - ]Faturas - <Obra>[ - <Lote> | - Por classificar].zip`). Os nomes de cada ficheiro são os
+do vault (§7), os mesmos que o zip da pasta da obra usa.
+
+Os âmbitos seguem **dois eixos**, não uma lista plana — e foi achatá-los numa lista que confundiu o
+utilizador a 2026-10-02 (escolhia "um lote", vinha vazio, e nada dizia porquê):
+
+1. **está associada a uma rubrica?** — `ASSOCIATED` ou `UNCLASSIFIED`, `ALL` para os dois juntos;
+2. **de que lote?** — **só se aplica às associadas**, porque o lote de uma fatura vem das rubricas
+   onde está classificada (`expense → budget_item → budget`) e não de um campo dela. Por isso o lote
+   é um parâmetro **opcional** do `ASSOCIATED` e não um âmbito à parte.
+
+O `SELECTED` está fora desses eixos de propósito: a lista de faturas já filtra por fornecedor, datas
+e estado de pagamento, por isso deixar escolher "estas" dá todos os outros cortes sem inventar aqui
+um âmbito por cada um. O `InvoiceDocumentsDownloadModal` desenha exatamente esta forma — o selector
+de lote vive **dentro** da opção "já associadas".
+
+| `scope` | O que leva |
+|---|---|
+| `ALL` | todas as faturas da obra |
+| `ASSOCIATED` | as classificadas em rubricas. **Com** `budgetId`, só as desse lote; **sem** ele, as de qualquer lote |
+| `UNCLASSIFIED` | as que não estão em rubrica nenhuma |
+| `SELECTED` | as de `invoiceIds` (lista separada por vírgulas). Vazia → `INVOICE_048`; mais de 300 → `INVOICE_049` |
+
+> ⚠️ **O `UNCLASSIFIED` não é conveniência, é cobertura.** Uma fatura sem rubrica não pertence a lote
+> nenhum, por isso sem esse âmbito os seus documentos não saíam em zip nenhum — e isso não é um caso
+> de canto: na Vila Aleu, a 2026-10-02, **as 44 faturas estavam todas por classificar**, ou seja os 43
+> documentos dela eram todos inalcançáveis por lote. `ASSOCIATED` (sem lote) e `UNCLASSIFIED` não se
+> sobrepõem e, somados, dão o `ALL` — exceto uma fatura **repartida por rubricas de dois lotes**, que
+> conta nos dois zips por lote (o documento é o mesmo, e quem o pede por lote quer vê-lo lá).
+
+**`SELECTED` e segurança**: os ids vêm no query string, mas o ponto de partida do filtro é sempre
+`findAllByEnterpriseIdForExport(enterpriseId)` — um id de outra obra posto à mão no URL não traz
+nada, porque a interseção é com as faturas desta obra. O teto de **300** ids existe para o URL não
+bater no limite do Tomcat e falhar com um erro que não diz nada; acima disso, `INVOICE_049`.
+
+**Não confundir com `/construction-budget/enterprise/{id}/export/zip`**: esse é a **pasta da obra do
+vault** — leva o livro `Despesas - <Obra>.xlsx` na raiz e os documentos em `Faturas/Lançadas/` (§7 de
+[[excel-parity.md]]), para extrair em `Empreendimentos\<slug>\`. Este é um download de conveniência:
+sem livro, sem pasta. O `_EM-FALTA.txt` que lista o que o Storage não devolveu existe nos dois, ao
+lado dos documentos (na raiz aqui, em `Faturas/Lançadas/` lá).
+
+`GET …/documents/summary?scope=&budgetId=` dá a contagem do âmbito sem tocar no Storage — é o que o
+modal mostra antes de alguém pedir dezenas de MB. O `/documents/zip` **entra no rate limiting** dos
+exports (é o mais pesado de todos); o `/documents/summary` fica de fora.
+
+**Âmbito sem documentos** → `INVOICE_047`, e não um zip vazio. Até 2026-10-02 devolvia `200` com 22
+bytes (um zip sem entradas): o browser "descarregava" e ninguém percebia que não havia nada. A
+verificação é **antes** de o streaming começar — depois disso os cabeçalhos já seguiram e não há como
+dizer porquê. O caso que o expôs: pedir o `LOT` de uma obra onde **nenhuma** fatura está classificada
+(a Vila Aleu, com as 44 por classificar) — o lote de uma fatura vem da rubrica, por isso sem
+classificação nenhum lote tem documentos. Quem chamar isto deve ler primeiro o `/documents/summary` e
+explicar a causa ao utilizador, que é o que o `InvoiceDocumentsDownloadModal` faz.
 
 ## Pagamentos (`PaymentController`)
 

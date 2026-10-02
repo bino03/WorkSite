@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceDocumentsScope;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportRowDTO;
@@ -59,6 +60,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -583,6 +585,229 @@ class BudgetExcelExportServiceTest {
             assertThat(BudgetExcelImportService.budgetSheet(wb, "Lote B").getSheetName())
                     .isEqualTo("Orçamento - Lote B");
         }
+    }
+
+    // ── download de um lote só ──────────────────────────────────
+
+    private ConstructionBudget lot(String name) {
+        ConstructionBudget lot = new ConstructionBudget();
+        lot.setId(UUID.randomUUID());
+        lot.setName(name);
+        lot.setEnterprise(enterprise);
+        return lot;
+    }
+
+    /** Obra com dois lotes e uma despesa em cada — o cenário real do download por lote. */
+    private ConstructionBudget twoLots() {
+        BudgetTreeDTO lotATree = tree();
+        BudgetItemNodeDTO lotAItem = item11;
+        BudgetTreeDTO lotBTree = tree(); // mesma numeração: o 1.1 existe nos dois
+        BudgetItemNodeDTO lotBItem = item11;
+
+        ConstructionBudget lotA = lot("Lote A");
+        ConstructionBudget lotB = lot("Lote B");
+        when(budgetService.listLots(ENTERPRISE_ID)).thenReturn(List.of(
+                new BudgetLotDTO(lotA.getId(), "Lote A", 0, 11, lotATree.budgetTotal(), BigDecimal.ZERO),
+                new BudgetLotDTO(lotB.getId(), "Lote B", 1, 11, lotBTree.budgetTotal(), BigDecimal.ZERO)));
+        when(budgetService.getBudgetTree(lotA.getId())).thenReturn(lotATree);
+        when(budgetService.getBudgetTree(lotB.getId())).thenReturn(lotBTree);
+        when(budgetService.getLot(lotA.getId())).thenReturn(lotA);
+        when(budgetService.getLot(lotB.getId())).thenReturn(lotB);
+
+        expense(invoice("FT L/1", "2026-09-01", "50", "Casa Dolores"), lotBItem, "50");
+        expense(invoice("FT L/2", "2026-09-02", "70", "Leroy"), lotAItem, "70");
+        // uma fatura por classificar: não é de lote nenhum
+        invoice("FT L/3", "2026-09-03", "90", "Sem rubrica");
+
+        return lotA;
+    }
+
+    @Test
+    @DisplayName("O download de um lote traz as três folhas, com as despesas recortadas a esse lote")
+    void exportLotCarriesAllSheetsNarrowedToTheLot() throws Exception {
+        ConstructionBudget lotA = twoLots();
+
+        BudgetExcelExportService.ExportFile file = service.exportLot(lotA.getId(), EnumSet.of(
+                BudgetExportSheet.BUDGET, BudgetExportSheet.EXPENSES, BudgetExportSheet.COMPARISON));
+
+        // o nome traz a obra *e* o lote: é o que distingue dois downloads da mesma obra
+        assertThat(file.fileName()).isEqualTo("Orçamento - Vila Teste - Lote A.xlsx");
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            // as três folhas, e só o orçamento *deste* lote
+            assertThat(sheetNames(wb)).contains("Orçamento - Lote A", "Despesas", "Rubricas", "Orçamento vs Gasto")
+                    .doesNotContain("Orçamento - Lote B", "Orçamento inicial");
+
+            // a "Despesas" leva a despesa do Lote A e **não** a do Lote B nem a fatura por classificar
+            Sheet expenses = wb.getSheet("Despesas");
+            assertThat(rowWithNumber(expenses, "FT L/2").getCell(8).getStringCellValue())
+                    .isEqualTo("Lote A · 1.1 — Montagem do estaleiro");
+            assertThatThrownBy(() -> rowWithNumber(expenses, "FT L/1"))
+                    .as("a despesa do Lote B não entra no ficheiro do Lote A")
+                    .isInstanceOf(AssertionError.class);
+            assertThatThrownBy(() -> rowWithNumber(expenses, "FT L/3"))
+                    .as("a fatura por classificar não é atribuível a este lote")
+                    .isInstanceOf(AssertionError.class);
+
+            // a etiqueta **mantém** o prefixo do lote, mesmo com um só lote no ficheiro:
+            // é o que mantém a reimportação inequívoca e as SUMIFS do painel a bater
+            Sheet panel = wb.getSheet("Orçamento vs Gasto");
+            List<String> chapterNames = new ArrayList<>();
+            for (int r = 8; r < 11; r++) chapterNames.add(panel.getRow(r).getCell(1).getStringCellValue());
+            assertThat(chapterNames).containsExactly("Lote A · ESTALEIRO",
+                    "Lote A · REVESTIMENTOS EXTERIORES", "Lote A · ACABAMENTOS");
+            assertThat(panel.getRow(8).getCell(3).getCellFormula()).contains("SUMIFS(", "[Lote],\"Lote A\"");
+
+            // e a coluna Lote continua na "Rubricas", que é a que as SUMIFS referenciam
+            assertThat(headers(wb.getSheet("Rubricas")).subList(10, 12)).containsExactly("Etiqueta", "Lote");
+
+            // reimportar o ficheiro para o mesmo lote volta a encontrar a folha pelo nome
+            assertThat(BudgetExcelImportService.budgetSheet(wb, "Lote A").getSheetName())
+                    .isEqualTo("Orçamento - Lote A");
+        }
+    }
+
+    @Test
+    @DisplayName("O que ficou de fora do ficheiro do lote é avisado, com a conta das linhas")
+    void exportLotWarnsAboutTheRowsItLeftOut() throws Exception {
+        ConstructionBudget lotA = twoLots();
+
+        // o aviso não vai no ficheiro, vai no `summary` da obra — aqui prova-se que o
+        // export do lote corre sem estourar e que o recorte aconteceu de facto
+        BudgetExcelExportService.ExportFile file = service.exportLot(lotA.getId(),
+                EnumSet.of(BudgetExportSheet.EXPENSES));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            Sheet expenses = wb.getSheet("Despesas");
+            // só a linha do Lote A sobrou das três
+            assertThat(rowWithNumber(expenses, "FT L/2")).isNotNull();
+            assertThat(sheetNames(wb)).containsExactly("Despesas");
+        }
+    }
+
+    @Test
+    @DisplayName("Numa obra de um só lote o ficheiro leva o nome do lote, e a folha fica \"Orçamento inicial\"")
+    void exportLotOnSingleLotEnterprise() throws Exception {
+        // `listLots` devolve vazio/um só: o `load` sai como antes da V39 e não marca o
+        // lote em nada, por isso o escritor fica no modo de um lote — sem coluna Lote
+        // e sem prefixo nas etiquetas, coerente entre si
+        ConstructionBudget lot = lot("Moradia 2");
+        when(budgetService.getLot(lot.getId())).thenReturn(lot);
+        when(budgetService.getBudgetTree(lot.getId())).thenReturn(tree());
+
+        BudgetExcelExportService.ExportFile file = service.exportLot(lot.getId(),
+                EnumSet.of(BudgetExportSheet.BUDGET));
+
+        assertThat(file.fileName()).isEqualTo("Orçamento - Vila Teste - Moradia 2.xlsx");
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            assertThat(sheetNames(wb)).containsExactly("Orçamento inicial");
+        }
+    }
+
+    @Test
+    @DisplayName("O ficheiro do lote leva o prefixo TESTE numa obra de teste, como o da obra")
+    void exportLotPrefixesTestEnterprise() {
+        enterprise.setIsTest(true);
+        ConstructionBudget lot = lot("Lote 3");
+        when(budgetService.getLot(lot.getId())).thenReturn(lot);
+        when(budgetService.getBudgetTree(lot.getId())).thenReturn(tree());
+
+        assertThat(service.exportLot(lot.getId(), EnumSet.of(BudgetExportSheet.BUDGET)).fileName())
+                .isEqualTo("TESTE - Orçamento - Vila Teste - Lote 3.xlsx");
+    }
+
+    @Test
+    @DisplayName("Um lote sem rubricas não gera ficheiro — dá BUDGET_EXPORT_NO_BUDGET")
+    void exportLotWithoutItemsFails() {
+        ConstructionBudget lot = lot("Lote vazio");
+        when(budgetService.getLot(lot.getId())).thenReturn(lot);
+        when(budgetService.getBudgetTree(lot.getId())).thenReturn(
+                new BudgetTreeDTO(ENTERPRISE_ID, "Lote vazio", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                        BigDecimal.ZERO, 0, 0, 0, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, List.of()));
+
+        assertThatThrownBy(() -> service.exportLot(lot.getId(), EnumSet.of(BudgetExportSheet.BUDGET)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BUDGET_EXPORT_NO_BUDGET);
+    }
+
+    @Test
+    @DisplayName("Sem folhas escolhidas, o download do lote dá BUDGET_EXPORT_NO_SHEETS como o da obra")
+    void exportLotWithoutSheetsFails() {
+        ConstructionBudget lot = lot("Lote 3");
+
+        assertThatThrownBy(() -> service.exportLot(lot.getId(), EnumSet.noneOf(BudgetExportSheet.class)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BUDGET_EXPORT_NO_SHEETS);
+    }
+
+    // ── livro + documentos no mesmo zip ─────────────────────────
+
+    @Test
+    @DisplayName("Obra + todos os documentos continua a ser a pasta do vault, com o nome de sempre")
+    void combinedZipKeepsTheVaultFolderUntouched() {
+        when(documentsExportService.plan(ENTERPRISE_ID)).thenReturn(
+                new InvoiceDocumentsExportService.Plan(List.of(), 0, List.of()));
+
+        // o caminho de sempre
+        assertThat(service.exportZip(ENTERPRISE_ID, EnumSet.of(BudgetExportSheet.BUDGET)).fileName())
+                .isEqualTo("Vila Teste.zip");
+
+        // e o caminho novo, na combinação equivalente, tem de dar o mesmo nome —
+        // é o que garante que ninguém extrai por cima da pasta do vault outra coisa
+        assertThat(BudgetExcelExportService.zipFileName(enterprise, null, null,
+                InvoiceDocumentsScope.ALL, new InvoiceDocumentsExportService.Plan(List.of(), 0, List.of())))
+                .isEqualTo("Vila Teste.zip");
+        assertThat(BudgetExcelExportService.zipFileName(enterprise, null, null, null,
+                new InvoiceDocumentsExportService.Plan(List.of(), 0, List.of())))
+                .isEqualTo("Vila Teste.zip");
+    }
+
+    @Test
+    @DisplayName("Qualquer outra combinação leva sufixo — não se extrai por cima da pasta do vault")
+    void combinedZipNamesEveryOtherCombinationApart() {
+        var vazio = new InvoiceDocumentsExportService.Plan(List.of(), 0, List.of());
+        var tres = new InvoiceDocumentsExportService.Plan(
+                java.util.Collections.nCopies(3, new InvoiceDocumentsExportService.Entry(
+                        "x.pdf", UUID.randomUUID(), "invoices", "k", false)), 0, List.of());
+        UUID lote = UUID.randomUUID();
+
+        // livro de um lote → o nome do lote manda, seja qual for o âmbito dos documentos
+        assertThat(BudgetExcelExportService.zipFileName(enterprise, lote, "Lote 3",
+                InvoiceDocumentsScope.ASSOCIATED, vazio)).isEqualTo("Vila Teste - Lote 3.zip");
+
+        // livro da obra, documentos recortados → o nome diz o recorte
+        assertThat(BudgetExcelExportService.zipFileName(enterprise, null, null,
+                InvoiceDocumentsScope.UNCLASSIFIED, vazio)).isEqualTo("Vila Teste - Por classificar.zip");
+        assertThat(BudgetExcelExportService.zipFileName(enterprise, null, null,
+                InvoiceDocumentsScope.SELECTED, tres)).isEqualTo("Vila Teste - 3 selecionadas.zip");
+        assertThat(BudgetExcelExportService.zipFileName(enterprise, null, null,
+                InvoiceDocumentsScope.ASSOCIATED, vazio)).isEqualTo("Vila Teste - Associadas.zip");
+
+        enterprise.setIsTest(true);
+        assertThat(BudgetExcelExportService.zipFileName(enterprise, lote, "Lote 3",
+                InvoiceDocumentsScope.ASSOCIATED, vazio)).isEqualTo("TESTE - Vila Teste - Lote 3.zip");
+    }
+
+    @Test
+    @DisplayName("Livro de um lote com os documentos desse lote: o zip leva os dois, e os PDFs na pasta do vault")
+    void combinedZipPairsLotWorkbookWithLotDocuments() {
+        ConstructionBudget lotA = twoLots();
+        var docs = new InvoiceDocumentsExportService.Plan(
+                List.of(new InvoiceDocumentsExportService.Entry(
+                        "Faturas/Lançadas/20260902_FTL-2_Leroy.pdf", UUID.randomUUID(), "invoices", "k", false)),
+                0, List.of());
+        when(documentsExportService.plan(eq(ENTERPRISE_ID), eq(InvoiceDocumentsScope.ASSOCIATED),
+                eq(lotA.getId()), any(), any())).thenReturn(docs);
+
+        BudgetExcelExportService.ZipExport zip = service.exportZip(
+                ENTERPRISE_ID, lotA.getId(), EnumSet.of(BudgetExportSheet.BUDGET),
+                InvoiceDocumentsScope.ASSOCIATED, lotA.getId(), null, "Lote A");
+
+        assertThat(zip.fileName()).isEqualTo("Vila Teste - Lote A.zip");
+        assertThat(zip.workbook().fileName()).isEqualTo("Orçamento - Vila Teste - Lote A.xlsx");
+        // os documentos ficam em Faturas/Lançadas/ — um zip com livro é uma pasta
+        assertThat(zip.documents().entries()).singleElement()
+                .satisfies(e -> assertThat(e.path()).startsWith("Faturas/Lançadas/"));
     }
 
     // ── helpers ─────────────────────────────────────────────────

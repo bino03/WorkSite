@@ -60,7 +60,23 @@ const r = await fetch('http://localhost:8080/auth/me', { credentials: 'include' 
 console.log('auth/me', r.status, r.status === 200 ? (await r.json()).role : '');
 ```
 
-`200` + `ADMIN` é o ponto de partida da maior parte das verificações. `401` → repetir o login; `403` → sessão de `EMPLOYEE` onde se precisa de `ADMIN`.
+`200` + `ADMIN` é o ponto de partida da maior parte das verificações. `401` → repetir o login; `403` → sessão de `EMPLOYEE` onde se precisa de `ADMIN`. (A role vem aninhada: `(await r.json()).user.role`.)
+
+> ⚠️ **`/auth/me` a `200` e a app a mandar-te para o `/login`.** O `PrivateRoute` não olha para o
+> cookie — lê o `user` do `AuthContext`, que arranca do **`sessionStorage`** (chave `session_user`).
+> O `sessionStorage` é **por tab**: num tab novo está vazio, o `PrivateRoute` redireciona antes de o
+> `/auth/me` assíncrono responder, e com `<Navigate replace>` fica lá. Não é preciso login nem
+> credenciais — semeia-se a chave a partir da sessão que já é válida:
+>
+> ```js
+> const u = (await (await fetch('http://localhost:8080/auth/me', { credentials:'include' })).json()).user;
+> sessionStorage.setItem('session_user', JSON.stringify({
+>   authUserId: u.id, name: u.name, role: u.role, email: u.email, profileId: u.profileId ?? '' }));
+> ```
+>
+> Depois disto, `navigate` para a rota. **As rotas do Backoffice são em português** —
+> `/backoffice/empreendimentos/<id>/budget`, não `enterprises` (ver `main.tsx`); uma rota errada
+> também cai no `/login` e confunde-se com este problema.
 
 > Se a extensão falhar 2-3 vezes seguidas, parar e dizer ao utilizador o que foi tentado — não continuar a bater na mesma ferramenta. A verificação fica registada como pendente (Step 7), que é o estado honesto.
 

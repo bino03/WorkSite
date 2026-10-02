@@ -315,6 +315,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_044': 'Há perguntas da importação por responder — nada foi gravado.',
   'INVOICE_045': 'Não se importa a folha de uma obra real para uma obra de teste.',
   'INVOICE_046': 'Os totais gravados não batem certo com a folha — a importação foi anulada.',
+  'INVOICE_047': 'Não há documentos para descarregar neste âmbito.',
+  'INVOICE_048': 'Escolha pelo menos uma fatura na lista.',
+  'INVOICE_049': 'Demasiadas faturas selecionadas de uma vez (máximo 300).',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

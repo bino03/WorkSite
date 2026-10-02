@@ -799,6 +799,8 @@ const ConstructionBudgetPage: FC = () => {
       <BudgetExportModal
         open={exportOpen}
         enterpriseId={enterpriseId ?? ""}
+        lots={lots ?? []}
+        currentLotId={lotId}
         onClose={() => setExportOpen(false)}
       />
     </div>

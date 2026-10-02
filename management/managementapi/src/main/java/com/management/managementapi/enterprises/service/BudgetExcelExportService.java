@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceDocumentsScope;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
@@ -9,6 +10,7 @@ import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDT
 import com.management.managementapi.enterprises.dto.budget.response.DocumentsExportSummaryDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
@@ -229,6 +231,105 @@ public class BudgetExcelExportService {
     }
 
     /**
+     * O orçamento de <b>um</b> lote, num ficheiro só dele:
+     * {@code Orçamento - <Obra> - <Lote>.xlsx}.
+     *
+     * Existe <b>a par</b> do {@code Despesas - <Obra>.xlsx} e não em vez dele. Esse
+     * é a moeda de troca com o vault Excel da Vilatro — um livro por obra, uma
+     * folha {@code Orçamento - <Lote>} por lote (ver [[excel-parity]]) — e partí-lo
+     * em ficheiros obrigaria a mudar o lado do Excel, decisão que não é deste repo.
+     * Este serve o caso de levar um lote só, que é como os orçamentos circulam com
+     * os empreiteiros.
+     *
+     * Aceita as <b>mesmas folhas</b> do export da obra ({@code BUDGET},
+     * {@code EXPENSES}, {@code COMPARISON}): o ficheiro do lote é uma <i>fatia</i>
+     * do da obra, não um formato à parte. O modelo carrega-se inteiro e depois
+     * recorta-se ao lote ({@link #narrowToLot}) — assim o escritor é exatamente o
+     * mesmo, e as três folhas não podem divergir entre os dois exports.
+     *
+     * A coluna Rubrica <b>mantém o prefixo</b> {@code <Lote> · }, mesmo havendo um
+     * só lote no ficheiro: é o que mantém as linhas inequívocas se o ficheiro for
+     * reimportado para uma obra com vários lotes (o {@code DespesasExcelImportService}
+     * recusa-se a adivinhar o lote), e é o que faz as {@code SUMIFS} do painel
+     * continuarem a bater. Por isso o {@code lots} fica com o lote escolhido em vez
+     * de vazio — é ele que liga o modo "multi-lote" do escritor.
+     *
+     * A folha do orçamento mantém o nome {@code Orçamento - <Lote>}, por isso
+     * reimportar o ficheiro para o mesmo lote volta a encontrá-la pelo nome.
+     */
+    @Transactional
+    public ExportFile exportLot(UUID budgetId, Set<BudgetExportSheet> requested) {
+        if (requested == null || requested.isEmpty()) {
+            throw new BusinessException(ErrorCode.BUDGET_EXPORT_NO_SHEETS);
+        }
+        Set<BudgetExportSheet> sheets = EnumSet.copyOf(requested);
+        if (sheets.contains(BudgetExportSheet.COMPARISON)) {
+            sheets.add(BudgetExportSheet.EXPENSES);
+        }
+
+        ConstructionBudget lot = budgetService.getLot(budgetId);
+        Model model = load(lot.getEnterprise().getId());
+        narrowToLot(model, budgetId, lot.getName());
+
+        boolean needsBudget = sheets.contains(BudgetExportSheet.BUDGET)
+                || sheets.contains(BudgetExportSheet.COMPARISON);
+        if (needsBudget && !model.hasBudget()) {
+            throw new BusinessException(ErrorCode.BUDGET_EXPORT_NO_BUDGET);
+        }
+
+        return new ExportFile(model.fileName, write(model, sheets));
+    }
+
+    /**
+     * Recorta um modelo da obra inteira a um só lote: a árvore, as rubricas, as
+     * linhas de despesa e o nome do ficheiro.
+     *
+     * As linhas sem lote — faturas por classificar, despesas numa rubrica
+     * eliminada — <b>não</b> entram: não são atribuíveis a este lote. Isso faz o
+     * total da "Despesas" do ficheiro do lote não bater com o da obra, e quem o
+     * abre tem de saber porquê.
+     *
+     * Quem avisa é o <b>modal</b>, antes do download, que é onde o aviso serve para
+     * algo. Aqui só se registra no log: um {@code model.warnings.add} não chegaria a
+     * ninguém — os avisos só saem no {@code /export/summary}, e o download de um
+     * lote não passa por lá (visto na verificação no browser de 2026-10-02, onde o
+     * aviso que estava aqui se revelou inalcançável).
+     */
+    private void narrowToLot(Model model, UUID budgetId, String lotName) {
+        model.tree = budgetService.getBudgetTree(budgetId);
+        int before = model.rows.size();
+
+        if (model.lots.isEmpty()) {
+            // Obra de um só lote: o `load` sai como antes da V39 — não marca o lote
+            // em nada (`lot == null`) e as etiquetas não levam prefixo. Filtrar pelo
+            // nome do lote apagava tudo. Já está tudo deste lote, por isso só se
+            // tiram as linhas sem rubrica, e o `lots` fica vazio de propósito: o
+            // escritor mantém-se no modo de um lote (sem coluna Lote, folha
+            // "Orçamento inicial", SUMIFS sobre $A), coerente com as etiquetas.
+            model.rows.removeIf(row -> row.rubric() == null);
+        } else {
+            model.lots.removeIf(l -> !l.name().equals(lotName));
+            model.rubrics.removeIf(rubric -> !lotName.equals(rubric.lot()));
+            model.rows.removeIf(row -> !lotName.equals(row.lot()));
+        }
+
+        int dropped = before - model.rows.size();
+        if (dropped > 0) {
+            log.info("Export do lote \"{}\" da obra {}: {} de {} linha(s) de despesa ficaram de fora "
+                            + "(de outros lotes, ou sem rubrica).",
+                    lotName, model.enterprise.getId(), dropped, before);
+        }
+
+        model.fileName = lotFileName(model.enterprise, lotName);
+    }
+
+    /** {@code Orçamento - <Obra> - <Lote>.xlsx}; {@code TESTE - } à frente numa obra de teste. */
+    static String lotFileName(Enterprise enterprise, String lotName) {
+        return testPrefix(enterprise) + "Orçamento - " + folderName(enterprise)
+                + " - " + safeName(lotName) + ".xlsx";
+    }
+
+    /**
      * O livro mais os documentos, na estrutura exata da pasta do vault (§7):
      * {@code <slug>.zip} com {@code Despesas - <slug>.xlsx} e
      * {@code Faturas/Lançadas/*} na raiz — extrai-se em
@@ -239,6 +340,70 @@ public class BudgetExcelExportService {
         ExportFile workbook = export(enterpriseId, requested);
         Enterprise enterprise = enterpriseRepository.findById(enterpriseId).orElseThrow();
         return new ZipExport(zipFileName(enterprise), workbook, documentsExportService.plan(enterpriseId));
+    }
+
+    /**
+     * O livro <b>mais</b> os documentos escolhidos, num zip só — para levar o Excel
+     * e os PDFs de uma vez em vez de dois downloads.
+     *
+     * Duas escolhas independentes, e é essa a razão de este método existir:
+     * <ul>
+     *   <li>o <b>livro</b>: da obra ({@code workbookLotId == null}) ou de um lote;</li>
+     *   <li>os <b>documentos</b>: qualquer {@link InvoiceDocumentsScope}.</li>
+     * </ul>
+     *
+     * O caso "obra + todos os documentos" continua a ser o {@link #exportZip(UUID, Set)}
+     * de cima, byte a byte: é a <b>pasta da obra do vault</b> (§7 de [[excel-parity]]),
+     * com o nome {@code <slug>.zip}, e não se mexe. Qualquer outra combinação leva um
+     * nome diferente, para ninguém a confundir com a pasta do vault ao extrair.
+     *
+     * Os documentos vão sempre para {@code Faturas/Lançadas/}: um zip que leva livro
+     * é uma pasta, e a estrutura do vault é a que já se conhece. Só o download
+     * <i>sem</i> livro os deixa na raiz.
+     */
+    @Transactional
+    public ZipExport exportZip(UUID enterpriseId, UUID workbookLotId, Set<BudgetExportSheet> requested,
+                               InvoiceDocumentsScope docsScope, UUID docsBudgetId, List<UUID> invoiceIds,
+                               String lotName) {
+        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_ENTERPRISE_NOT_FOUND));
+
+        ExportFile workbook = workbookLotId == null
+                ? export(enterpriseId, requested)
+                : exportLot(workbookLotId, requested);
+
+        InvoiceDocumentsExportService.Plan documents = documentsExportService.plan(
+                enterpriseId, docsScope, docsBudgetId, invoiceIds, InvoiceDocumentsExportService.FOLDER);
+
+        return new ZipExport(zipFileName(enterprise, workbookLotId, lotName, docsScope, documents),
+                workbook, documents);
+    }
+
+    /**
+     * {@code <slug>.zip} quando é a pasta da obra do vault; com um sufixo quando não
+     * é, porque extrair duas coisas diferentes com o mesmo nome por cima uma da
+     * outra é a maneira de perder a pasta boa.
+     */
+    static String zipFileName(Enterprise enterprise, UUID workbookLotId, String lotName,
+                              InvoiceDocumentsScope docsScope, InvoiceDocumentsExportService.Plan documents) {
+        boolean vaultFolder = workbookLotId == null
+                && (docsScope == null || docsScope == InvoiceDocumentsScope.ALL);
+        if (vaultFolder) {
+            return zipFileName(enterprise);
+        }
+        String suffix = workbookLotId != null
+                ? " - " + safeName(lotName == null ? "Lote" : lotName)
+                : switch (docsScope) {
+                    case UNCLASSIFIED -> " - Por classificar";
+                    case SELECTED -> " - " + documents.entries().size() + " selecionadas";
+                    case ASSOCIATED -> docsBudgetSuffix(lotName);
+                    default -> "";
+                };
+        return testPrefix(enterprise) + folderName(enterprise) + suffix + ".zip";
+    }
+
+    private static String docsBudgetSuffix(String lotName) {
+        return lotName == null ? " - Associadas" : " - " + safeName(lotName);
     }
 
     /** Fora de transação de propósito — corre enquanto a resposta HTTP já está a ser escrita. */
@@ -256,11 +421,11 @@ public class BudgetExcelExportService {
         return testPrefix(enterprise) + folderName(enterprise) + ".zip";
     }
 
-    private static String folderName(Enterprise enterprise) {
+    static String folderName(Enterprise enterprise) {
         return safeName(isBlank(enterprise.getSlug()) ? enterprise.getName() : enterprise.getSlug());
     }
 
-    private static String testPrefix(Enterprise enterprise) {
+    static String testPrefix(Enterprise enterprise) {
         return Boolean.TRUE.equals(enterprise.getIsTest()) ? TEST_PREFIX : "";
     }
 
@@ -369,6 +534,7 @@ public class BudgetExcelExportService {
                     + (label != null ? " (" + label + ")" : "") + ".");
         }
         model.labelByItemId.put(node.id(), label);
+        model.lotByItemId.put(node.id(), lot);
         for (BudgetItemNodeDTO child : node.children()) {
             flatten(child, label, lot, model);
         }
@@ -419,7 +585,7 @@ public class BudgetExcelExportService {
             model.rows.add(new ExpenseRow(null, expense.getExpenseDate(), expenseDescription(expense),
                     expense.getTotalPrice(), false, null, false,
                     "Despesa registada à mão na app, sem fatura.",
-                    rubricLabelOf(expense, model), null, null));
+                    rubricLabelOf(expense, model), null, null, lotOf(expense, model)));
         }
 
         // a tabela do vault está ordenada pela Data, da mais recente para a mais antiga;
@@ -469,7 +635,7 @@ public class BudgetExcelExportService {
             }
             model.rows.add(new ExpenseRow(number, invoice.getInvoiceDate(), nullToEmpty(invoice.getDescription()),
                     amount, paid, method, invoice.isSentToAccountant(), observations, null,
-                    invoice.getSupplierName(), invoice.getSupplierNif()));
+                    invoice.getSupplierName(), invoice.getSupplierNif(), null));
             return;
         }
 
@@ -479,7 +645,8 @@ public class BudgetExcelExportService {
             String description = isBlank(invoice.getDescription()) ? expenseDescription(expense) : invoice.getDescription();
             model.rows.add(new ExpenseRow(number, invoice.getInvoiceDate(), description,
                     expense.getTotalPrice(), paid, method, invoice.isSentToAccountant(), observations,
-                    rubricLabelOf(expense, model), invoice.getSupplierName(), invoice.getSupplierNif()));
+                    rubricLabelOf(expense, model), invoice.getSupplierName(), invoice.getSupplierNif(),
+                    lotOf(expense, model)));
         }
 
         BigDecimal expected = invoice.getTotalAmount() == null ? null
@@ -557,6 +724,15 @@ public class BudgetExcelExportService {
             parts.add(invoice.getNotes().trim());
         }
         return parts.isEmpty() ? null : String.join(NOTE_SEPARATOR, parts);
+    }
+
+    /**
+     * O lote da rubrica de uma despesa. Sem aviso quando não existe — o
+     * {@link #rubricLabelOf} já avisa pela rubrica eliminada, e avisar duas vezes
+     * pela mesma despesa só enchia o relatório.
+     */
+    private static String lotOf(ConstructionExpense expense, Model model) {
+        return model.lotByItemId.get(expense.getBudgetItem().getId());
     }
 
     private static String rubricLabelOf(ConstructionExpense expense, Model model) {
@@ -1313,6 +1489,12 @@ public class BudgetExcelExportService {
         final List<LotTree> lots = new ArrayList<>();
         final List<RubricRow> rubrics = new ArrayList<>();
         final Map<UUID, String> labelByItemId = new HashMap<>();
+        /**
+         * O lote de cada rubrica, para o export de um lote só poder filtrar as
+         * despesas pelo lote a que pertencem. Não se filtra pela etiqueta: um nome
+         * de lote com o separador lá dentro dava um prefixo ambíguo.
+         */
+        final Map<UUID, String> lotByItemId = new HashMap<>();
         final List<ExpenseRow> rows = new ArrayList<>();
         final List<String> warnings = new ArrayList<>();
         int invoiceCount, unclassifiedInvoiceCount, manualExpenseCount, creditNoteCount,
@@ -1344,9 +1526,15 @@ public class BudgetExcelExportService {
     record RubricRow(String code, String name, int chapter, int level, String kind,
                      BigDecimal budgeted, String label, String lot) {}
 
+    /**
+     * @param lot o lote da rubrica desta despesa, ou {@code null} se a despesa não
+     *            está classificada (fatura sem rubrica) ou a rubrica foi eliminada.
+     *            Só serve para o export de um lote filtrar as suas linhas — não vai
+     *            para nenhuma célula, a coluna Rubrica já leva o lote na etiqueta.
+     */
     record ExpenseRow(String number, LocalDate date, String description, BigDecimal amount, boolean paid,
                       String method, boolean bizdocs, String observations, String rubric,
-                      String supplierName, String supplierNif) {}
+                      String supplierName, String supplierNif, String lot) {}
 
     // ── utilitários ───────────────────────────────────────────
 

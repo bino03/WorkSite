@@ -47,6 +47,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceDocumentsScope;
 import java.util.UUID;
 
 /**
@@ -161,6 +162,34 @@ public class ConstructionBudgetItemController {
     }
 
     /**
+     * Um <b>lote</b> num ficheiro só dele: {@code Orçamento - <Obra> - <Lote>.xlsx}.
+     * É o download de quem quer levar um lote e não a obra toda — escolhe-se o lote
+     * no {@code budgetId}.
+     *
+     * Aceita as mesmas folhas do export da obra ({@code sheets=BUDGET,EXPENSES,COMPARISON}),
+     * recortadas a este lote: as linhas de despesa de outros lotes e as faturas por
+     * classificar ficam de fora, com um aviso no resultado.
+     *
+     * Não substitui o {@code /enterprise/{id}/export}: esse é o livro da obra que
+     * alimenta o vault Excel (§9 de [[excel-parity]]). A mesma permissão dos
+     * outros dois: é leitura.
+     */
+    @GetMapping("/budgets/{budgetId}/export")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<byte[]> exportLot(@PathVariable UUID budgetId,
+                                            @RequestParam Set<BudgetExportSheet> sheets) {
+        BudgetExcelExportService.ExportFile file = exportService.exportLot(budgetId, sheets);
+
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(file.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType(BudgetExcelExportService.CONTENT_TYPE))
+                .body(file.content());
+    }
+
+    /**
      * A pasta da obra inteira: {@code <slug>.zip} com o {@code Despesas - <slug>.xlsx}
      * e {@code Faturas/Lançadas/*} (os documentos das faturas com o nome do
      * vault, §7) na raiz — extrai-se em {@code Empreendimentos\<slug>\}.
@@ -172,9 +201,27 @@ public class ConstructionBudgetItemController {
      */
     @GetMapping("/enterprise/{enterpriseId}/export/zip")
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
-    public ResponseEntity<StreamingResponseBody> exportZip(@PathVariable UUID enterpriseId,
-                                                           @RequestParam Set<BudgetExportSheet> sheets) {
-        BudgetExcelExportService.ZipExport zip = exportService.exportZip(enterpriseId, sheets);
+    public ResponseEntity<StreamingResponseBody> exportZip(
+            @PathVariable UUID enterpriseId,
+            @RequestParam Set<BudgetExportSheet> sheets,
+            /* O livro: da obra por omissão, ou de um lote. */
+            @RequestParam(required = false) UUID budgetId,
+            /* Os documentos: todos por omissão — é o que faz a pasta do vault. */
+            @RequestParam(required = false) InvoiceDocumentsScope docs,
+            @RequestParam(required = false) UUID docsBudgetId,
+            @RequestParam(required = false) List<UUID> invoiceIds) {
+
+        BudgetExcelExportService.ZipExport zip;
+        if (budgetId == null && (docs == null || docs == InvoiceDocumentsScope.ALL)) {
+            // o caminho de sempre: a pasta da obra do vault, intocada
+            zip = exportService.exportZip(enterpriseId, sheets);
+        } else {
+            UUID lotForName = budgetId != null ? budgetId
+                    : (docs == InvoiceDocumentsScope.ASSOCIATED ? docsBudgetId : null);
+            String lotName = lotForName == null ? null : service.getLot(lotForName).getName();
+            zip = exportService.exportZip(enterpriseId, budgetId, sheets, docs, docsBudgetId,
+                    invoiceIds, lotName);
+        }
 
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(zip.fileName(), StandardCharsets.UTF_8)
