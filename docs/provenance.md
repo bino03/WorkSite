@@ -48,6 +48,19 @@ projeto — são candidatos a funcionalidades futuras, não lacunas.
   rubricas (`V32`), transferências e inconsistências (`V33`), importador/exportador `.xlsx` do vault.
   Ver [[faturas-modelo-alvo]] (decisões) e [[excel-parity]] (contrato).
 
+## Nomes de obras que mudaram
+
+Uma obra pode ter mudado de nome fora da app, e o nome antigo continua a aparecer em sítios que a
+app não controla — pastas, etiquetas do Gmail, assuntos de email, faturas já emitidas. Quem procurar
+pelo nome antigo não encontra nada, e quem o vir num documento pensa que é outra obra.
+
+| Nome antigo | Nome hoje | Onde o antigo ainda aparece |
+|---|---|---|
+| **Misericórdia** | **Villa Atrium** | etiqueta `Projetos andamento/Misericórdia` no Gmail da empresa (111 mensagens, 2025-09 → 2026), e assuntos de email de fornecedores desse período |
+
+Consequência prática: ao importar faturas do email (ver `notes/faturas-email-import.md`), a etiqueta
+`Misericórdia` resolve para `Villa Atrium` — não é uma obra por identificar.
+
 ## Relacionado
 
 - [[architecture]] · [[database]] · [[commands]]
