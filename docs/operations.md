@@ -141,7 +141,7 @@ O histórico do git já foi confirmado limpo (nenhum `.env` alguma vez commitado
 
 | O quê | Onde vive | Quem o gere | Como se guarda |
 |---|---|---|---|
-| Tabelas da app | schemas `worksite`, `settings`, `tasks` | Flyway (`V1`…) | `pg_dump` (abaixo) |
+| Tabelas da app | schemas `worksite`, `settings`, `tasks`, `attendance` | Flyway (`V1`…) | `pg_dump` (abaixo) |
 | Utilizadores de autenticação | `auth.users` | Supabase | `pg_dump` do schema `auth`, ou os backups do Supabase |
 | Ficheiros de faturas, miniaturas e provas de pagamento | bucket `documents` | Storage | `scripts/backup-storage.mjs` |
 | Banners, fotos e vídeos das obras | bucket `media` | Storage | `scripts/backup-storage.mjs --bucket media` |

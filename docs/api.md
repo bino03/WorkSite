@@ -1080,6 +1080,226 @@ Tarefas isoladas no seu próprio schema `tasks`, atribuíveis a um ou mais utili
 | PATCH | `/tasks/{id}/status` | `ADMIN` ou utilizador atribuído (validado no service) |
 | DELETE | `/tasks/{id}` | `ADMIN` |
 
+## Horários de trabalho (`WorkScheduleController`, `/attendance/work-schedules`)
+
+Catálogo de horários do módulo de assiduidade (`V42`, schema `attendance`). Um horário é **atribuível**:
+cria-se uma vez e dá-se a quem se quiser, porque cada trabalhador pode ter o seu. Tudo `ADMIN` — o
+self-service do funcionário é a fase 5 de [[../notes/roadmap/assiduidade]].
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/work-schedules` | `ADMIN` (paginado, ordenado por nome) |
+| GET | `/attendance/work-schedules/deleted` | `ADMIN` — zona de recuperação |
+| GET | `/attendance/work-schedules/{id}` | `ADMIN` |
+| POST | `/attendance/work-schedules` | `ADMIN` → `201` |
+| PUT | `/attendance/work-schedules/{id}` | `ADMIN` |
+| DELETE | `/attendance/work-schedules/{id}` | `ADMIN` → `204`, **soft-delete** |
+| POST | `/attendance/work-schedules/{id}/restore` | `ADMIN` |
+
+O corpo de `POST`/`PUT` traz **sempre a lista completa de dias** — gravar substitui a lista, não a
+acumula: "deixar de trabalhar à sexta" é apagar o dia, não editá-lo. `weekday` é o nome do dia
+(`"MONDAY"`…`"SUNDAY"`), e `startTime`/`endTime` vêm como `"HH:mm"`:
+
+```json
+{
+  "name": "08–17 c/ 1h almoço",
+  "notes": null,
+  "days": [
+    { "weekday": "MONDAY", "startTime": "08:00", "endTime": "17:00", "breakMinutes": 60 }
+  ]
+}
+```
+
+A resposta acrescenta `expectedMinutes` por dia e `weeklyMinutes` no horário, ambos já com a pausa
+descontada — são derivados, não colunas.
+
+### Códigos de erro
+
+| Código | Quando |
+|---|---|
+| `SCHED_001` | Horário não encontrado (ou apagado, nas rotas que só veem os vivos) |
+| `SCHED_002` | Já existe um horário com este nome entre os vivos |
+| `SCHED_004` | O mesmo dia da semana aparece duas vezes |
+| `SCHED_005` | Hora de saída não é depois da entrada — **um dia de trabalho não atravessa a meia-noite** |
+| `SCHED_006` | A pausa é igual ou maior que o período de trabalho do dia |
+| `SCHED_008` | Restaurar um horário que não está apagado |
+
+`SCHED_003` não existe: "horário sem dias" é apanhado pelo `@NotEmpty` do DTO e volta como erro de
+campo. `SCHED_007` está reservado para "horário já atribuído, logo imutável", que entra com a tabela
+`employment`.
+
+## Emprego (`EmploymentController`, `/attendance/employments`)
+
+Os dados de emprego de cada funcionário (`V43`). **As condições têm histórico**: mudar o horário ou os
+dias de férias não reescreve o passado — fecha o período em vigor no dia anterior e abre um novo, para
+que um relatório de janeiro continue correto depois de uma mudança em março.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/employments` | `ADMIN` |
+| GET | `/attendance/employments/{profileId}` | `ADMIN` |
+| POST | `/attendance/employments` | `ADMIN` → `201` (cria o vínculo + o primeiro período) |
+| PUT | `/attendance/employments/{profileId}/dates` | `ADMIN` — só `hiredAt`/`endedAt`, por query param |
+| POST | `/attendance/employments/{profileId}/terms` | `ADMIN` — **muda as condições a partir de uma data** |
+
+O `POST .../terms` é o único caminho para mudar horário ou dias de férias. Não há `PUT` de um período:
+alterar um período já decorrido é exactamente o que o histórico existe para impedir.
+
+| Código | Quando |
+|---|---|
+| `ATT_001` | O funcionário não tem dados de emprego |
+| `ATT_002` | Já tem — um funcionário só tem um registo de emprego |
+| `ATT_003` | Um período (ou a data de fim) começa antes da admissão |
+| `ATT_004` | O período novo não começa depois do que está em vigor |
+| `ATT_005` | Não há período em vigor, logo não há horário atribuído |
+
+## Picagens (`TimeEntryController`, `/attendance/time-entries`)
+
+As picagens (`V43`). `source` é sempre `MANUAL` nesta fase e **não vem do cliente** — o método de
+registo é um facto de como o registo entrou, não uma escolha de quem o grava; quando houver QR, é o
+endpoint do QR que o define.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/time-entries?profileId=` | `ADMIN` (paginado) |
+| GET | `/attendance/time-entries/day?profileId=&day=` | `ADMIN` — o dia local, 00:00 a 00:00 em `Europe/Lisbon` |
+| GET | `/attendance/time-entries/deleted?profileId=` | `ADMIN` — zona de recuperação |
+| GET | `/attendance/time-entries/{id}` | `ADMIN` |
+| GET | `/attendance/time-entries/{id}/revisions` | `ADMIN` — **o rasto de auditoria** |
+| POST | `/attendance/time-entries` | `ADMIN` → `201` |
+| PUT | `/attendance/time-entries/{id}` | `ADMIN` — corrigir (grava revisão) |
+| DELETE | `/attendance/time-entries/{id}?reason=` | `ADMIN` → `204`, **soft-delete** |
+| POST | `/attendance/time-entries/{id}/restore?reason=` | `ADMIN` |
+
+Não existe endpoint de apagar a sério. A resposta traz `localDate` — o dia a que a picagem pertence em
+`Europe/Lisbon`, que **não** é o dia do `happenedAt` em UTC.
+
+### Códigos de erro
+
+| Código | Quando |
+|---|---|
+| `ATT_010` | Picagem não encontrada |
+| `ATT_011` | Fora de sequência — uma entrada tem de ser seguida de uma saída, e a primeira picagem do dia é uma entrada. Validado também ao inserir no meio de um dia já preenchido |
+| `ATT_012` | Já existe uma picagem deste funcionário neste instante |
+| `ATT_013` | Restaurar uma picagem que não está anulada |
+| `ATT_014` | Picagem antes da data de admissão. Sem dados de emprego não se valida — registar antes de criar a ficha não é erro |
+
+A sequência é avaliada **dentro do dia local**: um dia de trabalho não atravessa a meia-noite (decisão
+de 2026-10-06), por isso cada dia começa a zero e um dia mal preenchido não contamina o seguinte.
+
+## Resumos de assiduidade (`AttendanceSummaryController`, `/attendance/summary`)
+
+Horas, extras, atrasos e faltas. **Só leitura, porque nada disto está guardado**: é tudo derivado das
+picagens e do horário que estava em vigor em cada dia. Um total gravado ficaria a mentir na primeira
+correção a uma picagem, e corrigir picagens é uma funcionalidade.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/summary/day?profileId=&day=` | `ADMIN` — devolve um dia |
+| GET | `/attendance/summary/week?profileId=&day=` | `ADMIN` — a semana ISO (segunda a domingo) desse dia |
+| GET | `/attendance/summary/month?profileId=&month=YYYY-MM` | `ADMIN` |
+| GET | `/attendance/summary/range?profileId=&from=&to=` | `ADMIN` |
+
+Cada dia traz `workedMinutes`, `expectedMinutes`, `overtimeMinutes`, `latenessMinutes`, `firstIn`,
+`lastOut`, `incomplete`, `needsAttention` e um `status`:
+
+| `status` | Significado |
+|---|---|
+| `WORKED` | Há picagens no dia |
+| `MISSING` | O horário previa trabalho e não há picagem nenhuma — **falta por justificar** |
+| `NOT_SCHEDULED` | O horário não previa trabalho (fim de semana, horário parcial). **Não é falta** |
+| `NO_SCHEDULE` | Não há horário atribuído a cobrir o dia (antes da admissão, ou sem ficha de emprego). Nem falta nem previsão |
+
+Como os números saem:
+- **horas trabalhadas** = soma dos pares entrada→saída, menos a pausa que o *horário* declara (ninguém
+  pica o almoço). A pausa não se desconta a quem não trabalhou, para o total nunca ser negativo.
+- **atraso** = primeira entrada depois da `start_time` do horário. Chegar adiantado dá 0, não negativo.
+- **extra** = o que passa das horas previstas. Trabalhar num dia não previsto conta tudo como extra.
+- **`incomplete`** = número ímpar de picagens (alguém esqueceu-se de picar a saída). O par fechado
+  continua a contar; a picagem sem par é ignorada em vez de o dia ser descartado.
+- **`scheduleChanges`** no resumo = quantas mudanças de horário o período atravessou. Mais de zero quer
+  dizer que os totais somam dias calculados com horários diferentes — e isso diz-se, não se esconde.
+
+O cálculo lê o horário **por dia** (`EmploymentTerm.termOn`), não uma vez para o período: é o que faz um
+mês que atravessa uma mudança de condições ser calculado com o horário certo em cada metade.
+
+## Feriados (`HolidayController`, `/attendance/holidays`)
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/holidays` (opcional `?from=&to=`) | `ADMIN` |
+| GET | `/attendance/holidays/{id}` | `ADMIN` |
+| POST | `/attendance/holidays` | `ADMIN` → `201` |
+| PUT | `/attendance/holidays/{id}` | `ADMIN` |
+| DELETE | `/attendance/holidays/{id}` | `ADMIN` → `204` (apagar a sério: um feriado errado não tem de ficar guardado) |
+
+`scope` é `NATIONAL` ou `MUNICIPAL`. O concelho é **obrigatório** nos municipais (`ABS_003`) e
+**recusado** nos nacionais (`ABS_004`) — um municipal sem concelho não se sabe onde se aplica, e um
+nacional com concelho é contraditório. Mudar um municipal para nacional limpa o concelho.
+
+## Ausências e férias (`AbsenceController`, `/attendance/absences`)
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/absences?profileId=&from=&to=` | `ADMIN` |
+| GET | `/attendance/absences/team?from=&to=[&status=]` | `ADMIN` — **os dados do mapa de equipa** (o mapa é frontend) |
+| GET | `/attendance/absences/pending` | `ADMIN` — o que está à espera de decisão |
+| GET | `/attendance/absences/{id}` | `ADMIN` — detalhe, **com os justificativos assinados** |
+| GET | `/attendance/absences/balance?profileId=[&year=]` | `ADMIN` — saldo de férias em dias úteis |
+| POST | `/attendance/absences` | `ADMIN` → `201`, nasce `PENDING` |
+| PUT | `/attendance/absences/{id}` | `ADMIN` — só enquanto `PENDING` |
+| POST | `/attendance/absences/{id}/approve` | `ADMIN` |
+| POST | `/attendance/absences/{id}/reject` | `ADMIN` |
+| POST | `/attendance/absences/justify?profileId=&day=&type=[&note=]` | `ADMIN` → `201` — **justificar uma falta** |
+| DELETE | `/attendance/absences/{id}` | `ADMIN` → `204`, soft-delete |
+| POST | `/attendance/absences/{id}/restore` | `ADMIN` |
+| POST | `/attendance/absences/{id}/documents` (multipart `file`) | `ADMIN` → `201` |
+| DELETE | `/attendance/absences/{id}/documents/{documentId}` | `ADMIN` → `204` (apaga também no Storage) |
+
+Decisões que explicam a forma destas rotas:
+
+- **Nasce sempre `PENDING`, e aprovar é um passo à parte.** É o que faz o ato de decidir ficar
+  registado com quem e quando. Só `APPROVED` faz o dia deixar de ser falta.
+- **Justificar uma falta é criar uma ausência aprovada que cobre o dia** — não há um estado "falta
+  justificada" em separado, porque a ausência *é* a justificação. Duas fontes de verdade para o mesmo
+  dia divergiriam.
+- **Uma falta `UNJUSTIFIED` continua a contar como falta.** Registá-la serve para ficar documentada,
+  não para a esconder.
+- **Sobreposições são recusadas na marcação** (`ABS_013`): duas ausências sobrepostas não têm
+  significado — qual delas explicaria o dia? Uma ausência `REJECTED` não bloqueia.
+- **Na lista os justificativos não vêm; no detalhe vêm assinados.** Assinar os documentos de um ano de
+  ausências que ninguém vai abrir é trabalho deitado fora, como nas faturas.
+- Justificativo: PDF ou imagem (`ABS_021`), 25 MB, bucket `documents`, chave
+  `attendance/absence/<id>/<8 chars>_<nome>`. **Validado antes de subir** — subir primeiro deixa órfãos
+  no bucket, que foi o que aconteceu com as faturas a 2026-09-18.
+
+### Saldo de férias
+
+Conta **dias úteis**, não dias de calendário: 22 é o mínimo legal em dias úteis. Por isso o saldo
+precisa do horário (que dias da semana a pessoa trabalha) e dos feriados — 5 dias de férias que
+atravessam um feriado descem **4** ao saldo, e uns que atravessam o fim de semana não gastam sábado nem
+domingo. `PENDING` desconta do `available` (senão marcava-se o dobro dos dias que se tem e só se
+descobria ao aprovar); `APPROVED` conta em `taken`. Meio dia conta 0,5. Umas férias que atravessam o
+ano só gastam, em cada ano, os dias que nele caem.
+
+### Códigos de erro
+
+| Código | Quando |
+|---|---|
+| `ABS_001`–`ABS_004` | Feriado: não encontrado, duplicado na data+âmbito, concelho em falta, concelho a mais |
+| `ABS_010` | Ausência não encontrada |
+| `ABS_011` | Data de fim antes da de início |
+| `ABS_012` | Meio dia num intervalo de vários dias |
+| `ABS_013` | Sobreposição com outra ausência não recusada |
+| `ABS_014` | Já foi aprovada ou recusada (editar e decidir só valem enquanto `PENDING`) |
+| `ABS_015` | Restaurar uma ausência que não está anulada |
+| `ABS_016` | Ausência antes da data de admissão |
+| `ABS_020`/`ABS_021` | Justificativo não encontrado / tipo não permitido |
+
+`ABS_017` está **reservado** para "saldo de férias insuficiente": bloquear a marcação por saldo é uma
+decisão de negócio que ainda não foi tomada. Hoje o saldo pode ficar negativo e mostra-se como está, em
+vez de recusar algo que o utilizador pode querer fazer de propósito.
+
 ## Notificações (`NotificationController`, `/notifications`)
 
 Avisos in-app para utilizadores **internos**. O item original do backlog dizia "notificações

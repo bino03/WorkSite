@@ -1,6 +1,8 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V40`). Três schemas: **`worksite`** (core do domínio), **`settings`** (convites/config) e **`tasks`** (tarefas standalone).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V44`). Quatro schemas: **`worksite`** (core do domínio), **`settings`** (convites/config), **`tasks`** (tarefas standalone) e **`attendance`** (assiduidade, horas e férias).
+
+> ⚠️ Um schema novo tem de entrar em `spring.flyway.schemas` no `application.yml` (`create-schemas: true` cria-o), senão a migração falha. E o trigger de `updated_at` **não** é automático fora de `worksite`: o `DO $$` da `V11` só percorre `table_schema = 'worksite'`, por isso cada tabela de `settings`, `tasks` ou `attendance` declara o seu `CREATE TRIGGER` à mão.
 
 Só o backend (`managementapi`) tem acesso direto à base de dados — ver [[architecture.md]].
 
@@ -181,6 +183,58 @@ Ver [[api.md]] → "Orçamento de Construção". O ficheiro de fatura é guardad
 | `tasks.task` | `tasks` | Tarefa standalone (nome, descrição, prazo, estado), sem ligação a nenhum ativo/imóvel |
 | `tasks.task_assignee` | `tasks` | Junção many-to-many entre `tasks.task` e `worksite.profile` — utilizadores atribuídos |
 | `notification` | `worksite` | Notificações in-app dirigidas a um `profile` (`V20`). `title`/`body` guardados **já escritos**, não tipo + parâmetros: torna a leitura um `select` simples, ao custo de o histórico ficar na língua em que nasceu. `entity_id` **sem FK** de propósito — aponta para tabelas diferentes conforme o `type`, e o aviso deve sobreviver ao desaparecimento da origem. `read_at` nulo = por ler |
+
+## Schema `attendance` — assiduidade, horas e férias
+
+Módulo novo (`V42`), isolado fora de `worksite` pela mesma razão que o `tasks`: é um domínio inteiro
+que liga a `worksite` só por FK a `profile` e `enterprises`. O desenho completo, com as decisões e o
+porquê de cada uma, está em [[../notes/roadmap/assiduidade]]; aqui fica só o que existe hoje.
+
+| Tabela | O que guarda |
+|---|---|
+| `work_schedule` | Catálogo de horários reutilizáveis ("08–17 c/ 1h almoço"), **atribuíveis** a funcionários — um horário não é um campo do funcionário, porque cada trabalhador pode ter o seu. Soft-delete (`deleted_at`): um horário apagado tem de continuar legível para recalcular meses passados. Único parcial no nome (`uq_work_schedule_name … where deleted_at is null`). Sem coluna `active` de propósito — `deleted_at` já exprime "não oferecer em atribuições novas" |
+| `work_schedule_day` | O horário dia-a-dia da semana: `weekday` (1=segunda … 7=domingo, ISO-8601, igual ao `DayOfWeek` do Java), `start_time`, `end_time`, `break_minutes`. **Um dia que não está na tabela não é dia de trabalho** — é assim que fins de semana e horários parciais se exprimem, sem flag. A pausa vive aqui e não nas picagens: ninguém pica o almoço, o horário declara-o e as horas do dia descontam-no |
+
+| `employment` | O vínculo de um funcionário: o que **não** muda — `profile_id` (único), `hired_at`, `ended_at`. Separado de `worksite.profile` de propósito: o perfil é identidade/login e um admin pode não ter dados de emprego |
+| `employment_term` | As **condições durante um período**: `work_schedule_id`, `vacation_days_per_year` (default 22, editável por pessoa), `valid_from`, `valid_to`. É o que faz um relatório de janeiro continuar correto depois de mudar o horário em março. Único parcial `uq_employment_term_current … where valid_to is null` — só pode haver um período em vigor |
+| `time_entry` | **A picagem**: `profile_id`, `enterprise_id` (nullable), `happened_at timestamptz`, `direction` (IN/OUT), `source` (MANUAL), `registered_by` (nullable = o próprio), `note`, `deleted_at`. Só soft-delete, nunca `delete` físico |
+| `time_entry_revision` | O estado **anterior** de cada alteração a uma picagem, escrito na **mesma transação**. Append-only: não tem `updated_at` nem trigger — uma revisão que se pudesse alterar não provava nada |
+| `holiday` | Feriados (`V44`): `holiday_date`, `name`, `scope` (nacional/municipal), `municipality`. **Tabela e não biblioteca de código**: os municipais variam por concelho e mudam de ano para ano, e uma tabela que o utilizador edita bate código que alguém tem de ir corrigir. `ck_holiday_municipality` obriga a concelho nos municipais e proíbe-o nos nacionais |
+| `absence` | Ausências (`V44`): férias, baixa, falta justificada ou injustificada. `starts_on`/`ends_on` (intervalo fechado nos dois extremos), `half_day` (NONE/MORNING/AFTERNOON, só num dia só — `ck_absence_half_day`), `status` (PENDING/APPROVED/REJECTED), `approved_by`/`approved_at`, soft-delete |
+| `absence_document` | Justificativos (`V44`), **0..N**: `bucket` + `storage_key`, `original_filename`, `mime_type`, `size_bytes`. Tabela própria e não colunas na `absence` porque **pode chegar um segundo ficheiro** — uma baixa de duas páginas, uma prorrogação. É a pergunta que a skill `add-file-upload` manda fazer, e foi ignorá-la que obrigou à `V24` nas faturas |
+
+**O que a `V44` arranjou**: antes dela, um feriado e um dia de férias apareciam como *falta por
+justificar*, porque o cálculo só sabia olhar para o horário e para as picagens.
+
+`uq_holiday_date_scope` usa `coalesce(municipality, '')` porque **dois NULL não colidem num unique** —
+sem isso, o mesmo feriado nacional entrava duas vezes na mesma data.
+
+**Porque é que a `time_entry` não precisa de ser refeita**: duas colunas. `source` guarda o *método* como
+dado (hoje só `MANUAL`; o QR e os outros entram por `alter type`, sem migrar nem recalcular), e
+`enterprise_id` vive em **cada** picagem, não no dia — o QR por obra traz a obra de graça no momento da
+picagem, e guardar por dia perderia quem andou em duas obras no mesmo dia.
+
+**Porque é que há uma tabela de revisões e não só o `activity_log`**: o `ActivityLogger` é `@Async` e
+pode perder linhas numa falha. Para faturas isso nunca importou; num registo legal de assiduidade é
+precisamente o registo corrigido que uma auditoria põe em causa. O `activity_log` continua a receber a
+sua linha, para o histórico geral. `changed_by_name` fica guardado já escrito (como no `activity_log`):
+o nome numa auditoria tem de ser o que a pessoa tinha na altura e sobreviver a apagar o perfil.
+
+**`on delete` escolhidos a dedo**: `time_entry.profile_id` é `restrict` (um funcionário com picagens não
+se apaga — a lei obriga a guardar os registos); `enterprise_id` é `set null` (apagar uma obra não pode
+apagar o registo de que alguém trabalhou); `employment_term.work_schedule_id` é `restrict` (um horário
+de um período passado não desaparece, senão esse período deixava de poder ser recalculado).
+
+**Horas locais, não instantes**: `start_time`/`end_time` são `time`, não `timestamptz`. A entrada é às
+08:00 em janeiro e em julho mesmo que o instante UTC não seja o mesmo; o fuso (`Europe/Lisbon`) aplica-se
+no cálculo. O resto do projeto é todo `timestamptz` + UTC (`jdbc.time_zone`), e para faturas isso é
+inofensivo — para assiduidade seria errado.
+
+`ck_work_schedule_day_order` (`end_time > start_time`) é o que garante que um dia de trabalho **não
+atravessa a meia-noite**: turnos noturnos não são suportados (decisão de 2026-10-06), e a constraint
+impede que o cálculo receba um caso que não sabe tratar. As mesmas regras existem no
+`WorkScheduleService` — a duplicação é deliberada: a BD é a última defesa, mas só devolve uma violação
+opaca; o service diz *qual* regra falhou, com um `SCHED_xxx`.
 
 ## Convenções
 

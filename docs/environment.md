@@ -58,6 +58,12 @@ Notas que se pagam caro por não se saberem:
   por conta + 20/min por IP em `/auth/login`; 3/15min por conta e por IP em `/auth/forgot-password`,
   mais apertado para não abrir uma via de enumeração de contas): limites do `RateLimitFilter`
   (bucket4j, em memória — só faz sentido enquanto o backend correr numa única instância).
+- `APP_ATTENDANCE_ZONE` (opcional, omissão `Europe/Lisbon`): o fuso em que a assiduidade conta "o dia".
+  **Não mexer sem motivo.** O resto do projeto é todo UTC e nunca precisou de fuso — uma fatura tem
+  data, não hora. A assiduidade tem: uma entrada às 08:00 em Lisboa é 07:00 UTC no verão e 08:00 UTC no
+  inverno, e contar dias em UTC poria picagens no dia errado durante metade do ano. Existe como
+  variável só para o dia em que houver uma obra fora do continente. Lido por
+  `service/attendance/AttendanceZone`, o único sítio do código que sabe o fuso.
 
 ## Backoffice — `.env` em `management/managementfrontend/apps/backoffice/`
 

@@ -32,7 +32,8 @@ Ao contrário do Property-Management, **não existe portal público** — esta �
 ┌──────────▼──────────────────┐
 │  PostgreSQL                     │
 │  (via Flyway)                    │
-│  schemas: worksite, settings, tasks      │
+│  schemas: worksite, settings,      │
+│           tasks, attendance       │
 │  + Supabase Auth (JWT) + Storage    │
 └─────────────────────────────────────┘
 ```

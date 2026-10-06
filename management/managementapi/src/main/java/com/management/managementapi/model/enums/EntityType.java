@@ -12,6 +12,11 @@ public enum EntityType {
     TASK("task"),
     PAYMENT("payment"),
     INVOICE_INCIDENT("invoice_incident"),
+    ABSENCE("absence"),
+    HOLIDAY("holiday"),
+    WORK_SCHEDULE("work_schedule"),
+    EMPLOYMENT("employment"),
+    TIME_ENTRY("time_entry"),
 
     // Mantidos só para leitura do histórico: o activity_log ainda tem linhas
     // destes tipos, das etapas/sub-etapas que a V15 substituiu pela árvore.

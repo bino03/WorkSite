@@ -26,6 +26,7 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 | `POST /auth/admin/**` | `ADMIN` |
 | `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
 | `GET /employees/**` | `ADMIN` ou `EMPLOYEE` |
+| `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. O self-service do funcionário é a fase 5 de [[../notes/roadmap/assiduidade]] |
 | `/auth/me` | qualquer utilizador autenticado |
 | Tudo o resto | autenticado (role específica validada por `@PreAuthorize` no controller) |
 
@@ -54,7 +55,7 @@ por ele ou por ficheiros. É esta frase que decide o que se segue.
 
 | Quem | Liga como | A quê | Sujeito a RLS? |
 |---|---|---|---|
-| `managementapi` (única ligação) | `DB_USER=postgres.<project-ref>` — o role `postgres` do Supabase, pelo pooler em modo transaction (`:6543`) | schemas `worksite`, `settings`, `tasks` | não — `postgres` ignora RLS |
+| `managementapi` (única ligação) | `DB_USER=postgres.<project-ref>` — o role `postgres` do Supabase, pelo pooler em modo transaction (`:6543`) | schemas `worksite`, `settings`, `tasks`, `attendance` | não — `postgres` ignora RLS |
 | `managementapi` → Storage e Auth | `SUPABASE_SERVICE_ROLE_KEY` (REST, via OkHttp) | buckets `documents`, `media`; `auth.users` | n/a (chave de serviço, ignora RLS) |
 | Supabase (Auth, Storage, PostgREST) | `service_role` | os seus próprios schemas; em `worksite`/`settings` tem `GRANT ALL` da `V8` | n/a |
 | Browser, `anon`/`authenticated` via PostgREST | — | **nada**: `worksite` não está nos schemas expostos pela API do Supabase, e desde a `V37` nem `USAGE` no schema têm | — |

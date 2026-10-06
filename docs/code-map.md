@@ -118,6 +118,26 @@ Tarefas standalone, isoladas no seu próprio schema — sem ligação a obra nen
 | **Backend** | `controller/TaskController` · `service/TaskService` · `model/Task` + `TaskAssignee` |
 | **Base de dados** | schema `tasks` — `V14` |
 
+## Assiduidade — horários, emprego e picagens
+
+Fase 1 do módulo de assiduidade (`V42`, `V43`). **Backend só** — o frontend está por estruturar.
+Desenho das 5 fases, com as decisões e o porquê, em [[../notes/roadmap/assiduidade]].
+
+| Camada | Ficheiros |
+|---|---|
+| **Entrada** | `controller/attendance/` — `WorkScheduleController` (`/attendance/work-schedules`), `EmploymentController` (`/attendance/employments`), `TimeEntryController` (`/attendance/time-entries`), `AttendanceSummaryController` (`/attendance/summary`), `HolidayController` (`/attendance/holidays`), `AbsenceController` (`/attendance/absences`). Tudo `ADMIN` |
+| **Cálculo** | `service/attendance/AttendanceCalculator` — **puro e estático**, recebe picagens + horário + feriado + ausência já carregados e devolve um `DayAttendance`. É onde um erro é silencioso (devolve o número errado, não lança), por isso tem os testes mais densos · `AttendanceSummaryService` junta as peças e agrega semana/mês · `VacationBalanceService` — o saldo, em **dias úteis** (precisa do horário e dos feriados, e é por isso que não é um método na entidade `Absence`) |
+| **Backend** | `service/attendance/` — `WorkScheduleService`, `EmploymentService`, `TimeEntryService`, `AbsenceService`, `HolidayService`, **`AttendanceZone`** (o único sítio que sabe o fuso) · `repository/attendance/` · `mapper/attendance/` (o `AbsenceMapper` é um `@Component` e não MapStruct, porque precisa do `SignedUrlService`) · `model/attendance/` — `WorkSchedule`, `WorkScheduleDay`, `Employment`, `EmploymentTerm`, `TimeEntry`, `TimeEntryRevision`, `Holiday`, `Absence`, `AbsenceDocument` · `dto/attendance/{request,response}/` |
+| **Enums** | `model/enums/` — `TimeDirection`, `TimeEntrySource`, `TimeEntryChange`, `HolidayScope`, `AbsenceType`, `AbsenceHalfDay`, `AbsenceStatus` · `DayAttendance.DayStatus` (WORKED/MISSING/NOT_SCHEDULED/NO_SCHEDULE/HOLIDAY/ON_LEAVE) |
+| **Base de dados** | schema `attendance` — `V42` (horários), `V43` (emprego, picagens, revisões), `V44` (feriados, ausências, justificativos). **A fase 2 não tem migração**: horas, atrasos, faltas e saldo são derivados, nunca guardados |
+| **Testes** | `service/attendance/` — `AttendanceZoneTest` (5, fuso e horário de verão), `WorkScheduleServiceTest` (12), `EmploymentServiceTest` (9, histórico), `TimeEntryServiceTest` (12, sequência e revisões), `AttendanceCalculatorTest` (18, aritmética do dia + feriados/ausências), `AttendanceSummaryServiceTest` (12), `VacationBalanceServiceTest` (10, dias úteis), `AbsenceServiceTest` (14), `HolidayServiceTest` (6). **98 no total** |
+| **Frontend** | — ainda não existe |
+
+> ⚠️ **O fuso é a armadilha deste módulo.** `AttendanceZone` existe porque o resto do projeto é todo
+> UTC e nunca precisou de outra coisa: uma fatura tem data, não hora. Uma entrada às 08:00 em Lisboa é
+> 07:00 UTC no verão e 08:00 UTC no inverno — contar dias em UTC poria picagens no dia errado durante
+> metade do ano. Nunca derivar "o dia" de um `happenedAt` sem passar por aqui.
+
 ## Equipa, perfis e convites
 
 | Camada | Ficheiros |

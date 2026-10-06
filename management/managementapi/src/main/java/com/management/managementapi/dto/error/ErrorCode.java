@@ -448,7 +448,54 @@ public enum ErrorCode {
     EMAIL_PROVIDER_NONE_CONFIGURED("EMAIL_002", "Nenhum provedor de email configurado"),
     EMAIL_PROVIDER_INACTIVE("EMAIL_003", "O provedor de email predefinido não está ativo"),
     EMAIL_SEND_FAILED("EMAIL_004", "Falha ao enviar o email"),
-    EMAIL_PROVIDER_TEST_FAILED("EMAIL_005", "Falha ao contactar o servidor de email com estas credenciais");
+    EMAIL_PROVIDER_TEST_FAILED("EMAIL_005", "Falha ao contactar o servidor de email com estas credenciais"),
+
+    // ========================================================================
+    // HORÁRIOS DE TRABALHO (SCHED_xxx)
+    // ========================================================================
+    SCHEDULE_NOT_FOUND("SCHED_001", "Horário não encontrado"),
+    SCHEDULE_DUPLICATE_NAME("SCHED_002", "Já existe um horário com este nome"),
+    // SCHED_003 não existe: "horário sem dias" é apanhado pelo @NotEmpty do DTO, que
+    // devolve erro de campo — mais útil ao frontend do que um código de negócio.
+    SCHEDULE_DUPLICATE_WEEKDAY("SCHED_004", "O mesmo dia da semana aparece duas vezes no horário"),
+    SCHEDULE_INVALID_HOURS("SCHED_005", "A hora de saída tem de ser depois da hora de entrada"),
+    SCHEDULE_BREAK_TOO_LONG("SCHED_006", "A pausa não pode ser igual ou maior que o período de trabalho do dia"),
+    SCHEDULE_IN_USE("SCHED_007", "Este horário já esteve atribuído a um funcionário e por isso não pode ser alterado — crie um horário novo e atribua-o a partir da data que quiser"),
+    SCHEDULE_NOT_DELETED("SCHED_008", "Este horário não está apagado"),
+
+    // ========================================================================
+    // ASSIDUIDADE — emprego e picagens (ATT_xxx)
+    // ========================================================================
+    EMPLOYMENT_NOT_FOUND("ATT_001", "Este funcionário não tem dados de emprego registados"),
+    EMPLOYMENT_ALREADY_EXISTS("ATT_002", "Este funcionário já tem dados de emprego"),
+    EMPLOYMENT_TERM_BEFORE_HIRE("ATT_003", "Um período não pode começar antes da data de admissão"),
+    EMPLOYMENT_TERM_NOT_AFTER_CURRENT("ATT_004", "O período novo tem de começar depois do que está em vigor"),
+    EMPLOYMENT_NO_CURRENT_TERM("ATT_005", "Este funcionário não tem horário atribuído"),
+    TIME_ENTRY_NOT_FOUND("ATT_010", "Picagem não encontrada"),
+    TIME_ENTRY_OUT_OF_SEQUENCE("ATT_011", "A picagem não encaixa na sequência do dia — uma entrada tem de ser seguida de uma saída"),
+    TIME_ENTRY_DUPLICATE_INSTANT("ATT_012", "Já existe uma picagem deste funcionário neste instante"),
+    TIME_ENTRY_NOT_DELETED("ATT_013", "Esta picagem não está apagada"),
+    TIME_ENTRY_BEFORE_HIRE("ATT_014", "Não se pode registar uma picagem antes da data de admissão do funcionário"),
+
+    // ========================================================================
+    // ASSIDUIDADE — feriados e ausências (ABS_xxx)
+    // ========================================================================
+    HOLIDAY_NOT_FOUND("ABS_001", "Feriado não encontrado"),
+    HOLIDAY_DUPLICATE("ABS_002", "Já existe um feriado nesta data para este âmbito"),
+    HOLIDAY_MUNICIPALITY_REQUIRED("ABS_003", "Um feriado municipal tem de indicar o concelho"),
+    HOLIDAY_MUNICIPALITY_NOT_ALLOWED("ABS_004", "Um feriado nacional não leva concelho"),
+    ABSENCE_NOT_FOUND("ABS_010", "Ausência não encontrada"),
+    ABSENCE_INVALID_DATES("ABS_011", "A data de fim não pode ser antes da data de início"),
+    ABSENCE_HALF_DAY_ON_RANGE("ABS_012", "Meio dia só se aplica a uma ausência de um dia só"),
+    ABSENCE_OVERLAPS("ABS_013", "Este funcionário já tem uma ausência marcada que se sobrepõe a estas datas"),
+    ABSENCE_ALREADY_DECIDED("ABS_014", "Esta ausência já foi aprovada ou recusada"),
+    ABSENCE_NOT_DELETED("ABS_015", "Esta ausência não está anulada"),
+    ABSENCE_BEFORE_HIRE("ABS_016", "Não se pode marcar uma ausência antes da data de admissão do funcionário"),
+    // ABS_017 fica reservado para "saldo de férias insuficiente": bloquear a marcação por
+    // saldo é uma decisão de negócio que ainda não foi tomada. Hoje o saldo pode ficar
+    // negativo e mostra-se como está, em vez de recusar algo que o utilizador pode querer.
+    ABSENCE_DOCUMENT_NOT_FOUND("ABS_020", "Documento da ausência não encontrado"),
+    ABSENCE_DOCUMENT_TYPE("ABS_021", "O justificativo tem de ser um PDF ou uma imagem");
 
     private final String code;
     private final String defaultMessage;
