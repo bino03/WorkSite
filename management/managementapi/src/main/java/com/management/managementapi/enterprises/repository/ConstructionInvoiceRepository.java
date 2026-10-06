@@ -124,6 +124,7 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
               and (:budgetFilter = false
                    or exists (select 1 from ConstructionExpense e
                               where e.invoice = i and e.budgetItem.id in :budgetItemIds))
+              and (:lotFilter = false or i.budget.id = :lotId)
             """)
     Page<ConstructionInvoice> search(@Param("enterpriseId") UUID enterpriseId,
                                      @Param("allocated") Boolean allocated,
@@ -144,6 +145,8 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                      @Param("allocationStatus") String allocationStatus,
                                      @Param("budgetFilter") boolean budgetFilter,
                                      @Param("budgetItemIds") Collection<UUID> budgetItemIds,
+                                     @Param("lotFilter") boolean lotFilter,
+                                     @Param("lotId") UUID lotId,
                                      Pageable pageable);
 
     /**
@@ -178,23 +181,29 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                             @Param("q") String q,
                                             Pageable pageable);
 
-    /** Quantas faturas do projeto ainda estão por associar — alimenta o contador no orçamento. */
+    /** Quantas faturas do projeto ainda estão por associar — alimenta o contador no orçamento. Com lote, só as desse lote. */
     @Query("""
             select count(i) from ConstructionInvoice i
             where i.enterprise.id = :enterpriseId
               and i.relatedInvoiceId is null
+              and (:lotFilter = false or i.budget.id = :lotId)
               and not exists (select 1 from ConstructionExpense e where e.invoice = i)
             """)
-    long countPending(@Param("enterpriseId") UUID enterpriseId);
+    long countPending(@Param("enterpriseId") UUID enterpriseId,
+                      @Param("lotFilter") boolean lotFilter,
+                      @Param("lotId") UUID lotId);
 
-    /** Quanto valem as faturas por associar — o que falta ao "Gasto" do orçamento para dar o total faturado. */
+    /** Quanto valem as faturas por associar — o que falta ao "Gasto" do orçamento para dar o total faturado. Com lote, só as desse lote. */
     @Query("""
             select coalesce(sum(i.totalAmount), 0) from ConstructionInvoice i
             where i.enterprise.id = :enterpriseId
               and i.relatedInvoiceId is null
+              and (:lotFilter = false or i.budget.id = :lotId)
               and not exists (select 1 from ConstructionExpense e where e.invoice = i)
             """)
-    java.math.BigDecimal sumPending(@Param("enterpriseId") UUID enterpriseId);
+    java.math.BigDecimal sumPending(@Param("enterpriseId") UUID enterpriseId,
+                                    @Param("lotFilter") boolean lotFilter,
+                                    @Param("lotId") UUID lotId);
 
     // ── notas de crédito (fase 3) ─────────────────────────────
     // Uma linha com `related_invoice_id` preenchido É uma nota de crédito
@@ -432,4 +441,8 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
               and (i.supplierName is null or trim(i.supplierName) = '')
             """)
     int fillMissingSupplierName(@Param("nif") String nif, @Param("name") String name);
+
+    @Modifying
+    @Query("update ConstructionInvoice i set i.budget = null where i.budget.id = :budgetId")
+    int clearBudget(@Param("budgetId") UUID budgetId);
 }

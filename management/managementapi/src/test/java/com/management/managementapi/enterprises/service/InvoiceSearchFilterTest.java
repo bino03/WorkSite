@@ -79,7 +79,7 @@ class InvoiceSearchFilterTest {
         when(budgetItemRepository.findTreeByEnterpriseId(enterpriseId))
                 .thenReturn(List.of(c4, c42, c421, c422, c43, deleted));
         when(repository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any()))
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of()));
         when(documentRepository.findByInvoiceIdInOrderByUploadedAtAsc(any())).thenReturn(List.of());
     }
@@ -117,27 +117,27 @@ class InvoiceSearchFilterTest {
     void otherFiltersArePassedNormalized() {
         InvoiceSearchFilter filter = new InvoiceSearchFilter(null, null, null, null, null, null, null, " ft ",
                 " 123456789 ", "credit_note", " missing ", "partial", "complete",
-                new BigDecimal("10"), new BigDecimal("500"), null);
+                new BigDecimal("10"), new BigDecimal("500"), null, null);
 
         service.search(enterpriseId, filter, pageable);
 
         verify(repository).search(eq(enterpriseId), any(), any(), any(), any(), any(), eq(BudgetRowKind.ITEM),
                 any(), any(), eq("ft"), eq("123456789"), eq("CREDIT_NOTE"), eq("MISSING"),
                 eq(new BigDecimal("10")), eq(new BigDecimal("500")), eq("PARTIAL"), eq("COMPLETE"),
-                eq(false), any(), eq(pageable));
+                eq(false), any(), eq(false), any(), eq(pageable));
     }
 
     // ── auxiliares ────────────────────────────────────────────
 
     private static InvoiceSearchFilter filterWithBudgetItem(UUID id) {
         return new InvoiceSearchFilter(null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, id);
+                null, null, null, null, null, null, null, id, null);
     }
 
     private boolean captureBudgetFilter() {
         ArgumentCaptor<Boolean> flag = ArgumentCaptor.forClass(Boolean.class);
         verify(repository).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), flag.capture(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), flag.capture(), any(), anyBoolean(), any(), any());
         return flag.getValue();
     }
 
@@ -145,7 +145,7 @@ class InvoiceSearchFilterTest {
     private Collection<UUID> captureBudgetItemIds() {
         ArgumentCaptor<Collection<UUID>> ids = ArgumentCaptor.forClass(Collection.class);
         verify(repository).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), ids.capture(), any());
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), ids.capture(), anyBoolean(), any(), any());
         return ids.getValue();
     }
 

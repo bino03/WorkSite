@@ -9,6 +9,7 @@ import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceDocumentRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
@@ -72,6 +73,7 @@ import static org.mockito.Mockito.when;
 class InvoiceTransferServiceTest {
 
     @Mock private ConstructionInvoiceRepository repository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private ConstructionInvoiceDocumentRepository documentRepository;
     @Mock private ConstructionExpenseRepository expenseRepository;
     @Mock private ConstructionBudgetItemRepository budgetItemRepository;

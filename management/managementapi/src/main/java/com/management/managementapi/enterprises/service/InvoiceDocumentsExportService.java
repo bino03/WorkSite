@@ -140,10 +140,10 @@ public class InvoiceDocumentsExportService {
     /**
      * O plano dos documentos de uma obra, limitado a um âmbito.
      *
-     * O lote de uma fatura deduz-se das rubricas onde está classificada
+     * O lote de uma fatura classificada deduz-se das rubricas onde está
      * ({@code expense → budget_item → budget}), numa só query pelas despesas de
-     * todas as faturas da obra. Uma fatura repartida por rubricas de dois lotes
-     * conta para os dois.
+     * todas as faturas da obra. Uma fatura por classificar pertence ao lote que
+     * tem em {@code construction_invoice.budget_id}.
      *
      * @param folder o prefixo dentro do zip. O zip da pasta da obra usa
      *               {@code Faturas/Lançadas/}, que é a estrutura do vault (§7); um
@@ -196,13 +196,16 @@ public class InvoiceDocumentsExportService {
 
         return invoices.stream()
                 .filter(invoice -> {
-                    Set<UUID> lots = lotsByInvoice.get(invoice.getId());
-                    boolean associated = lots != null && !lots.isEmpty();
+                    Set<UUID> lots = lotsByInvoice.getOrDefault(invoice.getId(), Set.of());
+                    boolean associated = !lots.isEmpty();
                     if (scope == InvoiceDocumentsScope.UNCLASSIFIED) {
                         return !associated;
                     }
-                    // ASSOCIATED: sem lote valem todas as associadas; com lote, só as desse
-                    return associated && (budgetId == null || lots.contains(budgetId));
+                    if (associated) {
+                        return budgetId == null || lots.contains(budgetId);
+                    }
+                    // Por classificar mas já com lote: é do lote, mesmo sem rubrica.
+                    return budgetId != null && budgetId.equals(invoice.getBudgetId());
                 })
                 .toList();
     }

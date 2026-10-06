@@ -289,11 +289,12 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) BigDecimal maxAmount,
             @RequestParam(required = false) UUID budgetItemId,
+            @RequestParam(required = false) UUID budgetId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return service.search(enterpriseId, new InvoiceSearchFilter(
                 allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
-                minAmount, maxAmount, budgetItemId), pageable);
+                minAmount, maxAmount, budgetItemId, budgetId), pageable);
     }
 
     // ── download dos documentos (PDFs e fotos das faturas) ────
@@ -409,11 +410,12 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) String allocationStatus,
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) BigDecimal maxAmount,
-            @RequestParam(required = false) UUID budgetItemId) {
+            @RequestParam(required = false) UUID budgetItemId,
+            @RequestParam(required = false) UUID budgetId) {
         return ResponseEntity.ok(service.outstandingSummary(enterpriseId, new InvoiceSearchFilter(
                 allocated, needsReview, null, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
-                minAmount, maxAmount, budgetItemId)));
+                minAmount, maxAmount, budgetItemId, budgetId)));
     }
 
     @GetMapping("/unidentified/outstanding-summary")
@@ -437,8 +439,10 @@ public class ConstructionInvoiceController {
      */
     @GetMapping("/enterprise/{enterpriseId}/pending-summary")
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
-    public ResponseEntity<PendingInvoicesSummaryDTO> pendingSummary(@PathVariable UUID enterpriseId) {
-        return ResponseEntity.ok(service.pendingSummary(enterpriseId));
+    public ResponseEntity<PendingInvoicesSummaryDTO> pendingSummary(
+            @PathVariable UUID enterpriseId,
+            @RequestParam(required = false) UUID budgetId) {
+        return ResponseEntity.ok(service.pendingSummary(enterpriseId, budgetId));
     }
 
     /**
@@ -530,6 +534,16 @@ public class ConstructionInvoiceController {
                 activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
                         EntityType.CONSTRUCTION_EXPENSE, expense.getId(), expense.getName(), request));
 
+        return ResponseEntity.ok(service.getDetail(id));
+    }
+
+    /** Define o lote da fatura antes de a classificar; sem {@code budgetId} limpa-o. */
+    @PatchMapping("/{id}/budget")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ConstructionInvoiceResponseDTO> setBudget(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID budgetId) {
+        service.setBudget(id, budgetId);
         return ResponseEntity.ok(service.getDetail(id));
     }
 

@@ -175,6 +175,8 @@ export interface ConstructionInvoice {
   id: string;
   /** Nulo quando `scope` não é `PROJECT` — despesa da empresa ou quarentena. */
   enterpriseId: string | null;
+  /** Nulo enquanto a fatura não tem lote — numa obra de vários lotes é preciso antes de classificar. */
+  budgetId: string | null;
   scope: InvoiceScope;
   documentType: InvoiceDocumentType;
   /** A fatura que esta nota de crédito corrige. */
@@ -531,9 +533,18 @@ export interface InvoiceFilters {
   /** Rubrica; o backend apanha também tudo o que está por baixo dela. `budgetItemLabel` é só para mostrar. */
   budgetItemId: string | null;
   budgetItemLabel: string | null;
+  /** Lote da fatura; só faz sentido numa obra com vários. Apanha também as que ainda não têm rubrica. */
+  budgetId: string | null;
 }
 
-/** As chaves da pesquisa avançada — o que o modal edita e o "Limpar filtros" apaga. */
+/**
+ * As chaves da pesquisa avançada — o que o modal edita e o "Limpar filtros" apaga.
+ *
+ * `budgetId` NÃO está aqui de propósito (2026-10-06): o lote saiu do modal para o
+ * dropdown da barra, e é navegação, não pesquisa avançada. Fora desta lista, não
+ * conta para o badge do botão "Filtros", o `apply()` do modal não lhe mexe, e o
+ * "Limpar filtros" não o apaga — limpa-se no próprio dropdown, em "Todos os lotes".
+ */
 export const ADVANCED_INVOICE_FILTER_KEYS = [
   "outstanding",
   "sentToAccountant",
@@ -570,6 +581,7 @@ export const EMPTY_INVOICE_FILTERS: InvoiceFilters = {
   minAmount: null,
   maxAmount: null,
   budgetItemId: null,
+  budgetId: null,
   budgetItemLabel: null,
 };
 

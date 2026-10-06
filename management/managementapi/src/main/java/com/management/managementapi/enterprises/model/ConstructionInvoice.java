@@ -63,6 +63,15 @@ public class ConstructionInvoice extends BaseEntity {
     @Column(name = "scope", nullable = false, columnDefinition = "worksite.invoice_scope")
     private Scope scope = Scope.PROJECT;
 
+    /**
+     * O lote a que a fatura pertence. Nulo enquanto não se souber — numa obra
+     * com vários lotes só se classifica depois de o escolher. Sempre nulo fora
+     * de {@code PROJECT}, e de um lote da própria obra (FK composta).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "budget_id")
+    private ConstructionBudget budget;
+
     /** Só em {@code UNIDENTIFIED}: a coluna "Obras possíveis" da quarentena. Texto livre. */
     @Column(name = "possible_enterprises")
     private String possibleEnterprises;
@@ -156,6 +165,11 @@ public class ConstructionInvoice extends BaseEntity {
 
     public Enterprise getEnterprise() { return enterprise; }
     public void setEnterprise(Enterprise enterprise) { this.enterprise = enterprise; }
+
+    public ConstructionBudget getBudget() { return budget; }
+    public void setBudget(ConstructionBudget budget) { this.budget = budget; }
+
+    public UUID getBudgetId() { return budget == null ? null : budget.getId(); }
 
     public Scope getScope() { return scope; }
     public void setScope(Scope scope) { this.scope = scope; }

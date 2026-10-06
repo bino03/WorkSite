@@ -18,6 +18,7 @@ import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
@@ -64,6 +65,7 @@ public class ConstructionBudgetItemService {
 
     private final ConstructionBudgetItemRepository repository;
     private final ConstructionBudgetRepository budgetRepository;
+    private final ConstructionInvoiceRepository invoiceRepository;
     private final ConstructionExpenseRepository expenseRepository;
     private final EnterpriseRepository enterpriseRepository;
     private final AuthContext authContext;
@@ -159,6 +161,7 @@ public class ConstructionBudgetItemService {
         OffsetDateTime now = OffsetDateTime.now();
         lot.setDeletedAt(now);
         budgetRepository.save(lot);
+        invoiceRepository.clearBudget(budgetId);
 
         List<ConstructionBudgetItem> liveItems = livesOnly(repository.findTreeByBudgetId(budgetId));
         liveItems.forEach(item -> item.setDeletedAt(now));

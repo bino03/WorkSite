@@ -4,11 +4,13 @@ import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceDocumentRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
@@ -67,6 +69,7 @@ class InvoiceSplitServiceTest {
     @Mock private ConstructionInvoiceDocumentRepository documentRepository;
     @Mock private ConstructionExpenseRepository expenseRepository;
     @Mock private ConstructionBudgetItemRepository budgetItemRepository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private EnterpriseRepository enterpriseRepository;
     @Mock private SupplierRepository supplierRepository;
     @Mock private ProfileRepository profileRepository;
@@ -85,6 +88,7 @@ class InvoiceSplitServiceTest {
     private static final UUID ENTERPRISE_ID = UUID.randomUUID();
     private static final UUID CIMENTO = UUID.randomUUID();
     private static final UUID FERRAGENS = UUID.randomUUID();
+    private static final UUID LOT_ID = UUID.randomUUID();
 
     private ConstructionInvoice invoice(BigDecimal total) {
         ConstructionInvoice inv = new ConstructionInvoice();
@@ -102,7 +106,7 @@ class InvoiceSplitServiceTest {
         return inv;
     }
 
-    /** Uma rubrica desta obra que aceita despesas. */
+    /** Uma rubrica desta obra, do único lote dela, que aceita despesas. */
     private ConstructionBudgetItem item(UUID id) {
         ConstructionBudgetItem item = new ConstructionBudgetItem();
         item.setId(id);
@@ -110,6 +114,9 @@ class InvoiceSplitServiceTest {
         Enterprise e = new Enterprise();
         e.setId(ENTERPRISE_ID);
         item.setEnterprise(e);
+        ConstructionBudget lot = new ConstructionBudget();
+        lot.setId(LOT_ID);
+        item.setBudget(lot);
         return item;
     }
 

@@ -155,8 +155,10 @@ rubricas".
 > orçamento"). Uma vila pode ter vários **lotes** (edifícios), cada um com o seu orçamento do empreiteiro, importado
 > à parte, e com numeração própria: o `4.2.1` do Lote A e o do Lote B são rubricas diferentes. A `V39` pôs a tabela
 > `construction_budget` (o lote) entre o projeto e as rubricas; o `code` passou a ser único **por lote**. As
-> **faturas continuam no projeto**: é a rubrica escolhida na repartição que diz de que lote é o gasto, e uma fatura
-> pode dividir-se entre lotes. Continua a não haver versões/revisões de um orçamento — corrigir um orçamento
+> **faturas continuam no projeto**, e desde 2026-10-06 têm lote próprio (`construction_invoice.budget_id`, `V41`):
+> numa obra de vários lotes escolhe-se o lote antes de classificar, e todas as rubricas da fatura são desse lote —
+> uma fatura **não** se reparte entre lotes. Numa obra de um só lote o lote deduz-se. Ao transferir uma fatura, o
+> lote é recalculado para a obra de destino (só fica se ela tiver um lote único). Continua a não haver versões/revisões de um orçamento — corrigir um orçamento
 > importado mal faz-se pelo CRUD de rubricas (decisão de 2026-08-18 mantida). O cabeçalho do Excel (empreiteiro,
 > cliente, obra, data), o `TOTAL` e as notas de condições continuam a **não** ser guardados.
 >

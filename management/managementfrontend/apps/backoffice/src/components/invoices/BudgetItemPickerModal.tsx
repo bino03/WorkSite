@@ -25,7 +25,8 @@ interface Props {
    */
   initialLotId?: string | null;
   onClose: () => void;
-  onPick: (item: BudgetItemNode) => void;
+  /** `lotId` é o lote da rubrica numa obra com vários; `null` com um só lote. */
+  onPick: (item: BudgetItemNode, lotId: string | null) => void;
   saving?: boolean;
 }
 
@@ -124,6 +125,11 @@ export const BudgetItemPickerModal: FC<Props> = ({
   }, [open, enterpriseId, supplierNif, initialLotId, fetchTree]);
 
   const roots = useMemo(() => tree?.roots ?? [], [tree]);
+
+  const lotOf = (node: BudgetItemNode): string | null => {
+    const top = pathTo(roots, node.id)[0];
+    return top && top.id.startsWith("lot:") ? top.id.slice(4) : null;
+  };
 
   /** Do topo até à rubrica aberta, inclusive — vazio no topo. */
   const trail = useMemo(() => (parentId ? pathTo(roots, parentId) : []), [roots, parentId]);
@@ -339,7 +345,7 @@ export const BudgetItemPickerModal: FC<Props> = ({
             type="primary"
             loading={saving}
             disabled={!selected}
-            onClick={() => selected && onPick(selected)}
+            onClick={() => selected && onPick(selected, lotOf(selected))}
           >
             Associar
           </Button>

@@ -160,8 +160,8 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 > Desde 2026-09-24, o mesmo DTO traz também `lots` (`BudgetLotOptionDTO[]`, só `id`+`name`, sem os
 > números do orçamento) — vazio (nunca `null`) numa obra sem lotes. É o que alimenta o seletor de
 > lote no `TransferInvoiceDrawer`: depois de escolher a obra de destino, se ela tiver lotes, escolhe-se
-> também um (opcional) — é só um atalho de UX (abre logo o `BudgetItemPickerModal` já dentro desse
-> lote), a transferência em si não muda nem grava o lote em lado nenhum.
+> também um (opcional). Depois de a transferência correr, o lote grava-se com `PATCH /construction-invoices/{id}/budget`
+> (ver a tabela de rotas de faturas); sem lote escolhido, a fatura fica sem lote até ser classificada.
 
 ### Relações do projeto (`EntrepriseRelationsController`, `/enterprise-relations/{id}`)
 
@@ -286,9 +286,10 @@ entre os dois exports:
 
 - a folha do orçamento é a do lote, com o nome `Orçamento - <Lote>` (logo reimportá-la para o mesmo
   lote volta a encontrá-la pelo nome);
-- na "Despesas" e no painel entram **só as linhas das rubricas desse lote**. As dos outros lotes e as
-  faturas **por classificar** ficam de fora — não são atribuíveis ao lote — com um aviso que diz
-  quantas linhas caíram, porque o total da "Despesas" deixa de ser o da obra;
+- na "Despesas" e no painel entram **só as linhas das rubricas desse lote**, mais as faturas **por
+  classificar cujo lote (`construction_invoice.budget_id`) é este**. As dos outros lotes e as faturas
+  por classificar sem lote ficam de fora, com um aviso que diz quantas linhas caíram, porque o total da
+  "Despesas" deixa de ser o da obra. Numa obra de um só lote as por classificar continuam fora, como antes;
 - a coluna `Rubrica` **mantém** o prefixo `<Lote> · `, apesar de haver um só lote no ficheiro: é o que
   mantém as linhas inequívocas se o ficheiro for reimportado numa obra com vários lotes (o
   `DespesasExcelImportService` recusa-se a adivinhar o lote) e o que faz as `SUMIFS` do painel bater.
@@ -396,7 +397,7 @@ de entrada.
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
-| GET | `/construction-invoices/enterprise/{enterpriseId}/pending-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total }` das faturas por associar (NC não entram): o contador do botão "Faturas" e o cartão "Por classificar" ao lado do "Gasto" no orçamento. Era `pending-count` (só o número) até 2026-09-18 |
+| GET | `/construction-invoices/enterprise/{enterpriseId}/pending-summary[?budgetId=]` | `ADMIN` ou `EMPLOYEE` — `{ count, total }` das faturas por associar (NC não entram); com `budgetId`, só as desse lote: o contador do botão "Faturas" e o cartão "Por classificar" ao lado do "Gasto" no orçamento. Era `pending-count` (só o número) até 2026-09-18 |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/outstanding-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total, withoutTotalCount }` do que **falta pagar** nas faturas por liquidar, com os mesmos filtros da lista (todos os da tabela "Filtros da caixa de entrada", incluindo os da pesquisa avançada; `outstanding` é sempre true). `total` = Σ (total − NC − pago) sobre **todas** as faturas do filtro, não só a página; as sem total contam em `count`/`withoutTotalCount` e valem 0. É o "Falta pagar X" ao lado do filtro "Por liquidar" (2026-09-21) |
 | GET | `/construction-invoices/unidentified/outstanding-summary?q=` · `/company/outstanding-summary?q=` | `ADMIN` — o mesmo para a quarentena e as despesas da empresa |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida por NIF, sem o porquê (o `rubric-suggestion` por fatura veio substituí-lo); `204` sem histórico |
@@ -405,7 +406,8 @@ de entrada.
 | POST | `/construction-invoices/{id}/file` | `ADMIN` ou `EMPLOYEE` — substitui o ficheiro, relê o QR |
 | POST | `/construction-invoices/{id}/rescan` | `ADMIN` ou `EMPLOYEE` — relê o QR do ficheiro arquivado e repõe os campos fiscais |
 | GET | `/construction-invoices/{id}/rubric-suggestion` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida **com o porquê**; `204` sem histórico |
-| PATCH | `/construction-invoices/{id}/allocate?budgetItemId=` | `ADMIN` — liga a **uma** rubrica, cria o lançamento |
+| PATCH | `/construction-invoices/{id}/budget?budgetId=` | `ADMIN` — define o lote da fatura antes de a classificar; sem `budgetId` limpa-o. Recusa com `INVOICE_052` se já tiver despesas (exceto para fixar o lote que elas já têm) |
+| PATCH | `/construction-invoices/{id}/allocate?budgetItemId=` | `ADMIN` — liga a **uma** rubrica, cria o lançamento. Obra de vários lotes sem lote na fatura → `INVOICE_051`; rubrica de outro lote → `INVOICE_050` |
 | POST | `/construction-invoices/{id}/expenses/split` | `ADMIN` — reparte por N rubricas, substituindo a repartição atual |
 | POST | `/construction-invoices/batch-allocate` | `ADMIN` — N faturas → 1 rubrica, melhor esforço (resultado por fatura) |
 | DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz **todas** as linhas, devolve à caixa de entrada |
@@ -596,6 +598,7 @@ ordenada por `uploadedAt` descendente:
 | `allocationStatus` | `NONE` / `PROVISIONAL` (com linhas, sem total) / `PARTIAL` (Σ linhas ≠ total) / `COMPLETE` — a regra do `allocationStatus` da resposta, em SQL |
 | `minAmount` / `maxAmount` | intervalo de `totalAmount`, inclusive |
 | `budgetItemId` | rubrica **e toda a sub-árvore dela** (o serviço resolve os ids das descendentes vivas antes da query; uma rubrica de outra obra ou apagada filtra tudo, não devolve a lista inteira) |
+| `budgetId` | lote da fatura (`construction_invoice.budget_id`). Apanha também as faturas **sem rubrica** — é o que deixa ver as "por classificar" de um lote. Vale também no `outstanding-summary` |
 
 Os últimos oito são a **pesquisa avançada** do Backoffice (2026-09-21, `InvoiceFiltersModal`) e vão
 também no `GET …/outstanding-summary`, que aceita exatamente o mesmo conjunto (menos `outstanding`).
@@ -710,6 +713,9 @@ associada acompanha os novos valores.
 | `INVOICE_031` | transferência para uma obra de teste (`is_test`) |
 | `INVOICE_032` | transferência cujo destino é o âmbito/obra onde a fatura já está |
 | `INVOICE_033` | `POST /{id}/transfer` sobre uma nota de crédito — a NC segue a fatura de origem, não se transfere sozinha |
+| `INVOICE_050` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — a rubrica é de outro lote do que o da fatura |
+| `INVOICE_051` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — obra de vários lotes e a fatura ainda não tem lote |
+| `INVOICE_052` | `PATCH /{id}/budget` — a fatura já tem despesas e o pedido mudaria o lote |
 | `INVOICE_034` | inconsistência não encontrada (`GET/POST /invoice-incidents/{id}`) |
 | `INVOICE_035` | `POST /invoice-incidents` com uma fatura que não existe |
 | `INVOICE_036` | `POST /import-excel` com ficheiro vazio |
@@ -761,8 +767,9 @@ de lote vive **dentro** da opção "já associadas".
 > nenhum, por isso sem esse âmbito os seus documentos não saíam em zip nenhum — e isso não é um caso
 > de canto: na Vila Aleu, a 2026-10-02, **as 44 faturas estavam todas por classificar**, ou seja os 43
 > documentos dela eram todos inalcançáveis por lote. `ASSOCIATED` (sem lote) e `UNCLASSIFIED` não se
-> sobrepõem e, somados, dão o `ALL` — exceto uma fatura **repartida por rubricas de dois lotes**, que
-> conta nos dois zips por lote (o documento é o mesmo, e quem o pede por lote quer vê-lo lá).
+> sobrepõem e, somados, dão o `ALL`. Desde a `V41` uma fatura por classificar **com lote** (`budget_id`)
+> entra também no zip desse lote (`LOT`), sem rubrica — por isso essa fatura conta em `LOT` e em
+> `UNCLASSIFIED`. Uma fatura classificada não se reparte entre lotes.
 
 **`SELECTED` e segurança**: os ids vêm no query string, mas o ponto de partida do filtro é sempre
 `findAllByEnterpriseIdForExport(enterpriseId)` — um id de outra obra posto à mão no URL não traz

@@ -318,6 +318,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_047': 'Não há documentos para descarregar neste âmbito.',
   'INVOICE_048': 'Escolha pelo menos uma fatura na lista.',
   'INVOICE_049': 'Demasiadas faturas selecionadas de uma vez (máximo 300).',
+  'INVOICE_050': 'A rubrica é de outro lote — a fatura já está noutro lote.',
+  'INVOICE_051': 'Escolha primeiro o lote da fatura — a obra tem vários lotes.',
+  'INVOICE_052': 'A fatura já tem despesas noutro lote — desfaça a classificação antes de mudar de lote.',
 
   // Fornecedores
   'SUPPLIER_001': 'Fornecedor não encontrado.',

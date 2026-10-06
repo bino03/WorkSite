@@ -284,10 +284,12 @@ public class BudgetExcelExportService {
      * Recorta um modelo da obra inteira a um só lote: a árvore, as rubricas, as
      * linhas de despesa e o nome do ficheiro.
      *
-     * As linhas sem lote — faturas por classificar, despesas numa rubrica
-     * eliminada — <b>não</b> entram: não são atribuíveis a este lote. Isso faz o
-     * total da "Despesas" do ficheiro do lote não bater com o da obra, e quem o
-     * abre tem de saber porquê.
+     * Numa obra de vários lotes, as faturas por classificar entram só se o lote
+     * delas (o {@code budget_id}) for este; as de outro lote, e as despesas numa
+     * rubrica eliminada, ficam de fora. Isso faz o total da "Despesas" do ficheiro
+     * do lote não bater com o da obra, e quem o abre tem de saber porquê. Numa obra
+     * de um só lote não há lote a escolher, e as faturas por classificar continuam
+     * fora, como antes.
      *
      * Quem avisa é o <b>modal</b>, antes do download, que é onde o aviso serve para
      * algo. Aqui só se registra no log: um {@code model.warnings.add} não chegaria a
@@ -306,7 +308,10 @@ public class BudgetExcelExportService {
             // tiram as linhas sem rubrica, e o `lots` fica vazio de propósito: o
             // escritor mantém-se no modo de um lote (sem coluna Lote, folha
             // "Orçamento inicial", SUMIFS sobre $A), coerente com as etiquetas.
-            model.rows.removeIf(row -> row.rubric() == null);
+            // "um só lote" aqui conta os lotes com rubricas; um lote vazio não faz a obra ser de vários
+            boolean severalLots = budgetService.listLots(model.enterprise.getId()).size() > 1;
+            model.rows.removeIf(row -> row.rubric() == null
+                    && !(severalLots && lotName.equals(row.lot())));
         } else {
             model.lots.removeIf(l -> !l.name().equals(lotName));
             model.rubrics.removeIf(rubric -> !lotName.equals(rubric.lot()));
@@ -635,7 +640,8 @@ public class BudgetExcelExportService {
             }
             model.rows.add(new ExpenseRow(number, invoice.getInvoiceDate(), nullToEmpty(invoice.getDescription()),
                     amount, paid, method, invoice.isSentToAccountant(), observations, null,
-                    invoice.getSupplierName(), invoice.getSupplierNif(), null));
+                    invoice.getSupplierName(), invoice.getSupplierNif(),
+                    invoice.getBudget() == null ? null : invoice.getBudget().getName()));
             return;
         }
 

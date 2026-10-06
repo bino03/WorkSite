@@ -13,6 +13,8 @@ interface Props {
   enterpriseId: string;
   /** A rubrica atualmente escolhida, para se destacar na lista. */
   selectedId?: string | null;
+  /** Só as rubricas deste lote — o lote da fatura, numa obra com vários. */
+  budgetId?: string | null;
   onPick: (item: BudgetItemSearchResult) => void;
   autoFocus?: boolean;
 }
@@ -30,7 +32,7 @@ interface Props {
  * o nome sozinho não os distingue. O gasto responde à pergunta que a pessoa tem
  * na cabeça — "ainda cabe aqui?" — sem a mandar a outro ecrã.
  */
-export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick, autoFocus }) => {
+export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, budgetId, onPick, autoFocus }) => {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BudgetItemSearchResult[]>([]);
@@ -48,7 +50,8 @@ export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick,
       setLoading(true);
       try {
         const found = await searchBudgetItems(enterpriseId, text);
-        if (mine === requestId.current) setResults(found);
+        const ofLot = budgetId ? found.filter((item) => item.budgetId === budgetId) : found;
+        if (mine === requestId.current) setResults(ofLot);
       } catch (error) {
         if (mine === requestId.current) {
           setResults([]);
@@ -58,7 +61,7 @@ export const RubricSearchField: FC<Props> = ({ enterpriseId, selectedId, onPick,
         if (mine === requestId.current) setLoading(false);
       }
     },
-    [enterpriseId]
+    [enterpriseId, budgetId]
   );
 
   // Com o campo vazio pede-se na mesma: o backend devolve os capítulos, que é

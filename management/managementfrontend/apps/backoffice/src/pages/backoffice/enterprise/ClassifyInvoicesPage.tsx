@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Button, Empty, Spin, Tooltip } from "antd";
+import { Alert, Button, Empty, Select, Spin, Tooltip } from "antd";
 import { ArrowLeftOutlined, BulbOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
@@ -9,17 +9,19 @@ import RubricSearchField from "@/components/invoices/RubricSearchField";
 import InvoiceSplitEditor from "@/components/invoices/InvoiceSplitEditor";
 import { rubricLabel, splitIsValid } from "@/components/invoices/invoiceSplit";
 import type { DraftSplitLine } from "@/components/invoices/invoiceSplit";
+import { listBudgetLots } from "@/services/budgetService";
 import {
   allocateInvoice,
   getInvoice,
   getRubricSuggestion,
   listInvoices,
+  setInvoiceBudget,
   splitInvoice,
 } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import type { BudgetItemSearchResult } from "@/types/budget";
+import type { BudgetItemSearchResult, BudgetLot } from "@/types/budget";
 import type { ConstructionInvoice, RubricSuggestion } from "@/types/invoice";
 import { EMPTY_INVOICE_FILTERS } from "@/types/invoice";
 
@@ -60,6 +62,10 @@ const ClassifyInvoicesPage: FC = () => {
   const [invoice, setInvoice] = useState<ConstructionInvoice | null>(null);
   const [suggestion, setSuggestion] = useState<RubricSuggestion | null>(null);
 
+  /** Os lotes da obra; com mais de um, a fatura escolhe o seu antes da rubrica. */
+  const [lots, setLots] = useState<BudgetLot[]>([]);
+  const [lotId, setLotId] = useState<string | null>(null);
+
   const [lines, setLines] = useState<DraftSplitLine[]>([emptyLine]);
   const [editingIndex, setEditingIndex] = useState(0);
   /** A rubrica da última fatura confirmada nesta sessão — o "igual à anterior". */
@@ -90,6 +96,12 @@ const ClassifyInvoicesPage: FC = () => {
     void loadQueue();
   }, [loadQueue]);
 
+  useEffect(() => {
+    listBudgetLots(enterpriseId)
+      .then(setLots)
+      .catch((error) => ErrorHandler.handle(error));
+  }, [enterpriseId]);
+
   // Ao mudar de fatura: traz o detalhe (para o documento) e pede a sugestão.
   useEffect(() => {
     if (!current) {
@@ -106,6 +118,7 @@ const ClassifyInvoicesPage: FC = () => {
     setInvoice(null);
     setSuggestion(null);
     setLines([{ ...emptyLine, amount: current.totalAmount }]);
+    setLotId(null);
     setEditingIndex(0);
 
     void (async () => {
@@ -116,6 +129,7 @@ const ClassifyInvoicesPage: FC = () => {
         ]);
         if (cancelled) return;
         setInvoice(detail);
+        setLotId(detail.budgetId);
         setSuggestion(hint);
         // A sugestão vem **pré-selecionada**, nunca gravada: poupa o gesto sem
         // tirar a decisão a ninguém.
@@ -155,6 +169,21 @@ const ClassifyInvoicesPage: FC = () => {
     setIndex((i) => i + 1);
   };
 
+  /** Grava só o lote, sem rubrica: a fatura continua na fila, para escolher a rubrica a seguir. */
+  const saveLotOnly = async () => {
+    if (!invoice || !lotId) return;
+    setSaving(true);
+    try {
+      const updated = await setInvoiceBudget(invoice.id, lotId);
+      setInvoice((prev) => (prev ? { ...prev, budgetId: updated.budgetId } : prev));
+      notificationService.success(t("invoices.classify.lotSaved"));
+    } catch (error) {
+      ErrorHandler.handle(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const confirm = async () => {
     if (!invoice) return;
     setSaving(true);
@@ -162,6 +191,10 @@ const ClassifyInvoicesPage: FC = () => {
       // Uma só rubrica passa pelo `allocate` de sempre; N pelo `split`. Não é
       // só elegância: o `allocate` é o caminho que o resto da app já usa, e
       // mandar tudo pelo `split` mudaria o comportamento do caso normal.
+      // O lote grava-se só agora, na confirmação: até lá é escolha de ecrã.
+      if (lots.length > 1 && lotId && invoice.budgetId !== lotId) {
+        await setInvoiceBudget(invoice.id, lotId);
+      }
       if (splitting) {
         await splitInvoice(
           invoice.id,
@@ -317,6 +350,18 @@ const ClassifyInvoicesPage: FC = () => {
                 </div>
               )}
 
+              {lots.length > 1 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.classify.fieldLot")}</label>
+                  <Select
+                    value={lotId ?? undefined}
+                    onChange={(value) => setLotId(value)}
+                    placeholder={t("invoices.classify.lotPlaceholder")}
+                    options={lots.map((lot) => ({ value: lot.id, label: lot.name }))}
+                  />
+                </div>
+              )}
+
               <InvoiceSplitEditor
                 lines={lines}
                 total={total}
@@ -328,6 +373,7 @@ const ClassifyInvoicesPage: FC = () => {
               <RubricSearchField
                 enterpriseId={enterpriseId}
                 selectedId={lines[editingIndex]?.budgetItemId}
+                budgetId={lots.length > 1 ? lotId : null}
                 onPick={pickRubric}
               />
 
@@ -335,6 +381,14 @@ const ClassifyInvoicesPage: FC = () => {
                 <Button type="primary" onClick={() => void confirm()} loading={saving} disabled={!canConfirm}>
                   {t("invoices.classify.confirm")}
                 </Button>
+                {lots.length > 1 && (
+                  <Button
+                    onClick={() => void saveLotOnly()}
+                    disabled={saving || !lotId || lotId === invoice?.budgetId}
+                  >
+                    {t("invoices.classify.saveLotOnly")}
+                  </Button>
+                )}
                 <Button onClick={advance} disabled={saving}>
                   {t("invoices.classify.skip")}
                 </Button>

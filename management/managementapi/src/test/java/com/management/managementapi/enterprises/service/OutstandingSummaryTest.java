@@ -66,7 +66,7 @@ class OutstandingSummaryTest {
         nc.setRelatedInvoiceId(b.getId());
 
         when(repository.search(eq(enterpriseId), any(), any(), eq(true), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any()))
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(a, b, c)));
         when(paymentService.paymentsForInvoices(any(), anyBoolean()))
                 .thenReturn(Map.of(a.getId(), List.of(payment("30"))));
@@ -82,7 +82,7 @@ class OutstandingSummaryTest {
         // Sem paginação e com outstanding=true, sempre — é o que faz o número bater com a lista inteira.
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(repository).search(eq(enterpriseId), any(), any(), eq(true), any(), any(), any(), any(), any(),
-                eq(null), any(), any(), any(), any(), any(), any(), any(), eq(false), any(), pageable.capture());
+                eq(null), any(), any(), any(), any(), any(), any(), any(), eq(false), any(), eq(false), any(), pageable.capture());
         assertThat(pageable.getValue().isUnpaged()).isTrue();
     }
 

@@ -171,6 +171,7 @@ export const BudgetExportModal: FC<Props> = ({
     });
   };
 
+  const hasMultipleLots = lots.length > 1;
   const lot = lots.find((l) => l.id === lotId) ?? null;
   const lotScope = scope === "LOT";
 
@@ -314,25 +315,27 @@ export const BudgetExportModal: FC<Props> = ({
 
         {summary && step === 0 && (
           <>
-            <Radio.Group
-              value={scope}
-              onChange={(e) => setScope(e.target.value as ExportScope)}
-              style={{ display: "flex", flexDirection: "column", gap: "6.8px" }}
-            >
-              <Radio value="ENTERPRISE">
-                <span style={{ fontWeight: 600 }}>A obra toda</span>
-                <div style={{ fontSize: 12, opacity: 0.6 }}>
-                  Um livro com as folhas que escolheres — é o ficheiro que vai para o vault.
-                </div>
-              </Radio>
-              <Radio value="LOT" disabled={lots.length === 0}>
-                <span style={{ fontWeight: 600 }}>Um lote só</span>
-                <div style={{ fontSize: 12, opacity: 0.6 }}>
-                  Um ficheiro por lote, com a obra e o lote no nome. As folhas são as mesmas,
-                  recortadas a esse lote.
-                </div>
-              </Radio>
-            </Radio.Group>
+            {hasMultipleLots && (
+              <Radio.Group
+                value={scope}
+                onChange={(e) => setScope(e.target.value as ExportScope)}
+                style={{ display: "flex", flexDirection: "column", gap: "6.8px" }}
+              >
+                <Radio value="ENTERPRISE">
+                  <span style={{ fontWeight: 600 }}>A obra toda</span>
+                  <div style={{ fontSize: 12, opacity: 0.6 }}>
+                    Um livro com as folhas que escolheres — é o ficheiro que vai para o vault.
+                  </div>
+                </Radio>
+                <Radio value="LOT">
+                  <span style={{ fontWeight: 600 }}>Um lote só</span>
+                  <div style={{ fontSize: 12, opacity: 0.6 }}>
+                    Um ficheiro por lote, com a obra e o lote no nome. As folhas são as mesmas,
+                    recortadas a esse lote.
+                  </div>
+                </Radio>
+              </Radio.Group>
+            )}
 
             {lotScope && (
               <div style={{ display: "flex", flexDirection: "column", gap: "6.8px" }}>
@@ -403,8 +406,8 @@ export const BudgetExportModal: FC<Props> = ({
               <Alert
                 type="info"
                 showIcon
-                message="Na Despesas e no painel entram só as rubricas deste lote — as dos outros
-                  lotes e as faturas por classificar ficam de fora, por isso o total não é o da obra."
+                message="Na Despesas e no painel entram só as rubricas deste lote e as faturas por
+                  classificar com este lote — as dos outros lotes ficam de fora, por isso o total não é o da obra."
               />
             )}
 
@@ -427,16 +430,13 @@ export const BudgetExportModal: FC<Props> = ({
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 13, opacity: 0.7 }}>quais:</span>
                     <Select
-                      value={docsChoice}
+                      value={docsChoice === "FOLLOW" && !lotScope ? "ALL" : docsChoice}
                       onChange={setDocsChoice}
                       style={{ minWidth: 280 }}
                       options={[
-                        {
-                          value: "FOLLOW",
-                          label: lotScope
-                            ? `as do lote escolhido (${lot?.name ?? "—"})`
-                            : "todas as faturas da obra",
-                        },
+                        ...(lotScope
+                          ? [{ value: "FOLLOW", label: `as do lote escolhido (${lot?.name ?? "—"})` }]
+                          : []),
                         { value: "ALL", label: "todas as faturas da obra" },
                         { value: "ASSOCIATED", label: "só as já associadas a rubricas" },
                         { value: "UNCLASSIFIED", label: "só as que ainda não estão associadas" },

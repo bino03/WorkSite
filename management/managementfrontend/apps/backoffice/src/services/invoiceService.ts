@@ -203,6 +203,7 @@ function invoiceFilterParams(filters: InvoiceFilters, includeOutstanding: boolea
   if (filters.minAmount !== null) params.set("minAmount", String(filters.minAmount));
   if (filters.maxAmount !== null) params.set("maxAmount", String(filters.maxAmount));
   if (filters.budgetItemId) params.set("budgetItemId", filters.budgetItemId);
+  if (filters.budgetId) params.set("budgetId", filters.budgetId);
   return params;
 }
 
@@ -229,8 +230,13 @@ export async function listInvoices(
  * classificar" ao lado do "Gasto" no ecrã do orçamento (o "Gasto" só conta o
  * que já está numa rubrica).
  */
-export async function getPendingInvoicesSummary(enterpriseId: string): Promise<PendingInvoicesSummary> {
-  const response = await api.get(`/construction-invoices/enterprise/${enterpriseId}/pending-summary`);
+export async function getPendingInvoicesSummary(
+  enterpriseId: string,
+  budgetId: string | null = null
+): Promise<PendingInvoicesSummary> {
+  const response = await api.get(`/construction-invoices/enterprise/${enterpriseId}/pending-summary`, {
+    params: budgetId ? { budgetId } : {},
+  });
   return response.data;
 }
 
@@ -283,6 +289,17 @@ export async function replaceInvoiceFile(id: string, file: File): Promise<Invoic
 
   const response = await api.post(`/construction-invoices/${id}/file`, form, {
     headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+}
+
+/** Define o lote da fatura (`null` limpa-o). Recusa-se se já tiver despesas noutro lote. */
+export async function setInvoiceBudget(
+  id: string,
+  budgetId: string | null
+): Promise<ConstructionInvoice> {
+  const response = await api.patch(`/construction-invoices/${id}/budget`, null, {
+    params: budgetId ? { budgetId } : {},
   });
   return response.data;
 }

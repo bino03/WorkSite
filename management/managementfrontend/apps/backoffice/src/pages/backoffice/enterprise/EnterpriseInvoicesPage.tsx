@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FC } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Badge, Button, Input, Space } from "antd";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Badge, Button, Input, Modal, Select, Space } from "antd";
 import { ArrowLeftOutlined, DownloadOutlined, FilterOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
 
 import {
@@ -11,8 +11,10 @@ import {
   getOutstandingInvoicesSummary,
   listInvoices,
   getInvoice,
+  setInvoiceBudget,
   setInvoiceSentToAccountant,
 } from "@/services/invoiceService";
+import { listBudgetLots } from "@/services/budgetService";
 import { getEnterpriseById } from "@/services/enterpriseService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
@@ -37,6 +39,7 @@ import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/i
 import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
 import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
+import type { BudgetLot } from "@/types/budget";
 import type { ConstructionInvoice, OutstandingInvoicesSummary, InvoiceFilters } from "@/types/invoice";
 import { EMPTY_INVOICE_FILTERS } from "@/types/invoice";
 import type { IncidentInvoiceRef } from "@/types/incident";
@@ -71,6 +74,10 @@ const initialFilters: InvoiceFilters = {
 const EnterpriseInvoicesPage: FC = () => {
   const { enterpriseId } = useParams<{ enterpriseId: string }>();
   const navigate = useNavigate();
+  // O lote de onde se veio (o botão "Faturas" da página do orçamento passa-o).
+  // Lê-se **só à entrada**: mudar o dropdown não reescreve a URL, ao contrário da
+  // página do orçamento, onde `?lote=` é o estado da aba aberta.
+  const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
   const confirm = useConfirm();
 
@@ -79,7 +86,10 @@ const EnterpriseInvoicesPage: FC = () => {
   /** Só para o título — a lista em si nunca mistura obras, por isso não vai a cada linha. */
   const [enterpriseName, setEnterpriseName] = useState<string | null>(null);
   const [totalElements, setTotalElements] = useState(0);
-  const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
+  const [filters, setFilters] = useState<InvoiceFilters>(() => ({
+    ...initialFilters,
+    budgetId: searchParams.get("lote"),
+  }));
   const [view, setView] = useState<ViewKey>("pending");
   /** `null` = ordem por omissão do backend (data de carregamento, mais recente primeiro). */
   const [sort, setSort] = useState<{ field: "invoiceDate" | "createdAt"; order: "ascend" | "descend" } | null>(
@@ -87,6 +97,16 @@ const EnterpriseInvoicesPage: FC = () => {
   );
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lots, setLots] = useState<BudgetLot[]>([]);
+  const [lotBulkOpen, setLotBulkOpen] = useState(false);
+  const [lotBulkId, setLotBulkId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enterpriseId) return;
+    listBudgetLots(enterpriseId)
+      .then(setLots)
+      .catch((error) => ErrorHandler.handle(error));
+  }, [enterpriseId]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -172,6 +192,17 @@ const EnterpriseInvoicesPage: FC = () => {
     fetch(next, sort);
   };
 
+  // Um `?lote=` que não seja um lote vivo desta obra ignora-se — e o mesmo numa obra
+  // de um só lote, onde o dropdown não aparece. A regra é não deixar ninguém aterrar
+  // numa lista filtrada sem o controlo à vista para a desfiltrar: faltariam faturas
+  // sem nada no ecrã a explicar porquê.
+  useEffect(() => {
+    if (!lots.length || !filters.budgetId) return;
+    if (lots.length > 1 && lots.some((lot) => lot.id === filters.budgetId)) return;
+    applyFilters({ budgetId: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lots]);
+
   /** Trocar a ordenação (data da fatura ou de carregamento) também volta à primeira página. */
   const handleSortChange = (
     field: "invoiceDate" | "createdAt" | null,
@@ -223,9 +254,48 @@ const EnterpriseInvoicesPage: FC = () => {
     }
   };
 
-  const handleAllocate = async (budgetItemId: string) => {
+  /** Associa ao lote, sem rubrica. Melhor esforço, como a associação: diz quais falharam. */
+  const handleBulkLot = async () => {
+    if (!lotBulkId) return;
+    setSaving(true);
+    let done = 0;
+    const failures: string[] = [];
+    for (const invoice of selectedInvoices) {
+      if (invoice.budgetId === lotBulkId) {
+        done++;
+        continue;
+      }
+      try {
+        await setInvoiceBudget(invoice.id, lotBulkId);
+        done++;
+      } catch (error) {
+        failures.push(`${invoice.invoiceNumber ?? "sem número"} (${ErrorHandler.getMessage(error)})`);
+      }
+    }
+    if (failures.length === 0) {
+      notificationService.success("Faturas", done === 1 ? "Fatura associada ao lote." : `${done} faturas associadas ao lote.`);
+    } else {
+      notificationService.warning("Faturas", `${done} associada(s), ${failures.length} não: ${failures.join("; ")}`);
+    }
+    setLotBulkOpen(false);
+    setLotBulkId(null);
+    setSelectedIds([]);
+    setSaving(false);
+    reload();
+  };
+
+  const handleAllocate = async (budgetItemId: string, lotId: string | null) => {
     setSaving(true);
     try {
+      // Numa obra de vários lotes a fatura leva o lote da rubrica escolhida,
+      // senão o servidor recusa (INVOICE_051).
+      if (lotId) {
+        for (const invoice of allocating) {
+          if (invoice.budgetId !== lotId) {
+            await setInvoiceBudget(invoice.id, lotId);
+          }
+        }
+      }
       // Uma chamada só, e melhor esforço do lado do servidor: era um `for` com
       // um `await` por fatura, que rebentava no primeiro erro e deixava quem
       // estava a ver sem saber quais tinham passado.
@@ -461,6 +531,33 @@ const EnterpriseInvoicesPage: FC = () => {
         />
         <Button onClick={() => applyFilters({})}>Pesquisar</Button>
 
+        {/* O lote é o eixo de navegação da obra, não pesquisa avançada: fica à vista na
+            barra, fora do modal, fora do badge de contagem e fora do "Limpar filtros"
+            (2026-10-06). Limpa-se aqui mesmo, em "Todos os lotes". Com um lote ou nenhum
+            não há nada a escolher, por isso não aparece. */}
+        {lots.length > 1 && (
+          <select
+            aria-label="Lote"
+            value={filters.budgetId ?? ""}
+            onChange={(e) => applyFilters({ budgetId: e.target.value || null })}
+            style={{
+              maxWidth: 200,
+              minHeight: 36,
+              padding: "6px 10px",
+              background: "var(--ind-color-surface)",
+              border: "1px solid var(--ind-color-divider)",
+              color: "var(--ind-color-text)",
+            }}
+          >
+            <option value="">Todos os lotes</option>
+            {lots.map((lot) => (
+              <option key={lot.id} value={lot.id}>
+                {lot.name}
+              </option>
+            ))}
+          </select>
+        )}
+
         {/* Pesquisa avançada: só o ícone com a contagem e o "Limpar" — sem chips (pedido do utilizador). */}
         <Badge count={activeFilterCount} size="small" color="var(--ind-color-accent)">
           <Button
@@ -483,6 +580,11 @@ const EnterpriseInvoicesPage: FC = () => {
             Associar {allocatableSelected.length} à mesma rubrica
           </Button>
         )}
+        {lots.length > 1 && selectedInvoices.length > 0 && isAdmin() && (
+          <Button onClick={() => setLotBulkOpen(true)}>
+            Associar {selectedInvoices.length} ao lote…
+          </Button>
+        )}
         {payableSelected.length > 0 && isAdmin() && (
           <Button onClick={() => setAggregatePayOpen(true)}>
             Registar pagamento de {payableSelected.length}
@@ -495,6 +597,27 @@ const EnterpriseInvoicesPage: FC = () => {
           </Button>
         )}
       </div>
+
+      <Modal
+        open={lotBulkOpen}
+        title="Associar ao lote"
+        okText="Associar"
+        okButtonProps={{ disabled: !lotBulkId }}
+        confirmLoading={saving}
+        onOk={() => void handleBulkLot()}
+        onCancel={() => {
+          setLotBulkOpen(false);
+          setLotBulkId(null);
+        }}
+      >
+        <Select
+          style={{ width: "100%" }}
+          placeholder="Escolher o lote"
+          value={lotBulkId ?? undefined}
+          onChange={(value) => setLotBulkId(value)}
+          options={lots.map((lot) => ({ value: lot.id, label: lot.name }))}
+        />
+      </Modal>
 
       <InvoicesList
         invoices={invoices}
@@ -634,7 +757,7 @@ const EnterpriseInvoicesPage: FC = () => {
               setAllocatingEnterpriseId(null);
               setAllocatingLotId(null);
             }}
-            onPick={(item) => handleAllocate(item.id)}
+            onPick={(item, lotId) => handleAllocate(item.id, lotId)}
           />
 
           <InvoiceFiltersModal

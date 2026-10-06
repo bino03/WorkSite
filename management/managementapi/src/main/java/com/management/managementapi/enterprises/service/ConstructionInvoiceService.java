@@ -29,6 +29,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.PendingInvo
 import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -36,6 +37,7 @@ import com.management.managementapi.enterprises.model.ConstructionInvoiceDocumen
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.model.Supplier;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionExpenseRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceDocumentRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
@@ -117,6 +119,7 @@ public class ConstructionInvoiceService {
     private final ConstructionInvoiceDocumentRepository documentRepository;
     private final ConstructionExpenseRepository expenseRepository;
     private final ConstructionBudgetItemRepository budgetItemRepository;
+    private final ConstructionBudgetRepository budgetRepository;
     private final EnterpriseRepository enterpriseRepository;
     private final SupplierRepository supplierRepository;
     private final ProfileRepository profileRepository;
@@ -479,6 +482,9 @@ public class ConstructionInvoiceService {
     private void applyScope(ConstructionInvoice invoice, ConstructionInvoice.Scope scope, Enterprise enterprise) {
         invoice.setScope(scope);
         invoice.setEnterprise(enterprise); // null em COMPANY/UNIDENTIFIED — o check ck_invoice_scope_enterprise
+        // O lote é da obra de origem: muda com ela. Só numa obra de um lote é que se deduz.
+        List<ConstructionBudget> lots = enterprise == null ? List.of() : liveLotsOf(enterprise.getId());
+        invoice.setBudget(lots.size() == 1 ? lots.get(0) : null);
         if (scope != ConstructionInvoice.Scope.UNIDENTIFIED) {
             invoice.setPossibleEnterprises(null);
             invoice.setAskWhom(null);
@@ -981,6 +987,8 @@ public class ConstructionInvoiceService {
                 // cair no "sem filtro" e devolver a lista inteira. O UUID de
                 // enchimento é para o `in` nunca ficar vazio.
                 budgetItemIds.isEmpty() ? List.of(new UUID(0L, 0L)) : budgetItemIds,
+                f.budgetId() != null,
+                f.budgetId() != null ? f.budgetId() : new UUID(0L, 0L),
                 pageable);
     }
 
@@ -1053,8 +1061,11 @@ public class ConstructionInvoiceService {
      * conta o que já está numa rubrica; isto é a outra metade do total faturado.
      */
     @Transactional(readOnly = true)
-    public PendingInvoicesSummaryDTO pendingSummary(UUID enterpriseId) {
-        return new PendingInvoicesSummaryDTO(repository.countPending(enterpriseId), repository.sumPending(enterpriseId));
+    public PendingInvoicesSummaryDTO pendingSummary(UUID enterpriseId, UUID budgetId) {
+        boolean lotFilter = budgetId != null;
+        UUID lotId = lotFilter ? budgetId : new UUID(0L, 0L);
+        return new PendingInvoicesSummaryDTO(repository.countPending(enterpriseId, lotFilter, lotId),
+                repository.sumPending(enterpriseId, lotFilter, lotId));
     }
 
     /**
@@ -1301,8 +1312,74 @@ public class ConstructionInvoiceService {
             throw new BusinessException(ErrorCode.INVOICE_SCOPE_NOT_ALLOCATABLE);
         }
 
-        return expenseRepository.save(
-                newAllocation(invoice, requireItemOf(invoice, budgetItemId), invoice.getTotalAmount()));
+        ConstructionBudgetItem item = requireItemOf(invoice, budgetItemId);
+        bindLot(invoice, List.of(item));
+        return expenseRepository.save(newAllocation(invoice, item, invoice.getTotalAmount()));
+    }
+
+    /**
+     * Define o lote da fatura (ou o limpa) antes de a classificar, para a obra de
+     * vários lotes. Recusa se a fatura já tem despesas: o lote de uma despesa é o
+     * da sua rubrica, e trocá-lo à frente delas punha as duas coisas em desacordo.
+     */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
+    public ConstructionInvoice setBudget(UUID invoiceId, UUID budgetId) {
+        ConstructionInvoice invoice = getById(invoiceId);
+        if (Objects.equals(invoice.getBudgetId(), budgetId)) {
+            return invoice;
+        }
+        List<ConstructionExpense> allocations = findAllocations(invoiceId);
+        // Uma fatura classificada antes do lote existir só ganha o lote que as suas
+        // rubricas já têm; trocá-lo ou limpá-lo com despesas lançadas recusa-se.
+        boolean fixesLegacyLot = invoice.getBudgetId() == null && budgetId != null
+                && allocations.stream().allMatch(expense -> budgetId.equals(expense.getBudgetItem().getBudgetId()));
+        if (!allocations.isEmpty() && !fixesLegacyLot) {
+            throw new BusinessException(ErrorCode.INVOICE_BUDGET_HAS_ALLOCATIONS);
+        }
+        if (budgetId == null) {
+            invoice.setBudget(null);
+            return repository.save(invoice);
+        }
+        if (invoice.getScope() != ConstructionInvoice.Scope.PROJECT) {
+            throw new BusinessException(ErrorCode.INVOICE_SCOPE_NOT_ALLOCATABLE);
+        }
+        invoice.setBudget(liveLotOf(invoice.getEnterpriseId(), budgetId));
+        return repository.save(invoice);
+    }
+
+    /**
+     * Confirma que as rubricas são de um só lote e que esse é o da fatura, antes
+     * de qualquer escrita. Numa obra de vários lotes a fatura tem de ter lote já
+     * escolhido; numa obra de um só lote deduz-se o único que existe.
+     */
+    private void bindLot(ConstructionInvoice invoice, List<ConstructionBudgetItem> items) {
+        UUID lotId = items.get(0).getBudgetId();
+        if (items.stream().anyMatch(item -> !lotId.equals(item.getBudgetId()))) {
+            throw new BusinessException(ErrorCode.INVOICE_BUDGET_OTHER_LOT);
+        }
+        if (invoice.getBudgetId() != null) {
+            if (!lotId.equals(invoice.getBudgetId())) {
+                throw new BusinessException(ErrorCode.INVOICE_BUDGET_OTHER_LOT);
+            }
+            return;
+        }
+        if (liveLotsOf(invoice.getEnterpriseId()).size() > 1) {
+            throw new BusinessException(ErrorCode.INVOICE_BUDGET_REQUIRED);
+        }
+        invoice.setBudget(items.get(0).getBudget());
+    }
+
+    private List<ConstructionBudget> liveLotsOf(UUID enterpriseId) {
+        return budgetRepository.findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(enterpriseId).stream()
+                .filter(lot -> lot.getDeletedAt() == null)
+                .toList();
+    }
+
+    private ConstructionBudget liveLotOf(UUID enterpriseId, UUID budgetId) {
+        return liveLotsOf(enterpriseId).stream()
+                .filter(lot -> lot.getId().equals(budgetId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
     }
 
     /**
@@ -1370,10 +1447,15 @@ public class ConstructionInvoiceService {
             }
         }
 
-        List<ConstructionExpense> replacement = lines.stream()
-                .map(line -> newAllocation(invoice, requireItemOf(invoice, line.budgetItemId()),
-                        provisional ? BigDecimal.ZERO : line.amount()))
+        List<ConstructionBudgetItem> items = lines.stream()
+                .map(line -> requireItemOf(invoice, line.budgetItemId()))
                 .toList();
+        bindLot(invoice, items);
+        List<ConstructionExpense> replacement = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            replacement.add(newAllocation(invoice, items.get(i),
+                    provisional ? BigDecimal.ZERO : lines.get(i).amount()));
+        }
 
         // Substituir, não acrescentar: a repartição antiga sai inteira, senão a
         // soma passava a contar duas vezes.
@@ -1551,6 +1633,7 @@ public class ConstructionInvoiceService {
         return new ConstructionInvoiceResponseDTO(
                 invoice.getId(),
                 invoice.getEnterpriseId(),
+                invoice.getBudgetId(),
                 invoice.getScope().name(),
                 invoice.getDocumentType().name(),
                 invoice.getRelatedInvoiceId(),

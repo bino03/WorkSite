@@ -28,6 +28,8 @@ public record ConstructionInvoiceResponseDTO(
         UUID id,
         /** Nulo quando a fatura está na quarentena ou é uma despesa da empresa. */
         UUID enterpriseId,
+        /** Nulo enquanto a fatura não tem lote — ver {@code ConstructionInvoice#getBudget}. */
+        UUID budgetId,
         /** `PROJECT`, `COMPANY` ou `UNIDENTIFIED` — o cliente traduz o rótulo. */
         String scope,
         /** `INVOICE` ou `CREDIT_NOTE`. */

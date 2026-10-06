@@ -28,6 +28,7 @@ import java.util.UUID;
  * @param minAmount        {@code totalAmount} ≥
  * @param maxAmount        {@code totalAmount} ≤
  * @param budgetItemId     rubrica; apanha também tudo o que está nas sub-rubricas dela
+ * @param budgetId         lote da fatura — apanha também as que ainda não têm rubrica
  */
 public record InvoiceSearchFilter(
         Boolean allocated,
@@ -45,20 +46,21 @@ public record InvoiceSearchFilter(
         String allocationStatus,
         BigDecimal minAmount,
         BigDecimal maxAmount,
-        UUID budgetItemId
+        UUID budgetItemId,
+        UUID budgetId
 ) {
     /** Só o que a lista tinha antes da pesquisa avançada — para os chamadores antigos e os testes. */
     public static InvoiceSearchFilter basic(Boolean allocated, Boolean needsReview, Boolean outstanding,
                                             Boolean sentToAccountant, Boolean atChapter,
                                             LocalDate from, LocalDate to, String q) {
         return new InvoiceSearchFilter(allocated, needsReview, outstanding, sentToAccountant, atChapter,
-                from, to, q, null, null, null, null, null, null, null, null);
+                from, to, q, null, null, null, null, null, null, null, null, null);
     }
 
     /** O mesmo filtro com {@code outstanding} forçado — o resumo do que falta pagar. */
     public InvoiceSearchFilter onlyOutstanding() {
         return new InvoiceSearchFilter(allocated, needsReview, true, sentToAccountant, atChapter,
                 from, to, q, supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
-                minAmount, maxAmount, budgetItemId);
+                minAmount, maxAmount, budgetItemId, budgetId);
     }
 }

@@ -29,7 +29,7 @@ impede que divirjam. Soft delete (`deleted_at`, `V40`) em vez do hard delete ori
 um lote arrasta as rubricas que ainda lhe restarem vivas para a mesma marca de tempo (a filtragem por
 `deleted_at` que já existe em toda a árvore/pesquisa/totais esconde-as sem precisar de saber nada sobre
 lotes); sem zona de recuperação dedicada, reverte-se na BD. Bloqueado se alguma rubrica do lote tiver
-despesas (`BUDGET_017`). As faturas **não** têm lote: ver [[excel-parity.md]] §6.
+despesas (`BUDGET_017`). Ao apagar um lote, as faturas que lhe pertenciam ficam sem lote (ver `construction_invoice.budget_id` abaixo).
 
 **`construction_invoice`** e **`construction_expense`** estão separados desde a `V16` porque
 **registar e classificar são momentos diferentes**: quem chega da obra com quinze faturas
@@ -37,7 +37,11 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
 (`invoice_id` de nenhuma linha aponta para ela) é a caixa de entrada — "por associar". Ver
 [[api.md]] → "Faturas de obra".
 
-- **`construction_invoice`** — o **registo** da fatura, não o ficheiro. `scope` decide onde
+- **`construction_invoice`** — o **registo** da fatura, não o ficheiro. `budget_id` (`V41`, nullable) é o lote da
+  fatura: FK composta `(budget_id, enterprise_id)` → `construction_budget`, `ON DELETE SET NULL (budget_id)`, e
+  `ck_invoice_budget_scope` impede lote fora de `PROJECT`. Numa obra de vários lotes, classificar exige o lote
+  primeiro (`INVOICE_051`); as rubricas da fatura são todas desse lote (`INVOICE_050`). O backfill da `V41` só
+  preenche obras de um só lote. `scope` decide onde
   ela vive (`V26`): `PROJECT` (de uma obra, `enterprise_id` obrigatório), `COMPANY` (despesa
   da empresa) ou `UNIDENTIFIED` (a quarentena — chegou uma fatura e ainda não se sabe de
   quem é). O check `ck_invoice_scope_enterprise` garante os dois lados: `PROJECT` **exige**

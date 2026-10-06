@@ -67,7 +67,7 @@ class ConstructionInvoiceChapterFilterTest {
         UUID enterpriseId = UUID.randomUUID();
         Pageable pageable = PageRequest.of(0, 20);
 
-        when(repository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any()))
+        when(repository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         service.search(enterpriseId, InvoiceSearchFilter.basic(null, null, null, null, true, null, null, null), pageable);
@@ -75,7 +75,7 @@ class ConstructionInvoiceChapterFilterTest {
         ArgumentCaptor<Boolean> atChapterCaptor = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<BudgetRowKind> rowKindCaptor = ArgumentCaptor.forClass(BudgetRowKind.class);
         verify(repository).search(eq(enterpriseId), any(), any(), any(), any(),
-                atChapterCaptor.capture(), rowKindCaptor.capture(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), eq(pageable));
+                atChapterCaptor.capture(), rowKindCaptor.capture(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), eq(pageable));
 
         assertThat(atChapterCaptor.getValue()).isTrue();
         assertThat(rowKindCaptor.getValue()).isEqualTo(BudgetRowKind.ITEM);
@@ -112,7 +112,7 @@ class ConstructionInvoiceChapterFilterTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<ConstructionInvoice> page = new PageImpl<>(List.of(invoice));
 
-        when(repository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), any()))
+        when(repository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any()))
                 .thenReturn(page);
         when(expenseRepository.findByInvoiceIdIn(List.of(invoiceId))).thenReturn(List.of(expense));
         when(documentRepository.findByInvoiceIdInOrderByUploadedAtAsc(List.of(invoiceId))).thenReturn(List.of());

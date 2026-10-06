@@ -161,11 +161,15 @@ const ConstructionBudgetPage: FC = () => {
     });
   };
 
+  // Numa obra de vários lotes o "Por classificar" é o do lote aberto; com um só, é o da obra.
+  const pendingLotId = lots && lots.length > 1 ? lotId : null;
   useEffect(() => {
     if (!enterpriseId) return;
     // Falhar aqui só custa o contador — não vale um erro na cara de ninguém.
-    getPendingInvoicesSummary(enterpriseId).then(setPending).catch(() => setPending({ count: 0, total: 0 }));
-  }, [enterpriseId]);
+    getPendingInvoicesSummary(enterpriseId, pendingLotId)
+      .then(setPending)
+      .catch(() => setPending({ count: 0, total: 0 }));
+  }, [enterpriseId, pendingLotId]);
 
   const refreshDeletedCount = useCallback(() => {
     if (!lotId || !isAdmin()) return;
@@ -508,11 +512,19 @@ const ConstructionBudgetPage: FC = () => {
           <h1 style={{ margin: 0 }}>Orçamento de Obra</h1>
         </div>
         <Space>
-          {/* O contador é o que faz alguém lembrar-se de ir classificar. */}
+          {/* O contador já conta só o lote aberto, por isso a lista que ele abre também
+              tem de ser a desse lote — senão o número e o que se vê desencontram-se.
+              Com um só lote não se passa nada: lá a lista não tem dropdown de lote. */}
           <Badge count={pending.count} overflowCount={99} offset={[-4, 2]}>
             <Button
               icon={<FileTextOutlined />}
-              onClick={() => navigate(`/backoffice/empreendimentos/${enterpriseId}/invoices`)}
+              onClick={() =>
+                navigate(
+                  lots && lots.length > 1 && lotId
+                    ? `/backoffice/empreendimentos/${enterpriseId}/invoices?lote=${lotId}`
+                    : `/backoffice/empreendimentos/${enterpriseId}/invoices`
+                )
+              }
             >
               Faturas
             </Button>

@@ -824,6 +824,16 @@ class BudgetExcelExportServiceTest {
         return out;
     }
 
+    private static boolean hasRowWithNumber(Sheet sheet, String number) {
+        for (Row row : sheet) {
+            Cell cell = row.getCell(0);
+            if (cell != null && cell.getCellType() == CellType.STRING && number.equals(cell.getStringCellValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static Row rowWithNumber(Sheet sheet, String number) {
         for (Row row : sheet) {
             Cell cell = row.getCell(0);
@@ -832,5 +842,55 @@ class BudgetExcelExportServiceTest {
             }
         }
         throw new AssertionError("Sem linha com nº " + number);
+    }
+
+    @Test
+    @DisplayName("Numa obra de dois lotes, o ficheiro de um lote leva só as faturas por classificar desse lote")
+    void exportLotCarriesOnlyUnclassifiedInvoicesOfThatLot() throws Exception {
+        ConstructionBudget lotA = twoLots();
+        ConstructionBudget outro = new ConstructionBudget();
+        outro.setId(UUID.randomUUID());
+        outro.setName("Lote Z");
+
+        ConstructionInvoice doLote = invoice("FT P/1", "2026-09-01", "100", "Casa A");
+        doLote.setBudget(lotA);
+        ConstructionInvoice deOutroLote = invoice("FT P/2", "2026-09-02", "200", "Casa B");
+        deOutroLote.setBudget(outro);
+        invoice("FT P/3", "2026-09-03", "300", "Casa C");
+
+        BudgetExcelExportService.ExportFile file = service.exportLot(lotA.getId(),
+                EnumSet.of(BudgetExportSheet.EXPENSES));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            Sheet expenses = wb.getSheet("Despesas");
+            assertThat(rowWithNumber(expenses, "FT P/1")).isNotNull();
+            assertThat(hasRowWithNumber(expenses, "FT P/2")).isFalse();
+            assertThat(hasRowWithNumber(expenses, "FT P/3")).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("Obra com um lote vazio: a folha do lote com rubricas leva as faturas por classificar desse lote")
+    void exportLotOfEnterpriseWithAnEmptyLotKeepsItsUnclassifiedInvoices() throws Exception {
+        ConstructionBudget lot3 = lot("Lote 3");
+        BudgetTreeDTO tree3 = tree();
+        when(budgetService.listLots(ENTERPRISE_ID)).thenReturn(List.of(
+                new BudgetLotDTO(lot3.getId(), "Lote 3", 0, 11, tree3.budgetTotal(), BigDecimal.ZERO),
+                new BudgetLotDTO(UUID.randomUUID(), "Lote 1", 1, 0, BigDecimal.ZERO, BigDecimal.ZERO)));
+        when(budgetService.getBudgetTree(lot3.getId())).thenReturn(tree3);
+        when(budgetService.getLot(lot3.getId())).thenReturn(lot3);
+
+        ConstructionInvoice doLote = invoice("FT X/1", "2026-09-01", "100", "Casa A");
+        doLote.setBudget(lot3);
+        invoice("FT X/2", "2026-09-02", "200", "Casa B");
+
+        BudgetExcelExportService.ExportFile file = service.exportLot(lot3.getId(),
+                EnumSet.of(BudgetExportSheet.EXPENSES));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            Sheet expenses = wb.getSheet("Despesas");
+            assertThat(hasRowWithNumber(expenses, "FT X/1")).isTrue();
+            assertThat(hasRowWithNumber(expenses, "FT X/2")).isFalse();
+        }
     }
 }

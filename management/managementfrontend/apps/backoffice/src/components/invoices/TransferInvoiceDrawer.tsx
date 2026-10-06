@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { TransferInvoiceSchema } from "@/components/invoices/transferFormSchema";
 import type { TransferInvoiceForm } from "@/components/invoices/transferFormSchema";
-import { splitInvoice, transferInvoice } from "@/services/invoiceService";
+import { setInvoiceBudget, splitInvoice, transferInvoice } from "@/services/invoiceService";
 import { searchEnterprises, type EnterpriseOption } from "@/services/enterpriseService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
@@ -26,8 +26,8 @@ interface Props {
   /**
    * Depois de transferir — o pai fecha o detalhe, recarrega, e trata do
    * `suggestIncident`. `targetLotId` só vem preenchido se o destino tiver
-   * lotes e o utilizador tiver escolhido um — é um atalho de UX (o pai pode
-   * abrir logo a classificação nesse lote), a transferência em si não muda.
+   * lotes e o utilizador tiver escolhido um — a fatura fica gravada nesse lote
+   * logo a seguir à transferência, e o pai pode abrir logo a classificação nele.
    */
   onTransferred: (result: InvoiceTransferResult, targetLotId?: string | null) => void;
 }
@@ -144,6 +144,9 @@ export const TransferInvoiceDrawer: FC<Props> = ({
           values.targetScope === "PROJECT" ? values.targetEnterpriseId : null,
         reason: values.reason.trim(),
       });
+      if (values.targetScope === "PROJECT" && targetLotId) {
+        await setInvoiceBudget(result.invoice.id, targetLotId);
+      }
       notificationService.success(t("invoices.transfer.success"));
       // Se `suggestIncident`, o pai (`InvoiceDetailDrawer` → página) abre o
       // `IncidentDrawer` já com esta fatura.

@@ -323,6 +323,9 @@ public enum ErrorCode {
     INVOICE_DOCUMENTS_EMPTY_SCOPE("INVOICE_047", "Não há documentos para descarregar neste âmbito"),
     INVOICE_DOCUMENTS_NO_SELECTION("INVOICE_048", "Escolha pelo menos uma fatura na lista"),
     INVOICE_DOCUMENTS_TOO_MANY("INVOICE_049", "Demasiadas faturas selecionadas de uma vez"),
+    INVOICE_BUDGET_OTHER_LOT("INVOICE_050", "A rubrica é de outro lote — a fatura já está no lote escolhido"),
+    INVOICE_BUDGET_REQUIRED("INVOICE_051", "Escolha primeiro o lote da fatura — a obra tem vários lotes"),
+    INVOICE_BUDGET_HAS_ALLOCATIONS("INVOICE_052", "A fatura já tem despesas noutro lote — desfaça a classificação antes de mudar de lote"),
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================

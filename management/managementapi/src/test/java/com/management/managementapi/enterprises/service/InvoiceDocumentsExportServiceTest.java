@@ -433,4 +433,22 @@ class InvoiceDocumentsExportServiceTest {
         storage.put(document.getStorageKey(), ("bytes:" + document.getStorageKey()).getBytes(StandardCharsets.UTF_8));
         return document;
     }
+
+    @Test
+    @DisplayName("Uma fatura por classificar com lote entra no zip desse lote, e só nesse")
+    void unclassifiedInvoiceWithLotGoesInThatLotsZip() {
+        UUID lot = UUID.randomUUID();
+        UUID outroLot = UUID.randomUUID();
+
+        ConstructionInvoice comLote = invoice("FT Y/1", "2026-09-05", "Vilatro", "Cimento");
+        document(comLote, "y.pdf", "application/pdf");
+        ConstructionBudget doLote = new ConstructionBudget();
+        doLote.setId(lot);
+        comLote.setBudget(doLote);
+
+        assertThat(service.plan(ENTERPRISE_ID, InvoiceDocumentsScope.ASSOCIATED, lot, "").entries())
+                .extracting("path").containsExactly("20260905_FTY-1_Vilatro.pdf");
+        assertThat(service.plan(ENTERPRISE_ID, InvoiceDocumentsScope.ASSOCIATED, outroLot, "").entries()).isEmpty();
+        assertThat(service.plan(ENTERPRISE_ID, InvoiceDocumentsScope.UNCLASSIFIED, null, "").entries()).hasSize(1);
+    }
 }
