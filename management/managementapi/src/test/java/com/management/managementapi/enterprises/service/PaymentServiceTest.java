@@ -15,6 +15,7 @@ import com.management.managementapi.enterprises.repository.ConstructionInvoiceRe
 import com.management.managementapi.enterprises.repository.InvoicePaymentRepository;
 import com.management.managementapi.enterprises.repository.PaymentRepository;
 import com.management.managementapi.exeption.BusinessException;
+import com.management.managementapi.exeption.FileUploadException;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.repository.ProfileRepository;
@@ -28,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -38,6 +40,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -343,5 +347,112 @@ class PaymentServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVOICE_PAYMENT_NOT_FOUND);
+    }
+
+    // ── prova a posteriori ──────────────────────────────────────
+
+    private Payment paymentWithLink(String proofKey) {
+        Payment payment = new Payment();
+        payment.setId(PAYMENT_ID);
+        payment.setAmount(new BigDecimal("1000"));
+        payment.setMethod(PaymentMethod.TRANSFERENCIA);
+        payment.setPaidOn(LocalDate.of(2026, 8, 28));
+        if (proofKey != null) {
+            payment.setProofBucket("documents");
+            payment.setProofKey(proofKey);
+            payment.setProofFilename("antigo.pdf");
+            payment.setProofMime("application/pdf");
+        }
+        InvoicePayment link = new InvoicePayment(payment,
+                invoice(INVOICE_ID, ENTERPRISE_A, new BigDecimal("1000")), new BigDecimal("1000"));
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
+        when(invoicePaymentRepository.findByPaymentId(PAYMENT_ID)).thenReturn(List.of(link));
+        when(storageService.sanitizeFileName(any())).thenAnswer(call -> call.getArgument(0));
+        return payment;
+    }
+
+    private static MockMultipartFile pdf(String name) {
+        return new MockMultipartFile("proof", name, "application/pdf", new byte[] {1, 2, 3});
+    }
+
+    @Test
+    @DisplayName("anexar a um pagamento sem prova: sobe para a pasta da obra, nada se apaga")
+    void anexarProva() throws Exception {
+        Payment payment = paymentWithLink(null);
+
+        PaymentService.ProofChange change = service().replaceProof(PAYMENT_ID, pdf("extrato.pdf"));
+
+        verify(storageService).upload(eq("documents"),
+                startsWith("construction-invoices/" + ENTERPRISE_A + "/payments/"), eq("application/pdf"), any());
+        verify(storageService, never()).delete(any(), any());
+        assertThat(payment.getProofFilename()).isEqualTo("extrato.pdf");
+        assertThat(change.previousFilename()).isNull();
+    }
+
+    @Test
+    @DisplayName("substituir: o ficheiro antigo sai do Storage e o nome dele volta para o log")
+    void substituirProva() throws Exception {
+        Payment payment = paymentWithLink("construction-invoices/x/payments/abc_antigo.pdf");
+
+        PaymentService.ProofChange change = service().replaceProof(PAYMENT_ID, pdf("novo.pdf"));
+
+        verify(storageService).delete("documents", "construction-invoices/x/payments/abc_antigo.pdf");
+        assertThat(payment.getProofFilename()).isEqualTo("novo.pdf");
+        assertThat(payment.getProofKey()).isNotEqualTo("construction-invoices/x/payments/abc_antigo.pdf");
+        assertThat(change.previousFilename()).isEqualTo("antigo.pdf");
+    }
+
+    @Test
+    @DisplayName("um tipo recusado não sobe nada e deixa a prova antiga onde estava")
+    void substituirComTipoErrado() throws Exception {
+        Payment payment = paymentWithLink("construction-invoices/x/payments/abc_antigo.pdf");
+        MockMultipartFile word = new MockMultipartFile("proof", "a.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", new byte[] {1});
+
+        assertThatThrownBy(() -> service().replaceProof(PAYMENT_ID, word))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVOICE_PAYMENT_PROOF_TYPE);
+        verify(storageService, never()).upload(any(), any(), any(), any());
+        verify(storageService, never()).delete(any(), any());
+        assertThat(payment.getProofFilename()).isEqualTo("antigo.pdf");
+    }
+
+    @Test
+    @DisplayName("sem ficheiro → FILE_008, antes de tocar no pagamento")
+    void substituirSemFicheiro() {
+        paymentWithLink(null);
+        MockMultipartFile vazio = new MockMultipartFile("proof", "x.pdf", "application/pdf", new byte[0]);
+
+        assertThatThrownBy(() -> service().replaceProof(PAYMENT_ID, vazio))
+                .isInstanceOf(FileUploadException.class)
+                .extracting(e -> ((FileUploadException) e).getErrorCode())
+                .isEqualTo(ErrorCode.FILE_EMPTY);
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("remover: os campos ficam a null e o ficheiro sai do Storage")
+    void removerProva() throws Exception {
+        Payment payment = paymentWithLink("construction-invoices/x/payments/abc_antigo.pdf");
+
+        PaymentService.ProofChange change = service().removeProof(PAYMENT_ID);
+
+        verify(storageService).delete("documents", "construction-invoices/x/payments/abc_antigo.pdf");
+        assertThat(payment.getProofKey()).isNull();
+        assertThat(payment.getProofBucket()).isNull();
+        assertThat(payment.getProofFilename()).isNull();
+        assertThat(change.previousFilename()).isEqualTo("antigo.pdf");
+    }
+
+    @Test
+    @DisplayName("remover de um pagamento sem prova não apaga nada — é idempotente")
+    void removerSemProva() throws Exception {
+        paymentWithLink(null);
+
+        PaymentService.ProofChange change = service().removeProof(PAYMENT_ID);
+
+        verify(storageService, never()).delete(any(), any());
+        assertThat(change.previousFilename()).isNull();
     }
 }

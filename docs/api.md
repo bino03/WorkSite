@@ -416,6 +416,8 @@ de entrada.
 | POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
 | POST | `/construction-invoices/payments` | `ADMIN` — pagamento **agregado** de N faturas (multipart: `payment` JSON com `invoiceIds[]` + `proof` opcional); `201` se bater, `200` (nada gravado) se o valor não bater |
 | DELETE | `/construction-invoices/payments/{paymentId}` | `ADMIN` — anula um pagamento, repõe as faturas; `204` |
+| PUT | `/construction-invoices/payments/{paymentId}/proof` | `ADMIN` — multipart `proof`: anexa ou substitui a prova de um pagamento já registado; `200` |
+| DELETE | `/construction-invoices/payments/{paymentId}/proof` | `ADMIN` — deixa o pagamento sem prova (idempotente); `200` |
 | GET | `/construction-invoices/{id}/credit-notes/split-preview?amount=` | `ADMIN` — proposta de repartição negativa de uma NC sobre esta fatura, na proporção das despesas dela; nada gravado |
 | POST | `/construction-invoices/{id}/credit-notes` | `ADMIN` — regista uma **nota de crédito** a partir desta fatura (JSON: valor, nº, data, NIF, `expenses[]` confirmadas); `201` |
 
@@ -807,6 +809,8 @@ caso raro (N faturas, 1 transferência) serem o **mesmo modelo**. Tudo `ADMIN`. 
 | POST | `/construction-invoices/{id}/payments` | multipart `payment` (JSON) + `proof` opcional. `paidOn`, `method`, `amount?` (por omissão o que falta liquidar), `reference?`, `notes?`. `201` → `PaymentResponseDTO` |
 | POST | `/construction-invoices/payments` | agregado. `payment` JSON com `invoiceIds[]` + `amount` do movimento + `proof` opcional. `201` `AggregatePaymentResultDTO` com `created=true` se o valor bater com a soma; `200` `created=false` + `leftOut[]` se for **menor** |
 | DELETE | `/construction-invoices/payments/{paymentId}` | anula: apaga as ligações e o movimento, as faturas voltam a `UNPAID`/`PARTIAL`. Fica em `activity_log`. `204` |
+| PUT | `/construction-invoices/payments/{paymentId}/proof` | multipart `proof` (PDF/JPEG/PNG, até 25 MB — `INVOICE_025`, `FILE_008` sem ficheiro): anexa ou **substitui** a prova. Devolve o pagamento. `200` |
+| DELETE | `/construction-invoices/payments/{paymentId}/proof` | tira a prova; sem prova já, não faz nada. `200` |
 
 **Estado de pagamento da fatura** sai em todos os DTOs de fatura, derivado (nunca coluna):
 `paymentStatus` (`UNPAID` / `PARTIAL` / `PAID`), `paidAmount`, `netAmount` (= `totalAmount`
@@ -825,6 +829,13 @@ Regras: uma fatura fora de `PROJECT` também pode ser paga (a quarentena e as de
 empresa têm pagamentos); o agregado **bloqueia** faturas de obras diferentes (`INVOICE_022`);
 um valor abaixo do líquido numa fatura deixa-a `PARTIAL` (a única via de parcial na fase 2 —
 não há repartição fina por linha); a prova de pagamento **não é obrigatória**.
+
+**A prova depois do registo** (2026-10-07). Antes só se anexava no `POST`, e a volta era apagar e
+recriar o pagamento — perdendo quem o registou e quando. O `PUT …/proof` anexa ou substitui; o
+`DELETE …/proof` tira. Num **agregado** a prova é do movimento, por isso muda para todas as faturas que
+ele cobre. O ficheiro antigo só sai do Storage **depois do commit** (apagá-lo antes deixava a linha a
+apontar para nada num rollback), e o nome dele fica no `activity_log` (`EDIT` com
+`{proof: attached|replaced|removed, previousFilename, filename}`).
 
 ## Notas de crédito
 

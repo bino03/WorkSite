@@ -1,5 +1,7 @@
 package com.management.managementapi.enterprises.controller;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -9,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -97,6 +100,46 @@ public class PaymentController {
                         EntityType.PAYMENT, removed.id(), paymentLabel(removed), request));
 
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Anexa a prova a um pagamento já registado, ou substitui a que tinha. Num
+     * pagamento agregado vale para todas as faturas que ele cobre. O ficheiro que
+     * saiu fica nomeado no {@code activity_log}.
+     */
+    @PutMapping(value = "/construction-invoices/payments/{paymentId}/proof",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PaymentResponseDTO> replaceProof(
+            @PathVariable UUID paymentId,
+            @RequestPart("proof") MultipartFile proof,
+            HttpServletRequest request) {
+        PaymentService.ProofChange change = paymentService.replaceProof(paymentId, proof);
+        logProofChange(change, change.previousFilename() == null ? "attached" : "replaced", request);
+        return ResponseEntity.ok(change.payment());
+    }
+
+    /** Deixa o pagamento sem prova. Idempotente: sem prova já, devolve o pagamento como está. */
+    @DeleteMapping("/construction-invoices/payments/{paymentId}/proof")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PaymentResponseDTO> removeProof(@PathVariable UUID paymentId,
+                                                          HttpServletRequest request) {
+        PaymentService.ProofChange change = paymentService.removeProof(paymentId);
+        if (change.previousFilename() != null) {
+            logProofChange(change, "removed", request);
+        }
+        return ResponseEntity.ok(change.payment());
+    }
+
+    private void logProofChange(PaymentService.ProofChange change, String action, HttpServletRequest request) {
+        Map<String, Object> changes = new LinkedHashMap<>();
+        changes.put("proof", action);
+        changes.put("previousFilename", change.previousFilename());
+        changes.put("filename", change.payment().proofFilename());
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.PAYMENT, change.payment().id(), paymentLabel(change.payment()),
+                        changes, request));
     }
 
     private static String paymentLabel(PaymentResponseDTO payment) {

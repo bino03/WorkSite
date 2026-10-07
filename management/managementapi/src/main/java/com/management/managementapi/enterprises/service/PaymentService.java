@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.management.managementapi.config.CacheConfig;
@@ -248,6 +250,61 @@ public class PaymentService {
         return snapshot;
     }
 
+    // ── prova ───────────────────────────────────────────────────
+
+    /** O pagamento depois da mudança, e o nome do ficheiro que lá estava antes (para o log). */
+    public record ProofChange(PaymentResponseDTO payment, String previousFilename) {}
+
+    /**
+     * Anexa a prova a um pagamento já registado, ou substitui a que tinha. Antes
+     * disto só se anexava no {@code POST}, e a volta era apagar e recriar o
+     * pagamento — o que perdia o registo de quem o registou e quando.
+     *
+     * <p>Num pagamento agregado a prova é do movimento, não de uma fatura: muda
+     * para todas as que ele cobre. O ficheiro antigo só sai do Storage depois do
+     * commit — apagá-lo antes deixava a linha a apontar para nada num rollback.
+     */
+    public ProofChange replaceProof(UUID paymentId, MultipartFile proof) {
+        if (proof == null || proof.isEmpty()) {
+            throw FileUploadException.empty(proof == null ? "proof" : proof.getOriginalFilename());
+        }
+        Payment payment = findPayment(paymentId);
+        String previousBucket = payment.getProofBucket();
+        String previousKey = payment.getProofKey();
+        String previousFilename = payment.getProofFilename();
+
+        // Um agregado só junta faturas da mesma obra e âmbito, por isso a primeira
+        // ligação dá o mesmo segmento de chave que deu no registo.
+        ConstructionInvoice context = invoicePaymentRepository.findByPaymentId(paymentId).getFirst().getInvoice();
+        attachProof(payment, proof, context);
+        paymentRepository.save(payment);
+
+        deleteAfterCommit(previousBucket, previousKey);
+        return new ProofChange(toResponseDTO(payment), previousFilename);
+    }
+
+    /** Deixa o pagamento sem prova. Sem prova já, não faz nada — é idempotente. */
+    public ProofChange removeProof(UUID paymentId) {
+        Payment payment = findPayment(paymentId);
+        String previousBucket = payment.getProofBucket();
+        String previousKey = payment.getProofKey();
+        String previousFilename = payment.getProofFilename();
+
+        payment.setProofBucket(null);
+        payment.setProofKey(null);
+        payment.setProofFilename(null);
+        payment.setProofMime(null);
+        paymentRepository.save(payment);
+
+        deleteAfterCommit(previousBucket, previousKey);
+        return new ProofChange(toResponseDTO(payment), previousFilename);
+    }
+
+    private Payment findPayment(UUID paymentId) {
+        return paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_PAYMENT_NOT_FOUND));
+    }
+
     // ── vistas para os DTOs de fatura ───────────────────────────
 
     /**
@@ -406,6 +463,26 @@ public class PaymentService {
         } catch (IOException e) {
             log.warn("Não foi possível eliminar {}/{} do storage: {}", bucket, key, e.getMessage());
         }
+    }
+
+    /**
+     * Apaga o ficheiro só se a transação vingar. Fora de uma transação (testes
+     * unitários) apaga já.
+     */
+    private void deleteAfterCommit(String bucket, String key) {
+        if (bucket == null || key == null) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            deleteQuietly(bucket, key);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                deleteQuietly(bucket, key);
+            }
+        });
     }
 
     private String proofUrl(Payment payment) {
