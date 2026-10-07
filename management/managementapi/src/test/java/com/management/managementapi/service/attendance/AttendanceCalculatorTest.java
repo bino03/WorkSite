@@ -7,10 +7,12 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.model.attendance.Absence;
 import com.management.managementapi.model.attendance.Holiday;
 import com.management.managementapi.model.attendance.TimeEntry;
@@ -320,5 +322,82 @@ class AttendanceCalculatorTest {
         assertThat(day.workedMinutes()).isEqualTo(390);
         assertThat(day.firstIn()).isEqualTo(LocalTime.parse("00:30"));
         assertThat(day.lastOut()).isEqualTo(LocalTime.parse("08:00"));
+    }
+
+    // ── horas por obra ──────────────────────────────────────
+
+    private static Enterprise obra(String nome) {
+        Enterprise enterprise = new Enterprise();
+        enterprise.setId(UUID.randomUUID());
+        enterprise.setName(nome);
+        return enterprise;
+    }
+
+    private static TimeEntry entry(TimeDirection direction, int hora, int minuto, Enterprise enterprise) {
+        TimeEntry entry = entry(direction, hora, minuto);
+        entry.setEnterprise(enterprise);
+        return entry;
+    }
+
+    @Test
+    @DisplayName("um dia em duas obras reparte a pausa na proporção do tempo em cada uma")
+    void pausaRepartidaPelasObras() {
+        Enterprise petrus = obra("Vila Petrus");
+        Enterprise aleu = obra("Vila Aleu");
+
+        DayAttendance day = calcular(
+                List.of(entry(TimeDirection.IN, 8, 0, petrus), entry(TimeDirection.OUT, 14, 0, petrus),
+                        entry(TimeDirection.IN, 14, 30, aleu), entry(TimeDirection.OUT, 17, 30, aleu)),
+                horario("08:00", "17:00", 60));
+
+        // 6h + 3h = 9h brutas, menos 1h de pausa = 8h; a pausa sai 2/3 da Petrus, 1/3 da Aleu.
+        assertThat(day.workedMinutes()).isEqualTo(480);
+        assertThat(day.enterprises()).containsExactly(
+                new WorkedAtEnterprise(petrus.getId(), "Vila Petrus", 320),
+                new WorkedAtEnterprise(aleu.getId(), "Vila Aleu", 160));
+    }
+
+    @Test
+    @DisplayName("o resto da divisão vai para a obra com mais tempo — a soma bate sempre com o dia")
+    void restoDaDivisaoNaoSePerde() {
+        Enterprise a = obra("A");
+        Enterprise b = obra("B");
+        Enterprise c = obra("C");
+
+        // Pares de 100, 100 e 101 min: 301 brutos, menos 60 = 241. Por divisão inteira cada
+        // obra fica com 80 → 240 atribuídos; o minuto que sobra vai para a C (a de mais tempo).
+        DayAttendance day = calcular(
+                List.of(entry(TimeDirection.IN, 8, 0, a), entry(TimeDirection.OUT, 9, 40, a),
+                        entry(TimeDirection.IN, 10, 0, b), entry(TimeDirection.OUT, 11, 40, b),
+                        entry(TimeDirection.IN, 12, 0, c), entry(TimeDirection.OUT, 13, 41, c)),
+                horario("08:00", "17:00", 60));
+
+        assertThat(day.workedMinutes()).isEqualTo(241);
+        assertThat(day.enterprises()).extracting(WorkedAtEnterprise::workedMinutes)
+                .containsExactly(80L, 80L, 81L);
+    }
+
+    @Test
+    @DisplayName("a obra de um par é a da entrada, e uma picagem sem obra fica como 'sem obra'")
+    void obraDaEntradaESemObra() {
+        Enterprise petrus = obra("Vila Petrus");
+
+        DayAttendance day = calcular(
+                List.of(entry(TimeDirection.IN, 8, 0, petrus), entry(TimeDirection.OUT, 12, 0, null),
+                        entry(TimeDirection.IN, 13, 0, null), entry(TimeDirection.OUT, 17, 0, petrus)),
+                null);
+
+        // Sem horário não há pausa: 4h + 4h, cada uma para a obra da sua entrada.
+        assertThat(day.enterprises()).containsExactly(
+                new WorkedAtEnterprise(petrus.getId(), "Vila Petrus", 240),
+                new WorkedAtEnterprise(null, null, 240));
+    }
+
+    @Test
+    @DisplayName("um dia sem trabalho não tem obras")
+    void diaSemTrabalhoSemObras() {
+        DayAttendance day = calcular(List.of(), horario("08:00", "17:00", 60));
+
+        assertThat(day.enterprises()).isEmpty();
     }
 }

@@ -2,11 +2,13 @@ package com.management.managementapi.dto.attendance.response;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import com.management.managementapi.model.enums.AbsenceType;
 import com.management.managementapi.service.attendance.DayAttendance.DayStatus;
+import com.management.managementapi.service.attendance.WorkedAtEnterprise;
 
 public record DayAttendanceDTO(
         LocalDate date,
@@ -23,5 +25,7 @@ public record DayAttendanceDTO(
         /** O nome do feriado, quando o dia é feriado. */
         String holidayName,
         /** O tipo da ausência aprovada que cobre o dia, ou null. */
-        AbsenceType absenceType
+        AbsenceType absenceType,
+        /** As horas do dia por obra (a pausa já repartida); somam {@code workedMinutes}. */
+        List<WorkedAtEnterprise> enterprises
 ) {}

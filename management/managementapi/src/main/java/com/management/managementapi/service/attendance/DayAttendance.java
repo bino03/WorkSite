@@ -3,6 +3,7 @@ package com.management.managementapi.service.attendance;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import com.management.managementapi.model.enums.AbsenceType;
 
@@ -23,6 +24,7 @@ import com.management.managementapi.model.enums.AbsenceType;
  * @param incomplete      número ímpar de picagens — falta uma saída (ou uma entrada)
  * @param holidayName     o nome do feriado, quando é feriado; null nos outros dias
  * @param absenceType     o tipo da ausência aprovada que cobre o dia, ou null
+ * @param enterprises     os minutos trabalhados repartidos por obra; somam {@code workedMinutes}
  */
 public record DayAttendance(
         LocalDate date,
@@ -35,7 +37,8 @@ public record DayAttendance(
         LocalTime lastOut,
         boolean incomplete,
         String holidayName,
-        AbsenceType absenceType
+        AbsenceType absenceType,
+        List<WorkedAtEnterprise> enterprises
 ) {
 
     public enum DayStatus {

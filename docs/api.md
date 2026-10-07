@@ -1201,7 +1201,8 @@ correção a uma picagem, e corrigir picagens é uma funcionalidade.
 | GET | `/attendance/summary/range?profileId=&from=&to=` | `ADMIN` |
 
 Cada dia traz `workedMinutes`, `expectedMinutes`, `overtimeMinutes`, `latenessMinutes`, `firstIn`,
-`lastOut`, `incomplete`, `needsAttention` e um `status`:
+`lastOut`, `incomplete`, `needsAttention`, `enterprises` (os minutos do dia por obra, com a pausa já
+repartida — somam `workedMinutes`; ver "Relatórios de assiduidade") e um `status`:
 
 | `status` | Significado |
 |---|---|
@@ -1222,6 +1223,32 @@ Como os números saem:
 
 O cálculo lê o horário **por dia** (`EmploymentTerm.termOn`), não uma vez para o período: é o que faz um
 mês que atravessa uma mudança de condições ser calculado com o horário certo em cada metade.
+
+## Relatórios de assiduidade (`AttendanceReportController`, `/attendance/reports`)
+
+O fecho do mês — fase 4, a que substitui de facto a Sesame. **Sem lógica nova**: os números por pessoa
+são os do `/attendance/summary/month`, e os por obra são os mesmos dias reagrupados, por isso as duas
+vistas batem sempre certo.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/reports/month?month=YYYY-MM` | `ADMIN` — `{ from, to, employees[], enterprises[] }` |
+| GET | `/attendance/reports/month/export?month=YYYY-MM` | `ADMIN` — `Assiduidade - YYYY-MM.xlsx`. **Entra no rate limiting** dos exports |
+
+- **`employees`** = um resumo mensal (o mesmo `AttendanceSummaryDTO`, com os dias) por cada pessoa com
+  vínculo em **algum** dia do mês — quem entrou ou saiu a meio também fecha o mês.
+- **`enterprises`** = por obra: `workedMinutes` e, por pessoa, minutos e dias lá trabalhados. Ordenadas
+  por nome; `enterpriseId`/`enterpriseName` null é **"sem obra"** (picagens sem obra) e vem no fim.
+- **A obra de um par entrada→saída é a da entrada.** A pausa do horário desconta-se ao dia, não a um
+  par, por isso **reparte-se pelas obras do dia na proporção do tempo em cada uma** (decisão de
+  2026-10-07); o resto da divisão inteira vai para a obra com mais tempo. A soma por obra = o total
+  do funcionário, sempre.
+
+O `.xlsx` (gerado a pedido — a prova é a base de dados com as revisões; o ficheiro é uma vista dela)
+tem cinco folhas: **Por funcionário**, **Por obra** (linha de total a negrito + as pessoas), **Dias**
+(pessoa × dia, com as obras do dia), **Picagens** (todas, **incluindo as anuladas**, com "Anulada em")
+e **Correções** (o `time_entry_revision` dessas picagens, com o estado *anterior* de cada alteração).
+Horas como `[h]:mm` (somáveis no Excel); datas e horas em **hora de Lisboa**, nunca UTC.
 
 ## Feriados (`HolidayController`, `/attendance/holidays`)
 

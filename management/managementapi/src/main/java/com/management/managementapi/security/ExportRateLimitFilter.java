@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Rate limiting nas exportações do orçamento (`/export`, `/export/zip`), por utilizador
+ * Rate limiting nas exportações (orçamento, documentos, assiduidade — ver {@code PATTERNS}), por utilizador
  * autenticado — não por IP: a app é interna (só ADMIN/EMPLOYEE, sem portal público), o risco é
  * abuso ou uma conta comprometida a repetir um pedido pesado (o zip faz streaming de todos os
  * documentos de uma obra), não bots externos. Ver notes/roadmap/pre-deploy-security.md.
@@ -52,7 +52,10 @@ public class ExportRateLimitFilter extends OncePerRequestFilter {
             // o zip dos documentos: é o mais pesado de todos (faz streaming de dezenas
             // de MB do Storage), por isso é o que menos pode ficar de fora. O
             // `/documents/summary` fica, que só lê a base de dados.
-            new PathPatternParser().parse("/construction-invoices/enterprise/{enterpriseId}/documents/zip")
+            new PathPatternParser().parse("/construction-invoices/enterprise/{enterpriseId}/documents/zip"),
+            // o mês de assiduidade: um resumo por funcionário mais todas as picagens e
+            // correções do mês num livro — o mesmo tipo de trabalho dos exports acima
+            new PathPatternParser().parse("/attendance/reports/month/export")
     );
 
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()

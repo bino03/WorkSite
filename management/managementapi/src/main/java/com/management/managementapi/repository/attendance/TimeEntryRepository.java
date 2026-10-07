@@ -60,4 +60,21 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, UUID> {
      * soft-delete não o faz desaparecer.
      */
     boolean existsByProfileId(UUID profileId);
+
+    /**
+     * Todas as picagens do período, <b>incluindo as anuladas</b> — é a vista de
+     * auditoria. Um ficheiro que só mostrasse as vivas esconderia precisamente as
+     * picagens que alguém decidiu tirar.
+     */
+    @Query("""
+            select e from TimeEntry e
+            join fetch e.profile
+            left join fetch e.enterprise
+            left join fetch e.registeredBy
+            where e.happenedAt >= :from
+              and e.happenedAt < :to
+            order by e.profile.name asc, e.happenedAt asc
+            """)
+    List<TimeEntry> findAllForAudit(@Param("from") OffsetDateTime from,
+                                    @Param("to") OffsetDateTime to);
 }

@@ -4,8 +4,14 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
+import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.model.attendance.Absence;
 import com.management.managementapi.model.attendance.Holiday;
 import com.management.managementapi.model.attendance.TimeEntry;
@@ -55,7 +61,8 @@ public final class AttendanceCalculator {
         LocalTime lastOut = lastLocalTime(entries, TimeDirection.OUT, zone);
         boolean incomplete = entries.size() % 2 != 0;
 
-        long grossMinutes = pairedMinutes(entries);
+        Map<UUID, WorkedAtEnterprise> grossByEnterprise = pairedMinutesByEnterprise(entries);
+        long grossMinutes = grossByEnterprise.values().stream().mapToLong(WorkedAtEnterprise::workedMinutes).sum();
         // A pausa desconta-se do bruto, e só se houve trabalho: descontar uma hora
         // de almoço a quem não apareceu daria um total negativo.
         long breakMinutes = (scheduled == null || grossMinutes == 0) ? 0 : scheduled.getBreakMinutes();
@@ -72,7 +79,8 @@ public final class AttendanceCalculator {
                 lastOut,
                 incomplete,
                 holiday == null ? null : holiday.getName(),
-                absence == null ? null : absence.getType());
+                absence == null ? null : absence.getType(),
+                shareOut(grossByEnterprise, grossMinutes, workedMinutes));
     }
 
     /**
@@ -97,20 +105,62 @@ public final class AttendanceCalculator {
      * esqueceu-se de picar a saída): a picagem sem par é ignorada em vez de o dia
      * inteiro ser descartado — o dia fica marcado como incompleto e o utilizador
      * corrige.
+     *
+     * <p>Soma-se por obra, e a obra de um par é a da <b>entrada</b> — é onde a pessoa
+     * picou ao chegar. A chave null é "sem obra".
      */
-    private static long pairedMinutes(List<TimeEntry> entries) {
-        long total = 0;
+    private static Map<UUID, WorkedAtEnterprise> pairedMinutesByEnterprise(List<TimeEntry> entries) {
+        Map<UUID, WorkedAtEnterprise> byEnterprise = new LinkedHashMap<>();
         TimeEntry openIn = null;
 
         for (TimeEntry entry : entries) {
             if (entry.getDirection() == TimeDirection.IN) {
                 openIn = entry;
             } else if (openIn != null) {
-                total += Duration.between(openIn.getHappenedAt(), entry.getHappenedAt()).toMinutes();
+                long minutes = Duration.between(openIn.getHappenedAt(), entry.getHappenedAt()).toMinutes();
+                Enterprise enterprise = openIn.getEnterprise();
+                UUID enterpriseId = enterprise == null ? null : enterprise.getId();
+                WorkedAtEnterprise soFar = byEnterprise.get(enterpriseId);
+                byEnterprise.put(enterpriseId, new WorkedAtEnterprise(
+                        enterpriseId,
+                        enterprise == null ? null : enterprise.getName(),
+                        minutes + (soFar == null ? 0 : soFar.workedMinutes())));
                 openIn = null;
             }
         }
-        return total;
+        return byEnterprise;
+    }
+
+    /**
+     * A pausa desconta-se ao dia e não a um par, por isso reparte-se pelas obras na
+     * proporção do tempo passado em cada uma (decisão de 2026-10-07): assim a soma das
+     * obras bate sempre com o total do dia. O resto da divisão inteira vai para a obra
+     * com mais tempo, para não se perderem minutos.
+     */
+    private static List<WorkedAtEnterprise> shareOut(Map<UUID, WorkedAtEnterprise> grossByEnterprise,
+                                                     long grossMinutes, long workedMinutes) {
+        if (grossMinutes == 0) {
+            return List.of();
+        }
+        List<WorkedAtEnterprise> gross = new ArrayList<>(grossByEnterprise.values());
+        WorkedAtEnterprise largest = gross.stream()
+                .max(Comparator.comparingLong(WorkedAtEnterprise::workedMinutes))
+                .orElseThrow();
+
+        long allocated = 0;
+        List<WorkedAtEnterprise> shares = new ArrayList<>();
+        for (WorkedAtEnterprise enterprise : gross) {
+            long share = enterprise.workedMinutes() * workedMinutes / grossMinutes;
+            allocated += share;
+            shares.add(new WorkedAtEnterprise(enterprise.enterpriseId(), enterprise.enterpriseName(), share));
+        }
+
+        long remainder = workedMinutes - allocated;
+        int largestIndex = gross.indexOf(largest);
+        WorkedAtEnterprise toTopUp = shares.get(largestIndex);
+        shares.set(largestIndex, new WorkedAtEnterprise(
+                toTopUp.enterpriseId(), toTopUp.enterpriseName(), toTopUp.workedMinutes() + remainder));
+        return shares;
     }
 
     /**

@@ -187,6 +187,7 @@ public class AttendanceSummaryService {
                 day.incomplete(),
                 day.needsAttention(),
                 day.holidayName(),
-                day.absenceType());
+                day.absenceType(),
+                day.enterprises());
     }
 }

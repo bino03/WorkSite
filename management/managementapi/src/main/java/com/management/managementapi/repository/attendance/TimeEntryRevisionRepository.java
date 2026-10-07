@@ -1,5 +1,6 @@
 package com.management.managementapi.repository.attendance;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,4 +13,6 @@ import com.management.managementapi.model.attendance.TimeEntryRevision;
 public interface TimeEntryRevisionRepository extends JpaRepository<TimeEntryRevision, UUID> {
 
     List<TimeEntryRevision> findByTimeEntryIdOrderByCreatedAtDesc(UUID timeEntryId);
+
+    List<TimeEntryRevision> findByTimeEntryIdInOrderByCreatedAtAsc(Collection<UUID> timeEntryIds);
 }

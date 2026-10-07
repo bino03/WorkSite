@@ -37,7 +37,7 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 - **`CookieJwtFilter`** — lê o cookie `access_token` e injeta-o como header `Authorization` se ainda não existir.
 - **Filtro Bearer JWT (OAuth2 Resource Server)** — valida assinatura/expiração e constrói as authorities.
 - **`AccountLockFilter`** — corre depois da autenticação. Dois ramos: (1) lê `account_status` do claim `app_metadata` do JWT — nunca é escrito (não há sincronização com o Supabase Auth), por isso nunca dispara; é o ramo morto. (2) compara `iat` do JWT com `profile.last_token_reset_at`, lido da BD a cada pedido — **este é o mecanismo real de corte de sessão**, e é imediato. Desde 2026-09-22, `blockProfile`/`deleteProfile` (`EmployeeServiceImpl`) escrevem `last_token_reset_at = now()` no mesmo `UPDATE` que muda o `account_status` — o mesmo padrão já usado no reset de password. Antes disso, bloquear/eliminar uma conta não cortava sessões já abertas.
-- **`ExportRateLimitFilter`** — corre depois da autenticação; limita `/export` e `/export/zip` do orçamento por utilizador autenticado (não por IP — app interna). Ver `docs/api.md` → "Orçamento de Construção".
+- **`ExportRateLimitFilter`** — corre depois da autenticação; limita os exports pesados — `/export` e `/export/zip` do orçamento, o export de um lote, o `/documents/zip` das faturas e o `/attendance/reports/month/export` — por utilizador autenticado (não por IP — app interna). Ver `docs/api.md` → "Orçamento de Construção".
 
 ## CORS
 
