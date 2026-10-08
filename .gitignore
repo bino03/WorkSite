@@ -53,3 +53,9 @@ coverage/
 
 # Definições pessoais do Claude Code (as skills em .claude/skills/ vão para o git)
 .claude/settings.local.json
+
+# Ficheiros de trabalho do import de faturas do email (PDFs reais de fornecedores).
+# Vivem numa pasta `public/` do Vite, que é servida tal e qual na raiz do site —
+# versioná-los punha faturas da empresa descarregáveis sem autenticação, e no
+# histórico do GitHub para sempre. Ficam só no disco de quem faz o import.
+management/managementfrontend/apps/backoffice/public/import-tmp/
