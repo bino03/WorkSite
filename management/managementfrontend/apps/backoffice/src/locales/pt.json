@@ -3680,7 +3680,8 @@
       "endBeforeHired": "A data de fim não pode ser anterior à admissão.",
       "validFromBeforeHired": "O período não pode começar antes da data de admissão.",
       "enterpriseRequired": "A obra é obrigatória.",
-      "reasonRequired": "O motivo é obrigatório."
+      "reasonRequired": "O motivo é obrigatório.",
+      "profileRequired": "O funcionário é obrigatório."
     }
   }
 }

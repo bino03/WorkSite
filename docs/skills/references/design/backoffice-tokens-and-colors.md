@@ -46,6 +46,20 @@ Se precisares de uma cor em JSX, usa `var(--ind-*)` numa string de `style`; `IND
 
 > Nota: `EmployeesList.tsx:51-64` também tem um objeto chamado `D`, mas os valores já apontam para `var(--ind-*)` — é só um alias local, não drift de cor.
 
+## O que a paleta não tem (2026-10-08)
+
+**Não há laranja, vermelho nem amarelo de aviso nos tokens `--ind-*`**: as duas escalas de acento são
+ambas azuis (`--ind-accent-*` e `--ind-accent-2-*`, esta só ligeiramente mais fria), e o resto é
+neutro. O espaço Equipa redefine `--ind-color-accent` e a escala `--ind-accent-*` para o verde-oliva,
+mas também não acrescenta nenhuma cor quente.
+
+Consequência prática, encontrada ao construir o mapa de férias: **uma maquete que peça laranja não
+tem token para isso.** A saída certa não é escrever o hex no componente — é usar o segundo acento
+para a distinção (foi o que o `TeamAbsenceMap` fez para a "baixa", com a divergência comentada) e, se
+a cor quente for mesmo necessária, **criar primeiro o token aqui e em `index.css`**, com a escala
+completa, em vez de um hex solto num ficheiro. Para *erro* continua a valer o que o AntD dá
+(`<Text type="danger">`, `<Button danger>`), que não depende destes tokens.
+
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
 - [[backoffice-tables-and-lists]] — onde estes tokens são aplicados em listas

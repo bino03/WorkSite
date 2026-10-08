@@ -9,6 +9,7 @@ import {
   FieldTimeOutlined,
   HomeOutlined,
   SettingOutlined,
+  SunOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import { teamAntdTheme } from "@/theme";
@@ -73,6 +74,9 @@ export default function TeamLayout() {
           </NavLink>
           <NavLink to={`${base}/time-entries`} style={navLinkStyle(HEADER_ACCENT)}>
             <FieldTimeOutlined />Picagens
+          </NavLink>
+          <NavLink to={`${base}/absences`} style={navLinkStyle(HEADER_ACCENT)}>
+            <SunOutlined />Férias e ausências
           </NavLink>
           <NavLink to={`${base}/employees`} style={navLinkStyle(HEADER_ACCENT)}>
             <TeamOutlined />Funcionários

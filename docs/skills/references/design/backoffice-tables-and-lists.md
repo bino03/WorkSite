@@ -156,6 +156,22 @@ Duas notas que vieram daqui:
   em memória, sem pedido novo). Mudar de mês arrasta o dia escolhido para dentro do mês novo, senão a
   vista fica vazia a apontar para fora do que foi carregado.
 
+## 10. Mapa mensal (grelha funcionário × dia) — `TeamAbsenceMap` (2026-10-08)
+
+Para "quem falta quando" não se usa um calendário de biblioteca: é uma **grelha CSS**
+(`gridTemplateColumns: 160px repeat(N, 1fr)`), uma linha por pessoa, uma coluna por dia do mês, com
+`<button>`s de 14px de altura como barras. Fins de semana levam fundo `--ind-neutral-100` para a
+grelha se ler como um calendário, cada barra tem `Tooltip` e `aria-label`, e o contentor faz
+`overflow-x` com `minWidth` para não espremer em ecrã estreito.
+
+**A barra diz o estado, não o tipo** (preenchido = aprovado, tracejado = pendente, neutro = recusado),
+com a exceção que muda o que se faz a seguir — a baixa, que leva o segundo acento.
+
+**Uma vista, um pedido**: o mapa e a lista da mesma página servem-se do **mesmo** array já carregado
+(`listTeamAbsences(from, to)` sem filtro de estado, porque o mapa precisa de todas); trocar de vista,
+filtrar por estado ou pesquisar **não volta a chamar a API**. O filtro de estado só se envia ao
+backend se alguma vista precisar de dados que o outro não tem.
+
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
 - [[backoffice-buttons-and-icons]] — variantes de botão e confirmação de ações destrutivas

@@ -3649,7 +3649,8 @@
       "endBeforeHired": "The end date cannot be before the hire date.",
       "validFromBeforeHired": "A period cannot start before the hire date.",
       "enterpriseRequired": "Work site is required.",
-      "reasonRequired": "A reason is required."
+      "reasonRequired": "A reason is required.",
+      "profileRequired": "An employee is required."
     }
   }
 }
