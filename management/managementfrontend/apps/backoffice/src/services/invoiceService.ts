@@ -37,14 +37,15 @@ function normalizePage(data: unknown): InvoicePage {
  * depois de rever o resultado é que se chama {@link uploadInvoice} ("Guardar").
  */
 export async function previewInvoice(
-  enterpriseId: string,
-  file: File
+  enterpriseId: string | null,
+  file: File,
+  scope?: InvoiceScope
 ): Promise<InvoicePreviewResult> {
   const form = new FormData();
   form.append("file", file);
 
   const response = await api.post(`/construction-invoices/preview`, form, {
-    params: { enterpriseId },
+    params: { enterpriseId: enterpriseId ?? undefined, scope },
     headers: { "Content-Type": "multipart/form-data" },
     // O erro pertence à linha do ficheiro; dez falhas não são dez toasts.
     skipErrorNotification: true,
@@ -66,14 +67,15 @@ export async function previewInvoice(
  * os restantes.
  */
 export async function uploadInvoice(
-  enterpriseId: string,
-  file: File
+  enterpriseId: string | null,
+  file: File,
+  scope?: InvoiceScope
 ): Promise<InvoiceUploadResult> {
   const form = new FormData();
   form.append("file", file);
 
   const response = await api.post(`/construction-invoices`, form, {
-    params: { enterpriseId },
+    params: { enterpriseId: enterpriseId ?? undefined, scope },
     headers: { "Content-Type": "multipart/form-data" },
     // O erro pertence à linha do ficheiro; dez falhas não são dez toasts.
     skipErrorNotification: true,
@@ -379,6 +381,12 @@ export async function batchAllocateInvoices(
 /** Devolve a fatura à caixa de entrada, apagando **todas** as linhas da repartição. */
 export async function deallocateInvoice(id: string): Promise<ConstructionInvoice> {
   const response = await api.delete(`/construction-invoices/${id}/allocate`);
+  return response.data;
+}
+
+/** Só a nota da fatura; vazio apaga-a. Não passa pelo PUT, que substitui tudo. */
+export async function setInvoiceNotes(id: string, notes: string): Promise<ConstructionInvoice> {
+  const response = await api.patch(`/construction-invoices/${id}/notes`, { notes });
   return response.data;
 }
 

@@ -1,4 +1,6 @@
+import { useCallback, useState } from "react";
 import type { FC } from "react";
+import { InvoiceContextMenu } from "@/components/invoices/InvoiceContextMenu";
 import { Empty, Pagination, Spin, Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { FileTextOutlined } from "@ant-design/icons";
@@ -8,7 +10,6 @@ import {
   ListActions,
   ListActionDanger,
   ListActionPrimary,
-  ListActionSecondary,
 } from "@/components/common/ListActions";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate } from "@/utils/formatters";
@@ -64,6 +65,10 @@ interface Props {
    * `INVOICE`: uma nota de crédito segue a fatura a que está ligada.
    */
   onTransfer?: (invoice: ConstructionInvoice) => void;
+  /** Só no menu de contexto (botão direito): sem estas, a entrada não aparece. */
+  onRegisterPayment?: (invoice: ConstructionInvoice) => void;
+  onMarkPaid?: (invoice: ConstructionInvoice) => void;
+  onAddNote?: (invoice: ConstructionInvoice) => void;
   /**
    * Onde esta lista está a ser mostrada. Muda as colunas, não os dados: a
    * rubrica só existe numa obra, e as notas de "de quem será?" só na
@@ -94,6 +99,9 @@ export const InvoicesList: FC<Props> = ({
   onSendToAccountant,
   onDelete,
   onTransfer,
+  onRegisterPayment,
+  onMarkPaid,
+  onAddNote,
   sortField,
   sortOrder,
   onSortChange,
@@ -103,6 +111,8 @@ export const InvoicesList: FC<Props> = ({
   const { t } = useTranslation();
   const isProject = scope === "PROJECT";
   const isQuarantine = scope === "UNIDENTIFIED";
+  const [menu, setMenu] = useState<{ x: number; y: number; invoice: ConstructionInvoice } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   const columns: ColumnsType<ConstructionInvoice> = [
     {
@@ -353,43 +363,12 @@ export const InvoicesList: FC<Props> = ({
     {
       title: "",
       key: "actions",
-      width: 200,
+      width: 150,
       render: (_: unknown, row) => (
         <ListActions>
           <ListActionPrimary onClick={() => onView(row)}>Ver detalhes</ListActionPrimary>
-          {/* Fora de uma obra não há rubrica a que associar — o backend
-              recusa com INVOICE_013, e esconder o botão poupa a viagem. */}
-          {isAdmin() &&
-            isProject &&
-            (row.allocated ? (
-              <ListActionSecondary onClick={() => onDeallocate(row)}>
-                Desassociar
-              </ListActionSecondary>
-            ) : (
-              <Tooltip
-                title={row.needsReview ? "Preencha a data e o total antes de associar." : undefined}
-              >
-                {/* O span mantém o tooltip vivo com o botão desativado. */}
-                <span>
-                  <ListActionSecondary onClick={() => onAllocate(row)} disabled={row.needsReview}>
-                    Associar
-                  </ListActionSecondary>
-                </span>
-              </Tooltip>
-            ))}
-          {/* Uma NC não se transfere sozinha — segue a fatura a que está ligada
-              (o backend recusa com INVOICE_033). Na quarentena, transferir é
-              "dar uma obra" à fatura, e é a razão de ser da lista. */}
-          {isAdmin() && onTransfer && row.documentType === "INVOICE" && (
-            <ListActionSecondary onClick={() => onTransfer(row)}>
-              {isQuarantine ? "Atribuir a uma obra" : "Transferir"}
-            </ListActionSecondary>
-          )}
-          {isAdmin() && (
-            <ListActionSecondary onClick={() => onSendToAccountant(row)}>
-              {row.sentToAccountant ? "Desmarcar envio" : "Enviar"}
-            </ListActionSecondary>
-          )}
+          {/* Associar, transferir, enviar, pagamento e nota vivem no menu de
+              contexto (botão direito) — ver `InvoiceContextMenu`. */}
           {isAdmin() && <ListActionDanger onClick={() => onDelete(row)}>Eliminar</ListActionDanger>}
         </ListActions>
       ),
@@ -398,6 +377,22 @@ export const InvoicesList: FC<Props> = ({
 
   return (
     <Spin spinning={loading}>
+      <InvoiceContextMenu
+        x={menu?.x ?? 0}
+        y={menu?.y ?? 0}
+        invoice={menu?.invoice ?? null}
+        onClose={closeMenu}
+        isAdmin={isAdmin()}
+        isProject={isProject}
+        isQuarantine={isQuarantine}
+        onAllocate={onAllocate}
+        onDeallocate={onDeallocate}
+        onTransfer={onTransfer}
+        onSendToAccountant={onSendToAccountant}
+        onRegisterPayment={onRegisterPayment}
+        onMarkPaid={onMarkPaid}
+        onAddNote={onAddNote}
+      />
       <Table<ConstructionInvoice>
         rowKey="id"
         columns={columns}
@@ -421,7 +416,14 @@ export const InvoicesList: FC<Props> = ({
               }
             : undefined
         }
-        onRow={(row) => ({ onClick: () => onView(row), style: { cursor: "pointer" } })}
+        onRow={(row) => ({
+          onClick: () => onView(row),
+          onContextMenu: (e) => {
+            e.preventDefault();
+            setMenu({ x: e.clientX, y: e.clientY, invoice: row });
+          },
+          style: { cursor: "pointer" },
+        })}
         onChange={(_pagination, _filters, sorter) => {
           if (!onSortChange) return;
           const s = Array.isArray(sorter) ? sorter[0] : sorter;

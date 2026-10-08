@@ -32,6 +32,8 @@ import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
+import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
+import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBadge";
 import { InvoiceFiltersModal } from "@/components/invoices/InvoiceFiltersModal";
@@ -113,6 +115,8 @@ const EnterpriseInvoicesPage: FC = () => {
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
+  const [payInvoice, setPayInvoice] = useState<ConstructionInvoice | null>(null);
+  const [noteInvoice, setNoteInvoice] = useState<ConstructionInvoice | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
   const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
@@ -237,6 +241,8 @@ const EnterpriseInvoicesPage: FC = () => {
     setSelectedIds([]);
     fetch(filters, sort);
   };
+
+  const markPaid = useQuickMarkPaid(reload);
 
   const handleView = (invoice: ConstructionInvoice) => setDetailId(invoice.id);
 
@@ -645,6 +651,9 @@ const EnterpriseInvoicesPage: FC = () => {
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
         onTransfer={setTransferInvoice}
+        onRegisterPayment={setPayInvoice}
+        onMarkPaid={markPaid}
+        onAddNote={setNoteInvoice}
         sortField={sort?.field ?? null}
         sortOrder={sort?.order ?? null}
         onSortChange={handleSortChange}
@@ -733,11 +742,16 @@ const EnterpriseInvoicesPage: FC = () => {
           />
 
           <AggregatePaymentDrawer
-            open={aggregatePayOpen}
-            invoices={payableSelected}
-            onClose={() => setAggregatePayOpen(false)}
+            open={aggregatePayOpen || payInvoice !== null}
+            invoices={payInvoice ? [payInvoice] : payableSelected}
+            onClose={() => {
+              setAggregatePayOpen(false);
+              setPayInvoice(null);
+            }}
             onDone={reload}
           />
+
+          <InvoiceNoteModal invoice={noteInvoice} onClose={() => setNoteInvoice(null)} onSaved={reload} />
 
           <BudgetItemPickerModal
             open={allocating.length > 0}

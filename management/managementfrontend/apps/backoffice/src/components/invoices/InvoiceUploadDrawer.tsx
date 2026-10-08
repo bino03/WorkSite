@@ -5,6 +5,7 @@ import { CloseOutlined, InboxOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
 import { previewInvoice, uploadInvoice } from "@/services/invoiceService";
+import type { InvoiceScope } from "@/types/invoice";
 import { validateInvoiceFile } from "@/components/construction/constructionFormSchemas";
 import { getErrorMessage } from "@/utils/apiError";
 import { formatCurrency, formatDate } from "@/utils/formatters";
@@ -75,7 +76,9 @@ interface Row {
 
 interface Props {
   open: boolean;
-  enterpriseId: string;
+  /** `null` fora de uma obra (despesas da empresa, quarentena) — aí o `scope` manda. */
+  enterpriseId: string | null;
+  scope?: InvoiceScope;
   onClose: () => void;
   /** Disparado quando pelo menos uma fatura foi guardada, para a lista recarregar. */
   onUploaded: () => void;
@@ -90,7 +93,7 @@ interface Props {
  * "Guardar", e aí sim os ficheiros ficam gravados. Uma duplicada é
  * descartada sozinha: nunca chega a "Guardar", não é preciso removê-la à mão.
  */
-export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, onUploaded }) => {
+export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, scope, onClose, onUploaded }) => {
   const { t } = useTranslation();
   const [rows, setRows] = useState<Row[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -274,7 +277,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
           }
 
           try {
-            const result = await previewInvoice(enterpriseId, file);
+            const result = await previewInvoice(enterpriseId, file, scope);
 
             if (result.duplicate) {
               // Nunca vai ser guardada — o ficheiro não faz falta em memória.
@@ -336,7 +339,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, onClose, on
           const { row, file } = queue[next++];
           patch(row.key, { status: "saving" });
           try {
-            const result = await uploadInvoice(enterpriseId, file);
+            const result = await uploadInvoice(enterpriseId, file, scope);
             uploadedAny.current = true;
 
             const invoice = result.invoice;

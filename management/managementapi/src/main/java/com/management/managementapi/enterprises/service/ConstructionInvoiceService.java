@@ -146,9 +146,9 @@ public class ConstructionInvoiceService {
      * quantas vezes for preciso sem custar nada.
      */
     @Transactional(readOnly = true)
-    public InvoicePreviewResultDTO preview(UUID enterpriseId, MultipartFile file) {
-        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_ENTERPRISE_NOT_FOUND));
+    public InvoicePreviewResultDTO preview(UUID enterpriseId, String scopeValue, MultipartFile file) {
+        ConstructionInvoice.Scope scope = scopeOrProject(scopeValue);
+        Enterprise enterprise = resolveEnterpriseFor(scope, enterpriseId);
 
         validateFile(file);
         byte[] original = readBytes(file);
@@ -200,15 +200,16 @@ public class ConstructionInvoiceService {
      * compressão — ver {@link InvoiceCompressionService}. Comprimir primeiro
      * já custou faturas que liam bem em qualidade total.
      */
-    public InvoiceUploadResultDTO upload(UUID enterpriseId, MultipartFile file) {
-        Enterprise enterprise = enterpriseRepository.findById(enterpriseId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVOICE_ENTERPRISE_NOT_FOUND));
+    public InvoiceUploadResultDTO upload(UUID enterpriseId, String scopeValue, MultipartFile file) {
+        ConstructionInvoice.Scope scope = scopeOrProject(scopeValue);
+        Enterprise enterprise = resolveEnterpriseFor(scope, enterpriseId);
 
         validateFile(file);
         byte[] original = readBytes(file);
         String mime = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
 
         ConstructionInvoice invoice = new ConstructionInvoice();
+        invoice.setScope(scope);
         invoice.setEnterprise(enterprise);
         String checksum = sha256Hex(original);
         authContext.currentProfileId().ifPresent(invoice::setCreatedBy);
@@ -231,7 +232,9 @@ public class ConstructionInvoiceService {
                 Notification.TYPE_INVOICE_PENDING,
                 "Fatura por classificar",
                 descreveFatura(saved),
-                "/backoffice/empreendimentos/" + enterpriseId + "/invoices",
+                scope == ConstructionInvoice.Scope.PROJECT
+                        ? "/backoffice/empreendimentos/" + enterpriseId + "/invoices"
+                        : "/backoffice/invoices/" + scope.name().toLowerCase(),
                 saved.getId()));
 
         return new InvoiceUploadResultDTO(
@@ -646,6 +649,11 @@ public class ConstructionInvoiceService {
                     + ", mas a fatura tem " + invoice.getTotalAmount() + ".");
         }
         return divergences;
+    }
+
+    /** O carregamento de ficheiro sem {@code scope} é o de sempre: uma obra. */
+    private static ConstructionInvoice.Scope scopeOrProject(String value) {
+        return isBlank(value) ? ConstructionInvoice.Scope.PROJECT : parseScope(value);
     }
 
     private static ConstructionInvoice.Scope parseScope(String value) {
@@ -1239,6 +1247,13 @@ public class ConstructionInvoiceService {
         resyncAllocations(allocations, saved);
 
         return saved;
+    }
+
+    /** Só a nota — a edição rápida da lista, sem passar pelo PUT que substitui a fatura inteira. */
+    public ConstructionInvoice setNotes(UUID id, String notes) {
+        ConstructionInvoice invoice = getById(id);
+        invoice.setNotes(trimToNull(notes));
+        return repository.save(invoice);
     }
 
     /** Marca (ou desmarca) a fatura como enviada para a contabilidade. */
@@ -1942,8 +1957,10 @@ public class ConstructionInvoiceService {
         document.setChecksumSha256(checksum);
         document.setOriginalSizeBytes(originalSizeBytes);
 
-        storeDocument(document, enterpriseId, stored.filename(), stored.content(), stored.mimeType());
-        storeThumbnail(document, enterpriseId, stored.content(), stored.mimeType());
+        // Sem obra (despesas da empresa, quarentena) a pasta é o âmbito.
+        String folder = enterpriseId != null ? enterpriseId.toString() : invoice.getScope().name().toLowerCase();
+        storeDocument(document, folder, stored.filename(), stored.content(), stored.mimeType());
+        storeThumbnail(document, folder, stored.content(), stored.mimeType());
 
         // Ter papel é o que faz o estado ARCHIVED. "Pedir" e "imprimir" deixam
         // de fazer sentido a partir do momento em que o documento chega.
@@ -1951,11 +1968,11 @@ public class ConstructionInvoiceService {
         return documentRepository.save(document);
     }
 
-    private void storeDocument(ConstructionInvoiceDocument document, UUID enterpriseId,
+    private void storeDocument(ConstructionInvoiceDocument document, String folder,
                                String originalFilename, byte[] content, String mime) {
         String safeName = storageService.sanitizeFileName(originalFilename);
         String key = String.format("construction-invoices/%s/%s_%s",
-                enterpriseId, UUID.randomUUID().toString().substring(0, 8), safeName);
+                folder, UUID.randomUUID().toString().substring(0, 8), safeName);
 
         try (InputStream in = new ByteArrayInputStream(content)) {
             storageService.upload(BUCKET, key, mime, in);
@@ -1978,7 +1995,7 @@ public class ConstructionInvoiceService {
      * A miniatura é um extra. Falhar aqui não pode custar a fatura, que já está
      * carregada e é o que interessa — a lista cai num ícone de ficheiro.
      */
-    private void storeThumbnail(ConstructionInvoiceDocument document, UUID enterpriseId, byte[] content, String mime) {
+    private void storeThumbnail(ConstructionInvoiceDocument document, String folder, byte[] content, String mime) {
         Optional<byte[]> thumbnail = thumbnailService.render(content, mime);
         if (thumbnail.isEmpty()) {
             document.setThumbnailKey(null);
@@ -1987,7 +2004,7 @@ public class ConstructionInvoiceService {
         }
 
         String key = String.format("construction-invoices/%s/thumb_%s.jpg",
-                enterpriseId, UUID.randomUUID().toString().substring(0, 8));
+                folder, UUID.randomUUID().toString().substring(0, 8));
         try (InputStream in = new ByteArrayInputStream(thumbnail.get())) {
             storageService.upload(BUCKET, key, InvoiceThumbnailService.THUMBNAIL_MIME, in);
             document.setThumbnailKey(key);

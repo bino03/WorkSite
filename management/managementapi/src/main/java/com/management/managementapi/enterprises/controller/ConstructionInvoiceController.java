@@ -25,6 +25,7 @@ import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTrans
 import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTransferResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.RubricSuggestionDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceNotesDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
@@ -97,11 +98,12 @@ public class ConstructionInvoiceController {
      * de ele decidir "Guardar" (que é o {@code POST /} abaixo).
      */
     @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasRole('ADMIN'))")
     public ResponseEntity<InvoicePreviewResultDTO> preview(
-            @RequestParam UUID enterpriseId,
+            @RequestParam(required = false) UUID enterpriseId,
+            @RequestParam(required = false) String scope,
             @RequestPart("file") MultipartFile file) {
-        return ResponseEntity.ok(service.preview(enterpriseId, file));
+        return ResponseEntity.ok(service.preview(enterpriseId, scope, file));
     }
 
     /**
@@ -114,12 +116,13 @@ public class ConstructionInvoiceController {
      * {@link ConstructionInvoiceService}.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasRole('ADMIN'))")
     public ResponseEntity<InvoiceUploadResultDTO> upload(
-            @RequestParam UUID enterpriseId,
+            @RequestParam(required = false) UUID enterpriseId,
+            @RequestParam(required = false) String scope,
             @RequestPart("file") MultipartFile file,
             HttpServletRequest request) {
-        InvoiceUploadResultDTO result = service.upload(enterpriseId, file);
+        InvoiceUploadResultDTO result = service.upload(enterpriseId, scope, file);
 
         authContext.currentProfileId().ifPresent(uid ->
                 activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),
@@ -635,6 +638,22 @@ public class ConstructionInvoiceController {
                         EntityType.CONSTRUCTION_INVOICE, id, invoice.getInvoiceNumber(), null, request));
 
         return ResponseEntity.ok(service.getDetail(id));
+    }
+
+    /** Escreve (ou apaga, se vier vazia) a nota da fatura, sem tocar no resto. */
+    @PatchMapping("/{id}/notes")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    public ResponseEntity<ConstructionInvoiceResponseDTO> setNotes(
+            @PathVariable UUID id,
+            @Valid @RequestBody InvoiceNotesDTO dto,
+            HttpServletRequest request) {
+        ConstructionInvoice updated = service.setNotes(id, dto.notes());
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, id, updated.getInvoiceNumber(), null, request));
+
+        return ResponseEntity.ok(service.toResponseDTO(updated, false));
     }
 
     /** Marca/desmarca a fatura como enviada para o contabilista. */

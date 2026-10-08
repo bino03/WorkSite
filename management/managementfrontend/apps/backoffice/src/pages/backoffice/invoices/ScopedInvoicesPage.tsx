@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FC } from "react";
 import { Button, Input, Space } from "antd";
-import { PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
+import { FileAddOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
 
 import {
   deleteInvoice,
@@ -18,9 +18,13 @@ import { useConfirm } from "@/context/ConfirmDialogContext";
 import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
+import { InvoiceUploadDrawer } from "@/components/invoices/InvoiceUploadDrawer";
 import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDrawer";
 import { ExpensesImportModal } from "@/components/invoices/ExpensesImportModal";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
+import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
+import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
+import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
@@ -67,6 +71,9 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [transferInvoice, setTransferInvoice] = useState<ConstructionInvoice | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [payInvoice, setPayInvoice] = useState<ConstructionInvoice | null>(null);
+  const [noteInvoice, setNoteInvoice] = useState<ConstructionInvoice | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
   const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
 
@@ -108,6 +115,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   }, [scope]);
 
   const reload = () => void fetch(page, pageSize, query, outstanding);
+  const markPaid = useQuickMarkPaid(reload);
 
   const search = () => {
     setPage(0);
@@ -183,8 +191,11 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
             <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
               Importar Excel
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
+            <Button icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>
               Registar sem ficheiro
+            </Button>
+            <Button type="primary" icon={<FileAddOutlined />} onClick={() => setUploadOpen(true)}>
+              Carregar faturas
             </Button>
           </Space>
         )}
@@ -244,6 +255,9 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
         onTransfer={setTransferInvoice}
+        onRegisterPayment={setPayInvoice}
+        onMarkPaid={markPaid}
+        onAddNote={setNoteInvoice}
       />
 
       <InvoiceDetailDrawer
@@ -270,6 +284,15 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         }}
       />
 
+      <AggregatePaymentDrawer
+        open={payInvoice !== null}
+        invoices={payInvoice ? [payInvoice] : []}
+        onClose={() => setPayInvoice(null)}
+        onDone={reload}
+      />
+
+      <InvoiceNoteModal invoice={noteInvoice} onClose={() => setNoteInvoice(null)} onSaved={reload} />
+
       <IncidentDrawer
         open={incidentInvoices !== null}
         presetInvoices={incidentInvoices ?? []}
@@ -282,6 +305,14 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         scope={scope}
         onClose={() => setRegisterOpen(false)}
         onCreated={reload}
+      />
+
+      <InvoiceUploadDrawer
+        open={uploadOpen}
+        enterpriseId={null}
+        scope={scope}
+        onClose={() => setUploadOpen(false)}
+        onUploaded={reload}
       />
 
       <ExpensesImportModal

@@ -95,7 +95,7 @@ class ConstructionInvoiceChecksumTest {
         when(documentRepository.findByChecksum(any(), any()))
                 .thenReturn(List.of(existingDocument));
 
-        assertThatThrownBy(() -> service.upload(enterpriseId, file))
+        assertThatThrownBy(() -> service.upload(enterpriseId, null, file))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                         .isEqualTo(ErrorCode.INVOICE_DUPLICATE_FILE))
@@ -124,7 +124,7 @@ class ConstructionInvoiceChecksumTest {
         when(documentRepository.save(any(ConstructionInvoiceDocument.class)))
                 .thenAnswer(call -> call.getArgument(0));
 
-        service.upload(enterpriseId, file);
+        service.upload(enterpriseId, null, file);
 
         ArgumentCaptor<ConstructionInvoiceDocument> captor =
                 ArgumentCaptor.forClass(ConstructionInvoiceDocument.class);

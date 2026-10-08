@@ -386,8 +386,8 @@ de entrada.
 
 | Método | Rota | Acesso |
 |---|---|---|
-| POST | `/construction-invoices/preview?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — lê o QR e verifica duplicados, não grava nada |
-| POST | `/construction-invoices?enterpriseId=` | `ADMIN` ou `EMPLOYEE` — multipart `file`; devolve `201` |
+| POST | `/construction-invoices/preview?enterpriseId=&scope=` | `ADMIN` ou `EMPLOYEE` (`scope` ≠ `PROJECT` só `ADMIN`) — lê o QR e verifica duplicados, não grava nada. Sem `scope` = `PROJECT` e `enterpriseId` obrigatório; `COMPANY`/`UNIDENTIFIED` não levam obra |
+| POST | `/construction-invoices?enterpriseId=&scope=` | idem ao preview — multipart `file`; devolve `201` |
 | POST | `/construction-invoices/register` | `ADMIN` — regista uma fatura **sem ficheiro** (JSON, não multipart); devolve `201` |
 | POST | `/construction-invoices/import-excel?scope=&enterpriseId=&dryRun=` | `ADMIN` — multipart `file` (o `Despesas - <Obra>.xlsx` do vault) + parte `answers` (JSON, opcional). Importa a folha "Despesas"; ver [[#Importar a folha "Despesas" do Excel (fase 6)]] |
 | POST | `/construction-invoices/{id}/documents` | `ADMIN` ou `EMPLOYEE` — multipart `file`, **junta** mais um documento; devolve `201` |
@@ -411,6 +411,7 @@ de entrada.
 | POST | `/construction-invoices/{id}/expenses/split` | `ADMIN` — reparte por N rubricas, substituindo a repartição atual |
 | POST | `/construction-invoices/batch-allocate` | `ADMIN` — N faturas → 1 rubrica, melhor esforço (resultado por fatura) |
 | DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz **todas** as linhas, devolve à caixa de entrada |
+| PATCH | `/construction-invoices/{id}/notes` | `ADMIN` ou `EMPLOYEE` — corpo `{ "notes": "…" }` (máx. 2000; vazio apaga); só mexe na nota, ao contrário do `PUT` |
 | PATCH | `/construction-invoices/{id}/accountant?sent=` | `ADMIN` — marca/desmarca enviada ao contabilista |
 | DELETE | `/construction-invoices/{id}` | `ADMIN` — apaga fatura, ficheiro, miniatura e lançamento |
 | POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
