@@ -3678,7 +3678,9 @@
       "vacationDaysRequired": "Os dias de férias por ano são obrigatórios.",
       "vacationDaysRange": "Os dias de férias têm de estar entre 0 e 365.",
       "endBeforeHired": "A data de fim não pode ser anterior à admissão.",
-      "validFromBeforeHired": "O período não pode começar antes da data de admissão."
+      "validFromBeforeHired": "O período não pode começar antes da data de admissão.",
+      "enterpriseRequired": "A obra é obrigatória.",
+      "reasonRequired": "O motivo é obrigatório."
     }
   }
 }

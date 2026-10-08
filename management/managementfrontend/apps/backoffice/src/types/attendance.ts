@@ -169,6 +169,26 @@ export interface TimeEntryUpsert {
   reason: string | null;
 }
 
+/**
+ * Os motivos que se repetem ao mexer numa picagem. Escolher de uma lista em vez
+ * de escrever à mão faz o histórico de revisões ficar comparável — "Engano" e
+ * "engano meu" são a mesma coisa e não deviam ser dois textos diferentes.
+ * `OUTRO` abre um campo livre; o que vai para a API é sempre o texto final.
+ */
+export const TIME_ENTRY_REASONS = [
+  "Engano no registo",
+  "O funcionário esqueceu-se de picar",
+  "Falta a saída do dia",
+  "Hora errada",
+  "Obra errada",
+  "Picagem duplicada",
+  "Avaria ou falha do sistema",
+  "Correção pedida pelo encarregado",
+] as const;
+
+/** Valor do seletor que abre o campo de texto livre. */
+export const REASON_OTHER = "OUTRO";
+
 export interface TimeEntryRevision {
   id: string;
   change: TimeEntryChange;

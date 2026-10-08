@@ -6,6 +6,7 @@ import {
   CalendarOutlined,
   ClockCircleOutlined,
   DownOutlined,
+  FieldTimeOutlined,
   HomeOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -69,6 +70,9 @@ export default function TeamLayout() {
         <ShellHeader spaceName="Equipa" homePath={base} dark>
           <NavLink to={base} end style={navLinkStyle(HEADER_ACCENT)}>
             <HomeOutlined />Hoje
+          </NavLink>
+          <NavLink to={`${base}/time-entries`} style={navLinkStyle(HEADER_ACCENT)}>
+            <FieldTimeOutlined />Picagens
           </NavLink>
           <NavLink to={`${base}/employees`} style={navLinkStyle(HEADER_ACCENT)}>
             <TeamOutlined />Funcionários

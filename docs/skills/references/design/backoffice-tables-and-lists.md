@@ -137,6 +137,25 @@ Duas barras acima da tabela, estreadas em `pages/team/settings/WorkSchedulesPage
   `aria-label`. Mudar o ano é o que dispara o `fetch` (o ano entra no `useCallback` da busca). Para
   um intervalo livre em vez de um ano inteiro, usa-se o `<DatePicker>`, não isto.
 
+## 9. Duas listas, um drawer de detalhe (2026-10-08)
+
+Quando o mesmo registo se alcança por dois caminhos — a lista de **toda a equipa**
+(`pages/team/TimeEntriesPage.tsx`) e o mês de **um funcionário** (`AttendanceMonthCard`) — o detalhe
+é **um só componente** (`DayTimeEntriesDrawer`), com as ações todas lá dentro, e cada lista passa-lhe
+as chaves (`profileId` + `day`) e um `onChanged` para recarregar. Não se duplicam as ações por lista.
+
+Duas notas que vieram daqui:
+
+- **A linha da lista pode não existir como recurso na API.** As picagens não têm endpoint de equipa
+  (`/attendance/time-entries` é sempre por funcionário); a lista é montada a partir de
+  `/attendance/reports/month`, achatando `employees[].days[]` em linhas funcionário × dia no cliente
+  (`useMemo`). Antes de pedir um endpoint novo ao backend, vale a pena ver se um relatório já traz o
+  que a lista precisa.
+- **Filtro de período com dois níveis**: setas < > para o **mês** (é o que define o pedido à API) e,
+  dentro dele, um `<DatePicker>` com `disabledDate` preso a esse mês para escolher **um dia** (filtro
+  em memória, sem pedido novo). Mudar de mês arrasta o dia escolhido para dentro do mês novo, senão a
+  vista fica vazia a apontar para fora do que foi carregado.
+
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
 - [[backoffice-buttons-and-icons]] — variantes de botão e confirmação de ações destrutivas

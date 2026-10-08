@@ -3647,7 +3647,9 @@
       "vacationDaysRequired": "Vacation days per year are required.",
       "vacationDaysRange": "Vacation days must be between 0 and 365.",
       "endBeforeHired": "The end date cannot be before the hire date.",
-      "validFromBeforeHired": "A period cannot start before the hire date."
+      "validFromBeforeHired": "A period cannot start before the hire date.",
+      "enterpriseRequired": "Work site is required.",
+      "reasonRequired": "A reason is required."
     }
   }
 }

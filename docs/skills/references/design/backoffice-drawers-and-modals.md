@@ -41,6 +41,12 @@ Drawer é o padrão dominante (24 ficheiros usam `<Drawer>` contra 12 com `<Moda
   lado do Modal por ser um utilitário curto e autocontido (um download), não a edição de uma
   entidade. Para um assistente de criação de entidade com passos, continua a ser Drawer.
 - `StatusChangeModal.tsx` continua a ser o exemplo claro a **não copiar**: é um formulário de entidade que devia ser Drawer. Migrar oportunisticamente, não é preciso reescrever já — `MyProfileModal.tsx` era o outro exemplo, migrado a 2026-09-16 (ver acima).
+- **Confirmação que precisa de input é Modal próprio, não `useConfirm()` (2026-10-08)**: o diálogo
+  partilhado só mostra texto e devolve sim/não. Quando a ação exige que o utilizador *escreva* algo
+  para poder avançar — o motivo de anular ou restaurar uma picagem, que fica no histórico de revisões
+  — faz-se um `Modal` pequeno do domínio (`TimeEntryReasonModal`), com o título, o texto e o rótulo
+  do botão a mudar conforme a ação. **Restaurar não pode ler "Confirmar eliminação"**: é a mesma
+  armadilha dos valores por omissão do `confirm()`, aqui resolvida por o modal ser próprio.
 - Confirmações de ações destrutivas usam o diálogo partilhado `useConfirm()` (`context/ConfirmDialogContext`) — ver [[backoffice-buttons-and-icons]]. `Popconfirm` só sobrevive em três ficheiros por migrar; não o uses em código novo. `Modal.confirm` só quando a confirmação precisa de mais contexto do que o diálogo partilhado permite.
 
 ## Skills relacionadas

@@ -15,6 +15,7 @@ import AppLayout from "./layouts/AppLayout";
 import TeamLayout from "./layouts/TeamLayout";
 import LegacyEmployeeRedirect from "./layouts/shell/LegacyEmployeeRedirect";
 import TeamTodayPage from "./pages/team/TeamTodayPage";
+import TimeEntriesPage from "./pages/team/TimeEntriesPage";
 import WorkSchedulesPage from "./pages/team/settings/WorkSchedulesPage";
 import HolidaysPage from "./pages/team/settings/HolidaysPage";
 import { BackofficeHome } from "./pages/backoffice/BackofficeHome";
@@ -70,6 +71,7 @@ const App = () => (
             {/* Espaço Equipa — só ADMIN (o TeamLayout devolve um EMPLOYEE a Obras) */}
             <Route path="/team/*" element={<PrivateRoute><TeamLayout /></PrivateRoute>}>
               <Route index element={<TeamTodayPage />} />
+              <Route path="time-entries" element={<TimeEntriesPage />} />
               <Route path="employees" element={<EmployeesList />} />
               <Route path="employees/:id" element={<EmployeeProfilePage />} />
               <Route path="settings/schedules" element={<WorkSchedulesPage />} />

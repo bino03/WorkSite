@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import ProfileView from "@/components/profile/ProfileView";
 import { App } from "antd";
 import { EmploymentCard } from "@/components/attendance/employment/EmploymentCard";
+import { AttendanceMonthCard } from "@/components/attendance/timeentries/AttendanceMonthCard";
 
 /**
  * A página de um funcionário no espaço Equipa (`/team/employees/:id`): a conta
@@ -16,6 +17,7 @@ export default function EmployeeProfilePage() {
     <App>
       <ProfileView profileId={id!} mode="page" />
       <EmploymentCard profileId={id!} />
+      <AttendanceMonthCard profileId={id!} />
     </App>
   );
 }

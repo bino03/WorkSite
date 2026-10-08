@@ -16,7 +16,8 @@
 | `/backoffice/tasks` | `TasksPage` |
 | `/team/` | `TeamTodayPage` — espaço **Equipa**, só `ADMIN` (ver §5) |
 | `/team/employees` | `EmployeesList` |
-| `/team/employees/:id` | `EmployeeProfilePage` |
+| `/team/time-entries` | `TimeEntriesPage` — picagens de toda a equipa, por mês ou por dia |
+| `/team/employees/:id` | `EmployeeProfilePage` — perfil + ficha de emprego + mês de assiduidade |
 | `/team/settings/schedules` | `WorkSchedulesPage` — horários de trabalho |
 | `/team/settings/holidays` | `HolidaysPage` — feriados, por ano |
 
@@ -123,7 +124,8 @@ envolve tudo num `ConfigProvider` com `teamAntdTheme` (`theme.ts`). A classe red
 `--ind-color-accent` e a escala `--ind-accent-*` (`index.css`); o tema troca o `colorPrimary` e os
 componentes que o tinham escrito à mão. Um componente que use os tokens fica verde em Equipa sozinho.
 
-**Nav de Equipa** (`TeamLayout`): Hoje (`/team`) · Funcionários (`/team/employees`) · **Configuração ▾**
+**Nav de Equipa** (`TeamLayout`), pela ordem do maquete aprovado: Hoje (`/team`) · Picagens
+(`/team/time-entries`) · Funcionários (`/team/employees`) · **Configuração ▾**
 (`Dropdown`, 2026-10-08) → Horários · Feriados. O dropdown é o mesmo molde do "Faturas ▾" do
 `AppLayout` — `trigger={["click"]}`, `selectedKeys: [pathname]`, o gatilho é um `<button>` com
 `navButtonStyle(ativo, cor)` e acende quando `pathname` começa por `/team/settings`. Rotas de
