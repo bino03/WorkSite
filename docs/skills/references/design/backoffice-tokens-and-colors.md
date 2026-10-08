@@ -12,6 +12,7 @@ O sistema visual é o **Industry ("blueprint")** — steel-blue, tipografia Barl
   - Neutros: `--ind-neutral-100…900`
   - Tipografia: `--ind-font-heading: "Barlow Condensed"`, `--ind-font-body: "Barlow"`
   - Sombras: `--ind-shadow-sm` / `-md` / `-lg`
+  - **Espaço Equipa** (2026-10-07): `--ind-team-header-*` (o header escuro) e a classe `.space-team`, que redefine `--ind-color-accent` e `--ind-accent-*` para verde-oliva (`#567438`); o `theme.ts` tem o par `teamAntdTheme`. Ver [[backoffice-app-shell-and-auth]] §5
 - **`src/theme.ts`** — o tema Ant Design que espelha essas cores (`colorPrimary: "#5980a6"`, `colorError: "#b53333"`, `colorSuccess: "#3a7d44"`, `colorWarning: "#a0622b"`). Os componentes AntD herdam daqui — não voltes a definir cor de botão/input/tabela por ficheiro.
 - **`src/colors.css`** — carregado a seguir ao `index.css`, para ajustes de cor complementares.
 

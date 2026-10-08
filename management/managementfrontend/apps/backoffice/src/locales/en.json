@@ -3628,5 +3628,26 @@
       "unitPriceNonNegative": "Unit price cannot be negative.",
       "endBeforeStart": "End date cannot be before the start date."
     }
+  },
+  "attendance": {
+    "formErrors": {
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name cannot be longer than 120 characters.",
+      "nameInvalid": "Name contains characters that are not allowed.",
+      "notesTooLong": "Notes cannot be longer than 500 characters.",
+      "textInvalid": "Text contains characters that are not allowed.",
+      "timeInvalid": "Enter a valid time (HH:MM).",
+      "endBeforeStart": "End time must be after the start time.",
+      "breakTooLong": "The break cannot be equal to or longer than the day's working period.",
+      "breakNegative": "The break cannot be negative.",
+      "atLeastOneDay": "Pick at least one working day.",
+      "dateRequired": "Date is required.",
+      "municipalityRequired": "A municipal holiday must name the municipality.",
+      "scheduleRequired": "Work schedule is required.",
+      "vacationDaysRequired": "Vacation days per year are required.",
+      "vacationDaysRange": "Vacation days must be between 0 and 365.",
+      "endBeforeHired": "The end date cannot be before the hire date.",
+      "validFromBeforeHired": "A period cannot start before the hire date."
+    }
   }
 }

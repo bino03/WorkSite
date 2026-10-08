@@ -80,3 +80,13 @@ export function savingsPercent(originalSize: number | null, finalSize: number | 
   if (!originalSize || !finalSize || originalSize <= finalSize) return null;
   return Math.round((1 - finalSize / originalSize) * 100);
 }
+
+/** Minutos como horas legíveis: 450 → "7h30", 480 → "8h", 0 → "0h". Negativos com sinal. */
+export function formatMinutes(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined) return "—";
+  const sign = minutes < 0 ? "−" : "";
+  const abs = Math.abs(Math.round(minutes));
+  const hours = Math.floor(abs / 60);
+  const rest = abs % 60;
+  return `${sign}${hours}h${rest ? String(rest).padStart(2, "0") : ""}`;
+}

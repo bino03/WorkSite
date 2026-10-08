@@ -287,7 +287,7 @@ export default function EmployeesList() {
               </Avatar>
               <div>
                 <div
-                  onClick={canNavigate ? () => navigate(`/backoffice/funcionarios/${record.id}`) : undefined}
+                  onClick={canNavigate ? () => navigate(`/team/employees/${record.id}`) : undefined}
                   style={{
                     fontWeight: 600,
                     color: D.nearBlack,

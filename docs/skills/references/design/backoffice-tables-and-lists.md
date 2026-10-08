@@ -118,6 +118,25 @@ compensa; para volumes altos, volta-se à tabela.
 a 2026-09-09), **sem `rehype-raw`** — HTML em bruto no texto fica literal, não é interpretado. É a
 única forma aprovada de mostrar markdown de utilizador; não reinventar com `dangerouslySetInnerHTML`.
 
+## 8. Alternar entre vivos e apagados, e escolher o ano (2026-10-08)
+
+Duas barras acima da tabela, estreadas em `pages/team/settings/WorkSchedulesPage.tsx` e
+`HolidaysPage.tsx`. Ambas ficam **entre o cabeçalho e a moldura da tabela**, com
+`marginBottom: "13.6px"`.
+
+- **Soft delete numa lista curta** → `<Segmented>` com "Ativos | Apagados" (o `Segmented` já existia
+  no `CreateEmployeeDrawer`, não é componente novo). Em "Apagados" a coluna de ações passa a ter um
+  só `ListActionPrimary` "Restaurar". É a alternativa leve à **zona de recuperação em Drawer**
+  (`BudgetRecycleBinDrawer`): escolhe-se o Drawer quando o que se recupera é uma árvore ou traz
+  contexto próprio, e o `Segmented` quando é uma lista plana de poucos registos.
+- **Restaurar não é eliminar**: o `confirm()` partilhado tem valores por omissão de *eliminação*, por
+  isso uma restauração passa sempre `title` e `actionLabel` — senão lê-se "Confirmar eliminação" ao
+  restaurar. É a mesma armadilha já documentada no `CLAUDE.md` do Backoffice.
+- **Listas por ano** → `<Button size="small" icon={<LeftOutlined/>}>` · o ano em
+  `var(--ind-font-heading)` a 600 com `minWidth: 48` · `<Button icon={<RightOutlined/>}>`, cada um com
+  `aria-label`. Mudar o ano é o que dispara o `fetch` (o ano entra no `useCallback` da busca). Para
+  um intervalo livre em vez de um ano inteiro, usa-se o `<DatePicker>`, não isto.
+
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]]
 - [[backoffice-buttons-and-icons]] — variantes de botão e confirmação de ações destrutivas

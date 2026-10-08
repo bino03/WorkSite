@@ -185,3 +185,46 @@ export const antdTheme: ThemeConfig = {
     },
   },
 };
+
+/**
+ * O espaço Equipa: aplicado num `ConfigProvider` aninhado no `TeamLayout`, que
+ * herda tudo do `antdTheme` e troca só o destaque — azul-aço → verde-oliva. Os
+ * valores espelham o `.space-team` de `index.css`.
+ */
+const TEAM_ACCENT = "#567438";        // accent-600 do espaço Equipa
+const TEAM_ACCENT_HOVER = "#4c6a31";  // accent-700
+const TEAM_ACCENT_ACTIVE = "#354b22"; // accent-800
+const TEAM_ACCENT_TINT = "#f1f6ea";   // accent-100
+
+export const teamAntdTheme: ThemeConfig = {
+  token: {
+    colorPrimary: TEAM_ACCENT,
+    colorLink: TEAM_ACCENT,
+    colorLinkHover: TEAM_ACCENT_HOVER,
+    colorLinkActive: TEAM_ACCENT_ACTIVE,
+    colorInfo: TEAM_ACCENT,
+  },
+  components: {
+    Button: {
+      colorPrimary: TEAM_ACCENT,
+      colorPrimaryHover: TEAM_ACCENT_HOVER,
+      colorPrimaryActive: TEAM_ACCENT_ACTIVE,
+    },
+    Input: { activeBorderColor: TEAM_ACCENT },
+    DatePicker: { activeBorderColor: TEAM_ACCENT },
+    Select: { optionSelectedBg: TEAM_ACCENT_TINT },
+    Tabs: {
+      colorPrimary: TEAM_ACCENT,
+      inkBarColor: TEAM_ACCENT,
+      itemActiveColor: TEAM_ACCENT_ACTIVE,
+      itemSelectedColor: TEAM_ACCENT_ACTIVE,
+      itemHoverColor: TEAM_ACCENT_HOVER,
+    },
+    Menu: { itemSelectedBg: TEAM_ACCENT_TINT, itemSelectedColor: TEAM_ACCENT },
+    Pagination: { colorPrimary: TEAM_ACCENT, colorPrimaryHover: TEAM_ACCENT_HOVER },
+    Steps: { colorPrimary: TEAM_ACCENT },
+    Switch: { colorPrimary: TEAM_ACCENT },
+    Checkbox: { colorPrimary: TEAM_ACCENT },
+    Radio: { colorPrimary: TEAM_ACCENT },
+  },
+};

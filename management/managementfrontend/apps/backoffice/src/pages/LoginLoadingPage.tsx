@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthContext } from "@/context/AuthContext";
 import { useTranslation } from "react-i18next";
+import { landingPath } from "@/layouts/shell/spaces";
 
 export const LoginLoadingPage = () => {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export const LoginLoadingPage = () => {
         sessionStorage.setItem("welcome_name", userInfo.name);
 
         if (userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE") {
-          navigate("/backoffice", { replace: true });
+          navigate(landingPath(userInfo.role === "ADMIN"), { replace: true });
         } else {
           navigate("/login", {
             replace: true,

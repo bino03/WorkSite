@@ -26,7 +26,7 @@ empresa, sem obra) ou `UNIDENTIFIED` (quarentena — ainda não se sabe de quem 
 |---|---|
 | **Entrada** | rota `/backoffice/empreendimentos/:enterpriseId/invoices` → `pages/backoffice/enterprise/EnterpriseInvoicesPage.tsx` |
 | **Classificar** | rota `/backoffice/empreendimentos/:enterpriseId/classify` → `pages/backoffice/enterprise/ClassifyInvoicesPage.tsx` (botão "Classificar" na página das faturas): repartir a fatura por rubricas (`V32`) · `components/invoices/RubricSearchField.tsx` · sugestão em `GET /construction-invoices/{id}/rubric-suggestion` |
-| **Fora das obras** | menu lateral, grupo **Faturas** (`layouts/AppLayout.tsx`): "Por identificar" → `/backoffice/invoices/unidentified` (`pages/backoffice/invoices/UnidentifiedInvoicesPage.tsx`) · "Despesas da empresa" → `/backoffice/invoices/company` (`CompanyInvoicesPage.tsx`) — as duas são o mesmo `ScopedInvoicesPage.tsx` com `scope` diferente, a ler `GET /construction-invoices/unidentified` e `/company` |
+| **Fora das obras** | dropdown **Faturas** da nav do espaço Obras (`layouts/AppLayout.tsx`): "Por identificar" → `/backoffice/invoices/unidentified` (`pages/backoffice/invoices/UnidentifiedInvoicesPage.tsx`) · "Despesas da empresa" → `/backoffice/invoices/company` (`CompanyInvoicesPage.tsx`) — as duas são o mesmo `ScopedInvoicesPage.tsx` com `scope` diferente, a ler `GET /construction-invoices/unidentified` e `/company` |
 | **Frontend** | `components/invoices/` — `InvoicesList`, `InvoiceFiltersModal` (pesquisa avançada: modal centrado, ícone de filtro com contagem + "Limpar filtros" na página, sem chips — 2026-09-21; helpers em `invoiceFilters.ts`), `OutstandingTotalBadge`, `InvoiceUploadDrawer` (2 fases), `InvoiceRegisterDrawer` (sem ficheiro), `InvoiceDetailDrawer` (correção manual, líquido e NC ligadas), `InvoiceDocumentGallery`, `CreditNoteDrawer` (fase 3), `BudgetItemPickerModal`, `invoiceNumber.ts` (tipo + série), `invoiceFormSchema.ts`/`creditNoteFormSchema.ts` · `components/construction/InvoicePreviewModal.tsx` · `services/invoiceService.ts` · `types/invoice.ts` |
 | **Backend** | `enterprises/controller/ConstructionInvoiceController` · `service/ConstructionInvoiceService` (o núcleo — upload, duplicados, correção, notas de crédito, repartição, transferência) · `AtInvoiceQrService` + `WeChatQrCodeService` (leitura do QR) · `InvoiceThumbnailService` · `InvoiceCompressionService` · `DespesasExcelImportService` (fase 6) · `repository/ConstructionInvoiceRepository` |
 | **Base de dados** | `worksite.construction_invoice` — `V16`, `V17` (ATCUD único), `V18` (checksum), `V26` (`scope`), `V29` (unicidade global) · `construction_invoice_document` (o ficheiro deixa de viver na fatura) — `V24`, `V25`, `V27` (estado), `V28` (tipo) · repartição por várias rubricas — `V32` |
@@ -65,7 +65,7 @@ Catálogo NIF → nome da empresa. Existe porque o QR da AT identifica o emitent
 
 | Camada | Ficheiros |
 |---|---|
-| **Entrada** | ⚙️ **Definições** no cabeçalho (`layouts/AppLayout.tsx`) → `components/suppliers/SuppliersDrawer.tsx` |
+| **Entrada** | menu do utilizador → grupo **Definições** (`layouts/shell/UserMenu.tsx`, nos dois espaços) → `components/suppliers/SuppliersDrawer.tsx` |
 | **Frontend** | `services/supplierService.ts` · `types/supplier.ts` · evento `SUPPLIERS_CHANGED_EVENT` ouvido por `EnterpriseInvoicesPage` |
 | **Backend** | `enterprises/controller/SupplierController` · `service/SupplierService` · `repository/SupplierRepository` · `model/Supplier` · `mapper/SupplierMapper` · as três queries de agregação em `ConstructionInvoiceRepository` |
 | **Base de dados** | `worksite.supplier` — `V19` |
@@ -78,7 +78,7 @@ tabela só era lida e a configuração entrava por `INSERT` à mão.
 
 | Camada | Ficheiros |
 |---|---|
-| **Entrada** | menu do utilizador → grupo **Definições** → "Provedores de email" (`layouts/AppLayout.tsx`, só `ADMIN`) → `components/settings/EmailProvidersDrawer.tsx` |
+| **Entrada** | menu do utilizador → grupo **Definições** → "Provedores de email" (`layouts/shell/UserMenu.tsx`, só `ADMIN`) → `components/settings/EmailProvidersDrawer.tsx` |
 | **Frontend** | `services/emailProviderService.ts` · `types/emailProvider.ts` · `components/settings/emailProviderFormSchema.ts` |
 | **Backend** | `controller/EmailProviderController` · `service/email/EmailProviderService` · `service/email/EmailService` (envio) · `repository/email/EmailProviderRepository` · `model/email/EmailProvider` · `mapper/email/EmailProviderMapper` |
 | **Base de dados** | `settings.email_providers` — `V7`, `V21` (trigger de `updated_at`, índice de predefinido único, `entity_type`) |
@@ -131,7 +131,7 @@ Desenho das 5 fases, com as decisões e o porquê, em [[../notes/roadmap/assidui
 | **Enums** | `model/enums/` — `TimeDirection`, `TimeEntrySource`, `TimeEntryChange`, `HolidayScope`, `AbsenceType`, `AbsenceHalfDay`, `AbsenceStatus` · `DayAttendance.DayStatus` (WORKED/MISSING/NOT_SCHEDULED/NO_SCHEDULE/HOLIDAY/ON_LEAVE) |
 | **Base de dados** | schema `attendance` — `V42` (horários), `V43` (emprego, picagens, revisões), `V44` (feriados, ausências, justificativos). **A fase 2 não tem migração**: horas, atrasos, faltas e saldo são derivados, nunca guardados |
 | **Testes** | `service/attendance/` — `AttendanceZoneTest` (5, fuso e horário de verão), `WorkScheduleServiceTest` (12), `EmploymentServiceTest` (9, histórico), `TimeEntryServiceTest` (12, sequência e revisões), `AttendanceCalculatorTest` (22, aritmética do dia + feriados/ausências + horas por obra), `AttendanceSummaryServiceTest` (12), `VacationBalanceServiceTest` (10, dias úteis), `AbsenceServiceTest` (14), `HolidayServiceTest` (6), `AttendanceReportServiceTest` (2), `AttendanceExcelExportServiceTest` (2). **106 no total**  |
-| **Frontend** | — ainda não existe |
+| **Frontend** | espaço **Equipa** (`/team/*`, só `ADMIN`): `layouts/TeamLayout.tsx` + `layouts/shell/` (header, lançador, menu do utilizador, partilhados com Obras) · páginas em `pages/team/` (`settings/WorkSchedulesPage`, `settings/HolidaysPage`) · drawers e schemas em `components/attendance/{schedules,holidays,employment}/` (a ficha de emprego é um cartão na `EmployeeProfilePage`, fora do `ProfileView`, que também serve a vista rápida e a "Minha Conta") · **todos** os tipos e chamadas do módulo em `types/attendance.ts` e `services/attendanceService.ts`, escritos de uma vez (os ecrãs que faltam só precisam de páginas) · ver [[skills/references/design/backoffice-app-shell-and-auth]] §5 |
 
 > ⚠️ **O fuso é a armadilha deste módulo.** `AttendanceZone` existe porque o resto do projeto é todo
 > UTC e nunca precisou de outra coisa: uma fatura tem data, não hora. Uma entrada às 08:00 em Lisboa é

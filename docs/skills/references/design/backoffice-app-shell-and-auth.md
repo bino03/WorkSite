@@ -9,12 +9,16 @@
 | Rota | Página |
 |---|---|
 | `/backoffice/` | `BackofficeHome` |
-| `/backoffice/funcionarios` | `EmployeesList` |
-| `/backoffice/funcionarios/:id` | `EmployeeProfilePage` |
+| `/backoffice/funcionarios` (`:id`) | redireciona para `/team/employees` (`:id`) — mudou de espaço a 2026-10-07 |
 | `/backoffice/empreendimentos` | `EnterprisesList` |
 | `/backoffice/empreendimentos/:enterpriseId/budget` | `ConstructionBudgetPage` |
 | `/backoffice/empreendimentos/:enterpriseId/invoices` | `EnterpriseInvoicesPage` |
 | `/backoffice/tasks` | `TasksPage` |
+| `/team/` | `TeamTodayPage` — espaço **Equipa**, só `ADMIN` (ver §5) |
+| `/team/employees` | `EmployeesList` |
+| `/team/employees/:id` | `EmployeeProfilePage` |
+| `/team/settings/schedules` | `WorkSchedulesPage` — horários de trabalho |
+| `/team/settings/holidays` | `HolidaysPage` — feriados, por ano |
 
 > ⚠️ **Esta tabela esteve errada até 2026-08-18**: listava as três rotas `construction/`
 > (`ConstructionStagesPage`, `ConstructionSubStagesPage`, `ConstructionExpensesPage`) que a `V15`
@@ -23,7 +27,7 @@
 > cópias da mesma tabela.
 
 **Idioma dos segmentos**: os segmentos de topo herdados estão em português (`funcionarios`, `empreendimentos`), os criados depois em inglês (`tasks`, `construction`) — exatamente a exceção documentada em [[../../frontend/skill-frontend-design-system]] ("pai em português herdado + filhos novos em inglês"). **Segmento novo escreve-se sempre em inglês**, mesmo quando o pai está em português.
-
+
 ## 2. Menu de navegação — hoje cobre todas as rotas de topo
 
 Reorganizado a 2026-09-09 para reduzir ao mínimo os títulos no header (era uma linha de sete
@@ -34,7 +38,7 @@ links achatados). Estrutura atual em `AppLayout.tsx`:
 | Wordmark **Worksite** (`NavLink to="/backoffice" end`) | todos | `/backoffice/` — substitui o antigo link "Início" |
 | **Empreendimentos** | todos | `/backoffice/empreendimentos` |
 | **Tarefas** / **Minhas Tarefas** (rótulo por `isAdmin()`) | todos | `/backoffice/tasks` |
-| **Gerir Contas** | só `ADMIN` | `/backoffice/funcionarios` — link direto (domínio próprio, fora do dropdown) |
+| ~~**Gerir Contas**~~ | — | saiu a 2026-10-07: é o **Funcionários** do espaço Equipa (§5) |
 | **Faturas ▾** (`Dropdown`, `invoicesMenuItems`) | só `ADMIN` | Por identificar (`/invoices/unidentified`) · Despesas da empresa (`/invoices/company`) · Inconsistências (`/invoices/incidents`) |
 
 O trigger "Faturas" acende (`--ind-color-accent`) quando `pathname` começa por uma das suas
@@ -90,6 +94,45 @@ Antes desta revisão eram o cartão de perfil **mais três botões de ícone sol
 `PrivateRoute.tsx:4-12` só verifica se existe `user` no `AuthContext` e redireciona para `/login` caso contrário — **não verifica role**. Não há hoje nenhuma rota exclusiva de `ADMIN` ao nível do router; o gate de `ADMIN` é feito dentro das páginas/menu (ponto 3).
 
 **Convenção**: se uma página passar a ser exclusiva de `ADMIN`, o gate tem de existir também no **backend** (`@PreAuthorize`, ver [[../../backend/skill-permissions-and-auth]]) — esconder o link no nav não é controlo de acesso.
+
+## 5. Espaços de trabalho — Obras e Equipa (2026-10-07)
+
+O Backoffice tem **dois espaços**, cada um com a sua shell inteira (header, nav, página inicial, cor de
+destaque). Mudar de espaço muda tudo menos o **sino e o bloco do utilizador**. Maquete aprovada:
+https://claude.ai/artifact/Pc44vRLcHtYd5qVLFqUEnB.
+
+| Espaço | Rotas | Layout | Visível a | Identidade |
+|---|---|---|---|---|
+| **Obras** | `/backoffice/*` | `AppLayout` | todos | header claro, azul-aço (`--ind-color-accent`) |
+| **Equipa** | `/team/*` | `TeamLayout` | só `ADMIN` | header escuro (`--ind-team-header-*`), verde-oliva |
+
+Peças em `layouts/shell/`:
+
+- **`ShellHeader`** — o header comum (lançador + wordmark "Worksite · <espaço>" à esquerda, a nav do
+  espaço ao centro como `children`, sino + `UserMenu` à direita). Prop `dark` para o de Equipa.
+- **`SpaceLauncher`** — o botão de grelha e o painel de mosaicos (um `Modal` do AntD com fundo
+  transparente, para ter foco preso e `Esc` de graça). **Quem só tem um espaço não vê o botão.**
+- **`UserMenu`** — o menu do avatar (§2.1), tirado do `AppLayout` para os dois espaços o partilharem.
+- **`spaces.ts`** — a lista de espaços, `visibleSpaces(isAdmin)`, e o último espaço usado
+  (`localStorage`, chave `worksite.lastSpace`): o login aterra nele (`landingPath`, em `LoginLoadingPage`).
+- **`navStyles.ts`** — `navLinkStyle(cor)` / `navButtonStyle(ativo, cor)`, a cor é o destaque do espaço.
+
+**Como o verde chega aos componentes sem os tocar:** o `TeamLayout` põe a classe `space-team` no
+`<body>` (não num wrapper — drawers, modais e dropdowns do AntD vivem em portal fora da árvore) e
+envolve tudo num `ConfigProvider` com `teamAntdTheme` (`theme.ts`). A classe redefine
+`--ind-color-accent` e a escala `--ind-accent-*` (`index.css`); o tema troca o `colorPrimary` e os
+componentes que o tinham escrito à mão. Um componente que use os tokens fica verde em Equipa sozinho.
+
+**Nav de Equipa** (`TeamLayout`): Hoje (`/team`) · Funcionários (`/team/employees`) · **Configuração ▾**
+(`Dropdown`, 2026-10-08) → Horários · Feriados. O dropdown é o mesmo molde do "Faturas ▾" do
+`AppLayout` — `trigger={["click"]}`, `selectedKeys: [pathname]`, o gatilho é um `<button>` com
+`navButtonStyle(ativo, cor)` e acende quando `pathname` começa por `/team/settings`. Rotas de
+**configuração** do espaço entram aqui; rotas de trabalho diário entram como link direto.
+
+**Gate**: o espaço Equipa é só `ADMIN` porque os endpoints de assiduidade são `hasRole('ADMIN')`. O
+`TeamLayout` devolve um `EMPLOYEE` a `/backoffice` (o self-service é a fase 5 da assiduidade, por
+decidir). **Rota nova de topo**: entra na nav do layout do seu espaço — Obras no `AppLayout`, Equipa no
+`TeamLayout`. Segmentos novos em inglês (`/team/...`), como manda a convenção.
 
 ## Skills relacionadas
 - [[../../frontend/skill-frontend-design-system]] — regra de idioma dos segmentos de rota

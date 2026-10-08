@@ -117,11 +117,11 @@ export const BackofficeHome = () => {
           </BlueprintCard>
         </Link>
         {isAdmin() && (
-          <Link to="/backoffice/funcionarios" style={{ color: "inherit" }}>
+          <Link to="/team" style={{ color: "inherit" }}>
             <BlueprintCard style={{ padding: "13.6px" }}>
               <TeamOutlined style={{ fontSize: 22, color: "var(--ind-color-accent)" }} />
               <span className="ind-card-title">Equipa</span>
-              <p className="ind-card-body">Gerir membros e permissões.</p>
+              <p className="ind-card-body">Picagens, férias, relatórios e contas.</p>
             </BlueprintCard>
           </Link>
         )}

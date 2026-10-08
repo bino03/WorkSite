@@ -322,3 +322,146 @@ h6 { letter-spacing: 0.08em; text-transform: uppercase; }
     opacity: 0;
   }
 }
+
+/* ════════════════════════════════════════════════════════
+   Espaços de trabalho (2026-10-07) — Obras e Equipa.
+   Mesma linguagem visual; Equipa troca o destaque para
+   verde-oliva e tem o header escuro, para se saber de relance
+   em que espaço se está. Ver backoffice-app-shell-and-auth.md §5.
+   ════════════════════════════════════════════════════════ */
+:root {
+  --ind-team-header-bg: #1c2420;
+  --ind-team-header-text: #e8ece6;
+  --ind-team-header-muted: #8d978f;
+  --ind-team-header-border: #34403a;
+  --ind-team-header-accent: #a9c784;
+  --ind-team-header-raised: #26302b;
+}
+
+/* Tudo o que lê --ind-color-accent / --ind-accent-* dentro do espaço Equipa
+   (tags, cartões, links) passa a verde-oliva sem tocar em cada componente. */
+.space-team {
+  --ind-color-accent: #567438;
+  --ind-color-accent-2: #7d9662;
+  --ind-accent-100: #f1f6ea;
+  --ind-accent-200: #dfeacf;
+  --ind-accent-300: #c6d9ac;
+  --ind-accent-400: #a6c184;
+  --ind-accent-500: #86a463;
+  --ind-accent-600: #567438;
+  --ind-accent-700: #4c6a31;
+  --ind-accent-800: #354b22;
+  --ind-accent-900: #222f17;
+}
+
+.space-launcher-trigger {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--ind-color-divider);
+  cursor: pointer;
+}
+.space-launcher-trigger:hover,
+.space-launcher-trigger:focus-visible {
+  border-color: currentColor;
+}
+.space-team-header .space-launcher-trigger {
+  border-color: var(--ind-team-header-border);
+  background: var(--ind-team-header-raised);
+}
+
+.space-launcher-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+.space-launcher-heading {
+  margin: 0;
+  color: #e9ecef;
+  font-family: var(--ind-font-heading);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+.space-launcher-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
+.space-tile {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  text-align: left;
+  font-family: inherit;
+  color: var(--ind-color-text);
+  background: #ffffff;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.space-tile:hover,
+.space-tile:focus-visible {
+  transform: translateY(-3px);
+  outline: none;
+  border-color: var(--ind-neutral-400);
+}
+.space-tile.is-current {
+  border-color: var(--ind-team-header-accent);
+}
+.space-tile-preview {
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  background: var(--ind-color-bg);
+  margin-bottom: 8px;
+}
+.space-tile-preview-header {
+  height: 22px;
+  background: var(--ind-neutral-300);
+}
+.space-tile-team .space-tile-preview-header {
+  background: var(--ind-team-header-bg);
+}
+.space-tile-preview-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 10px;
+}
+.space-tile-preview-body > span {
+  background: var(--ind-accent-200);
+}
+.space-tile-team .space-tile-preview-body > span {
+  background: #dfeacf;
+}
+.space-tile-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--ind-font-heading);
+  font-weight: 600;
+  font-size: 24px;
+}
+.space-tile-here {
+  font-family: var(--ind-font-body);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ind-neutral-700);
+}
+.space-tile-description {
+  font-size: 13px;
+  color: var(--ind-neutral-700);
+}

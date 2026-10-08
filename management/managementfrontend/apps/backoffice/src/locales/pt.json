@@ -3659,5 +3659,26 @@
       "unitPriceNonNegative": "O preço unitário não pode ser negativo.",
       "endBeforeStart": "A data de fim não pode ser anterior à de início."
     }
+  },
+  "attendance": {
+    "formErrors": {
+      "nameRequired": "O nome é obrigatório.",
+      "nameTooLong": "O nome não pode ter mais de 120 caracteres.",
+      "nameInvalid": "O nome tem caracteres que não são aceites.",
+      "notesTooLong": "As notas não podem ter mais de 500 caracteres.",
+      "textInvalid": "O texto tem caracteres que não são aceites.",
+      "timeInvalid": "Indique uma hora válida (HH:MM).",
+      "endBeforeStart": "A saída tem de ser depois da entrada.",
+      "breakTooLong": "A pausa não pode ser igual ou maior que o período de trabalho do dia.",
+      "breakNegative": "A pausa não pode ser negativa.",
+      "atLeastOneDay": "Escolha pelo menos um dia de trabalho.",
+      "dateRequired": "A data é obrigatória.",
+      "municipalityRequired": "Um feriado municipal tem de indicar o concelho.",
+      "scheduleRequired": "O horário é obrigatório.",
+      "vacationDaysRequired": "Os dias de férias por ano são obrigatórios.",
+      "vacationDaysRange": "Os dias de férias têm de estar entre 0 e 365.",
+      "endBeforeHired": "A data de fim não pode ser anterior à admissão.",
+      "validFromBeforeHired": "O período não pode começar antes da data de admissão."
+    }
   }
 }

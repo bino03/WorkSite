@@ -12,6 +12,11 @@ import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import AppLayout from "./layouts/AppLayout";
+import TeamLayout from "./layouts/TeamLayout";
+import LegacyEmployeeRedirect from "./layouts/shell/LegacyEmployeeRedirect";
+import TeamTodayPage from "./pages/team/TeamTodayPage";
+import WorkSchedulesPage from "./pages/team/settings/WorkSchedulesPage";
+import HolidaysPage from "./pages/team/settings/HolidaysPage";
 import { BackofficeHome } from "./pages/backoffice/BackofficeHome";
 import { PrivateRoute } from "./PrivateRoute";
 import EmployeesList from "./pages/backoffice/EmployeesList";
@@ -48,8 +53,10 @@ const App = () => (
             {/* Rotas protegidas do backoffice */}
             <Route path="/backoffice/*" element={<PrivateRoute><AppLayout /></PrivateRoute>}>
               <Route index element={<BackofficeHome />} />
-              <Route path="funcionarios" element={<EmployeesList />} />
-              <Route path="funcionarios/:id" element={<EmployeeProfilePage />} />
+              {/* A gestão de contas mudou-se para o espaço Equipa a 2026-10-07; os links
+                  antigos continuam a funcionar. */}
+              <Route path="funcionarios" element={<Navigate to="/team/employees" replace />} />
+              <Route path="funcionarios/:id" element={<LegacyEmployeeRedirect />} />
               <Route path="empreendimentos" element={<EnterprisesList />} />
               <Route path="empreendimentos/:enterpriseId/budget" element={<ConstructionBudgetPage />} />
               <Route path="empreendimentos/:enterpriseId/invoices" element={<EnterpriseInvoicesPage />} />
@@ -58,6 +65,15 @@ const App = () => (
               <Route path="invoices/company" element={<CompanyInvoicesPage />} />
               <Route path="invoices/incidents" element={<InvoiceIncidentsPage />} />
               <Route path="tasks" element={<TasksPage />} />
+            </Route>
+
+            {/* Espaço Equipa — só ADMIN (o TeamLayout devolve um EMPLOYEE a Obras) */}
+            <Route path="/team/*" element={<PrivateRoute><TeamLayout /></PrivateRoute>}>
+              <Route index element={<TeamTodayPage />} />
+              <Route path="employees" element={<EmployeesList />} />
+              <Route path="employees/:id" element={<EmployeeProfilePage />} />
+              <Route path="settings/schedules" element={<WorkSchedulesPage />} />
+              <Route path="settings/holidays" element={<HolidaysPage />} />
             </Route>
 
             {/* 404 */}
