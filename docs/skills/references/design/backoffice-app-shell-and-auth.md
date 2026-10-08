@@ -14,10 +14,11 @@
 | `/backoffice/empreendimentos/:enterpriseId/budget` | `ConstructionBudgetPage` |
 | `/backoffice/empreendimentos/:enterpriseId/invoices` | `EnterpriseInvoicesPage` |
 | `/backoffice/tasks` | `TasksPage` |
-| `/team/` | `TeamTodayPage` — espaço **Equipa**, só `ADMIN` (ver §5) |
+| `/team/` | `TeamTodayPage` — o painel de entrada do espaço **Equipa** (contagens, "Precisa de atenção", mapa de férias), só `ADMIN` (ver §5) |
 | `/team/employees` | `EmployeesList` |
 | `/team/time-entries` | `TimeEntriesPage` — picagens de toda a equipa, por mês ou por dia |
 | `/team/absences` | `AbsencesPage` — férias e ausências: mapa do mês e lista |
+| `/team/reports` | `ReportsPage` — o mês por funcionário e por obra + export `.xlsx` |
 | `/team/employees/:id` | `EmployeeProfilePage` — perfil + ficha de emprego + mês de assiduidade |
 | `/team/settings/schedules` | `WorkSchedulesPage` — horários de trabalho |
 | `/team/settings/holidays` | `HolidaysPage` — feriados, por ano |
@@ -126,8 +127,8 @@ envolve tudo num `ConfigProvider` com `teamAntdTheme` (`theme.ts`). A classe red
 componentes que o tinham escrito à mão. Um componente que use os tokens fica verde em Equipa sozinho.
 
 **Nav de Equipa** (`TeamLayout`), pela ordem do maquete aprovado: Hoje (`/team`) · Picagens
-(`/team/time-entries`) · Férias e ausências (`/team/absences`) · Funcionários (`/team/employees`) ·
-**Configuração ▾**
+(`/team/time-entries`) · Férias e ausências (`/team/absences`) · Relatórios (`/team/reports`) ·
+Funcionários (`/team/employees`) · **Configuração ▾**
 (`Dropdown`, 2026-10-08) → Horários · Feriados. O dropdown é o mesmo molde do "Faturas ▾" do
 `AppLayout` — `trigger={["click"]}`, `selectedKeys: [pathname]`, o gatilho é um `<button>` com
 `navButtonStyle(ativo, cor)` e acende quando `pathname` começa por `/team/settings`. Rotas de

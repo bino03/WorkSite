@@ -3,6 +3,7 @@ import { Navigate, Outlet, NavLink, useLocation, useNavigate } from "react-route
 import { ConfigProvider, Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import {
+  BarChartOutlined,
   CalendarOutlined,
   ClockCircleOutlined,
   DownOutlined,
@@ -77,6 +78,9 @@ export default function TeamLayout() {
           </NavLink>
           <NavLink to={`${base}/absences`} style={navLinkStyle(HEADER_ACCENT)}>
             <SunOutlined />Férias e ausências
+          </NavLink>
+          <NavLink to={`${base}/reports`} style={navLinkStyle(HEADER_ACCENT)}>
+            <BarChartOutlined />Relatórios
           </NavLink>
           <NavLink to={`${base}/employees`} style={navLinkStyle(HEADER_ACCENT)}>
             <TeamOutlined />Funcionários

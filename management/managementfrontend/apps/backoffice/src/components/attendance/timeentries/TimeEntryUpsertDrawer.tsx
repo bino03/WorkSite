@@ -8,7 +8,9 @@ import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { correctTimeEntry, registerTimeEntry } from "@/services/attendanceService";
 import { searchEnterprises } from "@/services/enterpriseService";
+import { listAssignableUsers } from "@/services/profileService";
 import type { EnterpriseOption } from "@/services/enterpriseService";
+import type { AssignableEmployee } from "@/services/profileService";
 import type { TimeEntry } from "@/types/attendance";
 import Label from "@/components/common/Label";
 import { ReasonField } from "./ui/ReasonField";
@@ -19,6 +21,7 @@ const { Text } = Typography;
 
 interface Props {
   open: boolean;
+  /** Vazio quando se regista de um sítio sem funcionário escolhido (o painel "Hoje"): aí pede-se. */
   profileId: string;
   /** O dia aberto, para uma picagem nova já nascer nele. */
   day: string;
@@ -28,12 +31,13 @@ interface Props {
   onSaved: () => void;
 }
 
-function defaultsFor(entry: TimeEntry | null, day: string): TimeEntryForm {
+function defaultsFor(entry: TimeEntry | null, day: string, profileId: string): TimeEntryForm {
   if (!entry) {
-    return { day, time: "08:00", direction: "IN", enterpriseId: "", note: "", reason: "" };
+    return { profileId, day, time: "08:00", direction: "IN", enterpriseId: "", note: "", reason: "" };
   }
   const moment = dayjs(entry.happenedAt);
   return {
+    profileId: entry.profileId,
     day: entry.localDate,
     time: moment.format("HH:mm"),
     direction: entry.direction,
@@ -54,7 +58,9 @@ function defaultsFor(entry: TimeEntry | null, day: string): TimeEntryForm {
 export function TimeEntryUpsertDrawer({ open, profileId, day, entry, onClose, onSaved }: Props) {
   const { t } = useTranslation();
   const isEdit = !!entry;
+  const needsProfile = !profileId && !entry;
   const [enterprises, setEnterprises] = useState<EnterpriseOption[]>([]);
+  const [employees, setEmployees] = useState<AssignableEmployee[]>([]);
 
   const {
     control,
@@ -65,16 +71,20 @@ export function TimeEntryUpsertDrawer({ open, profileId, day, entry, onClose, on
   } = useForm<TimeEntryForm>({
     resolver: zodResolver(TimeEntryFormSchema),
     mode: "onChange",
-    defaultValues: defaultsFor(entry, day),
+    defaultValues: defaultsFor(entry, day, profileId),
   });
 
   useEffect(() => {
-    if (open) reset(defaultsFor(entry, day));
-  }, [open, entry, day, reset]);
+    if (open) reset(defaultsFor(entry, day, profileId));
+  }, [open, entry, day, profileId, reset]);
 
   useEffect(() => {
     if (open) searchEnterprises("", 50).then(setEnterprises).catch(ErrorHandler.handle);
   }, [open]);
+
+  useEffect(() => {
+    if (open && needsProfile) listAssignableUsers().then(setEmployees).catch(ErrorHandler.handle);
+  }, [open, needsProfile]);
 
   const reason = watch("reason");
   const missingReason = isEdit && !reason.trim();
@@ -82,7 +92,7 @@ export function TimeEntryUpsertDrawer({ open, profileId, day, entry, onClose, on
   const onSubmit = handleSubmit(async (values) => {
     const happenedAt = dayjs(`${values.day}T${values.time}`).toISOString();
     const dto = {
-      profileId,
+      profileId: values.profileId,
       enterpriseId: values.enterpriseId,
       happenedAt,
       direction: values.direction,
@@ -135,6 +145,27 @@ export function TimeEntryUpsertDrawer({ open, profileId, day, entry, onClose, on
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "13.6px" }}>
+        {needsProfile && (
+          <div>
+            <Label required hasError={!!errors.profileId}>Funcionário</Label>
+            <Controller
+              name="profileId"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  {...field}
+                  showSearch
+                  optionFilterProp="label"
+                  style={{ width: "100%" }}
+                  placeholder="Escolher funcionário"
+                  options={employees.map((employee) => ({ value: employee.id, label: employee.name }))}
+                />
+              )}
+            />
+            {fieldError(errors.profileId?.message)}
+          </div>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" }}>
           <div>
             <Label required hasError={!!errors.day}>Dia</Label>

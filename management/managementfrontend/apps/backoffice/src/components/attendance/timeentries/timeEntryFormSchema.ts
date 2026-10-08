@@ -19,6 +19,8 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const FREE_TEXT = /^[\p{L}\p{N}\s.,;:!?()'"/–—€%ºª+&-]*$/u;
 
 export const TimeEntryFormSchema = z.object({
+  /** Vem fixo quando o drawer é aberto de dentro de um dia; escolhe-se quando não. */
+  profileId: z.string().uuid("attendance.formErrors.profileRequired"),
   day: z.string().regex(ISO_DATE, "attendance.formErrors.dateRequired"),
   time: z.string().regex(TIME, "attendance.formErrors.timeInvalid"),
   direction: z.enum(["IN", "OUT"]),
