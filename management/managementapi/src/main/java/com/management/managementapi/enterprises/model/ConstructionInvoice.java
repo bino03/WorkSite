@@ -141,6 +141,13 @@ public class ConstructionInvoice extends BaseEntity {
 
     private String notes;
 
+    /**
+     * Vencimento escrito à mão; prevalece sobre o calculado pelo prazo do
+     * fornecedor. O vencimento que se mostra é sempre {@link InvoiceDueDate}.
+     */
+    @Column(name = "due_date_override")
+    private LocalDate dueDateOverride;
+
     // ── envio para a contabilidade ──
 
     @Column(name = "sent_to_accountant", nullable = false)
@@ -151,6 +158,18 @@ public class ConstructionInvoice extends BaseEntity {
 
     @Column(name = "sent_to_accountant_at")
     private OffsetDateTime sentToAccountantAt;
+
+    // ── aprovação para pagamento ──
+
+    /** O passo entre "lançada" e "paga". Não bloqueia o pagamento — só o assinala. */
+    @Column(name = "approved_for_payment", nullable = false)
+    private boolean approvedForPayment = false;
+
+    @Column(name = "approved_for_payment_by")
+    private UUID approvedForPaymentBy;
+
+    @Column(name = "approved_for_payment_at")
+    private OffsetDateTime approvedForPaymentAt;
 
     @Column(name = "created_by")
     private UUID createdBy;
@@ -224,6 +243,9 @@ public class ConstructionInvoice extends BaseEntity {
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
 
+    public LocalDate getDueDateOverride() { return dueDateOverride; }
+    public void setDueDateOverride(LocalDate dueDateOverride) { this.dueDateOverride = dueDateOverride; }
+
     public boolean isSentToAccountant() { return sentToAccountant; }
     public void setSentToAccountant(boolean sentToAccountant) { this.sentToAccountant = sentToAccountant; }
 
@@ -232,6 +254,15 @@ public class ConstructionInvoice extends BaseEntity {
 
     public OffsetDateTime getSentToAccountantAt() { return sentToAccountantAt; }
     public void setSentToAccountantAt(OffsetDateTime sentToAccountantAt) { this.sentToAccountantAt = sentToAccountantAt; }
+
+    public boolean isApprovedForPayment() { return approvedForPayment; }
+    public void setApprovedForPayment(boolean approvedForPayment) { this.approvedForPayment = approvedForPayment; }
+
+    public UUID getApprovedForPaymentBy() { return approvedForPaymentBy; }
+    public void setApprovedForPaymentBy(UUID approvedForPaymentBy) { this.approvedForPaymentBy = approvedForPaymentBy; }
+
+    public OffsetDateTime getApprovedForPaymentAt() { return approvedForPaymentAt; }
+    public void setApprovedForPaymentAt(OffsetDateTime approvedForPaymentAt) { this.approvedForPaymentAt = approvedForPaymentAt; }
 
     public UUID getCreatedBy() { return createdBy; }
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }

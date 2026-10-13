@@ -25,11 +25,13 @@ import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
 import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
 import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
+import { useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import type { ConstructionInvoice, InvoiceScope, OutstandingInvoicesSummary } from "@/types/invoice";
 import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBadge";
+import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import type { IncidentInvoiceRef } from "@/types/incident";
 
 interface Props {
@@ -115,7 +117,16 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   }, [scope]);
 
   const reload = () => void fetch(page, pageSize, query, outstanding);
+
+  // O nome e o prazo de um fornecedor mexem no que estas linhas mostram
+  // (fornecedor, vencimento) — o mesmo motivo do listener na página de obra.
+  useEffect(() => {
+    const onSuppliersChanged = () => void fetch(page, pageSize, query, outstanding);
+    window.addEventListener(SUPPLIERS_CHANGED_EVENT, onSuppliersChanged);
+    return () => window.removeEventListener(SUPPLIERS_CHANGED_EVENT, onSuppliersChanged);
+  }, [fetch, page, pageSize, query, outstanding]);
   const markPaid = useQuickMarkPaid(reload);
+  const paymentApproval = useInvoicePaymentApproval(reload);
 
   const search = () => {
     setPage(0);
@@ -256,6 +267,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onDelete={handleDelete}
         onTransfer={setTransferInvoice}
         onRegisterPayment={setPayInvoice}
+        onTogglePaymentApproval={paymentApproval.toggle}
         onMarkPaid={markPaid}
         onAddNote={setNoteInvoice}
       />

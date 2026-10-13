@@ -3569,6 +3569,8 @@
       "shortfall": "Faltam {{amount}} para cobrir a soma.",
       "surplus": "O movimento é {{amount}} superior à soma — ajuste o valor.",
       "differentSupplierWarning": "As faturas selecionadas são de fornecedores diferentes.",
+      "notApprovedWarning": "Esta fatura ainda não foi aprovada para pagamento. Pode pagá-la na mesma.",
+      "notApprovedCountWarning": "{{count}} das faturas selecionadas ainda não foram aprovadas para pagamento. Pode pagá-las na mesma.",
       "registeredBy": "Registado por {{name}} em {{date}}",
       "alsoCovers": "junto com {{list}}",
       "success": "Pagamento registado.",

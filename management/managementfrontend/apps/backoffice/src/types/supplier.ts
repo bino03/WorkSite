@@ -11,6 +11,8 @@ export interface Supplier {
   nif: string;
   name: string;
   notes: string | null;
+  /** Prazo de pagamento em dias a contar da data da fatura. Null é "sem prazo"; 0 é pronto pagamento. */
+  paymentTermDays: number | null;
   /** Faturas com este NIF, em todos os projetos. */
   invoiceCount: number;
 }
@@ -28,6 +30,8 @@ export interface SupplierUpsert {
   nif: string;
   name: string;
   notes?: string | null;
+  /** O backend grava o que vier: omitir num `PUT` apaga o prazo. */
+  paymentTermDays?: number | null;
 }
 
 /** `invoicesUpdated` = faturas que estavam sem nome e ficaram com ele. */

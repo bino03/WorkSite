@@ -1,6 +1,6 @@
 # 🗄️ Base de Dados
 
-PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V44`). Quatro schemas: **`worksite`** (core do domínio), **`settings`** (convites/config), **`tasks`** (tarefas standalone) e **`attendance`** (assiduidade, horas e férias).
+PostgreSQL, gerido por **Flyway** em `management/managementapi/src/main/resources/db/migration/` (`V1` a `V46`). Quatro schemas: **`worksite`** (core do domínio), **`settings`** (convites/config), **`tasks`** (tarefas standalone) e **`attendance`** (assiduidade, horas e férias).
 
 > ⚠️ Um schema novo tem de entrar em `spring.flyway.schemas` no `application.yml` (`create-schemas: true` cria-o), senão a migração falha. E o trigger de `updated_at` **não** é automático fora de `worksite`: o `DO $$` da `V11` só percorre `table_schema = 'worksite'`, por isso cada tabela de `settings`, `tasks` ou `attendance` declara o seu `CREATE TRIGGER` à mão.
 
@@ -55,6 +55,14 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
   `taxable_amount`, `tax_amount`. Todos **nullable**: sem QR legível a fatura entra na mesma,
   marcada "por rever" (`AtInvoiceQrService`, ver [[api.md]] → "Leitura do QR code da AT").
   `sent_to_accountant` (+ `_by`/`_at`) também vive aqui, não na despesa.
+  `due_date_override` (`V45`, `date`, nullable) é o vencimento **escrito à mão**; o vencimento que a
+  app mostra é derivado — este, ou `invoice_date + supplier.payment_term_days` — e nunca é gravado
+  (ver [[api.md]] → "Vencimento da fatura"). `ck_invoice_due_date_override_not_credit_note` proíbe-o
+  numa nota de crédito.
+  `approved_for_payment` (+ `_by`/`_at`, `V46`) é a aprovação para pagamento: mesmo desenho do
+  `sent_to_accountant`, `default false` e **sem backfill** — não bloqueia o pagamento, por isso as
+  faturas já pagas não precisam dela. `ck_invoice_payment_approval_not_credit_note` proíbe-a numa
+  nota de crédito.
   - `document_status` (`V27`, enum `invoice_document_status`) diz o que se passa com o
     papel: `ARCHIVED` (há ficheiro), `MISSING`, `TO_PRINT`, `TO_REQUEST`. **Segue o papel, não
     é editado à mão para valer**: passa a `ARCHIVED` quando se junta um documento e volta a
@@ -170,7 +178,7 @@ Ver [[api.md]] → "Orçamento de Construção". O ficheiro de fatura é guardad
 
 | Tabela | Schema | Propósito |
 |---|---|---|
-| `supplier` | `worksite` | Catálogo NIF → nome da empresa (`V19`). O QR da AT só traz o NIF do emitente; sem isto o nome era escrito à mão fatura a fatura. Global, sem `enterprise_id` — o mesmo NIF é a mesma empresa em todas as obras — e ligado às faturas **pelo NIF, não por FK**, para uma fatura poder existir com um fornecedor ainda desconhecido. `nif` único (`uq_supplier_nif`) |
+| `supplier` | `worksite` | Catálogo NIF → nome da empresa (`V19`). O QR da AT só traz o NIF do emitente; sem isto o nome era escrito à mão fatura a fatura. Global, sem `enterprise_id` — o mesmo NIF é a mesma empresa em todas as obras — e ligado às faturas **pelo NIF, não por FK**, para uma fatura poder existir com um fornecedor ainda desconhecido. `nif` único (`uq_supplier_nif`). `payment_term_days` (`V45`, `integer`, nullable, `ck_supplier_payment_term_days` 0–365): o prazo de pagamento — `null` é "sem prazo", `0` é pronto pagamento, e por isso **não tem default** |
 | `profile` | `worksite` | Utilizador interno (liga a `auth_user_id` do Supabase); `role` = `ADMIN` ou `EMPLOYEE` |
 | `location` | `worksite` | Localização standalone (endereço, cidade, coordenadas), reutilizada por `enterprises` |
 | `activity_log` | `worksite` | Auditoria genérica (login/logout + CRUD em `enterprises`/`construction_budget_item`/`construction_expense`). Desde a `V33`, uma **transferência de fatura** grava aqui uma linha `activity_type = transfer` com a repartição antiga (da fatura e das NC ligadas) em `metadata` JSONB — é a fonte do `transfers[]` do detalhe da fatura |
@@ -241,7 +249,7 @@ opaca; o service diz *qual* regra falhou, com um `SCHED_xxx`.
 - Todas as PKs são `UUID DEFAULT gen_random_uuid()`, exceto `revoked_token` (BIGSERIAL).
 - Trigger genérico `worksite.tg_set_updated_at()` (definido em `V1`) mantém `updated_at` automaticamente — aplicado a todas as tabelas `worksite` com essa coluna via loop dinâmico em `V11`, e explicitamente às tabelas de construção em `V15`.
 - Enums nativos do Postgres: `role_enum` (`ADMIN`/`EMPLOYEE`), `account_status_enum` (`unlocked`/`blocked`/`deleted`), `media_type_enum`, `visibility_enum`, `activity_type`, `entity_type` (`V2`) e `budget_row_kind` (`ITEM`/`HEADING`/`NOTE`, `V15`). A fase 1 da paridade com o Excel acrescentou quatro: `invoice_document_kind` (`V24`), `invoice_scope` (`V26`), `invoice_document_status` (`V27`) e `invoice_document_type` (`V28`). A fase 2 acrescentou `payment_method` (`V31`).
-- `notification.type` é **texto e não enum** (`V20`): um tipo novo não vale uma migração, e nada no backend decide nada com base no valor — serve ao frontend para escolher o ícone. Tipos hoje: `task_assigned`, `invoice_pending`, `budget_item_deadline` (este último gerado por job, com dedupe por `(recipient_id, type, entity_id)` **no serviço, não por unique index** — os gatilhos manuais podem legitimamente repetir um tipo para a mesma entidade).
+- `notification.type` é **texto e não enum** (`V20`): um tipo novo não vale uma migração, e nada no backend decide nada com base no valor — serve ao frontend para escolher o ícone. Tipos hoje: `task_assigned`, `invoice_pending`, `budget_item_deadline` e `invoice_due` (estes dois últimos gerados por job, com dedupe por `(recipient_id, type, entity_id)` **no serviço, não por unique index** — os gatilhos manuais podem legitimamente repetir um tipo para a mesma entidade).
 - `entity_type` ganhou `budget_item` em `V15`, `construction_invoice` em `V16`, `supplier` em `V19`, `email_provider` em `V21`, `payment` em `V31` e `invoice_incident` em `V33`; `activity_type` ganhou `transfer` em `V33` (a transferência de fatura da fase 5). Os valores `construction_stage` e `construction_sub_stage` **mantêm-se de propósito**: há linhas históricas em `activity_log` que ainda os referenciam, e um valor não se remove de um enum do Postgres.
 - `enterprises` tem `slug` e `is_test` desde a `V23`: o `slug` é o nome da pasta desta obra no vault Excel da Vilatro (`Vila Petrus`), único quando preenchido (`ENT_032`), e é ele que faz a ponte entre os dois sistemas — ver [[excel-parity.md]] §2; `is_test` (NOT NULL, `false`) marca as obras que existem só para experimentar, para os relatórios as poderem excluir.
 - **Grants**: `V8` dá `GRANT ALL` em `worksite`/`settings` a `service_role` (o do próprio Supabase, para as suas APIs) — é o único grant que sobrevive. O `USAGE` que a `V8` dava a `anon`/`authenticated` e o role de leitura `worksite_expenses_ro` da `V30` (de um frontend descartado a 2026-09-06) foram **revogados na `V37`**: só o backend liga à base de dados, como `postgres`, e não há RLS — porquê em [[security]] → "Modelo de confiança na base de dados".

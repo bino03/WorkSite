@@ -6,6 +6,8 @@ import { useTranslation } from "react-i18next";
 
 import CreditNoteDrawer from "@/components/invoices/CreditNoteDrawer";
 import InvoiceDocumentGallery from "@/components/invoices/InvoiceDocumentGallery";
+import { InvoiceDueDateField } from "@/components/invoices/InvoiceDueDate";
+import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
 import MarkPaidDrawer from "@/components/invoices/MarkPaidDrawer";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import { deletePayment } from "@/services/paymentService";
@@ -262,6 +264,11 @@ export const InvoiceDetailDrawer: FC<Props> = ({
     });
   };
 
+  const paymentApproval = useInvoicePaymentApproval(() => {
+    void fetchInvoice();
+    onChanged();
+  });
+
   const handleAccountant = () => {
     if (!invoice) return;
     const action = invoice.sentToAccountant ? "desmarcar como enviada" : "marcar como enviada";
@@ -454,6 +461,33 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                   {t(`invoices.payment.status.${invoice.paymentStatus}`)}
                 </span>
 
+                {/* O selo aparece a toda a gente; só o ADMIN o pode mudar. Numa NC
+                    não há o que aprovar, e numa fatura paga só se mostra se a tiver. */}
+                {invoice.documentType !== "CREDIT_NOTE" &&
+                  (invoice.approvedForPayment || invoice.paymentStatus !== "PAID") && (
+                    <Tooltip
+                      title={
+                        !isAdmin()
+                          ? undefined
+                          : invoice.approvedForPayment
+                            ? "Clique para retirar a aprovação."
+                            : "Clique para aprovar para pagamento."
+                      }
+                    >
+                      <span
+                        className={`ind-tag ${invoice.approvedForPayment ? "ind-tag-accent-2" : "ind-tag-neutral"}`}
+                        style={{ cursor: isAdmin() ? "pointer" : undefined }}
+                        onClick={
+                          isAdmin() && (invoice.approvedForPayment || canApproveForPayment(invoice))
+                            ? () => paymentApproval.toggle(invoice)
+                            : undefined
+                        }
+                      >
+                        pagamento: {invoice.approvedForPayment ? "aprovado" : "por aprovar"}
+                      </span>
+                    </Tooltip>
+                  )}
+
                 {isAdmin() && (
                   <span
                     className={`ind-tag ${invoice.sentToAccountant ? "ind-tag-accent-2" : "ind-tag-neutral"}`}
@@ -464,6 +498,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                   </span>
                 )}
               </div>
+
+              {invoice.approvedForPayment && invoice.approvedForPaymentByName && (
+                <div style={{ fontSize: 11, opacity: 0.6, marginTop: -12 }}>
+                  Aprovada para pagamento por {invoice.approvedForPaymentByName} ·{" "}
+                  {formatDate(invoice.approvedForPaymentAt)}
+                </div>
+              )}
 
               {invoice.sentToAccountant && invoice.sentToAccountantByName && (
                 <div style={{ fontSize: 11, opacity: 0.6, marginTop: -12 }}>
@@ -479,6 +520,15 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               <div style={{ fontSize: 12, opacity: 0.75 }}>
                 Âmbito: <strong>{SCOPE_LABEL[invoice.scope]}</strong>
               </div>
+
+              <InvoiceDueDateField
+                invoice={invoice}
+                editable={isAdmin()}
+                onChanged={() => {
+                  void fetchInvoice();
+                  onChanged();
+                }}
+              />
 
               {isAdmin() && (
                 <div style={{ display: "flex", gap: 8 }}>

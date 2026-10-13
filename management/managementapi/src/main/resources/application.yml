@@ -151,3 +151,6 @@ app:
     budget-item-deadline:
       # Com quantos dias de antecedência os admins são avisados do fim de uma rubrica.
       days-ahead: ${APP_BUDGET_DEADLINE_DAYS_AHEAD:7}
+    invoice-due:
+      # Com quantos dias de antecedência os admins são avisados do vencimento de uma fatura.
+      days-ahead: ${APP_INVOICE_DUE_DAYS_AHEAD:7}

@@ -26,10 +26,11 @@ empresa, sem obra) ou `UNIDENTIFIED` (quarentena — ainda não se sabe de quem 
 |---|---|
 | **Entrada** | rota `/backoffice/empreendimentos/:enterpriseId/invoices` → `pages/backoffice/enterprise/EnterpriseInvoicesPage.tsx` |
 | **Classificar** | rota `/backoffice/empreendimentos/:enterpriseId/classify` → `pages/backoffice/enterprise/ClassifyInvoicesPage.tsx` (botão "Classificar" na página das faturas): repartir a fatura por rubricas (`V32`) · `components/invoices/RubricSearchField.tsx` · sugestão em `GET /construction-invoices/{id}/rubric-suggestion` |
-| **Fora das obras** | dropdown **Faturas** da nav do espaço Obras (`layouts/AppLayout.tsx`): "Por identificar" → `/backoffice/invoices/unidentified` (`pages/backoffice/invoices/UnidentifiedInvoicesPage.tsx`) · "Despesas da empresa" → `/backoffice/invoices/company` (`CompanyInvoicesPage.tsx`) — as duas são o mesmo `ScopedInvoicesPage.tsx` com `scope` diferente, a ler `GET /construction-invoices/unidentified` e `/company` |
+| **Fora das obras** | dropdown **Faturas** da nav do espaço Obras (`layouts/AppLayout.tsx`): "Por identificar" → `/backoffice/invoices/unidentified` (`pages/backoffice/invoices/UnidentifiedInvoicesPage.tsx`) · "Despesas da empresa" → `/backoffice/invoices/company` (`CompanyInvoicesPage.tsx`) — as duas são o mesmo `ScopedInvoicesPage.tsx` com `scope` diferente, a ler `GET /construction-invoices/unidentified` e `/company` · "A pagar" → `/backoffice/invoices/outstanding` (`OutstandingInvoicesPage.tsx`): por liquidar em todas as obras e na empresa, por ordem de vencimento, a ler `GET /construction-invoices/outstanding` (`ConstructionInvoiceService.outstandingByUrgency`); reutiliza o `InvoicesList` com a coluna "Obra" (`enterpriseNames`) |
 | **Frontend** | `components/invoices/` — `InvoicesList`, `InvoiceFiltersModal` (pesquisa avançada: modal centrado, ícone de filtro com contagem + "Limpar filtros" na página, sem chips — 2026-09-21; helpers em `invoiceFilters.ts`), `OutstandingTotalBadge`, `InvoiceUploadDrawer` (2 fases), `InvoiceRegisterDrawer` (sem ficheiro), `InvoiceDetailDrawer` (correção manual, líquido e NC ligadas), `InvoiceDocumentGallery`, `CreditNoteDrawer` (fase 3), `BudgetItemPickerModal`, `invoiceNumber.ts` (tipo + série), `invoiceFormSchema.ts`/`creditNoteFormSchema.ts` · `components/construction/InvoicePreviewModal.tsx` · `services/invoiceService.ts` · `types/invoice.ts` |
 | **Backend** | `enterprises/controller/ConstructionInvoiceController` · `service/ConstructionInvoiceService` (o núcleo — upload, duplicados, correção, notas de crédito, repartição, transferência) · `AtInvoiceQrService` + `WeChatQrCodeService` (leitura do QR) · `InvoiceThumbnailService` · `InvoiceCompressionService` · `DespesasExcelImportService` (fase 6) · `repository/ConstructionInvoiceRepository` |
 | **Base de dados** | `worksite.construction_invoice` — `V16`, `V17` (ATCUD único), `V18` (checksum), `V26` (`scope`), `V29` (unicidade global) · `construction_invoice_document` (o ficheiro deixa de viver na fatura) — `V24`, `V25`, `V27` (estado), `V28` (tipo) · repartição por várias rubricas — `V32` |
+| **Aprovação para pagamento** | `ConstructionInvoiceService.setApprovedForPayment` · `PATCH /construction-invoices/{id}/payment-approval` · `V46`. No frontend, `hooks/useInvoicePaymentApproval.ts` (aprovar/retirar, "Aprovar N", e as duas regras `canApproveForPayment` / `isUnapprovedPayment`); a ação está no `InvoiceContextMenu`, no selo do `InvoiceDetailDrawer` e no botão da `EnterpriseInvoicesPage`; o aviso "não aprovada" em `useQuickMarkPaid`, `MarkPaidDrawer` e `AggregatePaymentDrawer` |
 | **Detalhe** | [[api.md]] → "Faturas de obra", "Notas de crédito", "Classificar faturas em rubricas" · [[database.md]] · [[faturas-modelo-alvo]] |
 
 ## Pagamentos
@@ -66,9 +67,10 @@ Catálogo NIF → nome da empresa. Existe porque o QR da AT identifica o emitent
 | Camada | Ficheiros |
 |---|---|
 | **Entrada** | menu do utilizador → grupo **Definições** (`layouts/shell/UserMenu.tsx`, nos dois espaços) → `components/suppliers/SuppliersDrawer.tsx` |
-| **Frontend** | `services/supplierService.ts` · `types/supplier.ts` · evento `SUPPLIERS_CHANGED_EVENT` ouvido por `EnterpriseInvoicesPage` |
+| **Frontend** | `services/supplierService.ts` · `types/supplier.ts` · evento `SUPPLIERS_CHANGED_EVENT` ouvido por `EnterpriseInvoicesPage` e `ScopedInvoicesPage` |
 | **Backend** | `enterprises/controller/SupplierController` · `service/SupplierService` · `repository/SupplierRepository` · `model/Supplier` · `mapper/SupplierMapper` · as três queries de agregação em `ConstructionInvoiceRepository` |
-| **Base de dados** | `worksite.supplier` — `V19` |
+| **Base de dados** | `worksite.supplier` — `V19`; `payment_term_days` na `V45` |
+| **Prazo e vencimento** | o prazo edita-se na linha do fornecedor no `SuppliersDrawer`. O vencimento de cada fatura é `model/InvoiceDueDate` (derivado em `ConstructionInvoiceService.toResponseDTO`), o manual grava-se por `setDueDateOverride`; no frontend, `components/invoices/InvoiceDueDate.tsx` (célula da lista + campo do detalhe) |
 | **Detalhe** | [[api.md]] → "Fornecedores" |
 
 ## Provedores de email (SMTP)
@@ -153,8 +155,8 @@ Desenho das 5 fases, com as decisões e o porquê, em [[../notes/roadmap/assidui
 |---|---|
 | **Entrada** | o sino do cabeçalho — `components/notifications/NotificationBell.tsx` (`iconFor` escolhe o ícone por `type`; sem polling) |
 | **Frontend** | `services/notificationInboxService.ts` · `types/notification.ts` |
-| **Backend** | `notifications/controller/NotificationController` · `service/NotificationService` (escrita chamada pelos serviços de domínio, na mesma transação) · `service/BudgetItemDeadlineNotifier` (o gatilho por job) · `repository/NotificationRepository` · `model/Notification` (constantes `TYPE_*`) |
-| **Jobs agendados** | `enterprises/config/BudgetItemDeadlineNotifierConfig` (07:00 + arranque) — os outros dois jobs do projeto são `security/RevokedTokenCleanupConfig` (limpeza de tokens) e `enterprises/config/ConstructionBudgetItemPurgeConfig` (purga às 3h) |
+| **Backend** | `notifications/controller/NotificationController` · `service/NotificationService` (escrita chamada pelos serviços de domínio, na mesma transação) · `service/BudgetItemDeadlineNotifier` e `service/InvoiceDueNotifier` (o gatilho por job) · `repository/NotificationRepository` · `model/Notification` (constantes `TYPE_*`) |
+| **Jobs agendados** | `enterprises/config/BudgetItemDeadlineNotifierConfig` e `InvoiceDueNotifierConfig` (07:00 + arranque) — os outros dois jobs do projeto são `security/RevokedTokenCleanupConfig` (limpeza de tokens) e `enterprises/config/ConstructionBudgetItemPurgeConfig` (purga às 3h) |
 | **Base de dados** | `worksite.notification` — `V20` |
 | **Detalhe** | [[api.md]] → "Quem gera notificações" |
 
@@ -201,6 +203,7 @@ começar a olhar.
 | o link do email aponta para `localhost` | `APP_FRONTEND_URL` não está definido no ambiente — ver [[environment.md]] |
 | aceitar um convite dá erro | `InviteService#accept` — `USER_013` (desconhecido/usado/cancelado) ou `USER_012` (fora do prazo) |
 | o aviso de prazo de rubrica não aparece / aparece a dobrar | `BudgetItemDeadlineNotifier` — só `ITEM` vivas de obras não `completed/archived/deleted`, `end_date` em [hoje, hoje+N]; dedupe por `(recipient, type, entity)`, por isso adiar a data **não** reavisa |
+| o aviso de vencimento de fatura não aparece | `InvoiceDueNotifier` — só faturas por liquidar de `findOutstandingExcludingScope` (sem quarentena, sem obras `is_test`) **com vencimento** em [hoje, hoje+N]; sem prazo no fornecedor nem vencimento manual não há aviso; dedupe por `(recipient, type, entity)`, logo uma fatura já avisada não volta a avisar mesmo que o vencimento mude |
 | recuperar a password não faz nada | `PasswordResetService` — o `204` do `forgot-password` é sempre igual, exista ou não a conta; confirmar no log se saiu email |
 | preciso de acrescentar um campo à fatura | migração → `ConstructionInvoice` → DTOs de `dto/invoice/` → `ConstructionInvoiceService` → `types/invoice.ts` → `InvoiceDetailDrawer` |
 | a fatura está `PARTIAL` e devia estar `PAID` (ou o contrário) | `paymentStatus` é derivado da soma de `invoice_payment.amount` vs. o líquido — `PaymentService` (registo/anulação) e `InvoicePaymentSummaryDTO`; uma NC ligada baixa o líquido |

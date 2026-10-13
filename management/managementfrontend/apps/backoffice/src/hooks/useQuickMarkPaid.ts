@@ -5,6 +5,7 @@ import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { formatCurrency } from "@/utils/formatters";
+import { isUnapprovedPayment } from "@/hooks/useInvoicePaymentApproval";
 import type { ConstructionInvoice } from "@/types/invoice";
 
 /**
@@ -19,7 +20,12 @@ export function useQuickMarkPaid(onDone: () => void) {
     const remaining = Math.round(((invoice.netAmount ?? 0) - invoice.paidAmount) * 100) / 100;
     confirm({
       title: "Marcar como paga",
-      message: `Registar o pagamento de ${formatCurrency(remaining)} hoje, por transferência?`,
+      // Avisa e deixa: a aprovação não bloqueia o pagamento, só o assinala.
+      message:
+        `Registar o pagamento de ${formatCurrency(remaining)} hoje, por transferência?` +
+        (isUnapprovedPayment(invoice)
+          ? " Atenção: esta fatura ainda não foi aprovada para pagamento."
+          : ""),
       actionLabel: "Marcar como paga",
       onConfirm: async () => {
         try {

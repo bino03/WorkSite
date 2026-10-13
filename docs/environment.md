@@ -43,6 +43,8 @@ Notas que se pagam caro por não se saberem:
   em [[operations]].
 - `APP_BUDGET_DEADLINE_DAYS_AHEAD` (opcional, default `7`): com quantos dias de antecedência o
   job `BudgetItemDeadlineNotifierConfig` avisa os `ADMIN` do fim de uma rubrica de orçamento.
+- `APP_INVOICE_DUE_DAYS_AHEAD` (opcional, default `7`): com quantos dias de antecedência o job
+  `InvoiceDueNotifierConfig` avisa os `ADMIN` do vencimento de uma fatura por liquidar.
   Ver [[api]] → "Quem gera notificações".
 - `CORS_ALLOWED_ORIGINS` (lista separada por vírgulas, default só as portas de dev): sem valor de
   produção por omissão de propósito — o domínio real do Backoffice ainda não está decidido. Em

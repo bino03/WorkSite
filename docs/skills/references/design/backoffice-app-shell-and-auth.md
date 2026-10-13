@@ -42,7 +42,7 @@ links achatados). Estrutura atual em `AppLayout.tsx`:
 | **Empreendimentos** | todos | `/backoffice/empreendimentos` |
 | **Tarefas** / **Minhas Tarefas** (rótulo por `isAdmin()`) | todos | `/backoffice/tasks` |
 | ~~**Gerir Contas**~~ | — | saiu a 2026-10-07: é o **Funcionários** do espaço Equipa (§5) |
-| **Faturas ▾** (`Dropdown`, `invoicesMenuItems`) | só `ADMIN` | Por identificar (`/invoices/unidentified`) · Despesas da empresa (`/invoices/company`) · Inconsistências (`/invoices/incidents`) |
+| **Faturas ▾** (`Dropdown`, `invoicesMenuItems`) | só `ADMIN` | A pagar (`/invoices/outstanding`) · Por identificar (`/invoices/unidentified`) · Despesas da empresa (`/invoices/company`) · Inconsistências (`/invoices/incidents`) |
 
 O trigger "Faturas" acende (`--ind-color-accent`) quando `pathname` começa por uma das suas
 rotas (`invoicesActive`); o item do dropdown fica `selected` por `selectedKeys: [pathname]`.

@@ -13,6 +13,7 @@ import { registerAggregatePayment } from "@/services/paymentService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { formatCurrency } from "@/utils/formatters";
+import { isUnapprovedPayment } from "@/hooks/useInvoicePaymentApproval";
 import type { ConstructionInvoice, LeftOutInvoice, PaymentMethod } from "@/types/invoice";
 
 const { Text } = Typography;
@@ -48,6 +49,8 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
     () => Math.round(invoices.reduce((sum, i) => sum + remainingOf(i), 0) * 100) / 100,
     [invoices]
   );
+  const unapprovedCount = invoices.filter(isUnapprovedPayment).length;
+
   const differentSuppliers = useMemo(
     () => new Set(invoices.map((i) => i.supplierNif ?? "")).size > 1,
     [invoices]
@@ -146,6 +149,18 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
           {t("invoices.payment.selectedCount", { count: invoices.length })} ·{" "}
           {t("invoices.payment.selectedTotal")}: <strong>{formatCurrency(selectedTotal)}</strong>
         </div>
+
+        {unapprovedCount > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            message={t(
+              "invoices.payment.notApprovedCountWarning",
+              "{{count}} das faturas selecionadas ainda não foram aprovadas para pagamento. Pode pagá-las na mesma.",
+              { count: unapprovedCount }
+            )}
+          />
+        )}
 
         {differentSuppliers && (
           <Alert type="info" showIcon message={t("invoices.payment.differentSupplierWarning")} />

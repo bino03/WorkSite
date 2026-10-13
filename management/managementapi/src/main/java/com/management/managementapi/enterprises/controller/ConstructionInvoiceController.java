@@ -25,6 +25,7 @@ import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTrans
 import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTransferResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.RubricSuggestionDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.InvoiceDueDateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceNotesDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
@@ -32,6 +33,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.Constructio
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
@@ -422,6 +424,22 @@ public class ConstructionInvoiceController {
                 minAmount, maxAmount, budgetItemId, budgetId)));
     }
 
+    /**
+     * O que pagar primeiro: as faturas por liquidar de todas as obras e da
+     * empresa, por ordem de vencimento. Só ADMIN, como as outras listas que
+     * atravessam obras.
+     */
+    @GetMapping("/outstanding")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OutstandingByUrgencyDTO> outstandingByUrgency(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        // Limites aqui e não por anotação: o controlador não é @Validated, e um
+        // @Max num @RequestParam seria ignorado em silêncio.
+        return ResponseEntity.ok(service.outstandingByUrgency(
+                Math.max(page, 0), Math.min(Math.max(size, 1), 100), LocalDate.now()));
+    }
+
     @GetMapping("/unidentified/outstanding-summary")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummaryUnidentified(
@@ -649,6 +667,38 @@ public class ConstructionInvoiceController {
             @Valid @RequestBody InvoiceNotesDTO dto,
             HttpServletRequest request) {
         ConstructionInvoice updated = service.setNotes(id, dto.notes());
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, id, updated.getInvoiceNumber(), null, request));
+
+        return ResponseEntity.ok(service.toResponseDTO(updated, false));
+    }
+
+    /** Escreve (ou apaga, com null) o vencimento manual da fatura, sem tocar no resto. */
+    @PatchMapping("/{id}/due-date")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ConstructionInvoiceResponseDTO> setDueDate(
+            @PathVariable UUID id,
+            @Valid @RequestBody InvoiceDueDateDTO dto,
+            HttpServletRequest request) {
+        ConstructionInvoice updated = service.setDueDateOverride(id, dto.dueDate());
+
+        authContext.currentProfileId().ifPresent(uid ->
+                activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),
+                        EntityType.CONSTRUCTION_INVOICE, id, updated.getInvoiceNumber(), null, request));
+
+        return ResponseEntity.ok(service.toResponseDTO(updated, false));
+    }
+
+    /** Aprova a fatura para pagamento, ou retira a aprovação. Não bloqueia o pagamento. */
+    @PatchMapping("/{id}/payment-approval")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ConstructionInvoiceResponseDTO> setApprovedForPayment(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "true") boolean approved,
+            HttpServletRequest request) {
+        ConstructionInvoice updated = service.setApprovedForPayment(id, approved);
 
         authContext.currentProfileId().ifPresent(uid ->
                 activityLogger.logEdit(uid, authContext.currentUserName().orElse("unknown"),

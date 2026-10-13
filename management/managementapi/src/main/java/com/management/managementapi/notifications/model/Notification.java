@@ -30,6 +30,9 @@ public class Notification extends BaseEntity {
     /** Rubrica de orçamento cujo prazo (`end_date`) está a chegar ao fim. */
     public static final String TYPE_BUDGET_ITEM_DEADLINE = "budget_item_deadline";
 
+    /** Fatura por liquidar cujo vencimento está a chegar. */
+    public static final String TYPE_INVOICE_DUE = "invoice_due";
+
     @Column(name = "recipient_id", nullable = false)
     private UUID recipientId;
 

@@ -24,6 +24,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.DuplicateIn
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
@@ -35,6 +36,8 @@ import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.ConstructionInvoiceDocument;
 import com.management.managementapi.enterprises.model.Enterprise;
+import com.management.managementapi.enterprises.model.InvoiceDueDate;
+import com.management.managementapi.enterprises.model.enums.PaymentStatus;
 import com.management.managementapi.enterprises.model.Supplier;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetItemRepository;
 import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
@@ -81,6 +84,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HexFormat;
@@ -919,15 +923,22 @@ public class ConstructionInvoiceService {
      * registada ao lado é o que o utilizador apontou a 2026-09-17.
      */
     private String displaySupplierName(ConstructionInvoice invoice) {
+        return displaySupplierName(invoice, catalogSupplierOf(invoice));
+    }
+
+    private String displaySupplierName(ConstructionInvoice invoice, Supplier catalogSupplier) {
         if (!isBlank(invoice.getSupplierName())) {
             return invoice.getSupplierName();
         }
+        return catalogSupplier == null ? null : catalogSupplier.getName();
+    }
+
+    /** O fornecedor do catálogo com o NIF desta fatura, ou null. */
+    private Supplier catalogSupplierOf(ConstructionInvoice invoice) {
         if (isBlank(invoice.getSupplierNif())) {
             return null;
         }
-        return supplierRepository.findByNif(invoice.getSupplierNif().trim())
-                .map(Supplier::getName)
-                .orElse(null);
+        return supplierRepository.findByNif(invoice.getSupplierNif().trim()).orElse(null);
     }
 
     // ── leitura ───────────────────────────────────────────────
@@ -1041,6 +1052,89 @@ public class ConstructionInvoiceService {
         List<ConstructionInvoice> outstanding = repository.searchByScope(
                 scope, true, isBlank(q) ? null : q.trim(), Pageable.unpaged()).getContent();
         return summarizeOutstanding(outstanding);
+    }
+
+    /**
+     * As faturas por liquidar de todas as obras e da empresa, por ordem de
+     * urgência: vencidas primeiro, depois as que vencem mais cedo, e as sem
+     * vencimento no fim. A quarentena fica de fora — não se paga o que ainda não
+     * se sabe de quem é.
+     *
+     * Ordena e pagina em memória porque o vencimento é derivado (prazo do
+     * fornecedor ou escrito à mão) e não há coluna por onde a base de dados o
+     * ordene. Só a página pedida passa por {@link #toResponseDTO}, que é a parte
+     * cara (miniaturas assinadas).
+     */
+    @Transactional(readOnly = true)
+    public OutstandingByUrgencyDTO outstandingByUrgency(int page, int size, LocalDate today) {
+        List<ConstructionInvoice> outstanding =
+                repository.findOutstandingExcludingScope(ConstructionInvoice.Scope.UNIDENTIFIED);
+
+        Map<String, Supplier> suppliersByNif = supplierRepository.findAll().stream()
+                .collect(Collectors.toMap(Supplier::getNif, Function.identity(), (first, second) -> first));
+        Map<UUID, LocalDate> dueDates = new HashMap<>();
+        for (ConstructionInvoice invoice : outstanding) {
+            Supplier supplier = isBlank(invoice.getSupplierNif())
+                    ? null
+                    : suppliersByNif.get(invoice.getSupplierNif().trim());
+            dueDates.put(invoice.getId(), InvoiceDueDate.of(invoice, supplier).dueDate());
+        }
+
+        // Desempate pela data da fatura: entre duas sem vencimento, a mais
+        // antiga é a que está à espera há mais tempo.
+        List<ConstructionInvoice> ordered = outstanding.stream()
+                .sorted(Comparator
+                        .comparing((ConstructionInvoice invoice) -> dueDates.get(invoice.getId()),
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ConstructionInvoice::getInvoiceDate,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ConstructionInvoice::getId))
+                .toList();
+
+        List<ConstructionInvoice> overdue = ordered.stream()
+                .filter(invoice -> {
+                    LocalDate dueDate = dueDates.get(invoice.getId());
+                    return dueDate != null && dueDate.isBefore(today);
+                })
+                .toList();
+        long withoutDueDate = ordered.stream()
+                .filter(invoice -> dueDates.get(invoice.getId()) == null)
+                .count();
+
+        int safePage = Math.max(page, 0);
+        int from = Math.min(safePage * size, ordered.size());
+        List<ConstructionInvoice> slice = ordered.subList(from, Math.min(from + size, ordered.size()));
+
+        List<UUID> ids = slice.stream().map(ConstructionInvoice::getId).toList();
+        Map<UUID, List<ConstructionExpense>> allocations = loadAllocations(ids);
+        Map<UUID, List<ConstructionInvoiceDocument>> documents = loadDocuments(ids);
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
+        Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
+
+        Map<UUID, String> enterpriseNames = new LinkedHashMap<>();
+        for (ConstructionInvoice invoice : slice) {
+            if (invoice.getEnterprise() != null) {
+                enterpriseNames.put(invoice.getEnterprise().getId(), invoice.getEnterprise().getName());
+            }
+        }
+
+        return new OutstandingByUrgencyDTO(
+                slice.stream()
+                        .map(invoice -> toResponseDTO(invoice,
+                                allocations.getOrDefault(invoice.getId(), List.of()),
+                                documents.getOrDefault(invoice.getId(), List.of()),
+                                payments.getOrDefault(invoice.getId(), List.of()),
+                                creditNotes.getOrDefault(invoice.getId(), List.of()),
+                                false))
+                        .toList(),
+                enterpriseNames,
+                safePage,
+                size,
+                ordered.size(),
+                summarizeOutstanding(ordered).total(),
+                overdue.size(),
+                summarizeOutstanding(overdue).total(),
+                withoutDueDate);
     }
 
     private OutstandingInvoicesSummaryDTO summarizeOutstanding(List<ConstructionInvoice> invoices) {
@@ -1260,6 +1354,53 @@ public class ConstructionInvoiceService {
     public ConstructionInvoice setNotes(UUID id, String notes) {
         ConstructionInvoice invoice = getById(id);
         invoice.setNotes(trimToNull(notes));
+        return repository.save(invoice);
+    }
+
+    /**
+     * Escreve (ou apaga, com null) o vencimento manual da fatura. Sem ele o
+     * vencimento é o calculado pelo prazo do fornecedor — ver {@link InvoiceDueDate}.
+     */
+    public ConstructionInvoice setDueDateOverride(UUID id, LocalDate dueDate) {
+        ConstructionInvoice invoice = getById(id);
+        if (dueDate != null && invoice.getDocumentType() == ConstructionInvoice.DocumentType.CREDIT_NOTE) {
+            throw new BusinessException(ErrorCode.INVOICE_IS_CREDIT_NOTE);
+        }
+        invoice.setDueDateOverride(dueDate);
+        return repository.save(invoice);
+    }
+
+    /**
+     * Aprova (ou retira a aprovação de) uma fatura para pagamento.
+     *
+     * Só se aprova o que ainda há para pagar: uma nota de crédito não se paga,
+     * e aprovar uma fatura já liquidada não decide nada. Retirar é sempre
+     * possível, mesmo depois de paga — a aprovação não é o que valida o
+     * pagamento, por isso tirá-la não o desfaz.
+     */
+    public ConstructionInvoice setApprovedForPayment(UUID id, boolean approved) {
+        ConstructionInvoice invoice = getById(id);
+
+        if (approved) {
+            if (invoice.getDocumentType() == ConstructionInvoice.DocumentType.CREDIT_NOTE) {
+                throw new BusinessException(ErrorCode.INVOICE_IS_CREDIT_NOTE);
+            }
+            BigDecimal net = paymentService.netAmount(invoice);
+            if (PaymentService.deriveStatus(net, paymentService.paidAmount(id)) == PaymentStatus.PAID) {
+                throw new BusinessException(ErrorCode.INVOICE_ALREADY_PAID);
+            }
+            // Aprovar outra vez não muda quem aprovou primeiro nem quando.
+            if (!invoice.isApprovedForPayment()) {
+                invoice.setApprovedForPayment(true);
+                invoice.setApprovedForPaymentAt(OffsetDateTime.now());
+                authContext.currentProfileId().ifPresent(invoice::setApprovedForPaymentBy);
+            }
+        } else {
+            invoice.setApprovedForPayment(false);
+            invoice.setApprovedForPaymentAt(null);
+            invoice.setApprovedForPaymentBy(null);
+        }
+
         return repository.save(invoice);
     }
 
@@ -1652,6 +1793,9 @@ public class ConstructionInvoiceService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         String paymentStatus = PaymentService.deriveStatus(netAmount, paidAmount).name();
 
+        Supplier catalogSupplier = catalogSupplierOf(invoice);
+        InvoiceDueDate due = InvoiceDueDate.of(invoice, catalogSupplier);
+
         return new ConstructionInvoiceResponseDTO(
                 invoice.getId(),
                 invoice.getEnterpriseId(),
@@ -1662,7 +1806,7 @@ public class ConstructionInvoiceService {
                 invoice.getDocumentStatus().name(),
                 invoice.getDescription(),
 
-                displaySupplierName(invoice),
+                displaySupplierName(invoice, catalogSupplier),
                 invoice.getSupplierNif(),
                 invoice.getInvoiceNumber(),
                 invoice.getInvoiceAtcud(),
@@ -1671,6 +1815,9 @@ public class ConstructionInvoiceService {
                 invoice.getTaxableAmount(),
                 invoice.getTaxAmount(),
                 invoice.getNotes(),
+                due.dueDate(),
+                invoice.getDueDateOverride(),
+                due.basis().name(),
                 invoice.getPossibleEnterprises(),
                 invoice.getAskWhom(),
                 invoice.needsReview(),
@@ -1712,6 +1859,11 @@ public class ConstructionInvoiceService {
                 resolveProfileName(invoice.getSentToAccountantBy()),
                 resolveProfileRole(invoice.getSentToAccountantBy()),
                 invoice.getSentToAccountantAt(),
+
+                invoice.isApprovedForPayment(),
+                invoice.getApprovedForPaymentBy(),
+                resolveProfileName(invoice.getApprovedForPaymentBy()),
+                invoice.getApprovedForPaymentAt(),
 
                 invoice.getCreatedBy(),
                 resolveProfileName(invoice.getCreatedBy()),

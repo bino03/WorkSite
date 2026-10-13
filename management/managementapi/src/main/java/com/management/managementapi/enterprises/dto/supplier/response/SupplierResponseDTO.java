@@ -18,5 +18,7 @@ public record SupplierResponseDTO(
         String nif,
         String name,
         String notes,
+        /** Dias a contar da data da fatura; null é "sem prazo", 0 é pronto pagamento. */
+        Integer paymentTermDays,
         long invoiceCount
 ) {}

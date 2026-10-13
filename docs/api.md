@@ -395,6 +395,7 @@ de entrada.
 | DELETE | `/construction-invoices/{id}/documents/{documentId}` | `ADMIN` — remove **um** documento; devolve `204` |
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro |
+| GET | `/construction-invoices/outstanding?page=&size=` | `ADMIN` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
@@ -413,6 +414,8 @@ de entrada.
 | POST | `/construction-invoices/batch-allocate` | `ADMIN` — N faturas → 1 rubrica, melhor esforço (resultado por fatura) |
 | DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz **todas** as linhas, devolve à caixa de entrada |
 | PATCH | `/construction-invoices/{id}/notes` | `ADMIN` ou `EMPLOYEE` — corpo `{ "notes": "…" }` (máx. 2000; vazio apaga); só mexe na nota, ao contrário do `PUT` |
+| PATCH | `/construction-invoices/{id}/due-date` | `ADMIN` — corpo `{ "dueDate": "2026-11-30" }`; escreve o **vencimento manual**, que prevalece sobre o calculado. `null` apaga-o e a fatura volta ao prazo do fornecedor. Numa nota de crédito → `INVOICE_027`. Ver [[#Vencimento da fatura]] |
+| PATCH | `/construction-invoices/{id}/payment-approval?approved=` | `ADMIN` — aprova a fatura para pagamento (`true`, por omissão) ou retira a aprovação (`false`). Ver [[#Aprovação para pagamento]] |
 | PATCH | `/construction-invoices/{id}/accountant?sent=` | `ADMIN` — marca/desmarca enviada ao contabilista |
 | DELETE | `/construction-invoices/{id}` | `ADMIN` — apaga fatura, ficheiro, miniatura e lançamento |
 | POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
@@ -1046,6 +1049,77 @@ a criação é sempre à mão. Tudo `ADMIN`. Ver [[database.md]] → `invoice_in
 createdBy, createdByName, createdAt, updatedAt, invoices: [{id, invoiceNumber, supplierName,
 scope, enterpriseId}] }`.
 
+### A pagar: por liquidar em todas as obras
+
+`GET /construction-invoices/outstanding` é a única lista de faturas que atravessa obras. Devolve
+`OutstandingByUrgencyDTO`, não um `Page`:
+
+| Campo | O que é |
+|---|---|
+| `invoices` | a página pedida (`ConstructionInvoiceResponseDTO`), **já ordenada** |
+| `enterpriseNames` | `{ enterpriseId: nome }` das obras que aparecem na página; uma despesa da empresa tem `enterpriseId` nulo e não entra |
+| `page`, `size`, `totalElements` | paginação (`size` 1–100, por omissão 20) |
+| `total` | Σ (líquido − pago) de **toda** a lista |
+| `overdueCount`, `overdueTotal` | as que já passaram o vencimento (vencer hoje ainda não é estar vencida) |
+| `withoutDueDateCount` | as que não têm vencimento |
+
+- **O que entra**: a mesma definição de "por liquidar" do filtro `outstanding=true` (pago + notas de
+  crédito < total, ou ainda sem total), em `PROJECT` e `COMPANY`. **Ficam de fora** a quarentena
+  (`UNIDENTIFIED` — não se paga o que ainda não se sabe de quem é), as notas de crédito, as obras
+  `is_test` e as eliminadas. Obras concluídas ou arquivadas **entram**: uma dívida não desaparece por
+  a obra ter acabado.
+- **A ordem** é fixa e não há `sort`: vencimento ascendente (logo, vencidas primeiro), sem vencimento
+  no fim; desempate pela data da fatura, a mais antiga primeiro.
+- **Ordena e pagina em memória.** O vencimento é derivado (ver [[#Vencimento da fatura]]) e não há
+  coluna por onde a base de dados o ordene. Carrega todas as faturas por liquidar e o catálogo de
+  fornecedores de uma vez; só a página pedida passa pelo `toResponseDTO`. Serve para dezenas ou
+  poucas centenas de faturas — se um dia forem milhares, é aqui que se sente.
+- **Pagar várias a partir daqui** continua a obedecer a `INVOICE_PAYMENT_CROSS_ENTERPRISE`: um
+  pagamento agregado é de uma obra só. O cliente desativa o botão quando a seleção mistura obras.
+
+### Vencimento da fatura
+
+Três campos em `ConstructionInvoiceResponseDTO`, em todas as listas e no detalhe:
+
+| Campo | O que é |
+|---|---|
+| `dueDate` | o vencimento que vale: o manual se houver, senão `invoiceDate + paymentTermDays` do fornecedor com o mesmo NIF. **Derivado, nunca coluna.** `null` = sem vencimento |
+| `dueDateOverride` | o vencimento escrito à mão (`construction_invoice.due_date_override`), ou `null`. Edita-se por `PATCH /{id}/due-date`, **não** pelo `PUT` — para corrigir outro campo nunca o apagar por omissão |
+| `dueDateBasis` | de onde vem o `dueDate`, ou porque falta (tabela abaixo) |
+
+| `dueDateBasis` | `dueDate` | Quando |
+|---|---|---|
+| `MANUAL` | preenchido | a fatura tem vencimento manual |
+| `SUPPLIER_TERM` | preenchido | data da fatura + prazo do fornecedor |
+| `NOT_APPLICABLE` | `null` | nota de crédito — não se paga, não vence |
+| `NO_SUPPLIER_NIF` | `null` | a fatura não tem NIF (todas as importadas do Excel) |
+| `SUPPLIER_NOT_IN_CATALOG` | `null` | o NIF não está no catálogo |
+| `NO_PAYMENT_TERM` | `null` | o fornecedor existe mas não tem prazo |
+| `NO_INVOICE_DATE` | `null` | há prazo, mas a fatura não tem data de onde o contar |
+
+Não há prazo global por omissão: sem prazo no fornecedor e sem vencimento manual, a fatura não
+vence. O vencimento não depende do estado de pagamento — uma fatura paga continua a tê-lo; é o
+cliente que deixa de a mostrar como "vencida". A regra vive em `InvoiceDueDate.of`.
+
+### Aprovação para pagamento
+
+O passo entre "lançada" e "paga" (`V46`). Quatro campos em `ConstructionInvoiceResponseDTO`:
+`approvedForPayment`, `approvedForPaymentBy`, `approvedForPaymentByName`, `approvedForPaymentAt`.
+
+- **Não bloqueia o pagamento.** `POST …/payments` aceita uma fatura não aprovada exatamente como
+  antes; o aviso é só do cliente (confirmação do "Marcar como pago", `MarkPaidDrawer`,
+  `AggregatePaymentDrawer`). É o que mantém válidos, sem aprovação retroativa, as faturas já pagas
+  e os pagamentos do import do Excel, do email e do extrato — `PaymentService` não sabe que a
+  aprovação existe.
+- **Aprovar** recusa uma nota de crédito (`INVOICE_027`) e uma fatura já liquidada (`INVOICE_019`);
+  uma parcialmente paga aprova-se. Aprovar outra vez não muda quem aprovou primeiro nem quando.
+- **Retirar** é sempre possível, mesmo depois de paga, e limpa quem e quando. Não desfaz pagamento
+  nenhum.
+- Aprova qualquer `ADMIN`. Quando existir o role "contabilidade" também há de poder — é só o
+  `@PreAuthorize` deste endpoint.
+- Não há endpoint de lote: o "Aprovar N" da página de obra chama este uma vez por fatura.
+- Editar ou transferir a fatura depois de aprovada **não** retira a aprovação.
+
 ## Fornecedores (`SupplierController`, `/suppliers`)
 
 Catálogo **NIF → nome da empresa**. Existe porque o QR da AT identifica o emitente só pelo NIF
@@ -1061,8 +1135,8 @@ carregar.
 |---|---|---|
 | GET | `/suppliers?q=` | `ADMIN` ou `EMPLOYEE` — catálogo por ordem alfabética, com `invoiceCount` |
 | GET | `/suppliers/unknown-nifs` | `ADMIN` ou `EMPLOYEE` — NIFs vistos nas faturas ainda sem empresa, do mais frequente para o menos |
-| POST | `/suppliers` | `ADMIN` — dá nome a um NIF; devolve `201` |
-| PUT | `/suppliers/{id}` | `ADMIN` — renomeia |
+| POST | `/suppliers` | `ADMIN` — dá nome a um NIF (e, se vier, o prazo); devolve `201` |
+| PUT | `/suppliers/{id}` | `ADMIN` — renomeia e/ou muda o prazo. **Substitui tudo**: `notes` e `paymentTermDays` omitidos ficam a `null` |
 | DELETE | `/suppliers/{id}` | `ADMIN` — tira do catálogo; devolve `204` |
 
 **Gravar propaga-se às faturas.** `POST` e `PUT` escrevem o nome nas faturas desse NIF que
@@ -1074,6 +1148,12 @@ fatura nova consulta o catálogo e nasce já com o nome (`applyKnownSupplierName
 `DELETE` **não** limpa o nome das faturas: o nome já lá está escrito e é um dado do documento,
 não uma referência viva à tabela. Apagar só significa "deixa de preencher sozinho a partir de
 agora".
+
+**Prazo de pagamento** (`paymentTermDays`, desde a `V45`): dias a contar da data da fatura, `0`–`365`.
+`null` é "sem prazo" e `0` é pronto pagamento — não são o mesmo. É dele que sai o vencimento de
+cada fatura desse NIF (ver [[#Vencimento da fatura]]); mudar o prazo muda o vencimento de **todas**
+as faturas do fornecedor, antigas incluídas, porque o vencimento nunca é gravado. Apagar o
+fornecedor, ou mudar-lhe o NIF, deixa essas faturas sem vencimento.
 
 `unknown-nifs` traz `suggestedName` — um nome que alguém já escreveu à mão nalguma fatura desse
 NIF, se existir — para o ecrã o mostrar pré-preenchido em vez de o pedir outra vez.
@@ -1365,6 +1445,7 @@ confirmaria a existência a quem não devia sequer saber disso.
 | `task_assigned` | `POST /tasks` e `PUT /tasks/{id}` | Os atribuídos, **menos** os que já estavam atribuídos antes e **menos** quem fez a atribuição |
 | `invoice_pending` | `POST /construction-invoices` (upload) | **Só quem carregou** |
 | `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` desbloqueados**, uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
+| `invoice_due` | Job agendado (`InvoiceDueNotifierConfig`, 07:00 diário **e no arranque**) — faturas por liquidar (as da página "A pagar": obras e empresa, sem quarentena, sem notas de crédito, sem obras `is_test` nem eliminadas) cujo **vencimento** cai em `[hoje, hoje + N]`, `N` = `app.notifications.invoice-due.days-ahead` (7). Para todos os `ADMIN` desbloqueados, **uma vez por fatura e destinatário**. Sem vencimento não avisa; já vencida também não (a lista mostra-as à frente). Avisa de todas, aprovadas ou não — o texto termina em "aprovada para pagamento" ou "por aprovar". Link: `/backoffice/invoices/outstanding`. Mudar o prazo do fornecedor ou o vencimento manual de uma fatura já avisada **não reavisa** |
 
 > O `budget_item_deadline` corre também no arranque porque a app não está ligada 24h por dia —
 > um cron às 7h numa app que só arranca às 9h nunca dispararia. O link é a página do orçamento da

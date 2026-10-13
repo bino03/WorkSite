@@ -35,6 +35,10 @@ public class Supplier extends BaseEntity {
     @Column(name = "notes")
     private String notes;
 
+    /** Dias a contar da data da fatura. Null é "sem prazo"; 0 é pronto pagamento. */
+    @Column(name = "payment_term_days")
+    private Integer paymentTermDays;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -46,6 +50,9 @@ public class Supplier extends BaseEntity {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public Integer getPaymentTermDays() { return paymentTermDays; }
+    public void setPaymentTermDays(Integer paymentTermDays) { this.paymentTermDays = paymentTermDays; }
 
     public UUID getCreatedBy() { return createdBy; }
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties, FC } from "react";
-import { Button, Drawer, Empty, Input, Space, Spin, Tabs } from "antd";
+import { Button, Drawer, Empty, Input, InputNumber, Space, Spin, Tabs } from "antd";
 import { DeleteOutlined, SearchOutlined } from "@ant-design/icons";
 
 import {
@@ -54,6 +54,8 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
   /** Nome em edição de cada fornecedor do catálogo. */
   const [editedNames, setEditedNames] = useState<Record<string, string>>({});
+  /** Prazo de pagamento em edição de cada fornecedor; null é "sem prazo". */
+  const [editedTerms, setEditedTerms] = useState<Record<string, number | null>>({});
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<TabKey>("pending");
 
@@ -72,6 +74,9 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
         Object.fromEntries(pending.map((row) => [row.nif, row.suggestedName ?? ""]))
       );
       setEditedNames(Object.fromEntries(known.map((supplier) => [supplier.id, supplier.name])));
+      setEditedTerms(
+        Object.fromEntries(known.map((supplier) => [supplier.id, supplier.paymentTermDays]))
+      );
       return pending;
     } catch (error) {
       ErrorHandler.handle(error);
@@ -119,13 +124,21 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
     }
   };
 
-  const handleRename = async (supplier: Supplier) => {
+  const handleSave = async (supplier: Supplier) => {
     const name = (editedNames[supplier.id] ?? "").trim();
-    if (!name || name === supplier.name) return;
+    const paymentTermDays = termOf(supplier);
+    if (!name || (name === supplier.name && paymentTermDays === supplier.paymentTermDays)) return;
 
     setSavingKey(supplier.id);
     try {
-      const result = await updateSupplier(supplier.id, { nif: supplier.nif, name });
+      // O PUT substitui tudo: as notas e o prazo vão sempre, senão gravar o
+      // nome apagava-os.
+      const result = await updateSupplier(supplier.id, {
+        nif: supplier.nif,
+        name,
+        notes: supplier.notes,
+        paymentTermDays,
+      });
       await afterSave(result.invoicesUpdated);
     } catch (error) {
       ErrorHandler.handle(error);
@@ -150,6 +163,10 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
       },
     });
   };
+
+  /** O prazo em edição; `undefined` no estado é "ainda não mexido", não "sem prazo". */
+  const termOf = (supplier: Supplier): number | null =>
+    supplier.id in editedTerms ? editedTerms[supplier.id] : supplier.paymentTermDays;
 
   const term = query.trim().toLowerCase();
   const visibleSuppliers = term
@@ -245,7 +262,10 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
         <ul style={LIST}>
           {visibleSuppliers.map((supplier, index) => {
             const edited = editedNames[supplier.id] ?? supplier.name;
-            const dirty = edited.trim() !== supplier.name && edited.trim().length > 0;
+            const editedTerm = termOf(supplier);
+            const dirty =
+              edited.trim().length > 0 &&
+              (edited.trim() !== supplier.name || editedTerm !== supplier.paymentTermDays);
 
             return (
               <li key={supplier.id} style={rowStyle(index)}>
@@ -257,7 +277,25 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
                     onChange={(e) =>
                       setEditedNames((prev) => ({ ...prev, [supplier.id]: e.target.value }))
                     }
-                    onPressEnter={() => handleRename(supplier)}
+                    onPressEnter={() => handleSave(supplier)}
+                  />
+                  {/* Vazio é "sem prazo" e 0 é pronto pagamento — não são o mesmo,
+                      e por isso o campo não tem valor por omissão. */}
+                  <InputNumber
+                    aria-label={`Prazo de pagamento de ${supplier.name}, em dias`}
+                    placeholder="sem prazo"
+                    disabled={!editable}
+                    min={0}
+                    max={365}
+                    precision={0}
+                    controls={false}
+                    suffix="dias"
+                    style={{ width: 150, flexShrink: 0 }}
+                    value={editedTerm}
+                    onChange={(value) =>
+                      setEditedTerms((prev) => ({ ...prev, [supplier.id]: value }))
+                    }
+                    onPressEnter={() => handleSave(supplier)}
                   />
                   {editable && (
                     <>
@@ -267,7 +305,7 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
                         <Button
                           type="primary"
                           loading={savingKey === supplier.id}
-                          onClick={() => handleRename(supplier)}
+                          onClick={() => handleSave(supplier)}
                         >
                           Guardar
                         </Button>

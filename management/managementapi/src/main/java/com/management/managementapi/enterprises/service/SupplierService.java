@@ -94,6 +94,7 @@ public class SupplierService {
         supplier.setNif(nif);
         supplier.setName(dto.name().trim());
         supplier.setNotes(trimToNull(dto.notes()));
+        supplier.setPaymentTermDays(dto.paymentTermDays());
         authContext.currentProfileId().ifPresent(supplier::setCreatedBy);
 
         return saveAndApplyName(supplier);
@@ -115,6 +116,7 @@ public class SupplierService {
         supplier.setNif(nif);
         supplier.setName(dto.name().trim());
         supplier.setNotes(trimToNull(dto.notes()));
+        supplier.setPaymentTermDays(dto.paymentTermDays());
 
         return saveAndApplyName(supplier);
     }

@@ -171,6 +171,16 @@ export interface InvoiceDocument {
   uploadedAt: string;
 }
 
+/** Espelha `InvoiceDueDate.Basis` do backend. */
+export type InvoiceDueDateBasis =
+  | "MANUAL"
+  | "SUPPLIER_TERM"
+  | "NOT_APPLICABLE"
+  | "NO_SUPPLIER_NIF"
+  | "SUPPLIER_NOT_IN_CATALOG"
+  | "NO_PAYMENT_TERM"
+  | "NO_INVOICE_DATE";
+
 export interface ConstructionInvoice {
   id: string;
   /** Nulo quando `scope` não é `PROJECT` — despesa da empresa ou quarentena. */
@@ -198,6 +208,14 @@ export interface ConstructionInvoice {
   taxableAmount: number | null;
   taxAmount: number | null;
   notes: string | null;
+
+  // ── vencimento — derivado, nunca coluna ──
+  /** O vencimento manual se houver, senão data da fatura + prazo do fornecedor. Null = sem prazo. */
+  dueDate: string | null;
+  /** O vencimento escrito à mão nesta fatura; prevalece sobre o calculado. */
+  dueDateOverride: string | null;
+  /** De onde vem o `dueDate`, ou porque falta. */
+  dueDateBasis: InvoiceDueDateBasis;
 
   /** Falta a data ou o total; não dá para associar enquanto assim estiver. */
   needsReview: boolean;
@@ -261,6 +279,12 @@ export interface ConstructionInvoice {
   sentToAccountantByName: string | null;
   sentToAccountantByRole: "ADMIN" | "EMPLOYEE" | null;
   sentToAccountantAt: string | null;
+
+  // ── aprovação para pagamento — pagar sem ela avisa, não bloqueia ──
+  approvedForPayment: boolean;
+  approvedForPaymentBy: string | null;
+  approvedForPaymentByName: string | null;
+  approvedForPaymentAt: string | null;
 
   createdBy: string | null;
   createdByName: string | null;
@@ -680,6 +704,24 @@ export interface PendingInvoicesSummary {
  * sobre todas as faturas do filtro, não só as da página. As sem total contam
  * em `count` e em `withoutTotalCount`, mas valem 0 em `total`.
  */
+/**
+ * `GET /construction-invoices/outstanding` — as faturas por liquidar de todas as
+ * obras e da empresa, já pela ordem de urgência. Os números são da lista
+ * inteira, não da página.
+ */
+export interface OutstandingByUrgency {
+  invoices: ConstructionInvoice[];
+  /** Nome de cada obra da página, por id. As despesas da empresa não têm obra. */
+  enterpriseNames: Record<string, string>;
+  page: number;
+  size: number;
+  totalElements: number;
+  total: number;
+  overdueCount: number;
+  overdueTotal: number;
+  withoutDueDateCount: number;
+}
+
 export interface OutstandingInvoicesSummary {
   count: number;
   total: number;

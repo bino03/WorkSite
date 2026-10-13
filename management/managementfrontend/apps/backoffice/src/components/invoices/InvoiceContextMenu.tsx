@@ -4,6 +4,7 @@
 import React, { useEffect, useRef } from "react";
 import {
   CheckCircleOutlined,
+  CloseCircleOutlined,
   CommentOutlined,
   EditOutlined,
   LinkOutlined,
@@ -11,8 +12,10 @@ import {
   SwapOutlined,
   DisconnectOutlined,
   DollarOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 
+import { canApproveForPayment } from "@/hooks/useInvoicePaymentApproval";
 import type { ConstructionInvoice } from "@/types/invoice";
 
 interface Props {
@@ -28,6 +31,8 @@ interface Props {
   onDeallocate: (invoice: ConstructionInvoice) => void;
   onTransfer?: (invoice: ConstructionInvoice) => void;
   onSendToAccountant: (invoice: ConstructionInvoice) => void;
+  /** Aprova para pagamento ou retira a aprovação, conforme o estado da fatura. */
+  onTogglePaymentApproval?: (invoice: ConstructionInvoice) => void;
   onRegisterPayment?: (invoice: ConstructionInvoice) => void;
   onMarkPaid?: (invoice: ConstructionInvoice) => void;
   onAddNote?: (invoice: ConstructionInvoice) => void;
@@ -52,6 +57,7 @@ export const InvoiceContextMenu: React.FC<Props> = ({
   onDeallocate,
   onTransfer,
   onSendToAccountant,
+  onTogglePaymentApproval,
   onRegisterPayment,
   onMarkPaid,
   onAddNote,
@@ -124,6 +130,21 @@ export const InvoiceContextMenu: React.FC<Props> = ({
       label: invoice.sentToAccountant ? "Desmarcar envio" : "Marcar como enviada",
       onClick: run(onSendToAccountant),
     });
+  }
+  if (isAdmin && onTogglePaymentApproval) {
+    if (invoice.approvedForPayment) {
+      items.push({
+        icon: <CloseCircleOutlined />,
+        label: "Retirar aprovação",
+        onClick: run(onTogglePaymentApproval),
+      });
+    } else if (canApproveForPayment(invoice)) {
+      items.push({
+        icon: <SafetyCertificateOutlined />,
+        label: "Aprovar para pagamento",
+        onClick: run(onTogglePaymentApproval),
+      });
+    }
   }
   if (isAdmin && onRegisterPayment && payable) {
     items.push({

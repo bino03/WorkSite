@@ -52,6 +52,23 @@ public record ConstructionInvoiceResponseDTO(
         BigDecimal taxAmount,
         String notes,
 
+        // ── vencimento ──
+        /**
+         * Quando a fatura vence: o vencimento manual se houver, senão a data da
+         * fatura + o prazo do fornecedor. Derivado, nunca coluna. Null quando
+         * não há de onde o tirar — o porquê está em {@code dueDateBasis}.
+         */
+        LocalDate dueDate,
+        /** O vencimento escrito à mão nesta fatura, ou null. É o que o formulário edita. */
+        LocalDate dueDateOverride,
+        /**
+         * De onde vem o {@code dueDate}, ou porque falta: {@code MANUAL},
+         * {@code SUPPLIER_TERM}, {@code NOT_APPLICABLE} (nota de crédito),
+         * {@code NO_SUPPLIER_NIF}, {@code SUPPLIER_NOT_IN_CATALOG},
+         * {@code NO_PAYMENT_TERM} ou {@code NO_INVOICE_DATE}.
+         */
+        String dueDateBasis,
+
         // ── quarentena (só em UNIDENTIFIED) ──
         String possibleEnterprises,
         String askWhom,
@@ -135,6 +152,13 @@ public record ConstructionInvoiceResponseDTO(
         /** `ADMIN` ou `EMPLOYEE` — o cliente traduz o rótulo. */
         String sentToAccountantByRole,
         OffsetDateTime sentToAccountantAt,
+
+        // ── aprovação para pagamento ──
+        /** O passo antes de pagar. Pagar sem ele é permitido — o cliente só avisa. */
+        boolean approvedForPayment,
+        UUID approvedForPaymentBy,
+        String approvedForPaymentByName,
+        OffsetDateTime approvedForPaymentAt,
 
         UUID createdBy,
         String createdByName,

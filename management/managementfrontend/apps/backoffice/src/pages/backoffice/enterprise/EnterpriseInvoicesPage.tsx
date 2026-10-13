@@ -34,6 +34,7 @@ import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
 import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
 import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
+import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBadge";
 import { InvoiceFiltersModal } from "@/components/invoices/InvoiceFiltersModal";
@@ -243,6 +244,7 @@ const EnterpriseInvoicesPage: FC = () => {
   };
 
   const markPaid = useQuickMarkPaid(reload);
+  const paymentApproval = useInvoicePaymentApproval(reload);
 
   const handleView = (invoice: ConstructionInvoice) => setDetailId(invoice.id);
 
@@ -446,6 +448,7 @@ const EnterpriseInvoicesPage: FC = () => {
     (i) => i.documentType !== "CREDIT_NOTE" && i.netAmount != null && i.paidAmount < i.netAmount
   );
   const sendableSelected = selectedInvoices.filter((i) => !i.sentToAccountant);
+  const approvableSelected = selectedInvoices.filter(canApproveForPayment);
 
   return (
     <div>
@@ -591,6 +594,11 @@ const EnterpriseInvoicesPage: FC = () => {
             Associar {selectedInvoices.length} ao lote…
           </Button>
         )}
+        {approvableSelected.length > 0 && isAdmin() && (
+          <Button onClick={() => paymentApproval.approveMany(approvableSelected)}>
+            Aprovar {approvableSelected.length} para pagamento
+          </Button>
+        )}
         {payableSelected.length > 0 && isAdmin() && (
           <Button onClick={() => setAggregatePayOpen(true)}>
             Registar pagamento de {payableSelected.length}
@@ -652,6 +660,7 @@ const EnterpriseInvoicesPage: FC = () => {
         onDelete={handleDelete}
         onTransfer={setTransferInvoice}
         onRegisterPayment={setPayInvoice}
+        onTogglePaymentApproval={paymentApproval.toggle}
         onMarkPaid={markPaid}
         onAddNote={setNoteInvoice}
         sortField={sort?.field ?? null}

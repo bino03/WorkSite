@@ -3538,6 +3538,8 @@
       "shortfall": "{{amount}} short of the total.",
       "surplus": "The movement is {{amount}} over the total — adjust the amount.",
       "differentSupplierWarning": "The selected invoices are from different suppliers.",
+      "notApprovedWarning": "This invoice has not been approved for payment yet. You can still pay it.",
+      "notApprovedCountWarning": "{{count}} of the selected invoices have not been approved for payment yet. You can still pay them.",
       "registeredBy": "Registered by {{name}} on {{date}}",
       "alsoCovers": "together with {{list}}",
       "success": "Payment registered.",

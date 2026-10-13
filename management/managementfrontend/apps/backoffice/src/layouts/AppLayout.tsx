@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import {
   BankOutlined,
+  ClockCircleOutlined,
   QuestionCircleOutlined,
   WarningOutlined,
   BuildOutlined,
@@ -35,11 +36,17 @@ export default function AppLayout() {
   useEffect(() => rememberSpace("works"), []);
 
   /**
-   * "Faturas" — o único dropdown da nav. Junta as três listas de faturas que não
-   * pertencem a obra nenhuma. Só o ADMIN as vê; o gate real de cada rota é o
+   * "Faturas" — o único dropdown da nav. Junta as listas de faturas que não são
+   * de uma obra só — as sem obra e a "A pagar", que atravessa todas. Só o ADMIN as vê; o gate real de cada rota é o
    * `@PreAuthorize` do backend — esconder aqui só evita que um EMPLOYEE bata num 403.
    */
   const invoicesMenuItems: MenuProps["items"] = [
+    {
+      key: `${base}/invoices/outstanding`,
+      icon: <ClockCircleOutlined />,
+      label: "A pagar",
+      onClick: () => navigate(`${base}/invoices/outstanding`),
+    },
     {
       key: `${base}/invoices/unidentified`,
       icon: <QuestionCircleOutlined />,
@@ -62,6 +69,7 @@ export default function AppLayout() {
 
   /** O trigger "Faturas" acende quando a rota atual é uma das que ele contém. */
   const invoicesActive = [
+    `${base}/invoices/outstanding`,
     `${base}/invoices/unidentified`,
     `${base}/invoices/company`,
     `${base}/invoices/incidents`,

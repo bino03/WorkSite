@@ -13,6 +13,7 @@ import { markInvoicePaid } from "@/services/paymentService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { formatCurrency } from "@/utils/formatters";
+import { isUnapprovedPayment } from "@/hooks/useInvoicePaymentApproval";
 import type { ConstructionInvoice, PaymentMethod } from "@/types/invoice";
 
 const { Text } = Typography;
@@ -132,6 +133,17 @@ export const MarkPaidDrawer: FC<Props> = ({ open, invoice, onClose, onPaid }) =>
             type="warning"
             showIcon
             message={t("invoices.formErrors.totalRequired", "Preencha o total da fatura antes de a marcar como paga.")}
+          />
+        )}
+
+        {invoice && isUnapprovedPayment(invoice) && (
+          <Alert
+            type="warning"
+            showIcon
+            message={t(
+              "invoices.payment.notApprovedWarning",
+              "Esta fatura ainda não foi aprovada para pagamento. Pode pagá-la na mesma."
+            )}
           />
         )}
 

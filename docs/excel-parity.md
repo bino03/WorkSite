@@ -100,6 +100,23 @@ não bater certo com o Excel. O endpoint é `POST /construction-invoices/{id}/ex
 soma das linhas tem de esgotar o total da fatura — ver [[api.md]] → "Classificar faturas em
 rubricas".
 
+### 3.4 Campos que só existem na app
+
+Colunas de `supplier`, `construction_invoice` ou `payment` que **não têm coluna no Excel, de propósito**.
+Não entram na importação nem na exportação: uma obra que vá ao Excel e volte perde-os, e isso é
+aceite — são ferramentas de trabalho da app, não dados do documento. Um campo novo destas tabelas que
+não tenha equivalente regista-se aqui, para a revisão que o §11 pede ter onde olhar.
+
+| Campo | Desde | O que é | Porque não vai para o Excel |
+|---|---|---|---|
+| `supplier.payment_term_days` | `V45` | prazo de pagamento do fornecedor, em dias | o Excel não tem catálogo de fornecedores com atributos (as colunas `Fornecedor`/`NIF` são texto por linha) |
+| `construction_invoice.due_date_override` | `V45` | vencimento escrito à mão numa fatura | o Excel não tem coluna de vencimento; decidido a 2026-10-13 que não ganha |
+| `construction_invoice.approved_for_payment` (+ `_by`, `_at`) | `V46` | a fatura foi aprovada para pagamento, por quem e quando | é um passo de trabalho da app; no Excel paga-se sem ele. Uma fatura que venha do Excel entra por aprovar, e isso não a impede de ser paga |
+
+O vencimento que a app mostra (`dueDate`) é derivado dos dois e não é coluna em lado nenhum. As faturas
+importadas do Excel chegam sem NIF (§3.1) e por isso **sem vencimento** até alguém lhes escrever um à
+mão ou lhes preencher o NIF.
+
 ## 4. Pagamento
 
 | Excel `Metodo Pagamento` | `payment.method` |

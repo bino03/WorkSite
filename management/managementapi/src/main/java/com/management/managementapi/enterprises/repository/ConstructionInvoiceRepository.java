@@ -181,6 +181,35 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                             @Param("q") String q,
                                             Pageable pageable);
 
+    /**
+     * Tudo o que está por liquidar e se sabe de quem é: as faturas das obras e
+     * as despesas da empresa, de uma vez. É a lista "o que pagar primeiro".
+     *
+     * A mesma definição de "por liquidar" do filtro {@code outstanding = true}
+     * (pago + notas de crédito &lt; total, ou ainda sem total; notas de crédito
+     * de fora). Ficam também de fora as obras de teste e as eliminadas.
+     *
+     * Sem ordem nem paginação: o vencimento é derivado (ver
+     * {@code InvoiceDueDate}) e não há coluna por onde ordenar — quem chama
+     * ordena em memória. São dezenas de faturas, não milhares.
+     *
+     * O âmbito excluído vai como parâmetro e não como literal pelo mesmo motivo
+     * do {@code rowKind} noutras queries: a coluna é um enum nomeado do Postgres.
+     */
+    @Query("""
+            select i from ConstructionInvoice i
+            left join fetch i.enterprise e
+            where i.relatedInvoiceId is null
+              and i.scope <> :excludedScope
+              and (e is null or ((e.isTest is null or e.isTest = false)
+                   and e.status <> com.management.managementapi.enterprises.model.enums.EnterPriseStatus.deleted))
+              and (i.totalAmount is null
+                   or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                      + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                      < i.totalAmount)
+            """)
+    List<ConstructionInvoice> findOutstandingExcludingScope(@Param("excludedScope") ConstructionInvoice.Scope excludedScope);
+
     /** Quantas faturas do projeto ainda estão por associar — alimenta o contador no orçamento. Com lote, só as desse lote. */
     @Query("""
             select count(i) from ConstructionInvoice i

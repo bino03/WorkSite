@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { FC } from "react";
 import { InvoiceContextMenu } from "@/components/invoices/InvoiceContextMenu";
+import { InvoiceDueDateCell } from "@/components/invoices/InvoiceDueDate";
 import { Empty, Pagination, Spin, Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { FileTextOutlined } from "@ant-design/icons";
@@ -66,6 +67,7 @@ interface Props {
    */
   onTransfer?: (invoice: ConstructionInvoice) => void;
   /** Só no menu de contexto (botão direito): sem estas, a entrada não aparece. */
+  onTogglePaymentApproval?: (invoice: ConstructionInvoice) => void;
   onRegisterPayment?: (invoice: ConstructionInvoice) => void;
   onMarkPaid?: (invoice: ConstructionInvoice) => void;
   onAddNote?: (invoice: ConstructionInvoice) => void;
@@ -75,6 +77,11 @@ interface Props {
    * quarentena. Por omissão, obra — é a lista que já existia.
    */
   scope?: InvoiceScope;
+  /**
+   * Nome das obras por id. Com isto a lista ganha a coluna "Obra" — é a
+   * página "A pagar", a única que mistura obras.
+   */
+  enterpriseNames?: Record<string, string>;
 }
 
 /**
@@ -99,6 +106,7 @@ export const InvoicesList: FC<Props> = ({
   onSendToAccountant,
   onDelete,
   onTransfer,
+  onTogglePaymentApproval,
   onRegisterPayment,
   onMarkPaid,
   onAddNote,
@@ -106,6 +114,7 @@ export const InvoicesList: FC<Props> = ({
   sortOrder,
   onSortChange,
   scope = "PROJECT",
+  enterpriseNames,
 }) => {
   const { isAdmin } = useAuth();
   const { t } = useTranslation();
@@ -213,6 +222,21 @@ export const InvoicesList: FC<Props> = ({
         </span>
       ),
     },
+    ...(enterpriseNames
+      ? ([
+          {
+            title: "Obra",
+            dataIndex: "enterpriseId",
+            width: 160,
+            render: (enterpriseId: string | null) =>
+              enterpriseId ? (
+                (enterpriseNames[enterpriseId] ?? "—")
+              ) : (
+                <span style={{ opacity: 0.6 }}>Empresa</span>
+              ),
+          },
+        ] as ColumnsType<ConstructionInvoice>)
+      : []),
     {
       title: "Data",
       dataIndex: "invoiceDate",
@@ -252,6 +276,12 @@ export const InvoicesList: FC<Props> = ({
       ),
     },
     {
+      title: "Vencimento",
+      dataIndex: "dueDate",
+      width: 132,
+      render: (_value: string | null, row: ConstructionInvoice) => <InvoiceDueDateCell invoice={row} />,
+    },
+    {
       title: "Pagamento",
       dataIndex: "paymentStatus",
       width: 116,
@@ -264,7 +294,13 @@ export const InvoicesList: FC<Props> = ({
           return <span style={{ opacity: 0.4 }}>—</span>;
         }
         return (
-          <span className={`ind-tag ${PAYMENT_STATUS[status].cls}`}>{PAYMENT_STATUS[status].label}</span>
+          <span style={{ display: "inline-flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
+            <span className={`ind-tag ${PAYMENT_STATUS[status].cls}`}>{PAYMENT_STATUS[status].label}</span>
+            {/* Depois de paga a aprovação já não decide nada — o selo só fazia ruído. */}
+            {row.approvedForPayment && status !== "PAID" && (
+              <span className="ind-tag ind-tag-accent-2" style={{ fontSize: 10 }}>aprovada</span>
+            )}
+          </span>
         );
       },
     },
@@ -389,6 +425,7 @@ export const InvoicesList: FC<Props> = ({
         onDeallocate={onDeallocate}
         onTransfer={onTransfer}
         onSendToAccountant={onSendToAccountant}
+        onTogglePaymentApproval={onTogglePaymentApproval}
         onRegisterPayment={onRegisterPayment}
         onMarkPaid={onMarkPaid}
         onAddNote={onAddNote}

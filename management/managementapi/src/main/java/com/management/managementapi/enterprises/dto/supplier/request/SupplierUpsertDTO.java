@@ -1,5 +1,7 @@
 package com.management.managementapi.enterprises.dto.supplier.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -25,5 +27,13 @@ public record SupplierUpsertDTO(
         String name,
 
         @Size(max = 2000, message = "Notas demasiado longas")
-        String notes
+        String notes,
+
+        /**
+         * Prazo de pagamento, em dias a contar da data da fatura. Null é "sem
+         * prazo" — e, como o resto deste DTO, um {@code PUT} que o omita apaga-o.
+         */
+        @Min(value = 0, message = "O prazo de pagamento não pode ser negativo")
+        @Max(value = 365, message = "O prazo de pagamento não pode passar de 365 dias")
+        Integer paymentTermDays
 ) {}

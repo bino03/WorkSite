@@ -17,6 +17,7 @@ import type {
   InvoiceTransferPayload,
   InvoiceTransferResult,
   InvoiceUploadResult,
+  OutstandingByUrgency,
   OutstandingInvoicesSummary,
   PendingInvoicesSummary,
   RubricSuggestion,
@@ -171,6 +172,17 @@ export async function listUnidentifiedInvoices(
 ): Promise<InvoicePage> {
   const response = await api.get(`/construction-invoices/unidentified`, { params });
   return normalizePage(response.data);
+}
+
+/**
+ * "A pagar": por liquidar em todas as obras e na empresa, vencidas primeiro e
+ * sem prazo no fim. A ordem é do servidor — não há `sort`. Só `ADMIN`.
+ */
+export async function listOutstandingByUrgency(
+  params: { page: number; size: number }
+): Promise<OutstandingByUrgency> {
+  const response = await api.get(`/construction-invoices/outstanding`, { params });
+  return response.data;
 }
 
 /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. Só `ADMIN`. */
@@ -388,6 +400,26 @@ export async function deallocateInvoice(id: string): Promise<ConstructionInvoice
 /** Só a nota da fatura; vazio apaga-a. Não passa pelo PUT, que substitui tudo. */
 export async function setInvoiceNotes(id: string, notes: string): Promise<ConstructionInvoice> {
   const response = await api.patch(`/construction-invoices/${id}/notes`, { notes });
+  return response.data;
+}
+
+/** O vencimento manual da fatura; `null` devolve-a ao calculado pelo prazo do fornecedor. */
+export async function setInvoiceDueDate(
+  id: string,
+  dueDate: string | null
+): Promise<ConstructionInvoice> {
+  const response = await api.patch(`/construction-invoices/${id}/due-date`, { dueDate });
+  return response.data;
+}
+
+/** Aprova a fatura para pagamento, ou retira a aprovação. */
+export async function setInvoicePaymentApproval(
+  id: string,
+  approved: boolean
+): Promise<ConstructionInvoice> {
+  const response = await api.patch(`/construction-invoices/${id}/payment-approval`, null, {
+    params: { approved },
+  });
   return response.data;
 }
 
