@@ -101,8 +101,8 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
       "Fornecedores",
       updated === 0
         ? "Fornecedor guardado."
-        : `Fornecedor guardado — ${updated} fatura${updated > 1 ? "s" : ""} ficou${
-            updated > 1 ? "aram" : ""
+        : `Fornecedor guardado — ${
+            updated > 1 ? `${updated} faturas ficaram` : "1 fatura ficou"
           } com o nome.`
     );
     window.dispatchEvent(new Event(SUPPLIERS_CHANGED_EVENT));

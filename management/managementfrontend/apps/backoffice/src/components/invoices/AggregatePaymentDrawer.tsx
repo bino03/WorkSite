@@ -154,11 +154,20 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
           <Alert
             type="warning"
             showIcon
-            message={t(
-              "invoices.payment.notApprovedCountWarning",
-              "{{count}} das faturas selecionadas ainda não foram aprovadas para pagamento. Pode pagá-las na mesma.",
-              { count: unapprovedCount }
-            )}
+            // Com uma fatura só (o "Registar pagamento…" de uma linha), "1 das
+            // faturas selecionadas" lia-se mal.
+            message={
+              invoices.length === 1
+                ? t(
+                    "invoices.payment.notApprovedWarning",
+                    "Esta fatura ainda não foi aprovada para pagamento. Pode pagá-la na mesma."
+                  )
+                : t(
+                    "invoices.payment.notApprovedCountWarning",
+                    "{{count}} das faturas selecionadas ainda não foram aprovadas para pagamento. Pode pagá-las na mesma.",
+                    { count: unapprovedCount }
+                  )
+            }
           />
         )}
 
