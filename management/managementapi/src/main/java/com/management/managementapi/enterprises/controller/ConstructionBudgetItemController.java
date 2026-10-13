@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.controller;
 
 import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.request.BudgetLotOrderDTO;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetLotUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetExportSummaryDTO;
@@ -84,6 +85,14 @@ public class ConstructionBudgetItemController {
                         EntityType.CONSTRUCTION_BUDGET, lot.id(), lot.name(), request));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(lot);
+    }
+
+    /** A ordem das abas dos lotes — a lista inteira, do primeiro para o último. */
+    @PutMapping("/enterprise/{enterpriseId}/budgets/order")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<BudgetLotDTO>> reorderLots(@PathVariable UUID enterpriseId,
+                                                          @Valid @RequestBody BudgetLotOrderDTO dto) {
+        return ResponseEntity.ok(service.reorderLots(enterpriseId, dto));
     }
 
     @PatchMapping("/budgets/{budgetId}")

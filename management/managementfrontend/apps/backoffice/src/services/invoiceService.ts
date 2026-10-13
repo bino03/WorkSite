@@ -69,13 +69,14 @@ export async function previewInvoice(
 export async function uploadInvoice(
   enterpriseId: string | null,
   file: File,
-  scope?: InvoiceScope
+  scope?: InvoiceScope,
+  budgetId?: string | null
 ): Promise<InvoiceUploadResult> {
   const form = new FormData();
   form.append("file", file);
 
   const response = await api.post(`/construction-invoices`, form, {
-    params: { enterpriseId: enterpriseId ?? undefined, scope },
+    params: { enterpriseId: enterpriseId ?? undefined, scope, budgetId: budgetId ?? undefined },
     headers: { "Content-Type": "multipart/form-data" },
     // O erro pertence à linha do ficheiro; dez falhas não são dez toasts.
     skipErrorNotification: true,

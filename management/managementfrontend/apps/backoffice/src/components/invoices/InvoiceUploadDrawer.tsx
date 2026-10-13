@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { FC } from "react";
-import { Button, Drawer, Space, Upload } from "antd";
+import { Button, Drawer, Select, Space, Upload } from "antd";
 import { CloseOutlined, InboxOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
 import { previewInvoice, uploadInvoice } from "@/services/invoiceService";
 import type { InvoiceScope } from "@/types/invoice";
+import type { BudgetLot } from "@/types/budget";
 import { validateInvoiceFile } from "@/components/construction/constructionFormSchemas";
 import { getErrorMessage } from "@/utils/apiError";
 import { formatCurrency, formatDate } from "@/utils/formatters";
@@ -79,6 +80,8 @@ interface Props {
   /** `null` fora de uma obra (despesas da empresa, quarentena) — aí o `scope` manda. */
   enterpriseId: string | null;
   scope?: InvoiceScope;
+  /** Lotes da obra. Só com mais de um é que o seletor aparece (uma obra de um lote não tem escolha). */
+  lots?: BudgetLot[];
   onClose: () => void;
   /** Disparado quando pelo menos uma fatura foi guardada, para a lista recarregar. */
   onUploaded: () => void;
@@ -93,10 +96,12 @@ interface Props {
  * "Guardar", e aí sim os ficheiros ficam gravados. Uma duplicada é
  * descartada sozinha: nunca chega a "Guardar", não é preciso removê-la à mão.
  */
-export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, scope, onClose, onUploaded }) => {
+export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, scope, lots = [], onClose, onUploaded }) => {
   const { t } = useTranslation();
   const [rows, setRows] = useState<Row[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
+  /** Lote para todas as faturas deste carregamento; `null` deixa-as por classificar. */
+  const [budgetId, setBudgetId] = useState<string | null>(null);
   /** Evita disparar o refresh da lista várias vezes durante a mesma leva. */
   const uploadedAny = useRef(false);
   /**
@@ -133,6 +138,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, scope, onCl
   useEffect(() => {
     if (open) {
       setRows([]);
+      setBudgetId(null);
       setPhase("idle");
       phaseRef.current = "idle";
       uploadedAny.current = false;
@@ -339,7 +345,7 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, scope, onCl
           const { row, file } = queue[next++];
           patch(row.key, { status: "saving" });
           try {
-            const result = await uploadInvoice(enterpriseId, file, scope);
+            const result = await uploadInvoice(enterpriseId, file, scope, budgetId);
             uploadedAny.current = true;
 
             const invoice = result.invoice;
@@ -445,6 +451,20 @@ export const InvoiceUploadDrawer: FC<Props> = ({ open, enterpriseId, scope, onCl
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "13.6px" }}>
+        {enterpriseId && lots.length > 1 && (
+          <div>
+            <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldLot")}</label>
+            <Select
+              allowClear
+              disabled={phase !== "idle"}
+              value={budgetId ?? undefined}
+              onChange={(value) => setBudgetId(value ?? null)}
+              placeholder={t("invoices.transfer.lotPlaceholder")}
+              style={{ width: "100%", marginTop: 4 }}
+              options={lots.map((lot) => ({ value: lot.id, label: lot.name }))}
+            />
+          </div>
+        )}
         <Upload.Dragger
           accept=".pdf,.jpg,.jpeg,.png"
           multiple

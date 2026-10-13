@@ -200,7 +200,7 @@ public class ConstructionInvoiceService {
      * compressão — ver {@link InvoiceCompressionService}. Comprimir primeiro
      * já custou faturas que liam bem em qualidade total.
      */
-    public InvoiceUploadResultDTO upload(UUID enterpriseId, String scopeValue, MultipartFile file) {
+    public InvoiceUploadResultDTO upload(UUID enterpriseId, String scopeValue, UUID budgetId, MultipartFile file) {
         ConstructionInvoice.Scope scope = scopeOrProject(scopeValue);
         Enterprise enterprise = resolveEnterpriseFor(scope, enterpriseId);
 
@@ -211,6 +211,13 @@ public class ConstructionInvoiceService {
         ConstructionInvoice invoice = new ConstructionInvoice();
         invoice.setScope(scope);
         invoice.setEnterprise(enterprise);
+        // O lote escolhido no carregamento; sem ele fica como antes, por classificar.
+        if (budgetId != null) {
+            if (scope != ConstructionInvoice.Scope.PROJECT) {
+                throw new BusinessException(ErrorCode.INVOICE_SCOPE_NOT_ALLOCATABLE);
+            }
+            invoice.setBudget(liveLotOf(enterprise.getId(), budgetId));
+        }
         String checksum = sha256Hex(original);
         authContext.currentProfileId().ifPresent(invoice::setCreatedBy);
 

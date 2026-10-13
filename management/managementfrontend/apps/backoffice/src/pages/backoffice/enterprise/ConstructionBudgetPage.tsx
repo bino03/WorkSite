@@ -10,6 +10,7 @@ import {
   DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
+  OrderedListOutlined,
   PlusOutlined,
   SearchOutlined,
   SwapOutlined,
@@ -27,6 +28,7 @@ import {
   listDeletedBudgetItems,
   moveBudgetItem,
   renameBudgetLot,
+  reorderBudgetLots,
 } from "@/services/budgetService";
 import { getPendingInvoicesSummary } from "@/services/invoiceService";
 import type { PendingInvoicesSummary } from "@/types/invoice";
@@ -60,6 +62,9 @@ const ConstructionBudgetPage: FC = () => {
   const lotId = searchParams.get("lote") ?? lots?.[0]?.id ?? null;
   const currentLot = lots?.find((l) => l.id === lotId) ?? null;
   const [lotModal, setLotModal] = useState<{ lot: BudgetLot | null; name: string } | null>(null);
+  // A ordem das abas, enquanto se mexe nela no modal — só se grava no "Guardar".
+  const [lotOrder, setLotOrder] = useState<BudgetLot[] | null>(null);
+  const [savingLotOrder, setSavingLotOrder] = useState(false);
 
   const [tree, setTree] = useState<BudgetTree | null>(null);
   const [loading, setLoading] = useState(false);
@@ -138,6 +143,31 @@ const ConstructionBudgetPage: FC = () => {
       selectLot(saved.id);
     } catch (error) {
       ErrorHandler.handle(error);
+    }
+  };
+
+  const shiftLot = (index: number, delta: -1 | 1) => {
+    setLotOrder((order) => {
+      if (!order) return order;
+      const next = [...order];
+      [next[index], next[index + delta]] = [next[index + delta], next[index]];
+      return next;
+    });
+  };
+
+  const saveLotOrder = async () => {
+    if (!enterpriseId || !lotOrder) return;
+    setSavingLotOrder(true);
+    try {
+      setLots(await reorderBudgetLots(enterpriseId, lotOrder.map((l) => l.id)));
+      // Sem `?lote=` o lote aberto é o primeiro: fixa-o, para a aba aberta não
+      // saltar para outro lote só porque a ordem mudou.
+      if (lotId) setSearchParams({ lote: lotId }, { replace: true });
+      setLotOrder(null);
+    } catch (error) {
+      ErrorHandler.handle(error);
+    } finally {
+      setSavingLotOrder(false);
     }
   };
 
@@ -590,6 +620,16 @@ const ConstructionBudgetPage: FC = () => {
           tabBarExtraContent={
             isAdmin() && currentLot ? (
               <Space size={4}>
+                {lots.length > 1 && (
+                  <Tooltip title="Ordenar lotes">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<OrderedListOutlined />}
+                      onClick={() => setLotOrder(lots)}
+                    />
+                  </Tooltip>
+                )}
                 <Tooltip title="Renomear lote">
                   <Button
                     type="text"
@@ -806,6 +846,54 @@ const ConstructionBudgetPage: FC = () => {
           onChange={(e) => setLotModal((m) => (m ? { ...m, name: e.target.value } : m))}
           onPressEnter={saveLot}
         />
+      </Modal>
+
+      <Modal
+        open={!!lotOrder}
+        title="Ordenar lotes"
+        okText="Guardar"
+        cancelText="Cancelar"
+        confirmLoading={savingLotOrder}
+        onOk={saveLotOrder}
+        onCancel={() => setLotOrder(null)}
+        destroyOnClose
+      >
+        <p style={{ fontSize: 12, opacity: 0.7 }}>
+          A ordem das abas nesta página — e a dos lotes nos seletores e na exportação.
+        </p>
+        {lotOrder?.map((lot, index) => (
+          <div
+            key={lot.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 0",
+              borderTop: index > 0 ? "1px solid var(--ind-color-divider)" : undefined,
+            }}
+          >
+            <span style={{ width: 20, opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>{index + 1}</span>
+            <span style={{ flex: 1 }}>{lot.name}</span>
+            <Tooltip title="Subir">
+              <Button
+                type="text"
+                size="small"
+                icon={<UpOutlined />}
+                disabled={index === 0}
+                onClick={() => shiftLot(index, -1)}
+              />
+            </Tooltip>
+            <Tooltip title="Descer">
+              <Button
+                type="text"
+                size="small"
+                icon={<DownOutlined />}
+                disabled={index === lotOrder.length - 1}
+                onClick={() => shiftLot(index, 1)}
+              />
+            </Tooltip>
+          </div>
+        ))}
       </Modal>
 
       <BudgetExportModal

@@ -120,9 +120,10 @@ public class ConstructionInvoiceController {
     public ResponseEntity<InvoiceUploadResultDTO> upload(
             @RequestParam(required = false) UUID enterpriseId,
             @RequestParam(required = false) String scope,
+            @RequestParam(required = false) UUID budgetId,
             @RequestPart("file") MultipartFile file,
             HttpServletRequest request) {
-        InvoiceUploadResultDTO result = service.upload(enterpriseId, scope, file);
+        InvoiceUploadResultDTO result = service.upload(enterpriseId, scope, budgetId, file);
 
         authContext.currentProfileId().ifPresent(uid ->
                 activityLogger.logCreate(uid, authContext.currentUserName().orElse("unknown"),

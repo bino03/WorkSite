@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.request.BudgetLotOrderDTO;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetLotUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemSearchResultDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
@@ -84,6 +85,31 @@ class BudgetLotsTest {
         });
         when(repository.findById(any())).thenAnswer(inv -> items.stream()
                 .filter(i -> i.getId().equals(inv.getArgument(0))).findFirst());
+    }
+
+    @Test
+    @DisplayName("Reordenar renumera de 0 em diante; o lote que a lista não refere vai para o fim")
+    void reorderLotsRenumbers() {
+        ConstructionBudget lotC = lot("Lote C", 1);
+        when(budgetRepository.findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(ENTERPRISE_ID))
+                .thenReturn(List.of(lotA, lotB, lotC));
+
+        service().reorderLots(ENTERPRISE_ID, new BudgetLotOrderDTO(List.of(lotC.getId(), lotA.getId())));
+
+        assertThat(lotC.getSortOrder()).isEqualTo(0);
+        assertThat(lotA.getSortOrder()).isEqualTo(1);
+        assertThat(lotB.getSortOrder()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Reordenar com um lote que não é do projeto é recusado, sem gravar nada")
+    void reorderLotsRejectsForeignLot() {
+        assertThatThrownBy(() -> service().reorderLots(ENTERPRISE_ID,
+                new BudgetLotOrderDTO(List.of(lotB.getId(), UUID.randomUUID()))))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.BUDGET_LOT_NOT_FOUND);
+        verify(budgetRepository, never()).saveAll(any());
     }
 
     @Test

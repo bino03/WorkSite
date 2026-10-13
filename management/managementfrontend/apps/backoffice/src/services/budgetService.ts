@@ -34,6 +34,15 @@ export async function renameBudgetLot(budgetId: string, name: string): Promise<B
   return response.data;
 }
 
+/**
+ * Grava a ordem das abas dos lotes — vai a lista inteira, do primeiro para o
+ * último, e volta a lista já renumerada.
+ */
+export async function reorderBudgetLots(enterpriseId: string, budgetIds: string[]): Promise<BudgetLot[]> {
+  const response = await api.put(`/construction-budget/enterprise/${enterpriseId}/budgets/order`, { budgetIds });
+  return response.data;
+}
+
 /** Apaga o lote e o seu orçamento. Recusa com `BUDGET_017` se houver despesas nas rubricas. */
 export async function deleteBudgetLot(budgetId: string): Promise<void> {
   await api.delete(`/construction-budget/budgets/${budgetId}`);

@@ -664,6 +664,7 @@ const EnterpriseInvoicesPage: FC = () => {
           <InvoiceUploadDrawer
             open={uploadOpen}
             enterpriseId={enterpriseId}
+            lots={lots}
             onClose={() => setUploadOpen(false)}
             onUploaded={reload}
           />

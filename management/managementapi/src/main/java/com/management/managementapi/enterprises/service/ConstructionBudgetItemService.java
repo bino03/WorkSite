@@ -3,6 +3,7 @@ package com.management.managementapi.enterprises.service;
 import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetItemUpsertDTO;
+import com.management.managementapi.enterprises.dto.budget.request.BudgetLotOrderDTO;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetLotUpsertDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemDeletedDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetLotDTO;
@@ -139,6 +140,39 @@ public class ConstructionBudgetItemService {
                 .filter(l -> l.id().equals(budgetId))
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND));
+    }
+
+    /**
+     * Grava a ordem dos lotes do projeto: os da lista primeiro, pela ordem em
+     * que vêm, e depois os que ela não refere, pela ordem que já tinham — um
+     * lote criado noutro separador enquanto o modal estava aberto vai para o
+     * fim em vez de fazer falhar o pedido. Renumera todos de 0 em diante.
+     */
+    @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE }, allEntries = true)
+    public List<BudgetLotDTO> reorderLots(UUID enterpriseId, BudgetLotOrderDTO dto) {
+        Map<UUID, ConstructionBudget> remaining = new LinkedHashMap<>();
+        for (ConstructionBudget lot : budgetRepository.findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(enterpriseId)) {
+            if (lot.getDeletedAt() == null) {
+                remaining.put(lot.getId(), lot);
+            }
+        }
+
+        List<ConstructionBudget> ordered = new ArrayList<>();
+        for (UUID id : dto.budgetIds()) {
+            ConstructionBudget lot = remaining.remove(id);
+            // de outro projeto, eliminado, ou repetido na lista
+            if (lot == null) {
+                throw new BusinessException(ErrorCode.BUDGET_LOT_NOT_FOUND);
+            }
+            ordered.add(lot);
+        }
+        ordered.addAll(remaining.values());
+
+        for (int i = 0; i < ordered.size(); i++) {
+            ordered.get(i).setSortOrder(i);
+        }
+        budgetRepository.saveAll(ordered);
+        return listLots(enterpriseId);
     }
 
     /**

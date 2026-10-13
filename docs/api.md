@@ -186,7 +186,8 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 |---|---|---|
 | GET | `/construction-budget/enterprise/{enterpriseId}/budgets` | `ADMIN` ou `EMPLOYEE` — os lotes, com `budgetTotal`/`spentTotal`/`itemCount` de cada |
 | POST | `/construction-budget/enterprise/{enterpriseId}/budgets` | `ADMIN` — criar lote `{name}` (`BUDGET_016` se o nome se repetir no projeto) |
-| PATCH | `/construction-budget/budgets/{budgetId}` | `ADMIN` — renomear/reordenar `{name, sortOrder?}` |
+| PATCH | `/construction-budget/budgets/{budgetId}` | `ADMIN` — renomear `{name, sortOrder?}`. O `sortOrder` grava-se tal como vem, sem mexer nos outros lotes — para reordenar, a rota abaixo |
+| PUT | `/construction-budget/enterprise/{enterpriseId}/budgets/order` | `ADMIN` — a ordem dos lotes `{budgetIds: [...]}`, do primeiro para o último; renumera `sortOrder` de 0 em diante e devolve a lista. Lotes que a lista não refira ficam no fim, pela ordem que tinham; id de outra obra, eliminado ou repetido → `BUDGET_015` |
 | DELETE | `/construction-budget/budgets/{budgetId}` | `ADMIN` — apaga o lote e as rubricas (hard delete); `BUDGET_017` se alguma tiver despesas |
 | GET | `/construction-budget/budgets/{budgetId}/tree` | `ADMIN` ou `EMPLOYEE` — a árvore de um lote com agregados (a página do orçamento) |
 | GET | `/construction-budget/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — a vila inteira: as árvores de todos os lotes lado a lado (a exportação e o seletor de rubricas) |
@@ -387,7 +388,7 @@ de entrada.
 | Método | Rota | Acesso |
 |---|---|---|
 | POST | `/construction-invoices/preview?enterpriseId=&scope=` | `ADMIN` ou `EMPLOYEE` (`scope` ≠ `PROJECT` só `ADMIN`) — lê o QR e verifica duplicados, não grava nada. Sem `scope` = `PROJECT` e `enterpriseId` obrigatório; `COMPANY`/`UNIDENTIFIED` não levam obra |
-| POST | `/construction-invoices?enterpriseId=&scope=` | idem ao preview — multipart `file`; devolve `201` |
+| POST | `/construction-invoices?enterpriseId=&scope=&budgetId=` | idem ao preview — multipart `file`; devolve `201`. `budgetId` (desde 2026-10-12, opcional) é o lote da fatura, só em `PROJECT` (senão `INVOICE_SCOPE_NOT_ALLOCATABLE`) e tem de ser um lote vivo da obra (senão `BUDGET_LOT_NOT_FOUND`); sem ele a fatura fica por classificar, como antes |
 | POST | `/construction-invoices/register` | `ADMIN` — regista uma fatura **sem ficheiro** (JSON, não multipart); devolve `201` |
 | POST | `/construction-invoices/import-excel?scope=&enterpriseId=&dryRun=` | `ADMIN` — multipart `file` (o `Despesas - <Obra>.xlsx` do vault) + parte `answers` (JSON, opcional). Importa a folha "Despesas"; ver [[#Importar a folha "Despesas" do Excel (fase 6)]] |
 | POST | `/construction-invoices/{id}/documents` | `ADMIN` ou `EMPLOYEE` — multipart `file`, **junta** mais um documento; devolve `201` |
