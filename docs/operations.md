@@ -1,7 +1,8 @@
 # 🛠️ Operações
 
 O que se faz à volta da app quando ela já está a correr: o que é "produção", como se guarda e se
-repõe uma cópia, o que fazer a uma migração que correu mal, e a rotação da chave de cifra.
+repõe uma cópia, como se tiram as faturas por enviar à contabilidade, o que fazer a uma migração
+que correu mal, e a rotação da chave de cifra.
 Nada disto vive no código — é o que se perde quando só se lê o repo.
 
 ## O que é "produção"
@@ -215,6 +216,51 @@ Antes de qualquer coisa que não se desfaz com um `git revert`:
 - uma importação em massa do Excel com `dryRun=false` ([[excel-parity]] §9);
 - uma rotação de chave (abaixo);
 - e, sem motivo, de tempos a tempos — os ficheiros de faturas só existem no bucket.
+
+## Descarregar as faturas por enviar à contabilidade
+
+Para entregar à contabilidade o que ainda lá não chegou, sem abrir fatura a fatura na app.
+Corrido pela primeira vez a 2026-10-12: 103 faturas, 125 ficheiros, 30,6 MB, 11 pastas.
+
+```bash
+cd management/managementapi
+npm i --prefix scripts --no-save --no-package-lock pg   # uma vez
+
+node scripts/download-unsent-invoices.mjs --out "C:\Users\<eu>\Desktop\Por enviar"
+node scripts/download-unsent-invoices.mjs --out <pasta> --per 20
+node scripts/download-unsent-invoices.mjs --out <pasta> --skip "Destino Teste Claude"
+```
+
+O que entra e como fica arrumado:
+
+- **Entra**: `construction_invoice` com `scope = 'PROJECT'` e `sent_to_accountant = false`, de
+  obras que não são `is_test`. Despesas da empresa (`COMPANY`) e quarentena (`UNIDENTIFIED`) ficam
+  de fora — o script é das obras.
+- **`--skip "<nome da obra>"`** (repetível) tira uma obra pelo nome. Existe por causa de "Destino
+  Teste Claude", que é de teste mas não tem `is_test`; marcá-la na app dispensa a flag.
+- **Pastas de N faturas, não de N ficheiros** (`--per`, 10 por omissão): `Pasta 01`, `Pasta 02`…
+  Uma fatura com vários documentos fica inteira na mesma pasta (`… (1 de 3).pdf`), por isso uma
+  pasta pode ter mais ficheiros do que N. Ordem: obra → data → número.
+- **Nome do ficheiro**: `<Obra> - <data> - <fornecedor> - <nº>`, com "sem fornecedor"/"sem
+  número" quando o campo está vazio na fatura.
+- **`lista.csv`** na raiz (`;` e BOM — abre direto no Excel): pasta, obra, fornecedor, número,
+  data, total, tipo e ficheiros de cada fatura. No fim, com a pasta `(sem ficheiro)`, as faturas
+  por enviar que não têm documento nenhum (`document_status` `MISSING`/`TO_REQUEST`): não há o que
+  descarregar, mas continuam a faltar à contabilidade.
+
+Só lê — sessão da base de dados em read-only, Storage só com GET. **Não marca nada como
+enviado**: isso continua a fazer-se na app, depois de a entrega ter mesmo acontecido. Correr outra
+vez para a mesma pasta substitui os ficheiros mas não apaga os de faturas entretanto enviadas;
+usar uma pasta nova por entrega.
+
+É o único script de `scripts/` com uma dependência (`pg`), porque é o único que precisa da base
+de dados: a lista do que falta enviar não está no Storage. Liga com `DB_URL`/`DB_USER`/`DB_PASS`
+do `.env`, pelo mesmo pooler do backend. A pasta destino fica **fora do repo** — são faturas reais.
+
+**Chaves com espaço.** A descarga faz-se pela `storage_key` da base de dados, e 21 dos 125
+documentos tinham um espaço na chave onde o objeto no Storage tem `+` — pela chave tal como está
+na BD dão `NoSuchKey`. O script tenta a variante com `+` e diz no resumo quantos apanhou assim.
+A causa está por investigar (`notes/bugs.md`, 2026-10-12).
 
 ## Repor
 

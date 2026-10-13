@@ -134,3 +134,18 @@ node scripts/restore-storage.mjs --from backups/storage/<data-hora> --yes
 
 `backups/` está no `.gitignore`. Quando fazer, o que guardar da base de dados e como repor está
 em `docs/operations.md`.
+
+## Faturas por enviar à contabilidade
+
+| Ficheiro | Trata de |
+|---|---|
+| `download-unsent-invoices.mjs` | descarregar os ficheiros das faturas de obra com `sent_to_accountant = false`, em pastas de N faturas, com um `lista.csv` |
+
+```bash
+npm i --prefix scripts --no-save --no-package-lock pg   # uma vez
+node scripts/download-unsent-invoices.mjs --out <pasta fora do repo>
+```
+
+Só lê, e não marca nada como enviado. É o único script daqui com uma dependência (`pg`): a lista
+do que falta enviar está na base de dados, não no Storage. O que entra, como fica arrumado e a
+história das chaves com espaço estão em `docs/operations.md`.
