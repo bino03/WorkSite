@@ -163,12 +163,27 @@ export async function createCreditNote(
 }
 
 /**
+ * Filtros das listas sem obra. `uploadedFrom`/`uploadedTo` são dias (`YYYY-MM-DD`)
+ * de carregamento, ambos inclusivos — o backend conta-os no fuso de Lisboa.
+ */
+export interface ScopedInvoiceParams {
+  q?: string;
+  outstanding?: boolean;
+  uploadedFrom?: string;
+  uploadedTo?: string;
+  /** Formato do `Pageable`: `invoiceDate,desc`, `createdAt,asc`. Sem ele, a ordem por omissão do backend. */
+  sort?: string;
+  page: number;
+  size: number;
+}
+
+/**
  * A quarentena: faturas que chegaram e ainda não se sabe de quem são. Vêm da
  * mais antiga para a mais recente — quanto mais tempo lá está, mais urgente é.
  * Só `ADMIN`.
  */
 export async function listUnidentifiedInvoices(
-  params: { q?: string; outstanding?: boolean; page: number; size: number }
+  params: ScopedInvoiceParams
 ): Promise<InvoicePage> {
   const response = await api.get(`/construction-invoices/unidentified`, { params });
   return normalizePage(response.data);
@@ -187,7 +202,7 @@ export async function listOutstandingByUrgency(
 
 /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. Só `ADMIN`. */
 export async function listCompanyInvoices(
-  params: { q?: string; outstanding?: boolean; page: number; size: number }
+  params: ScopedInvoiceParams
 ): Promise<InvoicePage> {
   const response = await api.get(`/construction-invoices/company`, { params });
   return normalizePage(response.data);
@@ -275,11 +290,11 @@ export async function getOutstandingInvoicesSummary(
 /** O mesmo para a quarentena e as despesas da empresa. Só `ADMIN`. */
 export async function getScopedOutstandingSummary(
   scope: "UNIDENTIFIED" | "COMPANY",
-  q?: string
+  filters: Pick<ScopedInvoiceParams, "q" | "uploadedFrom" | "uploadedTo"> = {}
 ): Promise<OutstandingInvoicesSummary> {
   const path = scope === "UNIDENTIFIED" ? "unidentified" : "company";
   const response = await api.get(`/construction-invoices/${path}/outstanding-summary`, {
-    params: q ? { q } : undefined,
+    params: filters,
   });
   return response.data;
 }

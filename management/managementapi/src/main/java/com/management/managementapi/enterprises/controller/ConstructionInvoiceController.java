@@ -261,8 +261,10 @@ public class ConstructionInvoiceController {
     public Page<ConstructionInvoiceResponseDTO> listUnidentified(
             @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedTo,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
-        return service.searchByScope(ConstructionInvoice.Scope.UNIDENTIFIED, outstanding, q, pageable);
+        return service.searchByScope(ConstructionInvoice.Scope.UNIDENTIFIED, outstanding, q, uploadedFrom, uploadedTo, pageable);
     }
 
     /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. */
@@ -271,8 +273,10 @@ public class ConstructionInvoiceController {
     public Page<ConstructionInvoiceResponseDTO> listCompany(
             @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedTo,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return service.searchByScope(ConstructionInvoice.Scope.COMPANY, outstanding, q, pageable);
+        return service.searchByScope(ConstructionInvoice.Scope.COMPANY, outstanding, q, uploadedFrom, uploadedTo, pageable);
     }
 
     @GetMapping("/enterprise/{enterpriseId}")
@@ -443,15 +447,19 @@ public class ConstructionInvoiceController {
     @GetMapping("/unidentified/outstanding-summary")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummaryUnidentified(
-            @RequestParam(required = false) String q) {
-        return ResponseEntity.ok(service.outstandingSummaryByScope(ConstructionInvoice.Scope.UNIDENTIFIED, q));
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedTo) {
+        return ResponseEntity.ok(service.outstandingSummaryByScope(ConstructionInvoice.Scope.UNIDENTIFIED, q, uploadedFrom, uploadedTo));
     }
 
     @GetMapping("/company/outstanding-summary")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummaryCompany(
-            @RequestParam(required = false) String q) {
-        return ResponseEntity.ok(service.outstandingSummaryByScope(ConstructionInvoice.Scope.COMPANY, q));
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedTo) {
+        return ResponseEntity.ok(service.outstandingSummaryByScope(ConstructionInvoice.Scope.COMPANY, q, uploadedFrom, uploadedTo));
     }
 
     /**

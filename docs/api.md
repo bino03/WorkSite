@@ -393,15 +393,15 @@ de entrada.
 | POST | `/construction-invoices/import-excel?scope=&enterpriseId=&dryRun=` | `ADMIN` — multipart `file` (o `Despesas - <Obra>.xlsx` do vault) + parte `answers` (JSON, opcional). Importa a folha "Despesas"; ver [[#Importar a folha "Despesas" do Excel (fase 6)]] |
 | POST | `/construction-invoices/{id}/documents` | `ADMIN` ou `EMPLOYEE` — multipart `file`, **junta** mais um documento; devolve `201` |
 | DELETE | `/construction-invoices/{id}/documents/{documentId}` | `ADMIN` — remove **um** documento; devolve `204` |
-| GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro |
-| GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro |
+| GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro (por omissão; `sort=invoiceDate,desc`, `createdAt,asc`… como na lista de obra) |
+| GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro (idem) |
 | GET | `/construction-invoices/outstanding?page=&size=` | `ADMIN` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/pending-summary[?budgetId=]` | `ADMIN` ou `EMPLOYEE` — `{ count, total }` das faturas por associar (NC não entram); com `budgetId`, só as desse lote: o contador do botão "Faturas" e o cartão "Por classificar" ao lado do "Gasto" no orçamento. Era `pending-count` (só o número) até 2026-09-18 |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/outstanding-summary` | `ADMIN` ou `EMPLOYEE` — `{ count, total, withoutTotalCount }` do que **falta pagar** nas faturas por liquidar, com os mesmos filtros da lista (todos os da tabela "Filtros da caixa de entrada", incluindo os da pesquisa avançada; `outstanding` é sempre true). `total` = Σ (total − NC − pago) sobre **todas** as faturas do filtro, não só a página; as sem total contam em `count`/`withoutTotalCount` e valem 0. É o "Falta pagar X" ao lado do filtro "Por liquidar" (2026-09-21) |
-| GET | `/construction-invoices/unidentified/outstanding-summary?q=` · `/company/outstanding-summary?q=` | `ADMIN` — o mesmo para a quarentena e as despesas da empresa |
+| GET | `/construction-invoices/unidentified/outstanding-summary?q=&uploadedFrom=&uploadedTo=` · `/company/outstanding-summary` | `ADMIN` — o mesmo para a quarentena e as despesas da empresa |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/suggestion?supplierNif=` | `ADMIN` ou `EMPLOYEE` — rubrica sugerida por NIF, sem o porquê (o `rubric-suggestion` por fatura veio substituí-lo); `204` sem histórico |
 | GET | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — única resposta com `fileUrl` |
 | PUT | `/construction-invoices/{id}` | `ADMIN` ou `EMPLOYEE` — correção manual |
@@ -429,6 +429,11 @@ de entrada.
 As três listas (`/unidentified`, `/company`, `/enterprise/{id}`) aceitam `?outstanding=true`
 para filtrar só as **por liquidar** — o filtro é aplicado por subquery no servidor, para a
 paginação continuar certa. Ver "Pagamentos".
+
+`/unidentified` e `/company` (e os dois `/outstanding-summary`) aceitam também
+`?uploadedFrom=YYYY-MM-DD&uploadedTo=YYYY-MM-DD` — a **data de carregamento** (`created_at`),
+ambos os dias inclusivos e contados no fuso de Lisboa (`AttendanceZone`), não em UTC. Qualquer um
+dos lados pode faltar.
 
 Não há endpoint de lote **de propósito**: o cliente chama o `POST` uma vez por ficheiro
 largado, para que cada um tenha o seu resultado e um QR ilegível não estrague os restantes.

@@ -61,6 +61,7 @@ import com.management.managementapi.repository.ActivityLogRepository;
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.security.AuthContext;
 import com.management.managementapi.service.ActivityLogService;
+import com.management.managementapi.service.attendance.AttendanceZone;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -138,6 +139,8 @@ public class ConstructionInvoiceService {
     private final ActivityLogService activityLogService;
     private final ActivityLogRepository activityLogRepository;
     private final ObjectMapper objectMapper;
+    /** Só para o filtro "carregada em": um dia de calendário é o de Lisboa, não o de UTC. */
+    private final AttendanceZone zone;
 
     // ── carregar ──────────────────────────────────────────────
 
@@ -713,9 +716,14 @@ public class ConstructionInvoiceService {
      */
     @Transactional(readOnly = true)
     public Page<ConstructionInvoiceResponseDTO> searchByScope(ConstructionInvoice.Scope scope,
-                                                              Boolean outstanding, String q, Pageable pageable) {
+                                                              Boolean outstanding, String q,
+                                                              LocalDate uploadedFrom, LocalDate uploadedTo,
+                                                              Pageable pageable) {
         Page<ConstructionInvoice> page = repository.searchByScope(
-                scope, outstanding, isBlank(q) ? null : q.trim(), pageable);
+                scope, outstanding, isBlank(q) ? null : q.trim(),
+                uploadedFrom == null ? null : zone.startOfDay(uploadedFrom),
+                uploadedTo == null ? null : zone.startOfNextDay(uploadedTo),
+                pageable);
 
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
         Map<UUID, List<ConstructionExpense>> allocations = loadAllocations(ids);
@@ -1048,9 +1056,13 @@ public class ConstructionInvoiceService {
 
     /** O mesmo para a quarentena e as despesas da empresa. */
     @Transactional(readOnly = true)
-    public OutstandingInvoicesSummaryDTO outstandingSummaryByScope(ConstructionInvoice.Scope scope, String q) {
+    public OutstandingInvoicesSummaryDTO outstandingSummaryByScope(ConstructionInvoice.Scope scope, String q,
+                                                                   LocalDate uploadedFrom, LocalDate uploadedTo) {
         List<ConstructionInvoice> outstanding = repository.searchByScope(
-                scope, true, isBlank(q) ? null : q.trim(), Pageable.unpaged()).getContent();
+                scope, true, isBlank(q) ? null : q.trim(),
+                uploadedFrom == null ? null : zone.startOfDay(uploadedFrom),
+                uploadedTo == null ? null : zone.startOfNextDay(uploadedTo),
+                Pageable.unpaged()).getContent();
         return summarizeOutstanding(outstanding);
     }
 

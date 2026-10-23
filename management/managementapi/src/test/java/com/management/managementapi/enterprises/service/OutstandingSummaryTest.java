@@ -12,6 +12,7 @@ import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.repository.ProfileRepository;
+import com.management.managementapi.service.attendance.AttendanceZone;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,11 +20,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,6 +56,8 @@ class OutstandingSummaryTest {
     @Mock private SupabaseStorageService storageService;
     @Mock private SignedUrlService signedUrls;
     @Mock private PaymentService paymentService;
+    // Real, não mock: o que se testa é justamente a conversão dia de Lisboa → instante.
+    @Spy private AttendanceZone zone = new AttendanceZone("Europe/Lisbon");
 
     @InjectMocks private ConstructionInvoiceService service;
 
@@ -90,17 +96,33 @@ class OutstandingSummaryTest {
     @DisplayName("Quarentena/empresa: a mesma conta pela lista por âmbito")
     void byScopeUsesTheScopedList() {
         ConstructionInvoice a = invoice("80");
-        when(repository.searchByScope(eq(ConstructionInvoice.Scope.COMPANY), eq(true), eq("acme"), any()))
+        when(repository.searchByScope(eq(ConstructionInvoice.Scope.COMPANY), eq(true), eq("acme"), eq(null), eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(a)));
         when(paymentService.paymentsForInvoices(any(), anyBoolean())).thenReturn(Map.of());
         when(repository.findCreditNotesForAll(any())).thenReturn(List.of());
 
         OutstandingInvoicesSummaryDTO summary =
-                service.outstandingSummaryByScope(ConstructionInvoice.Scope.COMPANY, " acme ");
+                service.outstandingSummaryByScope(ConstructionInvoice.Scope.COMPANY, " acme ", null, null);
 
         assertThat(summary.count()).isEqualTo(1);
         assertThat(summary.total()).isEqualByComparingTo("80");
         assertThat(summary.withoutTotalCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("Filtro \"carregada em\": dias de Lisboa, intervalo meio-aberto até ao dia seguinte ao fim")
+    void uploadedRangeIsLisbonDaysHalfOpen() {
+        when(repository.searchByScope(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.outstandingSummaryByScope(ConstructionInvoice.Scope.UNIDENTIFIED, null,
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
+
+        // Verão: Lisboa é UTC+1, logo o dia 1 começa às 23:00 UTC do dia anterior.
+        verify(repository).searchByScope(eq(ConstructionInvoice.Scope.UNIDENTIFIED), eq(true), eq(null),
+                eq(OffsetDateTime.parse("2026-07-01T00:00+01:00")),
+                eq(OffsetDateTime.parse("2026-08-01T00:00+01:00")),
+                any());
     }
 
     private static ConstructionInvoice invoice(String total) {

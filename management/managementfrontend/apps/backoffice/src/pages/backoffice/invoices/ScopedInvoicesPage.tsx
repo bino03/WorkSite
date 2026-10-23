@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FC } from "react";
-import { Button, Input, Space } from "antd";
+import { Button, DatePicker, Input, Space } from "antd";
 import { FileAddOutlined, PlusOutlined, SearchOutlined, UploadOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 
 import {
   deleteInvoice,
@@ -34,6 +35,11 @@ import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBad
 import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import type { IncidentInvoiceRef } from "@/types/incident";
 
+type UploadedRange = [string | null, string | null];
+const NO_RANGE: UploadedRange = [null, null];
+/** `null` = a ordem por omissão do backend (carregamento; ver o comentário do componente). */
+type ScopedSort = { field: "invoiceDate" | "createdAt"; order: "ascend" | "descend" } | null;
+
 interface Props {
   /** `COMPANY` ou `UNIDENTIFIED` — a lista de obra é a `EnterpriseInvoicesPage`. */
   scope: Exclude<InvoiceScope, "PROJECT">;
@@ -52,6 +58,9 @@ interface Props {
  * recente, como qualquer arquivo. Duplicar o ficheiro para isso não se
  * justificava.
  *
+ * Essa é só a ordem por omissão: como na lista de obra, os cabeçalhos "Data"
+ * e "Carregada em" ordenam (mais recente → mais antiga → omissão).
+ *
  * Ambas são só `ADMIN` — o gate real está no `@PreAuthorize` do backend; o
  * `NavLink` escondido é só para o `EMPLOYEE` não bater num 403.
  */
@@ -66,6 +75,9 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [query, setQuery] = useState("");
   const [outstanding, setOutstanding] = useState(false);
+  /** Dias de carregamento (`YYYY-MM-DD`), inclusivos; qualquer um dos lados pode ficar aberto. */
+  const [uploaded, setUploaded] = useState<UploadedRange>(NO_RANGE);
+  const [sort, setSort] = useState<ScopedSort>(null);
   /** O que falta pagar no filtro "Por liquidar" — só se pede quando o filtro está ligado. */
   const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
 
@@ -80,19 +92,22 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
 
   const fetch = useCallback(
-    async (nextPage: number, nextSize: number, q: string, onlyOutstanding: boolean) => {
+    async (nextPage: number, nextSize: number, q: string, onlyOutstanding: boolean, range: UploadedRange, sortBy: ScopedSort) => {
       setLoading(true);
       try {
         const params = {
           q: q.trim() || undefined,
           outstanding: onlyOutstanding || undefined,
+          uploadedFrom: range[0] ?? undefined,
+          uploadedTo: range[1] ?? undefined,
+          sort: sortBy ? `${sortBy.field},${sortBy.order === "ascend" ? "asc" : "desc"}` : undefined,
           page: nextPage,
           size: nextSize,
         };
         // A soma é sobre a lista inteira, por isso vem à parte da página.
         const [list, summary] = await Promise.all([
           scope === "UNIDENTIFIED" ? listUnidentifiedInvoices(params) : listCompanyInvoices(params),
-          onlyOutstanding ? getScopedOutstandingSummary(scope, params.q) : Promise.resolve(null),
+          onlyOutstanding ? getScopedOutstandingSummary(scope, params) : Promise.resolve(null),
         ]);
         setInvoices(list.content);
         setTotalElements(list.totalElements);
@@ -107,37 +122,56 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   );
 
   useEffect(() => {
-    void fetch(0, pageSize, "", false);
+    void fetch(0, pageSize, "", false, NO_RANGE, null);
     setPage(0);
     setQuery("");
     setOutstanding(false);
+    setUploaded(NO_RANGE);
+    setSort(null);
     // Trocar de lista pelo nav mantém o componente montado: sem isto ficava-se
     // a olhar para a lista anterior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope]);
 
-  const reload = () => void fetch(page, pageSize, query, outstanding);
+  const reload = () => void fetch(page, pageSize, query, outstanding, uploaded, sort);
 
   // O nome e o prazo de um fornecedor mexem no que estas linhas mostram
   // (fornecedor, vencimento) — o mesmo motivo do listener na página de obra.
   useEffect(() => {
-    const onSuppliersChanged = () => void fetch(page, pageSize, query, outstanding);
+    const onSuppliersChanged = () => void fetch(page, pageSize, query, outstanding, uploaded, sort);
     window.addEventListener(SUPPLIERS_CHANGED_EVENT, onSuppliersChanged);
     return () => window.removeEventListener(SUPPLIERS_CHANGED_EVENT, onSuppliersChanged);
-  }, [fetch, page, pageSize, query, outstanding]);
+  }, [fetch, page, pageSize, query, outstanding, uploaded, sort]);
   const markPaid = useQuickMarkPaid(reload);
   const paymentApproval = useInvoicePaymentApproval(reload);
 
   const search = () => {
     setPage(0);
-    void fetch(0, pageSize, query, outstanding);
+    void fetch(0, pageSize, query, outstanding, uploaded, sort);
   };
 
   const toggleOutstanding = () => {
     const next = !outstanding;
     setOutstanding(next);
     setPage(0);
-    void fetch(0, pageSize, query, next);
+    void fetch(0, pageSize, query, next, uploaded, sort);
+  };
+
+  const changeUploaded = (next: UploadedRange) => {
+    setUploaded(next);
+    setPage(0);
+    void fetch(0, pageSize, query, outstanding, next, sort);
+  };
+
+  /** Trocar a ordenação volta à primeira página, como na lista de obra. */
+  const handleSortChange = (
+    field: "invoiceDate" | "createdAt" | null,
+    order: "ascend" | "descend" | null
+  ) => {
+    const next = field && order ? { field, order } : null;
+    setSort(next);
+    setPage(0);
+    void fetch(0, pageSize, query, outstanding, uploaded, next);
   };
 
   const handleOpenPreview = async (invoiceId: string) => {
@@ -231,11 +265,27 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
           onClear={() => {
             setQuery("");
             setPage(0);
-            void fetch(0, pageSize, "", outstanding);
+            void fetch(0, pageSize, "", outstanding, uploaded, sort);
           }}
           style={{ maxWidth: 320 }}
         />
         <Button onClick={search}>Pesquisar</Button>
+        <DatePicker.RangePicker
+          value={[
+            uploaded[0] ? dayjs(uploaded[0]) : null,
+            uploaded[1] ? dayjs(uploaded[1]) : null,
+          ]}
+          format="DD/MM/YYYY"
+          placeholder={["Carregada de", "até"]}
+          allowEmpty={[true, true]}
+          onChange={(range) =>
+            changeUploaded([
+              range?.[0] ? range[0].format("YYYY-MM-DD") : null,
+              range?.[1] ? range[1].format("YYYY-MM-DD") : null,
+            ])
+          }
+          style={{ width: 260 }}
+        />
         <Button size="small" type={outstanding ? "primary" : "default"} onClick={toggleOutstanding}>
           Por liquidar
         </Button>
@@ -252,11 +302,14 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         scope={scope}
         pagination={{ currentPage: page, totalElements, pageSize }}
         selectedIds={[]}
+        sortField={sort?.field ?? null}
+        sortOrder={sort?.order ?? null}
+        onSortChange={handleSortChange}
         onSelectionChange={() => undefined}
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);
           setPageSize(nextSize);
-          void fetch(nextPage, nextSize, query, outstanding);
+          void fetch(nextPage, nextSize, query, outstanding, uploaded, sort);
         }}
         onView={(invoice) => setDetailId(invoice.id)}
         onImageClick={(invoiceId) => void handleOpenPreview(invoiceId)}

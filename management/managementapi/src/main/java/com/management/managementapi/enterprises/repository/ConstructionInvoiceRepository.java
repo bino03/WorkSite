@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -153,6 +154,10 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
      * As faturas que não são de obra nenhuma: a quarentena ("Por identificar")
      * e as despesas da empresa. Sem filtro de obra, porque nestes dois âmbitos
      * o enterprise_id é nulo por construção (check da V26).
+     *
+     * O intervalo de carregamento é meio-aberto ({@code >= início},
+     * {@code < fim}) e já vem em instantes — o service é que converte os dias
+     * de calendário de Lisboa.
      */
     @Query("""
             select i from ConstructionInvoice i
@@ -175,10 +180,14 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                    or lower(i.invoiceAtcud)  like lower(concat('%', :q, '%'))
                    or lower(i.description)   like lower(concat('%', :q, '%'))
                    or lower(i.notes)         like lower(concat('%', :q, '%')))
+              and (:uploadedFrom   is null or i.createdAt >= :uploadedFrom)
+              and (:uploadedBefore is null or i.createdAt <  :uploadedBefore)
             """)
     Page<ConstructionInvoice> searchByScope(@Param("scope") ConstructionInvoice.Scope scope,
                                             @Param("outstanding") Boolean outstanding,
                                             @Param("q") String q,
+                                            @Param("uploadedFrom") OffsetDateTime uploadedFrom,
+                                            @Param("uploadedBefore") OffsetDateTime uploadedBefore,
                                             Pageable pageable);
 
     /**
