@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { DEFAULT_INVOICE_TYPE, INVOICE_TYPES, joinInvoiceNumber } from "@/components/invoices/invoiceNumber";
 import { InvoiceRegisterSchema } from "@/components/invoices/invoiceFormSchema";
 import type { InvoiceRegisterForm } from "@/components/invoices/invoiceFormSchema";
+import { SupplierNameInput } from "@/components/suppliers/SupplierNameInput";
 import { registerInvoice } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
@@ -60,6 +61,7 @@ export const InvoiceRegisterDrawer: FC<Props> = ({
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isValid, isSubmitting },
   } = useForm<InvoiceRegisterForm>({
     resolver: zodResolver(InvoiceRegisterSchema),
@@ -186,7 +188,15 @@ export const InvoiceRegisterDrawer: FC<Props> = ({
             <Controller
               name="supplierName"
               control={control}
-              render={({ field }) => <Input {...field} maxLength={255} />}
+              render={({ field }) => (
+                <SupplierNameInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  onSelectSupplier={(supplier) =>
+                    setValue("supplierNif", supplier.nif, { shouldValidate: true, shouldDirty: true })
+                  }
+                />
+              )}
             />
             {fieldError(errors.supplierName?.message)}
           </div>

@@ -10,6 +10,7 @@ import { InvoiceDueDateField } from "@/components/invoices/InvoiceDueDate";
 import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
 import MarkPaidDrawer from "@/components/invoices/MarkPaidDrawer";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
+import { SupplierNameInput } from "@/components/suppliers/SupplierNameInput";
 import { deletePayment } from "@/services/paymentService";
 import {
   DEFAULT_INVOICE_TYPE,
@@ -884,12 +885,13 @@ const InvoiceFields: FC<{
   const supplier = (
     <div style={PAIR}>
       <Field id="invoice-supplier" label="Fornecedor" hint="Nome que vem no topo da fatura.">
-        <Input
+        <SupplierNameInput
           id="invoice-supplier"
           size="large"
           value={values.supplierName}
           disabled={!editable}
-          onChange={(e) => onChange("supplierName", e.target.value)}
+          onChange={(name) => onChange("supplierName", name)}
+          onSelectSupplier={(chosen) => onChange("supplierNif", chosen.nif)}
           placeholder="Betão Liz, Lda."
         />
       </Field>
