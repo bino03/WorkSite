@@ -32,6 +32,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemS
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceSearchResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
@@ -277,6 +278,20 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedTo,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return service.searchByScope(ConstructionInvoice.Scope.COMPANY, outstanding, q, uploadedFrom, uploadedTo, pageable);
+    }
+
+    /**
+     * A pesquisa global (o modal Ctrl+K do header): todas as obras, a empresa
+     * e a quarentena. Só ADMIN, como as outras listas que atravessam obras.
+     * Menos de 2 caracteres devolve a lista vazia.
+     */
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<InvoiceSearchResultDTO> searchEverywhere(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "20") int size) {
+        // Limite aqui e não por anotação: o controlador não é @Validated.
+        return service.searchEverywhere(q, Math.min(Math.max(size, 1), 50));
     }
 
     @GetMapping("/enterprise/{enterpriseId}")

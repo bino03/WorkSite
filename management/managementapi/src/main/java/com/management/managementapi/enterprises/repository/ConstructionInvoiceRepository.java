@@ -219,6 +219,37 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
             """)
     List<ConstructionInvoice> findOutstandingExcludingScope(@Param("excludedScope") ConstructionInvoice.Scope excludedScope);
 
+    /**
+     * A pesquisa global (o modal Ctrl+K): obras, despesas da empresa e
+     * quarentena de uma vez, notas de crédito incluídas. Ficam de fora as obras
+     * de teste e as eliminadas, como em {@link #findOutstandingExcludingScope}.
+     *
+     * O texto procura nos campos das duas listas existentes somados — os do
+     * {@link #search} (com o nome do ficheiro) e a descrição do
+     * {@link #searchByScope}. O {@code amount} é o mesmo texto lido como valor
+     * ("1 234,56 €"), quando se deixa ler; casa o total exato.
+     */
+    @Query("""
+            select i from ConstructionInvoice i
+            left join fetch i.enterprise e
+            where (e is null or ((e.isTest is null or e.isTest = false)
+                   and e.status <> com.management.managementapi.enterprises.model.enums.EnterPriseStatus.deleted))
+              and (lower(i.supplierName)  like lower(concat('%', :q, '%'))
+                   or lower(i.supplierNif)   like lower(concat('%', :q, '%'))
+                   or lower(i.invoiceNumber) like lower(concat('%', :q, '%'))
+                   or lower(i.invoiceAtcud)  like lower(concat('%', :q, '%'))
+                   or lower(i.description)   like lower(concat('%', :q, '%'))
+                   or lower(i.notes)         like lower(concat('%', :q, '%'))
+                   or exists (select 1 from ConstructionInvoiceDocument d
+                              where d.invoice = i
+                                and lower(d.originalFilename) like lower(concat('%', :q, '%')))
+                   or (:amount is not null and i.totalAmount = :amount))
+            order by i.invoiceDate desc nulls last, i.createdAt desc
+            """)
+    List<ConstructionInvoice> searchEverywhere(@Param("q") String q,
+                                               @Param("amount") BigDecimal amount,
+                                               Pageable pageable);
+
     /** Quantas faturas do projeto ainda estão por associar — alimenta o contador no orçamento. Com lote, só as desse lote. */
     @Query("""
             select count(i) from ConstructionInvoice i

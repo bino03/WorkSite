@@ -43,6 +43,12 @@ links achatados). Estrutura atual em `AppLayout.tsx`:
 | **Tarefas** / **Minhas Tarefas** (rótulo por `isAdmin()`) | todos | `/backoffice/tasks` |
 | ~~**Gerir Contas**~~ | — | saiu a 2026-10-07: é o **Funcionários** do espaço Equipa (§5) |
 | **Faturas ▾** (`Dropdown`, `invoicesMenuItems`) | só `ADMIN` | A pagar (`/invoices/outstanding`) · Por identificar (`/invoices/unidentified`) · Despesas da empresa (`/invoices/company`) · Inconsistências (`/invoices/incidents`) |
+| **Pesquisar** `Ctrl K` (botão, `navButtonStyle`) | só `ADMIN` | não é rota: abre o `GlobalInvoiceSearchModal` (pesquisa global de faturas, 2026-10-22) |
+
+**Atalho de teclado global**: o `Ctrl+K`/`⌘K` é um listener `keydown` no `document`, registado no
+`AppLayout` só para `ADMIN`. Vale portanto em qualquer página do espaço Obras e não no espaço
+Equipa. É o único atalho global da app: um próximo entra no layout do espaço onde faz sentido,
+nunca num componente de página. O modal fica montado no layout, ao lado do `<Outlet />`.
 
 O trigger "Faturas" acende (`--ind-color-accent`) quando `pathname` começa por uma das suas
 rotas (`invoicesActive`); o item do dropdown fica `selected` por `selectedKeys: [pathname]`.

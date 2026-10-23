@@ -23,6 +23,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteS
 import com.management.managementapi.enterprises.dto.invoice.response.DuplicateInvoiceRefDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceDocumentDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceSearchResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
@@ -98,6 +99,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -737,6 +739,53 @@ public class ConstructionInvoiceService {
                 payments.getOrDefault(invoice.getId(), List.of()),
                 creditNotes.getOrDefault(invoice.getId(), List.of()),
                 false));
+    }
+
+    /** Abaixo disto a pesquisa global devolveria meia base de dados a cada tecla. */
+    static final int GLOBAL_SEARCH_MIN_LENGTH = 2;
+
+    /**
+     * A pesquisa global de faturas — "onde está aquela fatura?" sem saber em
+     * que obra, ou se na empresa ou na quarentena. As mais recentes primeiro.
+     */
+    @Transactional(readOnly = true)
+    public List<InvoiceSearchResultDTO> searchEverywhere(String q, int limit) {
+        String text = isBlank(q) ? "" : q.trim();
+        if (text.length() < GLOBAL_SEARCH_MIN_LENGTH) {
+            return List.of();
+        }
+        return repository.searchEverywhere(text, parseSearchAmount(text), PageRequest.of(0, limit)).stream()
+                .map(invoice -> new InvoiceSearchResultDTO(
+                        invoice.getId(),
+                        invoice.getDocumentType().name(),
+                        invoice.getScope().name(),
+                        invoice.getEnterprise() == null ? null : invoice.getEnterprise().getId(),
+                        invoice.getEnterprise() == null ? null : invoice.getEnterprise().getName(),
+                        invoice.getInvoiceNumber(),
+                        invoice.getSupplierName(),
+                        invoice.getSupplierNif(),
+                        invoice.getInvoiceDate(),
+                        invoice.getTotalAmount()))
+                .toList();
+    }
+
+    private static final Pattern AMOUNT_WITH_THOUSANDS = Pattern.compile("\\d{1,3}(\\.\\d{3})+(,\\d{1,2})?");
+    private static final Pattern PLAIN_AMOUNT = Pattern.compile("\\d+([.,]\\d{1,2})?");
+
+    /**
+     * O texto da pesquisa lido como valor, à portuguesa ou não: "1 234,56 €",
+     * "1.234,56", "1234,56" e "1234.56" dão todos 1234.56. Null quando não é um
+     * valor — aí a pesquisa é só por texto.
+     */
+    static BigDecimal parseSearchAmount(String text) {
+        String compact = text.replace("€", "").replaceAll("[\\s\\u00A0]", "");
+        if (AMOUNT_WITH_THOUSANDS.matcher(compact).matches()) {
+            return new BigDecimal(compact.replace(".", "").replace(',', '.'));
+        }
+        if (PLAIN_AMOUNT.matcher(compact).matches()) {
+            return new BigDecimal(compact.replace(',', '.'));
+        }
+        return null;
     }
 
     /** Substitui o ficheiro de uma fatura já registada, relendo o QR e a miniatura. */

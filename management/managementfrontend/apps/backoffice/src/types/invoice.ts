@@ -727,3 +727,21 @@ export interface OutstandingInvoicesSummary {
   total: number;
   withoutTotalCount: number;
 }
+
+/**
+ * Uma linha de `GET /construction-invoices/search` — a pesquisa global do
+ * header (Ctrl+K). Leve: o detalhe vem do `getInvoice` quando se clica.
+ * `enterpriseName` é null na empresa e na quarentena.
+ */
+export interface InvoiceSearchResult {
+  id: string;
+  documentType: InvoiceDocumentType;
+  scope: InvoiceScope;
+  enterpriseId: string | null;
+  enterpriseName: string | null;
+  invoiceNumber: string | null;
+  supplierName: string | null;
+  supplierNif: string | null;
+  invoiceDate: string | null;
+  totalAmount: number | null;
+}

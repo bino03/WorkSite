@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
@@ -13,7 +13,9 @@ import {
   CheckSquareOutlined,
   DownOutlined,
   FileTextOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
+import { GlobalInvoiceSearchModal } from "@/components/invoices/GlobalInvoiceSearchModal";
 import { ShellHeader } from "./shell/ShellHeader";
 import { navButtonStyle, navLinkStyle } from "./shell/navStyles";
 import { rememberSpace } from "./shell/spaces";
@@ -34,6 +36,22 @@ export default function AppLayout() {
   const base = "/backoffice";
 
   useEffect(() => rememberSpace("works"), []);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const admin = isAdmin();
+
+  // Ctrl+K (⌘K no Mac) abre a pesquisa global de faturas de qualquer página do espaço.
+  useEffect(() => {
+    if (!admin) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [admin]);
 
   /**
    * "Faturas" — o único dropdown da nav. Junta as listas de faturas que não são
@@ -94,11 +112,24 @@ export default function AppLayout() {
             </button>
           </Dropdown>
         )}
+        {admin && (
+          <button
+            type="button"
+            title="Pesquisar faturas em todas as obras (Ctrl+K)"
+            onClick={() => setSearchOpen(true)}
+            style={navButtonStyle(searchOpen, ACCENT)}
+          >
+            <SearchOutlined />Pesquisar
+            <kbd style={{ fontSize: 10, opacity: 0.55, fontFamily: "inherit" }}>Ctrl K</kbd>
+          </button>
+        )}
       </ShellHeader>
 
       <main className="container-page" style={{ padding: "27.2px 20.4px" }}>
         <Outlet />
       </main>
+
+      {admin && <GlobalInvoiceSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />}
     </div>
   );
 }

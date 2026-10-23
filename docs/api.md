@@ -395,6 +395,7 @@ de entrada.
 | DELETE | `/construction-invoices/{id}/documents/{documentId}` | `ADMIN` — remove **um** documento; devolve `204` |
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro (por omissão; `sort=invoiceDate,desc`, `createdAt,asc`… como na lista de obra) |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro (idem) |
+| GET | `/construction-invoices/search?q=&size=` | `ADMIN` — **pesquisa global** (o modal Ctrl+K do header): todas as obras, a empresa e a quarentena, notas de crédito incluídas, sem obras `is_test` nem eliminadas. Ver [[#Pesquisa global de faturas]] |
 | GET | `/construction-invoices/outstanding?page=&size=` | `ADMIN` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
@@ -1054,9 +1055,26 @@ a criação é sempre à mão. Tudo `ADMIN`. Ver [[database.md]] → `invoice_in
 createdBy, createdByName, createdAt, updatedAt, invoices: [{id, invoiceNumber, supplierName,
 scope, enterpriseId}] }`.
 
+### Pesquisa global de faturas
+
+`GET /construction-invoices/search?q=&size=` (2026-10-22) responde a "onde está aquela fatura?" sem
+saber em que obra ela está, ou se está na empresa ou na quarentena. Devolve uma **lista** (não um `Page`) de
+`InvoiceSearchResultDTO`, uma linha leve sem repartições, pagamentos nem miniaturas: `id, documentType,
+scope, enterpriseId, enterpriseName, invoiceNumber, supplierName, supplierNif, invoiceDate,
+totalAmount`. O detalhe vem do `GET /{id}` quando se clica.
+
+- **Texto**: `lower() like` (distingue acentos, como as outras listas) sobre fornecedor, NIF, número,
+  ATCUD, descrição, notas e nome do ficheiro. São os campos do `q` por obra e os do `q` da empresa e da
+  quarentena juntos; essas duas listas não mudaram.
+- **Valor exato**: se o `q` se lê como valor (`1 234,56 €`, `1.234,56`, `1234,56`, `1234.56`), também
+  casa `total_amount =` esse valor (`ConstructionInvoiceService.parseSearchAmount`).
+- **Mínimo de 2 caracteres**: abaixo disso devolve `[]` sem consultar a BD. `size` vai de 1 a 50 (20 por omissão).
+- Ordem: `invoice_date desc nulls last`, depois `created_at desc`.
+
 ### A pagar: por liquidar em todas as obras
 
-`GET /construction-invoices/outstanding` é a única lista de faturas que atravessa obras. Devolve
+`GET /construction-invoices/outstanding` é a única lista paginada de faturas que atravessa obras (a
+pesquisa global também as atravessa, mas é uma lista curta, sem paginação). Devolve
 `OutstandingByUrgencyDTO`, não um `Page`:
 
 | Campo | O que é |

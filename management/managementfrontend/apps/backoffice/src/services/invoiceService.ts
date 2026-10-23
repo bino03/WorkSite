@@ -13,6 +13,7 @@ import type {
   InvoiceScope,
   InvoicePreviewResult,
   InvoiceRegisterPayload,
+  InvoiceSearchResult,
   InvoiceSplitLine,
   InvoiceTransferPayload,
   InvoiceTransferResult,
@@ -197,6 +198,16 @@ export async function listOutstandingByUrgency(
   params: { page: number; size: number }
 ): Promise<OutstandingByUrgency> {
   const response = await api.get(`/construction-invoices/outstanding`, { params });
+  return response.data;
+}
+
+/**
+ * A pesquisa global (Ctrl+K): todas as obras, a empresa e a quarentena, as mais
+ * recentes primeiro. Um texto que se lê como valor ("1 234,56") também casa o
+ * total exato. Menos de 2 caracteres devolve `[]`. Só `ADMIN`.
+ */
+export async function searchAllInvoices(q: string, size = 20): Promise<InvoiceSearchResult[]> {
+  const response = await api.get(`/construction-invoices/search`, { params: { q, size } });
   return response.data;
 }
 
