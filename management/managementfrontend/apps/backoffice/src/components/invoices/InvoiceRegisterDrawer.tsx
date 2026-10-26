@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
 import { DEFAULT_INVOICE_TYPE, INVOICE_TYPES, joinInvoiceNumber } from "@/components/invoices/invoiceNumber";
+import { CompanyNifWarning } from "@/components/invoices/CompanyNifWarning";
 import { InvoiceRegisterSchema } from "@/components/invoices/invoiceFormSchema";
 import type { InvoiceRegisterForm } from "@/components/invoices/invoiceFormSchema";
 import { SupplierNameInput } from "@/components/suppliers/SupplierNameInput";
@@ -62,6 +63,7 @@ export const InvoiceRegisterDrawer: FC<Props> = ({
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors, isValid, isSubmitting },
   } = useForm<InvoiceRegisterForm>({
     resolver: zodResolver(InvoiceRegisterSchema),
@@ -208,6 +210,7 @@ export const InvoiceRegisterDrawer: FC<Props> = ({
               render={({ field }) => <Input {...field} maxLength={20} />}
             />
             {fieldError(errors.supplierNif?.message)}
+            <CompanyNifWarning nif={watch("supplierNif")} />
           </div>
         </div>
 

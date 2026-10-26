@@ -18,6 +18,7 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
+import { CompanyNifWarning } from "@/components/invoices/CompanyNifWarning";
 import { CreditNoteSchema } from "@/components/invoices/creditNoteFormSchema";
 import type { CreditNoteForm } from "@/components/invoices/creditNoteFormSchema";
 import { INVOICE_TYPES, joinInvoiceNumber } from "@/components/invoices/invoiceNumber";
@@ -403,6 +404,7 @@ export const CreditNoteDrawer: FC<Props> = ({ open, invoice, onClose, onCreated 
                 {t("invoices.creditNote.fieldNifHint")}
               </div>
               {fieldError(errors.supplierNif?.message)}
+              <CompanyNifWarning nif={watch("supplierNif")} />
             </div>
             <div>
               {label(t("invoices.creditNote.fieldDocumentStatus"))}

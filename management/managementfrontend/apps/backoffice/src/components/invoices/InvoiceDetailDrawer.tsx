@@ -4,6 +4,7 @@ import { Button, DatePicker, Drawer, Input, InputNumber, Select, Space, Spin, To
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
+import { CompanyNifWarning } from "@/components/invoices/CompanyNifWarning";
 import CreditNoteDrawer from "@/components/invoices/CreditNoteDrawer";
 import InvoiceDocumentGallery from "@/components/invoices/InvoiceDocumentGallery";
 import { InvoiceDueDateField } from "@/components/invoices/InvoiceDueDate";
@@ -906,6 +907,7 @@ const InvoiceFields: FC<{
           onChange={(e) => onChange("supplierNif", e.target.value)}
           placeholder="500123456"
         />
+        <CompanyNifWarning nif={values.supplierNif} />
       </Field>
     </div>
   );
