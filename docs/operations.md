@@ -59,6 +59,28 @@ da plataforma. `COOKIE_DOMAIN` tem de ser o domínio pai partilhado (ex. `.works
 cookie posto pela API em `api.worksite.pt` ser lido também pelo Backoffice em `app.worksite.pt`/
 `worksite.pt`.
 
+#### E sem comprar domínio? (levantado a 2026-10-28)
+
+Mudar o nome dentro do domínio da plataforma é grátis (`worksite-vilatro.vercel.app`,
+`.pages.dev`, `.onrender.com`), mas **não resolve o cookie**: `vercel.app`, `pages.dev` e
+`onrender.com` estão na Public Suffix List, por isso cada subdomínio conta como um site próprio —
+até `a.vercel.app` e `b.vercel.app` são cross-site entre si. Backoffice e API em dois desses
+endereços = o cookie `Lax` não viaja no Axios, o login parece funcionar e tudo a seguir dá `401`.
+
+Sem domínio, a única saída é o browser ver **uma só origem** para a app e para a API:
+
+1. **O backend serve o frontend** — o `vite build` vai para os estáticos do Spring Boot e tudo
+   corre num serviço só (ex. `worksite.onrender.com`). Sem CORS, sem problema de cookie, um
+   alojamento a menos. Exige um ajuste no build e um fallback no Spring para as rotas do React
+   (senão um refresh numa rota interna dá `404`).
+2. **Proxy no frontend** — um rewrite no `vercel.json` de `/api/*` para o backend; o browser só vê
+   `worksite.vercel.app`. Mas na Vercel isto implica o plano Pro ($20/mês), pelo mesmo motivo de uso
+   comercial descrito abaixo.
+
+**Recomendado mesmo assim: comprar o domínio** (~10–15 €/ano, valor aproximado por confirmar) —
+custa menos que um mês de Vercel Pro, não exige código, e os links dos emails de convite saem com o
+nome da empresa. Sem domínio, a opção 1 é a mais simples e deixa o frontend sem custo.
+
 ### Opções de hospedagem pesquisadas (2026-09-23)
 
 Nenhuma decisão tomada ainda — isto é o levantamento para decidir, não uma escolha feita. Preços
