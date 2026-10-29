@@ -1,7 +1,13 @@
 # Deploy no Fly.io a cada push para o master que mexa no código (ver docs/operations.md
 # → "Deploy"). Commits só de docs/ não reconstroem nem reiniciam a app.
-# Precisa de dois secrets no repo GitHub: FLY_API_TOKEN (`fly tokens create deploy`) e,
-# opcional, VITE_GOOGLE_MAPS_API_KEY (o seletor de localização no mapa).
+#
+# Tudo corre aqui, não na máquina de dev: lá o Smart App Control do Windows bloqueia o
+# flyctl.exe. Secrets no repo GitHub (Settings → Secrets and variables → Actions):
+# - FLY_API_TOKEN: token de organização do Fly (Dashboard → Tokens) — tem de ser de
+#   organização, não de deploy, para o primeiro run poder criar a app;
+# - FLY_APP_SECRETS: o .env do backend sem as linhas COOKIE_* (essas estão no fly.toml);
+#   importado em cada deploy, por isso mudar um segredo = editar este e correr o workflow;
+# - VITE_GOOGLE_MAPS_API_KEY (opcional): o seletor de localização no mapa.
 name: Deploy Fly.io
 
 on:
@@ -16,6 +22,10 @@ concurrency:
   group: fly-deploy
   cancel-in-progress: false
 
+env:
+  FLY_APP: worksite-vilatro
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,7 +35,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      # O build corre nos builders do Fly (--remote-only), não no runner.
-      - run: flyctl deploy --remote-only --build-arg VITE_GOOGLE_MAPS_API_KEY="${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}"
+
+      - name: Criar a app se ainda não existir
+        run: flyctl status -a "$FLY_APP" > /dev/null 2>&1 || flyctl apps create "$FLY_APP"
+
+      # --stage: grava sem reiniciar; o deploy a seguir é que os aplica.
+      - name: Carregar os segredos
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          APP_SECRETS: ${{ secrets.FLY_APP_SECRETS }}
+        run: |
+          if [ -z "$APP_SECRETS" ]; then
+            echo "::warning::FLY_APP_SECRETS vazio — segredos não atualizados"
+          else
+            printf '%s\n' "$APP_SECRETS" | flyctl secrets import --stage -a "$FLY_APP"
+          fi
+
+      # O build corre nos builders do Fly (--remote-only), não no runner.
+      - name: Deploy
+        run: flyctl deploy --remote-only -a "$FLY_APP" --build-arg VITE_GOOGLE_MAPS_API_KEY="${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}"

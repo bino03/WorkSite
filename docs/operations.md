@@ -100,11 +100,14 @@ Uma app Fly só, `https://worksite-vilatro.fly.dev`, a servir o Backoffice e a A
   `[env]`: `COOKIE_SECURE=true`, `COOKIE_DOMAIN=localhost` (o valor que o `CookieUtil` trata como "sem
   domínio" → cookie do host exato), `APP_FRONTEND_URL`/`CORS_ALLOWED_ORIGINS` no `fly.dev`. **Mudar o
   nome da app obriga a mudar estes dois URLs.**
-- **Segredos** (as do `.env` do backend menos as `COOKIE_*` — [[environment]]) vivem só no Fly, por
-  `fly secrets import`. Nunca no `fly.toml`.
+- **Segredos** (as do `.env` do backend menos as `COOKIE_*` — [[environment]]) vivem no secret
+  `FLY_APP_SECRETS` do repo GitHub e o workflow importa-os no Fly a cada deploy. Nunca no `fly.toml`.
 - **`.github/workflows/fly-deploy.yml`**: `flyctl deploy --remote-only` a cada push para o `master` que
-  toque `management/**` (commits só de `docs/` não reiniciam a app). Secrets do repo GitHub:
-  `FLY_API_TOKEN` e, opcional, `VITE_GOOGLE_MAPS_API_KEY` (vai como build arg).
+  toque `management/**` (commits só de `docs/` não reiniciam a app); no primeiro run cria a app.
+  **Não há `flyctl` na máquina de dev** — o Smart App Control do Windows bloqueia o `flyctl.exe`, e
+  desligá-lo no Windows 11 Home é irreversível. Tudo passa pelo workflow e pelo dashboard do Fly.
+  Secrets do repo GitHub: `FLY_API_TOKEN` (token de **organização**, para poder criar a app),
+  `FLY_APP_SECRETS` e, opcional, `VITE_GOOGLE_MAPS_API_KEY` (vai como build arg).
 - **`SpaController`** reencaminha as rotas do React (`/login`, `/backoffice/**`, `/team/**`, …) para o
   `index.html`. Nenhuma colide com a API. **Uma rota de topo nova no `main.tsx` tem de entrar aqui e
   em `SecurityConfig.SPA_PATHS`**, senão um refresh nela dá `401`.
