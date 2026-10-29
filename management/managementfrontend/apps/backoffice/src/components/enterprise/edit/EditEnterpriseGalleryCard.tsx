@@ -56,7 +56,7 @@ const resolveMediaUrl = (m: any): string | undefined => {
   if (m.downloadUrl) {
     // Se downloadUrl começar com /, adiciona o base URL da API
     if (m.downloadUrl.startsWith("/")) {
-      return `${import.meta.env.VITE_API_URL || "http://localhost:8080"}${m.downloadUrl}`;
+      return `${import.meta.env.VITE_API_URL ?? ""}${m.downloadUrl}`;
     }
     return m.downloadUrl;
   }

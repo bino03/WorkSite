@@ -74,6 +74,13 @@ VITE_API_URL=http://localhost:8080
 VITE_GOOGLE_MAPS_API_KEY=          # opcional — só o seletor de localização no mapa precisa
 ```
 
+**Em produção não há `.env` do Backoffice**: o `management/Dockerfile` constrói-o com
+`VITE_API_URL=""` (mesma origem — o backend serve o frontend, ver [[operations]] → "Deploy") e
+`VITE_GOOGLE_MAPS_API_KEY` vem como build arg das variáveis do serviço no Render. Vazio quer dizer
+"o host que serviu a página"; por isso os fallbacks no código são `?? ""`, nunca `|| "http://localhost:8080"`.
+
+No backend, o Render define `PORT` — `server.port: ${PORT:8080}` no `application.yml`.
+
 Não há chaves do Supabase no frontend, de propósito: o Backoffice **não usa o SDK do Supabase**.
 Fala só com o backend, e o JWT viaja em cookies HttpOnly. Ver [[security]].
 

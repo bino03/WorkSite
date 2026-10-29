@@ -60,7 +60,11 @@ spring:
       request-timeout: 10m
 
 server:
-  port: 8080
+  # O Render (como quase toda a PaaS) diz em que porta escutar por $PORT.
+  port: ${PORT:8080}
+  # O TLS termina no proxy da hospedagem — sem isto request.isSecure() nunca é true e o
+  # HSTS não sai (ver docs/operations.md → "Deploy").
+  forward-headers-strategy: native
   tomcat:
     max-http-form-post-size: 25MB
     max-swallow-size: -1
@@ -72,7 +76,7 @@ server:
   # directamente pelo Supabase via signed URL, sem passar por aqui.
   compression:
     enabled: true
-    mime-types: application/json,application/xml,text/plain,text/css,application/javascript
+    mime-types: application/json,application/xml,text/plain,text/css,application/javascript,text/javascript,text/html,image/svg+xml
     min-response-size: 2KB
 
 logging:

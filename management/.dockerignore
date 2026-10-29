@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/target
+**/logs
+**/backups
+**/*.log
+**/.env
+**/.env.*
+!**/.env.example
+managementfrontend/apps/backoffice/public/import-tmp

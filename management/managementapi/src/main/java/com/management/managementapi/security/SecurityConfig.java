@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -111,8 +112,48 @@ public class SecurityConfig {
         return new ExportRateLimitFilter(maxRequestsPerUser, windowMinutes);
     }
 
+    // --- Backoffice servido pelo próprio backend (deploy sem domínio — ver docs/operations.md) ---
+    // O build da imagem copia o `vite build` para classpath:/static e o SpaController
+    // reencaminha as rotas do React para o index.html. Estes caminhos são HTML/JS/CSS
+    // públicos; os dados continuam todos atrás da cadeia principal, abaixo.
+    // Lista de rotas tem de acompanhar o <Routes> de main.tsx e o SpaController.
+    static final String[] SPA_PATHS = {
+        "/", "/index.html", "/assets/**", "/*.svg", "/*.ico",
+        "/login", "/loading", "/forgot-password", "/reset-password", "/accept-invite",
+        "/backoffice", "/backoffice/**", "/team", "/team/**"
+    };
+
+    // A página corre com uma CSP própria — a da API (`default-src 'none'`) não deixava o
+    // HTML carregar nada. Supabase: imagens e PDFs por signed URL (<embed>). Google: o
+    // seletor de localização no mapa (allowlist recomendada pela Google para Maps JS).
+    private static final String SPA_CSP = String.join("; ",
+        "default-src 'self'",
+        "script-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.google.com blob:",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://*.supabase.co https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com",
+        "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://*.google.com https://*.gstatic.com",
+        "object-src 'self' blob: https://*.supabase.co",
+        "frame-src 'self' blob: https://*.supabase.co https://*.google.com",
+        "worker-src 'self' blob:",
+        "frame-ancestors 'none'",
+        "base-uri 'self'");
+
+    @Bean
+    @Order(1)
+    SecurityFilterChain spaSecurity(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher(SPA_PATHS)
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives(SPA_CSP)))
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
     // --- Configuração de segurança principal ---
     @Bean
+    @Order(2)
     SecurityFilterChain security(HttpSecurity http,
                                  JwtDecoder decoder,
                                  JwtAuthenticationConverter authConv,

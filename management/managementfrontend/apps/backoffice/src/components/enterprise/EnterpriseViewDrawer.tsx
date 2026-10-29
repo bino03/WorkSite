@@ -82,7 +82,7 @@ const resolveMediaUrl = (m: MediaResponseDTO & { url?: string | null }): string 
   if (m.downloadUrl) {
     if (m.downloadUrl.startsWith("http://") || m.downloadUrl.startsWith("https://")) return m.downloadUrl;
     if (m.downloadUrl.startsWith("/")) {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const apiUrl = import.meta.env.VITE_API_URL ?? "";
       return `${apiUrl}${m.downloadUrl}`;
     }
     return m.downloadUrl;
