@@ -43,6 +43,7 @@ public interface EnterpriseMapper {
     @Mapping(target = "banner", ignore = true)
     @Mapping(target = "isActive", constant = "true")
     @Mapping(target = "isTest", defaultValue = "false")
+    @Mapping(target = "currency", defaultValue = "EUR")
     @Mapping(target = "status", qualifiedByName = "mapStatus")
     Enterprise toEntity(CreateEnterpriseDTO createEnterpriseDTO);
 

@@ -35,7 +35,7 @@ export interface Enterprise {
   /** O mesmo número que o cabeçalho da página do orçamento — é o que a coluna "Investimento" mostra. */
   budgetTotal?: number | null;
   currentValue?: number;
-  currency: string;
+  currency: string | null;
   constructionCompany?: string;
   architect?: string;
   managerId?: string;
@@ -80,11 +80,11 @@ export const fetchEnterprises = async (params?: {
   return normalizeSpringPage<Enterprise>(response.data);
 };
 
-const formatCurrency = (value: number | null | undefined, currency: string = "EUR") => {
+const formatCurrency = (value: number | null | undefined, currency?: string | null) => {
   if (value == null) return "—";
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
-    currency,
+    currency: currency || "EUR",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
