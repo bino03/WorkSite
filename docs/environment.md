@@ -76,10 +76,12 @@ VITE_GOOGLE_MAPS_API_KEY=          # opcional — só o seletor de localização
 
 **Em produção não há `.env` do Backoffice**: o `management/Dockerfile` constrói-o com
 `VITE_API_URL=""` (mesma origem — o backend serve o frontend, ver [[operations]] → "Deploy") e
-`VITE_GOOGLE_MAPS_API_KEY` vem como build arg das variáveis do serviço no Render. Vazio quer dizer
+`VITE_GOOGLE_MAPS_API_KEY` vem como build arg do workflow de deploy (secret do repo GitHub). Vazio quer dizer
 "o host que serviu a página"; por isso os fallbacks no código são `?? ""`, nunca `|| "http://localhost:8080"`.
 
-No backend, o Render define `PORT` — `server.port: ${PORT:8080}` no `application.yml`.
+No backend, `server.port: ${PORT:8080}` (o `fly.toml` fixa 8080). As variáveis não-secretas de
+produção (`COOKIE_*`, `APP_FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`) estão no `[env]` do
+`management/fly.toml`; as secretas, em `fly secrets` — ver [[operations]] → "Como está montado".
 
 Não há chaves do Supabase no frontend, de propósito: o Backoffice **não usa o SDK do Supabase**.
 Fala só com o backend, e o JWT viaja em cookies HttpOnly. Ver [[security]].

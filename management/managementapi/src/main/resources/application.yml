@@ -60,7 +60,7 @@ spring:
       request-timeout: 10m
 
 server:
-  # O Render (como quase toda a PaaS) diz em que porta escutar por $PORT.
+  # A hospedagem pode impor a porta por $PORT (o fly.toml fixa-a em 8080).
   port: ${PORT:8080}
   # O TLS termina no proxy da hospedagem — sem isto request.isSecure() nunca é true e o
   # HSTS não sai (ver docs/operations.md → "Deploy").
@@ -68,6 +68,13 @@ server:
   tomcat:
     max-http-form-post-size: 25MB
     max-swallow-size: -1
+    # 200 threads por omissão; uma app interna de poucos utilizadores não chega perto
+    # de 20 pedidos em simultâneo, e cada thread custa stack e buffers na máquina de
+    # 1 GB (ver docs/operations.md → "Memória"). Os pedidos a mais esperam na fila
+    # (accept-count, 100), não são recusados.
+    threads:
+      max: ${TOMCAT_MAX_THREADS:20}
+      min-spare: 2
   # Desligada por omissão no Spring Boot. As respostas JSON desta API repetem os
   # mesmos nomes de campo centenas de vezes — a árvore de orçamento traz ~198 nós
   # com ~25 chaves cada — por isso comprimem muito bem. Só conta em ligações

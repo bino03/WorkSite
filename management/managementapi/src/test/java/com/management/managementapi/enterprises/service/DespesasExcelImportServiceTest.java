@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ExpensesImportAnswersDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -84,6 +86,7 @@ class DespesasExcelImportServiceTest {
     @Mock private PaymentService paymentService;
     @Mock private AuthContext authContext;
 
+    @Spy private HeavyWorkGate heavyWork = new HeavyWorkGate();
     @InjectMocks private DespesasExcelImportService service;
 
     private static final UUID ENTERPRISE_ID = UUID.randomUUID();

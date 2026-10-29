@@ -1,5 +1,6 @@
 package com.management.managementapi.service.attendance;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDate;
@@ -58,7 +59,7 @@ class AttendanceExcelExportServiceTest {
 
     private AttendanceExcelExportService service() {
         return new AttendanceExcelExportService(reportService, timeEntryRepository, revisionRepository,
-                enterpriseRepository, ZONE);
+                enterpriseRepository, ZONE, new HeavyWorkGate());
     }
 
     private static Workbook read(ExportFile file) throws IOException {

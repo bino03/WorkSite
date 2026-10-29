@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
@@ -69,6 +70,7 @@ import java.util.Optional;
 public class AtInvoiceQrService {
 
     private final WeChatQrCodeService weChatQrCodeService;
+    private final HeavyWorkGate heavyWork;
 
     /**
      * Resoluções a tentar, por ordem. A 200 DPI resolve-se a esmagadora maioria
@@ -109,6 +111,10 @@ public class AtInvoiceQrService {
      *         legível ou o conteúdo não for um QR da AT
      */
     public Optional<AtInvoiceData> read(byte[] content, String mimeType) {
+        return heavyWork.run("leitura do QR da fatura", () -> doRead(content, mimeType));
+    }
+
+    private Optional<AtInvoiceData> doRead(byte[] content, String mimeType) {
         List<String> codes = decodeQr(content, mimeType);
 
         if (codes.isEmpty()) {

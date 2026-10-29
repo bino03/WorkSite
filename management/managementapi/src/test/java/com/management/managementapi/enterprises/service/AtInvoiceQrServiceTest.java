@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
@@ -45,7 +46,7 @@ class AtInvoiceQrServiceTest {
             "G:FT 2026/114", "H:CSDF7T5H-0114", "I1:PT", "I7:12000.00", "I8:2760.00",
             "N:2760.00", "O:14760.00", "Q:kLp0", "R:9999");
 
-    private final AtInvoiceQrService service = new AtInvoiceQrService(new WeChatQrCodeService());
+    private final AtInvoiceQrService service = new AtInvoiceQrService(new WeChatQrCodeService(), new HeavyWorkGate());
 
     @Test
     @DisplayName("lê os campos fiscais de um QR numa imagem")

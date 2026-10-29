@@ -77,8 +77,10 @@ Sem domínio, a única saída é o browser ver **uma só origem** para a app e p
    `worksite.vercel.app`. Mas na Vercel isto implica o plano Pro ($20/mês), pelo mesmo motivo de uso
    comercial descrito abaixo.
 
-**Decidido a 2026-10-29: opção 1, no Render ($7/mês), mesmo projeto Supabase.** Ver "Como está
-montado" abaixo. A recomendação seguinte fica para o dia em que se quiser o nome da empresa nos links.
+**Decidido a 2026-10-29: opção 1, no Fly.io (máquina de 1 GB, Londres), mesmo projeto Supabase.**
+Começou por ser o Render Starter ($7, 512 MB), mas medido o arranque não cabe lá — ver "Memória"
+abaixo; o passo seguinte do Render era o Standard a $25, o Fly dá 1 GB por ~$6. Ver "Como está
+montado". A recomendação seguinte fica para o dia em que se quiser o nome da empresa nos links.
 
 **Recomendado mesmo assim: comprar o domínio** (~10–15 €/ano, valor aproximado por confirmar) —
 custa menos que um mês de Vercel Pro, não exige código, e os links dos emails de convite saem com o
@@ -86,33 +88,60 @@ nome da empresa. Sem domínio, a opção 1 é a mais simples e deixa o frontend 
 
 ### Como está montado (2026-10-29)
 
-Um serviço só, `https://<serviço>.onrender.com`, a servir o Backoffice e a API na mesma origem:
+Uma app Fly só, `https://worksite-vilatro.fly.dev`, a servir o Backoffice e a API na mesma origem:
 
 - **`management/Dockerfile`** (contexto `management/`) em três fases: `npx vite build` do Backoffice
   (sem o `tsc -b` do script `build`, que tem erros antigos e partiria a imagem) → copia o `dist/`
   para `src/main/resources/static` e faz `mvn package -DskipTests` → JRE 21. `.dockerignore` deixa de
   fora `.env`, `node_modules`, `target`, logs.
+- **`management/fly.toml`**: app `worksite-vilatro`, região `lhr` (o Supabase é `eu-west-1`), 1 GB
+  partilhada, sempre ligada (`auto_stop_machines = "off"` — parada, o primeiro pedido esperava o
+  arranque), health check `/actuator/health` com 120 s de graça, e as variáveis não-secretas em
+  `[env]`: `COOKIE_SECURE=true`, `COOKIE_DOMAIN=localhost` (o valor que o `CookieUtil` trata como "sem
+  domínio" → cookie do host exato), `APP_FRONTEND_URL`/`CORS_ALLOWED_ORIGINS` no `fly.dev`. **Mudar o
+  nome da app obriga a mudar estes dois URLs.**
+- **Segredos** (as do `.env` do backend menos as `COOKIE_*` — [[environment]]) vivem só no Fly, por
+  `fly secrets import`. Nunca no `fly.toml`.
+- **`.github/workflows/fly-deploy.yml`**: `flyctl deploy --remote-only` a cada push para o `master` que
+  toque `management/**` (commits só de `docs/` não reiniciam a app). Secrets do repo GitHub:
+  `FLY_API_TOKEN` e, opcional, `VITE_GOOGLE_MAPS_API_KEY` (vai como build arg).
 - **`SpaController`** reencaminha as rotas do React (`/login`, `/backoffice/**`, `/team/**`, …) para o
   `index.html`. Nenhuma colide com a API. **Uma rota de topo nova no `main.tsx` tem de entrar aqui e
   em `SecurityConfig.SPA_PATHS`**, senão um refresh nela dá `401`.
 - **`SecurityConfig`** tem duas cadeias: `spaSecurity` (`@Order(1)`, só `SPA_PATHS`, público, CSP que
   deixa a página carregar scripts/estilos `'self'`, imagens e PDFs do Supabase e o Google Maps) e a da
   API de sempre (`@Order(2)`, `default-src 'none'`).
-- `application.yml`: `server.port: ${PORT:8080}` e `forward-headers-strategy: native`.
+- `application.yml`: `server.port: ${PORT:8080}`, `forward-headers-strategy: native`, Tomcat com 20
+  threads (`TOMCAT_MAX_THREADS`).
 - Localmente nada muda: sem `static/` copiado as rotas do React dão `404` em `:8080` e o Vite em
   `:5173` continua a ser o caminho.
 
-**Variáveis no Render** (Environment): as do `.env` do backend ([[environment]]), mais
-`COOKIE_SECURE=true`, `COOKIE_DOMAIN=localhost` (o valor que o `CookieUtil` trata como "sem
-domínio" → cookie do host exato, que é o que se quer), `APP_FRONTEND_URL=https://<serviço>.onrender.com`,
-`CORS_ALLOWED_ORIGINS=https://<serviço>.onrender.com` (mesma origem, o CORS nem entra em jogo, mas
-fica sem localhost), e `VITE_GOOGLE_MAPS_API_KEY` se se quiser o mapa. Health check: `/actuator/health`.
+**Por confirmar no primeiro deploy**: o build da imagem (não há Docker na máquina de dev — o resto foi
+testado a 2026-10-29 com o `dist/` copiado à mão e o backend em `:8090`); o arranque dentro dos 120 s
+de graça numa CPU partilhada; login e cookies sobre HTTPS real; que o Tomcat confia no proxy do Fly
+para o `X-Forwarded-Proto` (sem isso o HSTS não sai); a CSP com o mapa e os PDFs
+(`notes/verificacao-browser-pendente.md` §51). O `RateLimitFilter` confia no primeiro
+`X-Forwarded-For`, que um cliente pode forjar atrás do proxy — aceitável para uma app interna, mas o
+limite por IP do login fica contornável.
 
-**Por confirmar no primeiro deploy**: o build da imagem no Render (não há Docker na máquina de dev —
-o resto foi testado a 2026-10-29 com o `dist/` copiado à mão e o backend em `:8090`); login e cookies
-sobre HTTPS real; a CSP com o mapa e os PDFs (`notes/verificacao-browser-pendente.md` §51).
-O `RateLimitFilter` confia no primeiro `X-Forwarded-For`, que um cliente pode forjar atrás do proxy
-do Render — aceitável para uma app interna, mas o limite por IP do login fica contornável.
+### Memória (medido a 2026-10-29)
+
+Com `-XX:MaxRAM=512m` a simular a máquina: heap a 50% (256 MB) e a 60% (307 MB) → `OutOfMemoryError`
+**a meio do arranque**. Sem teto, a heap sobe a **~516 MB durante ~30 s** e assenta em **~140 MB**.
+A causa é o Hibernate a preparar as 74 `@Query` dos repositórios no arranque: o parser HQL (ANTLR)
+gera montanhas de lixo temporário e guarda uma cache de ~60 MB (`ATNConfig`) para sempre. O grosso
+vem do `ConstructionInvoiceRepository` (21 queries, 23 `CASE`/`COALESCE`). Fora da heap: metaspace
+~108 MB, code cache ~17 MB, ~26 threads, mais a memória nativa do OpenCV.
+
+- **Por isso 1 GB, heap a 60%** (`JAVA_TOOL_OPTIONS` no `Dockerfile`: `SerialGC`, tetos ao metaspace
+  e code cache, `ExitOnOutOfMemoryError`).
+- **`HeavyWorkGate`**: leitura de QR, miniaturas e import/export de Excel correm uma de cada vez
+  (`ReentrantLock` justo, reentrante, desiste do portão ao fim de 5 min). Fica de fora o `writeZip`,
+  que é streaming e pode durar minutos.
+- **Alternativa testada e não adotada**: `spring.data.jpa.repositories.bootstrap-mode=lazy` arranca
+  com ~51 MB — mas só adia o pico para o primeiro pedido que use cada repositório, e um erro numa
+  query deixa de aparecer no arranque. Só faria sentido para voltar a 512 MB, e aí reescrever as
+  queries pesadas em SQL nativo (sem parser HQL) seria a correção a sério.
 
 ### Opções de hospedagem pesquisadas (2026-09-23)
 

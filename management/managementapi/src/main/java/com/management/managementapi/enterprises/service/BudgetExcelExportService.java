@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceDocumentsScope;
@@ -191,6 +192,7 @@ public class BudgetExcelExportService {
     private final InvoicePaymentRepository invoicePaymentRepository;
     private final PaymentService paymentService;
     private final InvoiceDocumentsExportService documentsExportService;
+    private final HeavyWorkGate heavyWork;
 
     /** O ficheiro pronto a devolver. */
     public record ExportFile(String fileName, byte[] content) {}
@@ -212,6 +214,10 @@ public class BudgetExcelExportService {
 
     @Transactional
     public ExportFile export(UUID enterpriseId, Set<BudgetExportSheet> requested) {
+        return heavyWork.run("exportação Excel do orçamento", () -> doExport(enterpriseId, requested));
+    }
+
+    private ExportFile doExport(UUID enterpriseId, Set<BudgetExportSheet> requested) {
         if (requested == null || requested.isEmpty()) {
             throw new BusinessException(ErrorCode.BUDGET_EXPORT_NO_SHEETS);
         }
@@ -259,6 +265,10 @@ public class BudgetExcelExportService {
      */
     @Transactional
     public ExportFile exportLot(UUID budgetId, Set<BudgetExportSheet> requested) {
+        return heavyWork.run("exportação Excel do lote", () -> doExportLot(budgetId, requested));
+    }
+
+    private ExportFile doExportLot(UUID budgetId, Set<BudgetExportSheet> requested) {
         if (requested == null || requested.isEmpty()) {
             throw new BusinessException(ErrorCode.BUDGET_EXPORT_NO_SHEETS);
         }

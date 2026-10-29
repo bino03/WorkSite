@@ -1,0 +1,43 @@
+# Fly.io — uma máquina só, a servir o Backoffice e a API na mesma origem
+# (ver docs/operations.md → "Deploy"). Deploy a partir desta pasta: `fly deploy`,
+# ou o workflow .github/workflows/fly-deploy.yml a cada push para o master.
+# Segredos (DB, Supabase, chave de cifra) não vivem aqui: `fly secrets`.
+
+app = "worksite-vilatro"
+# O Supabase está em eu-west-1 (Irlanda); Londres é a região Fly mais próxima.
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Não são segredos — saem para o browser ou são só flags. O domínio tem de bater com `app`.
+[env]
+  PORT = "8080"
+  COOKIE_SECURE = "true"
+  # "localhost" é o valor que o CookieUtil trata como "sem Domain" → cookie do host exato.
+  COOKIE_DOMAIN = "localhost"
+  APP_FRONTEND_URL = "https://worksite-vilatro.fly.dev"
+  CORS_ALLOWED_ORIGINS = "https://worksite-vilatro.fly.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Sempre ligada: parada, o primeiro pedido esperava pelo arranque do Spring (~45 s).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/actuator/health"
+    interval = "30s"
+    timeout = "5s"
+    # O arranque mede ~45 s numa máquina rápida; numa CPU partilhada pode ir além.
+    grace_period = "120s"
+
+# 1 GB: o arranque chega a ~516 MB de heap (medido a 2026-10-29 — o parser HQL do
+# Hibernate a preparar as queries); 512 MB não chegava.
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

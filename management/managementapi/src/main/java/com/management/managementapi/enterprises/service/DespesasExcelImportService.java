@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteExpenseLineDTO;
@@ -185,10 +186,16 @@ public class DespesasExcelImportService {
     private final ConstructionInvoiceService invoiceService;
     private final PaymentService paymentService;
     private final AuthContext authContext;
+    private final HeavyWorkGate heavyWork;
 
     @Transactional
     public ExpensesImportResultDTO importExpenses(String scopeValue, UUID enterpriseId, MultipartFile file,
                                                   boolean dryRun, ExpensesImportAnswersDTO answers) {
+        return heavyWork.run("importação Excel de despesas", () -> doImportExpenses(scopeValue, enterpriseId, file, dryRun, answers));
+    }
+
+    private ExpensesImportResultDTO doImportExpenses(String scopeValue, UUID enterpriseId, MultipartFile file,
+                                                     boolean dryRun, ExpensesImportAnswersDTO answers) {
         Scope scope = parseScope(scopeValue);
         Enterprise enterprise = resolveEnterprise(scope, enterpriseId);
         validateFile(file);

@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -37,7 +38,7 @@ class InvoiceThumbnailServiceTest {
     /** Bem acima do que uma miniatura de 480px deve pesar. */
     private static final int SIZE_BUDGET_BYTES = 60 * 1024;
 
-    private final InvoiceThumbnailService service = new InvoiceThumbnailService();
+    private final InvoiceThumbnailService service = new InvoiceThumbnailService(new HeavyWorkGate());
 
     @Test
     @DisplayName("reduz uma foto grande a uma miniatura leve, mantendo a proporção")

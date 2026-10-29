@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -26,7 +27,7 @@ import java.util.stream.Stream;
  */
 class AtInvoiceQrBatchProbeTest {
 
-    private final AtInvoiceQrService service = new AtInvoiceQrService(new WeChatQrCodeService());
+    private final AtInvoiceQrService service = new AtInvoiceQrService(new WeChatQrCodeService(), new HeavyWorkGate());
 
     @Test
     @EnabledIfSystemProperty(named = "invoice.dir", matches = ".+")

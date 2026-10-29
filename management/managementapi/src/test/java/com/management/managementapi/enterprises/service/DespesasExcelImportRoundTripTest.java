@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.management.managementapi.enterprises.dto.budget.request.BudgetExportSheet;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetItemNodeDTO;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetTreeDTO;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -81,6 +83,7 @@ class DespesasExcelImportRoundTripTest {
     @Mock private InvoicePaymentRepository invoicePaymentRepository;
     @Mock private PaymentService paymentService;
     @Mock private InvoiceDocumentsExportService documentsExportService;
+    @Spy private HeavyWorkGate heavyWork = new HeavyWorkGate();
     @InjectMocks private BudgetExcelExportService exportService;
 
     // ── o importador real ──

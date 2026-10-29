@@ -1,5 +1,7 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pdfbox.Loader;
@@ -41,6 +43,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class InvoiceThumbnailService {
 
     /** Chega para um avatar de lista e para uma pré-visualização em hover. */
@@ -56,10 +59,16 @@ public class InvoiceThumbnailService {
 
     public static final String THUMBNAIL_MIME = "image/jpeg";
 
+    private final HeavyWorkGate heavyWork;
+
     /**
      * @return o JPEG da miniatura, ou vazio se o ficheiro não for renderizável
      */
     public Optional<byte[]> render(byte[] content, String mimeType) {
+        return heavyWork.run("miniatura da fatura", () -> doRender(content, mimeType));
+    }
+
+    private Optional<byte[]> doRender(byte[] content, String mimeType) {
         try {
             BufferedImage source = decode(content, mimeType);
             if (source == null) {

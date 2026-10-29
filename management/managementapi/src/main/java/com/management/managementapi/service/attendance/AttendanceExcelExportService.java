@@ -1,5 +1,6 @@
 package com.management.managementapi.service.attendance;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -80,11 +81,16 @@ public class AttendanceExcelExportService {
     private final TimeEntryRevisionRepository revisionRepository;
     private final EnterpriseRepository enterpriseRepository;
     private final AttendanceZone zone;
+    private final HeavyWorkGate heavyWork;
 
     public record ExportFile(String fileName, byte[] content) {}
 
     @Transactional(readOnly = true)
     public ExportFile exportMonth(YearMonth month) {
+        return heavyWork.run("exportação Excel da assiduidade", () -> doExportMonth(month));
+    }
+
+    private ExportFile doExportMonth(YearMonth month) {
         AttendanceMonthReportDTO report = reportService.forMonth(month);
         List<TimeEntry> entries = timeEntryRepository.findAllForAudit(
                 zone.startOfDay(month.atDay(1)), zone.startOfNextDay(month.atEndOfMonth()));

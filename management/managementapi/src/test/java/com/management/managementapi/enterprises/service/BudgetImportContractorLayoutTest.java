@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
 import com.management.managementapi.enterprises.model.BudgetRowKind;
 import com.management.managementapi.enterprises.model.ConstructionBudget;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -57,6 +59,7 @@ class BudgetImportContractorLayoutTest {
     @Mock private ConstructionBudgetRepository budgetRepository;
     @Mock private AuthContext authContext;
 
+    @Spy private HeavyWorkGate heavyWork = new HeavyWorkGate();
     @InjectMocks private BudgetExcelImportService service;
 
     private static final UUID LOT_ID = UUID.randomUUID();

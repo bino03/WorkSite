@@ -1,0 +1,31 @@
+# Deploy no Fly.io a cada push para o master que mexa no código (ver docs/operations.md
+# → "Deploy"). Commits só de docs/ não reconstroem nem reiniciam a app.
+# Precisa de dois secrets no repo GitHub: FLY_API_TOKEN (`fly tokens create deploy`) e,
+# opcional, VITE_GOOGLE_MAPS_API_KEY (o seletor de localização no mapa).
+name: Deploy Fly.io
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "management/**"
+      - ".github/workflows/fly-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: management
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # O build corre nos builders do Fly (--remote-only), não no runner.
+      - run: flyctl deploy --remote-only --build-arg VITE_GOOGLE_MAPS_API_KEY="${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

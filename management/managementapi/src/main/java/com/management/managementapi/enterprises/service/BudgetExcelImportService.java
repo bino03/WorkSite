@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.service.HeavyWorkGate;
 import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.budget.response.BudgetImportResultDTO;
@@ -83,12 +84,17 @@ public class BudgetExcelImportService {
     private final ConstructionBudgetItemRepository repository;
     private final ConstructionBudgetRepository budgetRepository;
     private final AuthContext authContext;
+    private final HeavyWorkGate heavyWork;
 
     @Transactional
     @CacheEvict(cacheNames = { CacheConfig.ENTERPRISES, CacheConfig.BUDGET_TREE },
             allEntries = true, condition = "!#dryRun")
     public BudgetImportResultDTO importBudget(UUID budgetId, MultipartFile file,
                                               boolean dryRun, boolean replace) {
+        return heavyWork.run("importação Excel do orçamento", () -> doImportBudget(budgetId, file, dryRun, replace));
+    }
+
+    private BudgetImportResultDTO doImportBudget(UUID budgetId, MultipartFile file, boolean dryRun, boolean replace) {
 
         ConstructionBudget lot = budgetRepository.findById(budgetId)
                 .filter(l -> l.getDeletedAt() == null)
