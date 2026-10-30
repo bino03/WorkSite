@@ -56,7 +56,7 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 - **Onde está o código disto?** → [[docs/code-map.md]] ← mapa domínio → ficheiros, e "onde procurar por sintoma"
 - **Comandos** → [[docs/commands.md]] ← correr, testar, build (e as armadilhas de cada um)
 - **Variáveis de ambiente** → [[docs/environment.md]]
-- **Operações** → [[docs/operations.md]] ← o que é produção, backup/restore, migração má, rotação de chave
+- **Operações** → [[docs/operations.md]] ← o que é produção (online no Fly.io), pôr uma alteração online (branch `dev` → merge no `master`), backup/restore, migração má, rotação de chave
 - **Convenções do backend** → [[docs/backend-conventions.md]]
 - **Proveniência** → [[docs/provenance.md]] ← porque é que a tabela se chama `enterprise`
 - **System Architecture** → [[docs/architecture.md]]

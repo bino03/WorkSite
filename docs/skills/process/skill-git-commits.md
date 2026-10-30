@@ -163,6 +163,23 @@ Closes #67
 
 ---
 
+## Branch — nunca commitar no `master`
+
+Desde 2026-10-30 o `master` **é a app online**: cada push que toque `management/**` faz deploy no
+Fly.io. Por isso:
+
+- Antes de commitar, `git branch --show-current` tem de dar **`dev`**. Se der `master`:
+  `git checkout dev` (ou `git checkout -b dev` se ainda não existir) — as alterações por commitar
+  vêm atrás.
+- Commits e pushes vão para o `dev` (`git push origin dev`) — não mexem na app online.
+- **Merge para o `master` só quando o utilizador pedir para pôr online.** Nunca por iniciativa
+  própria, nem no fecho de uma ronda do [[skill-implement-todo]].
+
+Procedimento do merge, cuidados com migrações (a base de dados é a mesma localmente e online) e o
+que fazer se o deploy falhar: [[operations]] → "Atualizar a app (branches e deploy)".
+
+---
+
 ## Related Skills
 
 - [[code-best-practices]] — General code quality rules

@@ -7,7 +7,7 @@ Central documentation for the Worksite project (backend + backoffice).
 - **code-map.md** — Onde vive cada funcionalidade (domínio → ficheiros) + tabela "onde procurar, por sintoma". É por aqui que se começa quando a pergunta é *"onde está o código disto?"*
 - **commands.md** — Como correr, testar e fazer build de cada projeto, com as armadilhas (testes que escrevem na BD real, portas e CORS, migrações que se aplicam sozinhas)
 - **environment.md** — As variáveis de ambiente de backend e Backoffice, e o que acontece sem elas
-- **operations.md** — O que é "produção" (backend local contra o Supabase real), cópia de segurança e restore do Postgres e do bucket `documents`, o que fazer a uma migração má, rotação da chave de cifra
+- **operations.md** — O que é "produção" (online no Fly.io desde 2026-10-30, contra o Supabase real), como se põe uma alteração online (branch `dev` → merge no `master` = deploy), cópia de segurança e restore do Postgres e do bucket `documents`, o que fazer a uma migração má, rotação da chave de cifra
 - **backend-conventions.md** — Decisões do `managementapi` que não se deduzem do código: ordem dos annotation processors, tratamento de erros, bibliotecas de leitura de ficheiros, compressão, signed URLs
 - **provenance.md** — O que veio do Property-Management e o que nasceu aqui. Explica nomes herdados (`enterprise`) e restos que não correspondem a funcionalidades reais
 - **architecture.md** — System architecture overview

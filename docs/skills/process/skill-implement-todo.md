@@ -231,7 +231,7 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 - **Estado da iniciativa** — atualiza a linha correspondente em `notes/roadmap/backlog.md` (estado, data, o que falta; cria a linha se a frente é nova; apaga-a se ficou ✅ sem restos). É o único sítio que diz *em que pé está cada frente* — se este passo se salta, o ficheiro volta a ficar vazio como esteve de 08-05 a 09-19.
 - **Lição de ferramenta?** — pergunta uma vez: "algo custou tempo nesta ronda que não fosse da app (extensão do Chrome, Claude Code, Excel, git, Obsidian)?". Se sim, um bullet datado em `notes/learning.md` (o que aconteceu → o que se faz diferente). Se a lição é da app, vai para `docs/`, não para lá.
 - **Alguma skill, doc ou regra atrapalhou?** — na mesma pergunta: algo do processo partilhado com o Workflow (skills, convenções, este ciclo) que confundiu, contradisse ou não servia. Se sim (e ainda não está lá), entrada em `notes/workflow-feedback.md` com "como se resolveu".
-- Proposta de commit seguindo [[skill-git-commits]] — pergunta antes de qualquer `git push`, como é norma geral do resto do trabalho neste repo. O Worksite é **um único repositório git** (backend e Backoffice vivem ambos em `management/`), por isso uma ronda normal fecha com **um só commit** — não há aqui a separação por submódulo que existia no projeto de origem.
+- Proposta de commit seguindo [[skill-git-commits]] — pergunta antes de qualquer `git push`, como é norma geral do resto do trabalho neste repo. O Worksite é **um único repositório git** (backend e Backoffice vivem ambos em `management/`), por isso uma ronda normal fecha com **um só commit** — não há aqui a separação por submódulo que existia no projeto de origem. **O commit vai para a branch `dev`, nunca para o `master`**: o `master` é a app online e cada push nele faz deploy. O merge para o `master` só se faz quando o utilizador pede para pôr online — ver [[skill-git-commits]] → "Branch" e [[operations]] → "Atualizar a app".
 - Se notares drift entre `notes/ideas.md` e `notes/ToDo.md`, ou que `notes/whatIveDone.md` tem entradas que não seguem o formato desta skill, menciona uma vez como aviso — não corrijas automaticamente, são ficheiros pessoais do utilizador.
 
 ---
@@ -252,7 +252,7 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 - [ ] `notes/ToDo.md` atualizado por tarefa concluída (remoção pontual, não reescrita)
 - [ ] `notes/whatIveDone.md` com entrada nova por tarefa concluída; integration guide da feature apagado (`git rm`) se a tarefa fechou o frontend
 - [ ] `notes/roadmap/backlog.md` com a linha da iniciativa atualizada; `notes/learning.md` se houve lição de ferramenta; `notes/workflow-feedback.md` se uma skill/doc atrapalhou
-- [ ] Resumo final + proposta de commit, sem `git push` sem confirmação
+- [ ] Resumo final + proposta de commit na branch `dev` (nunca no `master`), sem `git push` sem confirmação
 
 ---
 

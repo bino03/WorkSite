@@ -50,6 +50,7 @@ outra tarefa — acrescenta-se uma entrada a [[notes/workflow-feedback]] (o form
 | Como arranco, testo, faço build? | [[docs/commands]] |
 | Que variáveis de ambiente preciso? | [[docs/environment]] |
 | Como faço backup, restore, ou desfaço uma migração má? | [[docs/operations]] |
+| Como ponho uma alteração online? Em que branch trabalho? | [[docs/operations]] → "Atualizar a app" |
 | Que rotas tem a API? | [[docs/api]] |
 | Como é o schema da base de dados? | [[docs/database]] |
 | Autenticação, roles, CORS? | [[docs/security]] |

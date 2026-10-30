@@ -7,13 +7,18 @@ Nada disto vive no código — é o que se perde quando só se lê o repo.
 
 ## O que é "produção"
 
-**Não há servidor.** Produção é o **projeto Supabase real** (Postgres + Auth + Storage) com o
-backend a correr **localmente** em `:8080` e o Backoffice em `:5173`, na máquina de quem usa a
-app. O `.env` de `management/managementapi/` aponta para esse projeto — ver [[environment]].
+**A app está online desde 2026-10-30: `https://worksite-vilatro.fly.dev`.** Uma máquina Fly.io
+(organização `vilatro`, 1 GB, Londres) serve o Backoffice e a API na mesma origem, ligada ao
+**projeto Supabase real** (Postgres + Auth + Storage). Como está montada: "Como está montado",
+abaixo. Como se atualiza: "Atualizar a app", abaixo.
+
+O desenvolvimento continua local — backend em `:8080`, Backoffice em `:5173` — **mas com o mesmo
+`.env`, ou seja, contra a mesma base de dados de produção**: não há base de dados de
+desenvolvimento ([[environment]]).
 
 Consequências que se pagam caro por não se saberem:
 
-- **Tudo o que arranca o backend toca a base de dados real**: `spring-boot:run`,
+- **Tudo o que arranca o backend local toca a base de dados real** — a mesma que a app online usa: `spring-boot:run`,
   `-Dtest=ManagementApiApplicationTests` (a única classe que levanta o contexto — desde 2026-09-19
   fora do `./mvnw test` por defeito) e, com o devtools ligado, o próprio `mvn compile` — uma
   migração Flyway nova aplica-se no primeiro restart. Ver [[commands]] → "Testes".
@@ -26,12 +31,52 @@ Consequências que se pagam caro por não se saberem:
   orçamentos, faturas, pagamentos — [[excel-parity]] §9), mas não de utilizadores, tarefas,
   notificações nem definições. Uma cópia de segurança a sério é a que está abaixo.
 
-## Deploy — o que muda quando deixar de correr localmente
+## Atualizar a app (branches e deploy)
 
-Hoje "produção" é o parágrafo acima: o mesmo Postgres/Auth/Storage reais, mas o backend a correr
-na máquina de quem usa a app. O dia em que isto passar a correr num serviço a sério (um servidor,
-um container, uma PaaS) muda um conjunto concreto de coisas — nenhuma delas é código por escrever,
-são decisões e configuração. Levantado e testado a 2026-09-22 (roadmap completo em
+**O `master` é o que está online.** Cada push para o `master` que toque `management/**` ou o
+workflow faz deploy sozinho (`.github/workflows/fly-deploy.yml`). Por isso, desde 2026-10-30:
+
+- **Todo o trabalho vai para a branch `dev`**, nunca diretamente para o `master` — commits e pushes
+  à vontade lá, a app online não muda. Docs e `notes/` também.
+- **Pôr online = merge do `dev` para o `master` + push**, só quando o utilizador o pedir:
+
+  ```powershell
+  git checkout master
+  git merge dev
+  git push            # → deploy
+  git checkout dev    # voltar a trabalhar
+  ```
+
+  Merge só de docs não reconstrói a app (o workflow só olha para `management/**`).
+- **Antes do merge**: testes a passar e `npx tsc -b` sem erros novos ([[commands]]); se houver
+  migração nova, backup primeiro (abaixo, "Cópia de segurança").
+- **O deploy demora 5–10 min e a app fica ~1–2 min em baixo** enquanto o Spring arranca (uma só
+  máquina) — fazer o merge fora das horas de uso. Acompanhar em GitHub → Actions → "Deploy Fly.io",
+  ou `fly logs -a worksite-vilatro`.
+- **Se o deploy falhar** (build partido, app que não passa o health check), a versão anterior
+  continua a correr; o erro está no run vermelho.
+- **Mudar um segredo** (password da BD, chaves do Supabase): editar o secret `FLY_APP_SECRETS` no
+  GitHub e correr o workflow à mão (Actions → Deploy Fly.io → Run workflow). Um push não chega se o
+  secret não mudou antes. Um *Re-run* de um run antigo volta a correr **o commit antigo** — para
+  apanhar o último commit, é sempre "Run workflow".
+
+**A branch separa o código, não os dados.** O backend local e a app online usam a mesma base de
+dados, por isso:
+
+- O que se cria ou apaga a testar localmente aparece logo online — testar dentro de obras `is_test`.
+- **Uma migração Flyway nova aplica-se à base de dados de produção no primeiro arranque local**, antes
+  do merge. Uma migração aditiva (coluna ou tabela nova) não faz mal à app online. Uma destrutiva
+  (renomear/apagar coluna, mudar tipo) **parte a app online** até ao deploy — nesse caso, fazer o
+  merge e o deploy logo a seguir a arrancar localmente, ou partir a migração em duas (acrescentar
+  agora, apagar num deploy seguinte).
+- A saída para isto é um segundo projeto Supabase só para desenvolvimento, apontado no `.env`
+  local. Não existe — fica por decidir.
+
+## Deploy — o que mudou ao deixar de correr localmente
+
+Até 2026-10-30, "produção" era o mesmo Postgres/Auth/Storage reais com o backend a correr na
+máquina de quem usava a app. Passar a correr num serviço a sério mudou um conjunto concreto de
+coisas — nenhuma delas código por escrever, decisões e configuração. Levantado e testado a 2026-09-22 (roadmap completo em
 `notes/roadmap/pre-deploy-security.md`, já implementado e testado o que dava para testar sem essa
 hospedagem decidida).
 
@@ -86,9 +131,11 @@ montado". A recomendação seguinte fica para o dia em que se quiser o nome da e
 custa menos que um mês de Vercel Pro, não exige código, e os links dos emails de convite saem com o
 nome da empresa. Sem domínio, a opção 1 é a mais simples e deixa o frontend sem custo.
 
-### Como está montado (2026-10-29)
+### Como está montado (2026-10-29, online desde 2026-10-30)
 
-Uma app Fly só, `https://worksite-vilatro.fly.dev`, a servir o Backoffice e a API na mesma origem:
+Uma app Fly só, `https://worksite-vilatro.fly.dev`, na organização Fly **`vilatro`** (nome
+"Vilatro", onde está o cartão — a conta tem também a `personal`, que não se usa), a servir o
+Backoffice e a API na mesma origem:
 
 - **`management/Dockerfile`** (contexto `management/`) em três fases: `npx vite build` do Backoffice
   (sem o `tsc -b` do script `build`, que tem erros antigos e partiria a imagem) → copia o `dist/`
@@ -103,11 +150,17 @@ Uma app Fly só, `https://worksite-vilatro.fly.dev`, a servir o Backoffice e a A
 - **Segredos** (as do `.env` do backend menos as `COOKIE_*` — [[environment]]) vivem no secret
   `FLY_APP_SECRETS` do repo GitHub e o workflow importa-os no Fly a cada deploy. Nunca no `fly.toml`.
 - **`.github/workflows/fly-deploy.yml`**: `flyctl deploy --remote-only` a cada push para o `master` que
-  toque `management/**` (commits só de `docs/` não reiniciam a app); no primeiro run cria a app.
-  **Não há `flyctl` na máquina de dev** — o Smart App Control do Windows bloqueia o `flyctl.exe`, e
-  desligá-lo no Windows 11 Home é irreversível. Tudo passa pelo workflow e pelo dashboard do Fly.
-  Secrets do repo GitHub: `FLY_API_TOKEN` (token de **organização**, para poder criar a app),
-  `FLY_APP_SECRETS` e, opcional, `VITE_GOOGLE_MAPS_API_KEY` (vai como build arg).
+  toque `management/**` (commits só de `docs/` não reiniciam a app); se a app não existir, cria-a com
+  `--org "$FLY_ORG"` (`vilatro`) — sem terminal, o `apps create` não pode perguntar a organização e
+  falha com `org slug must be specified`.
+  Secrets do repo GitHub: `FLY_API_TOKEN` (token de **organização**, criado na `vilatro` — um token
+  de organização só vê a sua; com outra dá `organization … not found`), `FLY_APP_SECRETS` e,
+  opcional, `VITE_GOOGLE_MAPS_API_KEY` (vai como build arg).
+- **`flyctl` na máquina de dev**: a 2026-10-29 o Smart App Control do Windows bloqueou o
+  `flyctl.exe` (não desligar — no Windows 11 Home é irreversível); a 2026-10-30 `fly auth login`,
+  `fly orgs list` e `fly tokens create org` correram no PowerShell. Serve para ver (`fly logs`,
+  `fly status`), não é preciso para fazer deploy — esse é sempre pelo workflow. Uma organização
+  criada depois do `fly auth login` só aparece no CLI depois de `fly auth logout` + login de novo.
 - **`SpaController`** reencaminha as rotas do React (`/login`, `/backoffice/**`, `/team/**`, …) para o
   `index.html`. Nenhuma colide com a API. **Uma rota de topo nova no `main.tsx` tem de entrar aqui e
   em `SecurityConfig.SPA_PATHS`**, senão um refresh nela dá `401`.
@@ -119,11 +172,11 @@ Uma app Fly só, `https://worksite-vilatro.fly.dev`, a servir o Backoffice e a A
 - Localmente nada muda: sem `static/` copiado as rotas do React dão `404` em `:8080` e o Vite em
   `:5173` continua a ser o caminho.
 
-**Por confirmar no primeiro deploy**: o build da imagem (não há Docker na máquina de dev — o resto foi
-testado a 2026-10-29 com o `dist/` copiado à mão e o backend em `:8090`); o arranque dentro dos 120 s
-de graça numa CPU partilhada; login e cookies sobre HTTPS real; que o Tomcat confia no proxy do Fly
-para o `X-Forwarded-Proto` (sem isso o HSTS não sai); a CSP com o mapa e os PDFs
-(`notes/verificacao-browser-pendente.md` §51). O `RateLimitFilter` confia no primeiro
+**Confirmado no primeiro deploy (2026-10-30)**: a imagem constrói nos builders do Fly; o arranque
+cabe nos 120 s de graça; `/` dá 200, `/actuator/health` dá `UP`, e a resposta traz
+`Strict-Transport-Security` — o Tomcat confia no `X-Forwarded-Proto` do proxy do Fly.
+**Ainda por confirmar**: login e cookies sobre HTTPS real, refresh nas rotas do React, a CSP com o
+mapa e os PDFs, e o pico de memória nas Metrics do Fly (`notes/verificacao-browser-pendente.md` §51). O `RateLimitFilter` confia no primeiro
 `X-Forwarded-For`, que um cliente pode forjar atrás do proxy — aceitável para uma app interna, mas o
 limite por IP do login fica contornável.
 

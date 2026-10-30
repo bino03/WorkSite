@@ -43,7 +43,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 | Skill                      | Description                                                                           | Tags                                | Time               |
 | -------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------- | ------------------ |
 | [[skill-create-new-skill]] | Plan, write, and add a new skill (or reference) to the project                        | `#process` `#documentation` `#meta` | ~30-45m            |
-| [[skill-git-commits]]      | Commit message style and conventions                                                  | `#git` `#commits` `#style`          | ~1-2m              |
+| [[skill-git-commits]]      | Commit message style and conventions; commits go to `dev`, never `master` (= deploy)   | `#git` `#commits` `#style`          | ~1-2m              |
 | [[skill-implement-todo]]   | Backlog (`notes/ToDo.md`) → prioridade → implementação, orquestrando as outras skills | `#process` `#backlog` `#planning`   | ~1m a várias horas |
 | [[skill-refine-idea]]       | Ideia em linguagem livre → lê o vault → pergunta só o que falta → bullet no ToDo ou entrada em `ideas.md`; não implementa | `#process` `#backlog` `#ideas` | ~5-15m |
 | [[skill-run]]               | Arranca backend + Backoffice localmente em background, com verificação por log e health check `curl` | `#process` `#local` `#health-check` | ~1-2m |
