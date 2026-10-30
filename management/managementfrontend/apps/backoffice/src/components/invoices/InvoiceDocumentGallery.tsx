@@ -14,7 +14,7 @@ import type { InvoiceDocument } from "@/types/invoice";
 interface Props {
   invoiceId: string;
   documents: InvoiceDocument[];
-  /** Só `ADMIN` remove ou substitui; juntar é de toda a gente. */
+  /** Só `ADMIN` e `ACCOUNTANT` removem ou substituem; juntar é de toda a gente. */
   canManage: boolean;
   /** Recarrega a fatura: o `documentStatus` muda no servidor, não aqui. */
   onChanged: () => void;

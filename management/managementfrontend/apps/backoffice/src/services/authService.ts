@@ -2,7 +2,7 @@
 import api from "@/api";
 
 export interface UserInfo {
-  role: "ADMIN" | "EMPLOYEE";
+  role: "ADMIN" | "EMPLOYEE" | "ACCOUNTANT";
   accountStatus: string;
   authUserId: string;
   profileId: string;

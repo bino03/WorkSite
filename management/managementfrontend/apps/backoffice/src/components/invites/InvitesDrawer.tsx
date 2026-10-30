@@ -6,6 +6,7 @@ import {
   FilterOutlined,
   UserOutlined,
   CrownOutlined,
+  CalculatorOutlined,
   TeamOutlined,
   CalendarOutlined,
   ClockCircleOutlined,
@@ -18,6 +19,14 @@ import { listInvites, type InviteListItem, type InviteFilters } from "@/services
 import { useTranslation } from "react-i18next";
 import type { Role } from "@/services/profileService";
 import type { ColumnsType } from "antd/es/table";
+
+const ROLE_ICONS: Record<Role, React.ReactNode> = {
+  ADMIN: <CrownOutlined />,
+  EMPLOYEE: <TeamOutlined />,
+  ACCOUNTANT: <CalculatorOutlined />,
+};
+
+const ROLE_TAG_COLORS: Record<Role, string> = { ADMIN: "gold", EMPLOYEE: "blue", ACCOUNTANT: "green" };
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/pt";
@@ -110,15 +119,15 @@ export default function InvitesDrawer({ open, onClose }: Props) {
       key: "role",
       render: (role: Role) => (
         <Tag 
-          icon={role === "ADMIN" ? <CrownOutlined /> : <TeamOutlined />}
-          color={role === "ADMIN" ? "gold" : "blue"}
+          icon={ROLE_ICONS[role]}
+          color={ROLE_TAG_COLORS[role]}
           style={{ 
             borderRadius: '16px',
             padding: '4px 12px',
             fontWeight: 500
           }}
         >
-          {role === "ADMIN" ? t('profile.roles.admin') : t('profile.roles.employee')}
+          {t(`profile.roles.${role.toLowerCase()}`)}
         </Tag>
       ),
     },
@@ -319,6 +328,7 @@ export default function InvitesDrawer({ open, onClose }: Props) {
               options={[
                 { value: "ADMIN", label: t('profile.roles.admin') },
                 { value: "EMPLOYEE", label: t('profile.roles.employee') },
+                { value: "ACCOUNTANT", label: t('profile.roles.accountant') },
               ]}
             />
           </div>

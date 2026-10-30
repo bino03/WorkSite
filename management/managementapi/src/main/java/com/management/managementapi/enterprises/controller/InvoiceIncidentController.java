@@ -26,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Inconsistências ("Por conciliar") — a página que lista o que ficou por acertar
- * entre faturas, tipicamente depois de uma transferência. Só ADMIN.
+ * entre faturas, tipicamente depois de uma transferência. Só ADMIN e ACCOUNTANT.
  */
 @RestController
 @RequestMapping("/invoice-incidents")
@@ -39,19 +39,19 @@ public class InvoiceIncidentController {
 
     /** Por resolver primeiro, depois os mais recentes. */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public List<InvoiceIncidentResponseDTO> list() {
         return service.list();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public InvoiceIncidentResponseDTO get(@PathVariable UUID id) {
         return service.get(id);
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceIncidentResponseDTO> create(
             @Valid @RequestBody InvoiceIncidentCreateDTO dto,
             HttpServletRequest request) {
@@ -65,7 +65,7 @@ public class InvoiceIncidentController {
     }
 
     @PostMapping("/{id}/resolve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceIncidentResponseDTO> resolve(
             @PathVariable UUID id,
             HttpServletRequest request) {

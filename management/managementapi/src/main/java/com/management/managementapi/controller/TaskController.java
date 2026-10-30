@@ -45,7 +45,7 @@ public class TaskController {
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     @GetMapping
     public Page<TaskResponseDTO> list(
             @RequestParam(required = false) String q,
@@ -57,7 +57,7 @@ public class TaskController {
         return taskService.list(q, status, enterpriseId, assigneeId, requesterId, authContext.isCurrentUserAdmin(), pageable);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     @GetMapping("/{id}")
     public ResponseEntity<TaskResponseDTO> getById(@PathVariable UUID id) {
         UUID requesterId = currentProfileId();
@@ -82,7 +82,7 @@ public class TaskController {
      * Um EMPLOYEE só consegue editar tarefas onde está atribuído — validado
      * no service (não só aqui).
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     @PutMapping("/{id}")
     public ResponseEntity<TaskResponseDTO> update(
             @PathVariable UUID id,
@@ -101,7 +101,7 @@ public class TaskController {
      * Atualiza apenas o estado da tarefa. Um utilizador atribuído (não-admin)
      * só consegue chegar aqui — não pode alterar nome/descrição/prazo/atribuições.
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<TaskResponseDTO> updateStatus(
             @PathVariable UUID id,

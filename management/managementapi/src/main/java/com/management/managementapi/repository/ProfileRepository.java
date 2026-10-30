@@ -6,6 +6,7 @@ import com.management.managementapi.model.enums.ProfileRole;
 
 import jakarta.persistence.Tuple;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -36,10 +37,10 @@ public interface ProfileRepository extends JpaRepository<Profile, UUID> {
 
     Long countByRole(ProfileRole role);
 
-    /** Só contas desbloqueadas — um admin bloqueado/eliminado não recebe avisos. */
-    @Query("select p.id from Profile p where p.role = :role and p.accountStatus = :status")
-    List<UUID> findIdsByRoleAndAccountStatus(@Param("role") ProfileRole role,
-                                             @Param("status") AccountStatus status);
+    /** Só contas desbloqueadas — quem está bloqueado/eliminado não recebe avisos. */
+    @Query("select p.id from Profile p where p.role in :roles and p.accountStatus = :status")
+    List<UUID> findIdsByRoleInAndAccountStatus(@Param("roles") Collection<ProfileRole> roles,
+                                               @Param("status") AccountStatus status);
 
     @Query("select p.name from Profile p where p.id = :id")
     Optional<String> findNameOnlyById(UUID id);

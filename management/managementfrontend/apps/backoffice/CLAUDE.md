@@ -3,7 +3,7 @@
 > A documentação vive no vault: `docs/` e `notes/`. **Não documentar aqui.**
 > Ver a regra em [[../../../../CLAUDE]].
 
-Dashboard administrativo (`ADMIN`/`EMPLOYEE`). React 18, Vite 7, TypeScript 5.8 (strict),
+Dashboard administrativo (`ADMIN`/`EMPLOYEE`/`ACCOUNTANT`). React 18, Vite 7, TypeScript 5.8 (strict),
 Ant Design 5, Tailwind CSS 4. É a única app frontend do projeto.
 
 ## Onde ir

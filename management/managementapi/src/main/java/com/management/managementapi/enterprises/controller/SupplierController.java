@@ -34,7 +34,7 @@ import java.util.UUID;
 /**
  * Fornecedores de obra — o catálogo NIF → nome da empresa.
  *
- * Ler é para toda a gente que mexe em faturas; escrever é de ADMIN, como o
+ * Ler é para toda a gente que mexe em faturas; escrever é de ADMIN e ACCOUNTANT, como o
  * resto do que altera dados já registados (gravar um nome reescreve faturas de
  * todos os projetos — ver {@link SupplierService}).
  */
@@ -49,7 +49,7 @@ public class SupplierController {
 
     /** O catálogo, por ordem alfabética. {@code q} filtra por nome ou NIF. */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public List<SupplierResponseDTO> list(@RequestParam(required = false) String q) {
         return service.list(q);
     }
@@ -59,14 +59,14 @@ public class SupplierController {
      * mais frequente para o menos — a lista de trabalho do ecrã.
      */
     @GetMapping("/unknown-nifs")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public List<UnknownSupplierNifDTO> unknownNifs() {
         return service.listUnknownNifs();
     }
 
     /** Dá nome a um NIF. Preenche também as faturas desse NIF que estejam sem nome. */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<SupplierSaveResultDTO> create(
             @Valid @RequestBody SupplierUpsertDTO dto,
             HttpServletRequest request) {
@@ -80,7 +80,7 @@ public class SupplierController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<SupplierSaveResultDTO> update(
             @PathVariable UUID id,
             @Valid @RequestBody SupplierUpsertDTO dto,
@@ -99,7 +99,7 @@ public class SupplierController {
      * dado do documento, não uma referência a esta tabela.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID id, HttpServletRequest request) {
         Supplier supplier = service.getById(id);
 

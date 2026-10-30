@@ -23,7 +23,8 @@ interface Props {
   y: number;
   invoice: ConstructionInvoice | null;
   onClose: () => void;
-  isAdmin: boolean;
+  /** ADMIN ou contabilidade — `useAuth().canManageWorks()`. */
+  canManage: boolean;
   /** Só numa lista de obra há rubrica a que associar. */
   isProject: boolean;
   isQuarantine: boolean;
@@ -50,7 +51,7 @@ export const InvoiceContextMenu: React.FC<Props> = ({
   y,
   invoice,
   onClose,
-  isAdmin,
+  canManage,
   isProject,
   isQuarantine,
   onAllocate,
@@ -105,7 +106,7 @@ export const InvoiceContextMenu: React.FC<Props> = ({
   };
 
   const items: Item[] = [];
-  if (isAdmin && isProject) {
+  if (canManage && isProject) {
     items.push(
       invoice.allocated
         ? { icon: <DisconnectOutlined />, label: "Desassociar", onClick: run(onDeallocate) }
@@ -117,21 +118,21 @@ export const InvoiceContextMenu: React.FC<Props> = ({
           }
     );
   }
-  if (isAdmin && onTransfer && isInvoice) {
+  if (canManage && onTransfer && isInvoice) {
     items.push({
       icon: <SwapOutlined />,
       label: isQuarantine ? "Atribuir a uma obra" : "Transferir",
       onClick: run(onTransfer),
     });
   }
-  if (isAdmin) {
+  if (canManage) {
     items.push({
       icon: <SendOutlined />,
       label: invoice.sentToAccountant ? "Desmarcar envio" : "Marcar como enviada",
       onClick: run(onSendToAccountant),
     });
   }
-  if (isAdmin && onTogglePaymentApproval) {
+  if (canManage && onTogglePaymentApproval) {
     if (invoice.approvedForPayment) {
       items.push({
         icon: <CloseCircleOutlined />,
@@ -146,14 +147,14 @@ export const InvoiceContextMenu: React.FC<Props> = ({
       });
     }
   }
-  if (isAdmin && onRegisterPayment && payable) {
+  if (canManage && onRegisterPayment && payable) {
     items.push({
       icon: <DollarOutlined />,
       label: "Registar pagamento…",
       onClick: run(onRegisterPayment),
     });
   }
-  if (isAdmin && onMarkPaid && payable) {
+  if (canManage && onMarkPaid && payable) {
     items.push({
       icon: <CheckCircleOutlined />,
       label: "Marcar como pago",

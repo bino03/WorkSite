@@ -277,7 +277,7 @@ export interface ConstructionInvoice {
   sentToAccountant: boolean;
   sentToAccountantBy: string | null;
   sentToAccountantByName: string | null;
-  sentToAccountantByRole: "ADMIN" | "EMPLOYEE" | null;
+  sentToAccountantByRole: "ADMIN" | "EMPLOYEE" | "ACCOUNTANT" | null;
   sentToAccountantAt: string | null;
 
   // ── aprovação para pagamento — pagar sem ela avisa, não bloqueia ──

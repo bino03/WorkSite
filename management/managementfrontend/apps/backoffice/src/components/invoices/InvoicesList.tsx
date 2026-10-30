@@ -116,7 +116,7 @@ export const InvoicesList: FC<Props> = ({
   scope = "PROJECT",
   enterpriseNames,
 }) => {
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const { t } = useTranslation();
   const isProject = scope === "PROJECT";
   const isQuarantine = scope === "UNIDENTIFIED";
@@ -405,7 +405,7 @@ export const InvoicesList: FC<Props> = ({
           <ListActionPrimary onClick={() => onView(row)}>Ver detalhes</ListActionPrimary>
           {/* Associar, transferir, enviar, pagamento e nota vivem no menu de
               contexto (botão direito) — ver `InvoiceContextMenu`. */}
-          {isAdmin() && <ListActionDanger onClick={() => onDelete(row)}>Eliminar</ListActionDanger>}
+          {canManageWorks() && <ListActionDanger onClick={() => onDelete(row)}>Eliminar</ListActionDanger>}
         </ListActions>
       ),
     },
@@ -418,7 +418,7 @@ export const InvoicesList: FC<Props> = ({
         y={menu?.y ?? 0}
         invoice={menu?.invoice ?? null}
         onClose={closeMenu}
-        isAdmin={isAdmin()}
+        canManage={canManageWorks()}
         isProject={isProject}
         isQuarantine={isQuarantine}
         onAllocate={onAllocate}
@@ -437,7 +437,7 @@ export const InvoicesList: FC<Props> = ({
         pagination={false}
         size="small"
         rowSelection={
-          isAdmin()
+          canManageWorks()
             ? {
                 selectedRowKeys: selectedIds,
                 onChange: (keys) => onSelectionChange(keys as string[]),

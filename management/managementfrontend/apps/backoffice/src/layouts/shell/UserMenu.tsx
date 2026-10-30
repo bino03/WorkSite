@@ -144,7 +144,7 @@ export function UserMenu() {
           </div>
           <span>{userName}</span>
           <span className="ind-tag ind-tag-outline">
-            {userRole === "ADMIN" ? t("profile.roles.admin") : t("profile.roles.employee")}
+            {t(`profile.roles.${(userRole ?? "EMPLOYEE").toLowerCase()}`)}
           </span>
         </button>
       </Dropdown>

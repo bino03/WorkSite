@@ -167,7 +167,7 @@ export interface ExpenseInvoiceRef {
 
   sentToAccountant: boolean;
   sentToAccountantByName: string | null;
-  sentToAccountantByRole: "ADMIN" | "EMPLOYEE" | null;
+  sentToAccountantByRole: "ADMIN" | "EMPLOYEE" | "ACCOUNTANT" | null;
   sentToAccountantAt: string | null;
 }
 

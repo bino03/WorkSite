@@ -33,6 +33,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { parseApiError } from "@/utils/apiError";
 import { formatCurrency, formatDate } from "@/utils/formatters";
+import { roleToLabel } from "@/utils/profile";
 import type { ConstructionInvoice, InvoiceScope } from "@/types/invoice";
 
 const SCOPE_LABEL: Record<InvoiceScope, string> = {
@@ -41,7 +42,6 @@ const SCOPE_LABEL: Record<InvoiceScope, string> = {
   UNIDENTIFIED: "Por identificar",
 };
 
-const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrador", EMPLOYEE: "Funcionário" };
 
 /**
  * ErrorCode de `dto/error/ErrorCode.java` — as três chaves de duplicado que
@@ -102,7 +102,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   onIncidentSuggested,
   suggestedInvoiceType = DEFAULT_INVOICE_TYPE,
 }) => {
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const confirm = useConfirm();
   const { t } = useTranslation();
 
@@ -339,7 +339,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
           </div>
         }
         footer={
-          isAdmin() && (
+          canManageWorks() && (
             <Space style={{ display: "flex", justifyContent: "flex-end" }}>
               <Button onClick={onClose} disabled={saving}>
                 Fechar
@@ -402,7 +402,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               <InvoiceDocumentGallery
                 invoiceId={invoice.id}
                 documents={invoice.documents}
-                canManage={isAdmin()}
+                canManage={canManageWorks()}
                 onChanged={() => {
                   void fetchInvoice();
                   onChanged();
@@ -463,13 +463,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                   {t(`invoices.payment.status.${invoice.paymentStatus}`)}
                 </span>
 
-                {/* O selo aparece a toda a gente; só o ADMIN o pode mudar. Numa NC
+                {/* O selo aparece a toda a gente; só o ADMIN e a contabilidade o podem mudar. Numa NC
                     não há o que aprovar, e numa fatura paga só se mostra se a tiver. */}
                 {invoice.documentType !== "CREDIT_NOTE" &&
                   (invoice.approvedForPayment || invoice.paymentStatus !== "PAID") && (
                     <Tooltip
                       title={
-                        !isAdmin()
+                        !canManageWorks()
                           ? undefined
                           : invoice.approvedForPayment
                             ? "Clique para retirar a aprovação."
@@ -478,9 +478,9 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                     >
                       <span
                         className={`ind-tag ${invoice.approvedForPayment ? "ind-tag-accent-2" : "ind-tag-neutral"}`}
-                        style={{ cursor: isAdmin() ? "pointer" : undefined }}
+                        style={{ cursor: canManageWorks() ? "pointer" : undefined }}
                         onClick={
-                          isAdmin() && (invoice.approvedForPayment || canApproveForPayment(invoice))
+                          canManageWorks() && (invoice.approvedForPayment || canApproveForPayment(invoice))
                             ? () => paymentApproval.toggle(invoice)
                             : undefined
                         }
@@ -490,7 +490,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                     </Tooltip>
                   )}
 
-                {isAdmin() && (
+                {canManageWorks() && (
                   <span
                     className={`ind-tag ${invoice.sentToAccountant ? "ind-tag-accent-2" : "ind-tag-neutral"}`}
                     style={{ cursor: "pointer" }}
@@ -512,7 +512,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                 <div style={{ fontSize: 11, opacity: 0.6, marginTop: -12 }}>
                   Enviada por {invoice.sentToAccountantByName}
                   {invoice.sentToAccountantByRole
-                    ? ` (${ROLE_LABEL[invoice.sentToAccountantByRole]})`
+                    ? ` (${roleToLabel(invoice.sentToAccountantByRole)})`
                     : ""}{" "}
                   · {formatDate(invoice.sentToAccountantAt)}
                 </div>
@@ -525,14 +525,14 @@ export const InvoiceDetailDrawer: FC<Props> = ({
 
               <InvoiceDueDateField
                 invoice={invoice}
-                editable={isAdmin()}
+                editable={canManageWorks()}
                 onChanged={() => {
                   void fetchInvoice();
                   onChanged();
                 }}
               />
 
-              {isAdmin() && (
+              {canManageWorks() && (
                 <div style={{ display: "flex", gap: 8 }}>
                   {invoice.allocated ? (
                     <Button onClick={handleDeallocate}>
@@ -603,7 +603,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               {invoice.documentType === "INVOICE" && (
               <InvoicePaymentSection
                 invoice={invoice}
-                canManage={isAdmin()}
+                canManage={canManageWorks()}
                 onMarkPaid={() => setMarkPaidOpen(true)}
                 onDeletePayment={handleDeletePayment}
               />
@@ -616,7 +616,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               <InvoiceFields
                 invoice={invoice}
                 values={values}
-                editable={isAdmin()}
+                editable={canManageWorks()}
                 onChange={set}
                 onInvoiceNumberChange={handleInvoiceNumberChange}
               />

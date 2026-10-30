@@ -13,11 +13,11 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 ## Autorização (roles)
 
 - Todo o token válido recebe a authority `ROLE_AUTHENTICATED`.
-- Roles adicionais (`ROLE_ADMIN`, `ROLE_EMPLOYEE`) são derivadas de três fontes, por ordem: claim `role` no topo do JWT, `app_metadata.role`, e como fallback uma consulta a `worksite.profile.role`.
-- O tipo `role_enum` na base de dados só define `ADMIN` e `EMPLOYEE`.
+- Roles adicionais (`ROLE_ADMIN`, `ROLE_EMPLOYEE`, `ROLE_ACCOUNTANT`) são derivadas de três fontes, por ordem: claim `role` no topo do JWT, `app_metadata.role`, e como fallback uma consulta a `worksite.profile.role`.
+- O tipo `role_enum` na base de dados define `ADMIN`, `EMPLOYEE` e — desde a `V47` — `ACCOUNTANT`.
 - Autorização fina feita maioritariamente por `@PreAuthorize` em cada controller/método (`hasRole('ADMIN')`, `hasAnyRole('ADMIN','EMPLOYEE')`, `isAuthenticated()`).
 
-### Role `ACCOUNTANT` — decidida a 2026-10-30, por implementar
+### Role `ACCOUNTANT` — desde 2026-10-30 (`V47`)
 
 Uma terceira role para a contabilidade. **No espaço Obras faz tudo o que o ADMIN faz** (obras,
 orçamentos, despesas, faturas — incluindo despesas da empresa e quarentena —, pagamentos,
@@ -27,11 +27,23 @@ prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das De
 tarefas — em Tarefas comporta-se como EMPLOYEE. Não é trabalhador para a assiduidade.
 
 Como se aplica: `hasAnyRole('ADMIN','ACCOUNTANT')` explícito em cada `@PreAuthorize` de Obras (não
-uma `RoleHierarchy`, que não consegue dizer "ADMIN só em Obras"), e um teste de reflexão que falha
-se um endpoint de `enterprises.controller` aceitar `ADMIN` sem `ACCOUNTANT`. No Backoffice,
-`canManageWorks()` guarda Obras e `isAdmin()` continua a guardar o resto. Desenho e fases em
-`notes/roadmap/role-accountant.md`; quando estiver implementada, esta secção passa a descrever o
-estado real e a tabela de matchers abaixo ganha o `ACCOUNTANT`.
+uma `RoleHierarchy`, que não consegue dizer "ADMIN só em Obras"), e `ACCOUNTANT` acrescentado a todo
+o `hasAnyRole('ADMIN','EMPLOYEE')`. Dois testes guardam isto sem contexto Spring nem BD — avaliam as
+expressões `@PreAuthorize` com o `DefaultMethodSecurityExpressionHandler` (`security/PreAuthorizeEvaluator`
+nos testes):
+
+- `WorksEndpointsRoleGuardTest` — todo o endpoint de `enterprises.controller` tem `@PreAuthorize`, e
+  nenhum aceita `ADMIN` sem aceitar `ACCOUNTANT`. É o que apanha um endpoint novo de Obras escrito só
+  com `hasRole('ADMIN')`.
+- `AccountantAccessTest` — o que abre (faturas da empresa, pagamentos, aprovação) e o que continua
+  fechado (todo o `/attendance/**`, `/settings/**`, `/auth/admin/**`, escritas em `/employees`,
+  criar/apagar tarefas).
+
+Nas Tarefas o comportamento de EMPLOYEE sai de graça: `AuthContext.isCurrentUserAdmin()` é `role ==
+ADMIN`. Os avisos de Obras vão para `ProfileRole.WORKS_MANAGERS` (`ADMIN` + `ACCOUNTANT`). A
+assiduidade lista quem tem `attendance.employment`, não por role — o ACCOUNTANT só lá aparece se o
+ADMIN lhe criar uma ficha. No Backoffice, `useAuth().canManageWorks()` guarda Obras e `isAdmin()`
+continua a guardar o resto. Desenho e fases em `notes/roadmap/role-accountant.md`.
 
 ### Regras globais (`SecurityConfig`)
 
@@ -41,7 +53,7 @@ estado real e a tabela de matchers abaixo ganha o `ACCOUNTANT`.
 | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/accept-invite`, `/auth/forgot-password`, `/auth/reset-password` | público |
 | `POST /auth/admin/**` | `ADMIN` |
 | `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
-| `GET /employees/**` | `ADMIN` ou `EMPLOYEE` |
+| `GET /employees/**` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
 | `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. O self-service do funcionário é a fase 5 de [[../notes/roadmap/assiduidade]] |
 | `/auth/me` | qualquer utilizador autenticado |
 | Tudo o resto | autenticado (role específica validada por `@PreAuthorize` no controller) |

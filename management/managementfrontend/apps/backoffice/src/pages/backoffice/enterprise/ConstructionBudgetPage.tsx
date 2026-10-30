@@ -52,7 +52,7 @@ const DESC_CLAMP = 150;
 const ConstructionBudgetPage: FC = () => {
   const { enterpriseId } = useParams<{ enterpriseId: string }>();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const confirm = useConfirm();
 
   // Um orçamento por lote (edifício). O lote aberto vive na URL (`?lote=`), para
@@ -202,11 +202,11 @@ const ConstructionBudgetPage: FC = () => {
   }, [enterpriseId, pendingLotId]);
 
   const refreshDeletedCount = useCallback(() => {
-    if (!lotId || !isAdmin()) return;
+    if (!lotId || !canManageWorks()) return;
     listDeletedBudgetItems(lotId)
       .then((items) => setDeletedCount(items.length))
       .catch(() => setDeletedCount(0));
-  }, [lotId, isAdmin]);
+  }, [lotId, canManageWorks]);
 
   useEffect(() => {
     refreshDeletedCount();
@@ -432,7 +432,7 @@ const ConstructionBudgetPage: FC = () => {
           );
         },
       },
-      ...(isAdmin()
+      ...(canManageWorks()
         ? [
             {
               title: "",
@@ -503,7 +503,7 @@ const ConstructionBudgetPage: FC = () => {
           ]
         : []),
     ],
-    [expandedDescs, isAdmin, tree]
+    [expandedDescs, canManageWorks, tree]
   );
 
   const totals = tree;
@@ -559,19 +559,19 @@ const ConstructionBudgetPage: FC = () => {
               Faturas
             </Button>
           </Badge>
-          {isAdmin() && (
+          {canManageWorks() && (
             <Badge count={deletedCount} overflowCount={99} offset={[-4, 2]}>
               <Button icon={<UndoOutlined />} onClick={() => setRecycleBinOpen(true)}>
                 Eliminadas
               </Button>
             </Badge>
           )}
-          {isAdmin() && (
+          {canManageWorks() && (
             <Button icon={<PlusOutlined />} onClick={() => setLotModal({ lot: null, name: "" })}>
               Novo lote
             </Button>
           )}
-          {isAdmin() && tree && (
+          {canManageWorks() && tree && (
             <Button
               icon={<PlusOutlined />}
               onClick={() => setItemDrawer({ item: null, parentId: null })}
@@ -582,7 +582,7 @@ const ConstructionBudgetPage: FC = () => {
           {/* Importar por cima de um orçamento existente duplicava a árvore toda. O
               backend recusa na mesma (`BUDGET_IMPORT_NOT_EMPTY`); aqui tira-se o botão
               da frente. Com `tree` ainda por carregar não aparece, para não piscar. */}
-          {isAdmin() && tree?.roots.length === 0 && (
+          {canManageWorks() && tree?.roots.length === 0 && (
             <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
               Importar Excel
             </Button>
@@ -605,7 +605,7 @@ const ConstructionBudgetPage: FC = () => {
           description="Este projeto ainda não tem orçamento. Crie um lote (edifício) e importe o orçamento para ele."
           style={{ marginBottom: "20.4px" }}
         >
-          {isAdmin() && (
+          {canManageWorks() && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setLotModal({ lot: null, name: "" })}>
               Criar lote
             </Button>
@@ -618,7 +618,7 @@ const ConstructionBudgetPage: FC = () => {
           onChange={selectLot}
           items={lots.map((lot) => ({ key: lot.id, label: lot.name }))}
           tabBarExtraContent={
-            isAdmin() && currentLot ? (
+            canManageWorks() && currentLot ? (
               <Space size={4}>
                 {lots.length > 1 && (
                   <Tooltip title="Ordenar lotes">

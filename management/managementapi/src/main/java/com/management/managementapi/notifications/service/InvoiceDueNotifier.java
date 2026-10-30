@@ -25,10 +25,10 @@ import com.management.managementapi.notifications.repository.NotificationReposit
 import com.management.managementapi.repository.ProfileRepository;
 
 /**
- * Avisa os admins das faturas por liquidar que vencem dentro de
+ * Avisa os admins e a contabilidade das faturas por liquidar que vencem dentro de
  * {@code daysAhead} dias.
  *
- * O mesmo desenho do {@link BudgetItemDeadlineNotifier}: todos os {@code ADMIN}
+ * O mesmo desenho do {@link BudgetItemDeadlineNotifier}: todos os {@link ProfileRole#WORKS_MANAGERS}
  * desbloqueados, uma vez por fatura e por destinatário (dedupe por
  * {@code (recipient, type, entity)}). Por isso mudar o prazo do fornecedor, ou
  * o vencimento à mão, de uma fatura já avisada não volta a avisar.
@@ -69,8 +69,8 @@ public class InvoiceDueNotifier {
 
     /** Devolve quantas notificações foram criadas. */
     public int notifyUpcomingDueDates(LocalDate today) {
-        List<UUID> admins = profiles.findIdsByRoleAndAccountStatus(ProfileRole.ADMIN, AccountStatus.unlocked);
-        if (admins.isEmpty()) return 0;
+        List<UUID> recipients = profiles.findIdsByRoleInAndAccountStatus(ProfileRole.WORKS_MANAGERS, AccountStatus.unlocked);
+        if (recipients.isEmpty()) return 0;
 
         Map<String, Supplier> suppliersByNif = suppliers.findAll().stream()
                 .collect(Collectors.toMap(Supplier::getNif, Function.identity(), (first, second) -> first));
@@ -87,12 +87,12 @@ public class InvoiceDueNotifier {
                 continue;
             }
 
-            for (UUID admin : admins) {
-                if (notifications.existsByRecipientIdAndTypeAndEntityId(admin, Notification.TYPE_INVOICE_DUE, invoice.getId())) {
+            for (UUID recipient : recipients) {
+                if (notifications.existsByRecipientIdAndTypeAndEntityId(recipient, Notification.TYPE_INVOICE_DUE, invoice.getId())) {
                     continue;
                 }
                 notificationService.notify(
-                        admin,
+                        recipient,
                         Notification.TYPE_INVOICE_DUE,
                         "Fatura a vencer",
                         descreve(invoice, supplier, dueDate, today),

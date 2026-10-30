@@ -18,10 +18,10 @@ import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
+import { roleToLabel } from "@/utils/profile";
 import { BudgetExpenseDetailDrawer } from "./BudgetExpenseDetailDrawer";
 import { BudgetExpenseFormDrawer } from "./BudgetExpenseFormDrawer";
 
-const ROLE_LABEL: Record<string, string> = { ADMIN: "Administrador", EMPLOYEE: "Funcionário" };
 
 interface Props {
   item: BudgetItemNode | null;
@@ -32,7 +32,7 @@ interface Props {
 }
 
 export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onClose, onChanged }) => {
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState<ConstructionExpense[]>([]);
   const [loading, setLoading] = useState(false);
@@ -177,10 +177,10 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
         const tag = (
           <span
             className={`ind-tag ${sent ? "ind-tag-accent" : "ind-tag-neutral"}`}
-            style={{ cursor: isAdmin() ? "pointer" : "default" }}
+            style={{ cursor: canManageWorks() ? "pointer" : "default" }}
             onClick={(e) => {
               e.stopPropagation();
-              if (isAdmin()) toggleAccountant(row);
+              if (canManageWorks()) toggleAccountant(row);
             }}
           >
             {sent ? "enviada" : "por enviar"}
@@ -197,7 +197,7 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
                 <div style={{ fontWeight: 600 }}>{row.invoice.sentToAccountantByName}</div>
                 {row.invoice.sentToAccountantByRole && (
                   <div style={{ opacity: 0.65 }}>
-                    {ROLE_LABEL[row.invoice.sentToAccountantByRole]}
+                    {roleToLabel(row.invoice.sentToAccountantByRole)}
                   </div>
                 )}
               </div>
@@ -264,7 +264,7 @@ export const BudgetExpensesDrawer: FC<Props> = ({ item, enterpriseId, open, onCl
                 }}
               >
                 <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Despesas</h6>
-                {isAdmin() && (
+                {canManageWorks() && (
                   <Space>
                     {/* Caminho principal: a fatura entra pela caixa de entrada e
                         é aí que se escolhe a rubrica. */}

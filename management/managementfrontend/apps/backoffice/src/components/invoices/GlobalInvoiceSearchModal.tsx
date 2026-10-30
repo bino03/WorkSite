@@ -31,7 +31,7 @@ function whereLabel(row: InvoiceSearchResult): string {
  * por cima, e fechá-lo volta aos resultados.
  *
  * Modal e não página, de propósito: é um utilitário de passagem, como o
- * `BudgetItemPickerModal`. Só `ADMIN` — o gate real é o `@PreAuthorize`.
+ * `BudgetItemPickerModal`. Só `ADMIN` e `ACCOUNTANT` — o gate real é o `@PreAuthorize`.
  */
 export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
   const [query, setQuery] = useState("");

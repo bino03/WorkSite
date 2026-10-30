@@ -32,10 +32,10 @@ import type { ConstructionInvoice, OutstandingByUrgency } from "@/types/invoice"
  * A ordem vem do servidor e não se muda aqui: é a razão de ser da página. Para
  * procurar ou filtrar uma fatura há as listas de cada obra.
  *
- * Só `ADMIN` — o gate real é o `@PreAuthorize` do backend.
+ * Só `ADMIN` e `ACCOUNTANT` — o gate real é o `@PreAuthorize` do backend.
  */
 const OutstandingInvoicesPage: FC = () => {
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const confirm = useConfirm();
 
   const [data, setData] = useState<OutstandingByUrgency | null>(null);
@@ -166,7 +166,7 @@ const OutstandingInvoicesPage: FC = () => {
         </div>
       )}
 
-      {isAdmin() && selected.length > 0 && (
+      {canManageWorks() && selected.length > 0 && (
         <div style={{ display: "flex", gap: "10.2px", flexWrap: "wrap", marginBottom: "13.6px" }}>
           {approvableSelected.length > 0 && (
             <Button onClick={() => paymentApproval.approveMany(approvableSelected)}>

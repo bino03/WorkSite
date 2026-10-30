@@ -183,7 +183,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/auth/admin/**").hasRole("ADMIN")
                 // Credenciais SMTP: quem as controla controla os emails que saem em nome da plataforma.
                 .requestMatchers("/settings/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/employees/**").hasAnyRole("ADMIN", "EMPLOYEE")
+                .requestMatchers(HttpMethod.GET, "/employees/**").hasAnyRole("ADMIN", "EMPLOYEE", "ACCOUNTANT")
                 .requestMatchers("/auth/me").authenticated()
                 .anyRequest().authenticated()
             )

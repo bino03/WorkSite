@@ -61,7 +61,7 @@ const D = {
   whisper: "var(--ind-shadow-sm)",
 };
 
-type Role = "ADMIN" | "EMPLOYEE";
+type Role = "ADMIN" | "EMPLOYEE" | "ACCOUNTANT";
 type Status = "unlocked" | "blocked" | "deleted";
 
 type PageResponse<T> = {
@@ -606,6 +606,7 @@ export default function EmployeesList() {
           <Option value="ALL">{t('employees.roles.all')}</Option>
           <Option value="ADMIN">{t('employees.roles.admins')}</Option>
           <Option value="EMPLOYEE">{t('employees.roles.employees')}</Option>
+          <Option value="ACCOUNTANT">{t('employees.roles.accountants')}</Option>
         </Select>
       </div>
 

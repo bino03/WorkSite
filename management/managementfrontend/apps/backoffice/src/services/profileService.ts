@@ -4,7 +4,7 @@ import api from "@/api";
 /* ===========================
    Tipos
 =========================== */
-export type Role = "ADMIN" | "EMPLOYEE";
+export type Role = "ADMIN" | "EMPLOYEE" | "ACCOUNTANT";
 export type AccountStatus = "unlocked" | "locked" | "blocked" | "deleted";
 
 export type MyProfile = {

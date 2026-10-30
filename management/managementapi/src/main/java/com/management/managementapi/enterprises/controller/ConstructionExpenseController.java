@@ -53,7 +53,7 @@ public class ConstructionExpenseController {
     private final AuthContext authContext;
 
     @GetMapping("/budget-item/{budgetItemId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<List<ConstructionExpenseResponseDTO>> listByBudgetItem(@PathVariable UUID budgetItemId) {
         return ResponseEntity.ok(service.listByBudgetItem(budgetItemId));
     }
@@ -66,7 +66,7 @@ public class ConstructionExpenseController {
      * filtros são opcionais.
      */
     @GetMapping("/enterprise/{enterpriseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public Page<ConstructionExpenseResponseDTO> listByEnterprise(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -79,7 +79,7 @@ public class ConstructionExpenseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<ConstructionExpenseResponseDTO> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(service.toResponseDTO(service.getById(id)));
     }
@@ -90,7 +90,7 @@ public class ConstructionExpenseController {
      * {@code PATCH /construction-invoices/{id}/allocate}.
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionExpenseResponseDTO> create(
             @Valid @RequestBody ConstructionExpenseUpsertDTO dto,
             HttpServletRequest request) {
@@ -104,7 +104,7 @@ public class ConstructionExpenseController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionExpenseResponseDTO> update(
             @PathVariable UUID id,
             @Valid @RequestBody ConstructionExpenseUpsertDTO dto,
@@ -124,7 +124,7 @@ public class ConstructionExpenseController {
      * documento, {@code DELETE /construction-invoices/{id}}.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID id, HttpServletRequest request) {
         ConstructionExpense expense = service.getById(id);
 

@@ -32,7 +32,7 @@ public class EmployeesController {
 
     @Operation(summary = "Detalhe de funcionário por ID")
     @ApiResponse(responseCode = "200", description = "OK")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     @GetMapping("/{id}")
     public EmployeeResponseDTO getById(
             @Parameter(description = "ID do funcionário (profile.id)")
@@ -44,7 +44,7 @@ public class EmployeesController {
     @Operation(summary = "Lista leve de utilizadores para pickers (ex.: atribuir tarefa)",
             description = "Devolve só id, nome, email e role — sem telefone, foto, estado ou timestamps.")
     @ApiResponse(responseCode = "200", description = "OK")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     @GetMapping("/assignable")
     public List<EmployeeAssignableDTO> listAssignable() {
         return service.listAssignable();
@@ -57,7 +57,7 @@ public class EmployeesController {
                 Ordenação: **apenas por created_at** (`sortDir` = asc|desc).
                 """)
     @ApiResponse(responseCode = "200", description = "OK")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     @GetMapping
     public Page<EmployeeResponseDTO> search(
             @Parameter(description = "Pesquisa livre (nome, email, telefone)") @RequestParam(required = false) String q,

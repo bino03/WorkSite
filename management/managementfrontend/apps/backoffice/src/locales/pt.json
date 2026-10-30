@@ -15,7 +15,8 @@
     "language": "Idioma",
     "roles": {
       "admin": "Administrador",
-      "employee": "Funcionário"
+      "employee": "Funcionário",
+      "accountant": "Contabilidade"
     }
   },
   "logout": {
@@ -333,9 +334,11 @@
     "roles": {
       "ADMIN": "Administrador",
       "EMPLOYEE": "Funcionário",
+      "ACCOUNTANT": "Contabilidade",
       "all": "Todos",
       "admins": "Administradores",
-      "employees": "Funcionários"
+      "employees": "Funcionários",
+      "accountants": "Contabilidade"
     },
     "status": {
       "unlocked": "Ativo",

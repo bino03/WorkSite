@@ -101,7 +101,7 @@ public class ConstructionInvoiceController {
      * de ele decidir "Guardar" (que é o {@code POST /} abaixo).
      */
     @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasRole('ADMIN'))")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasAnyRole('ADMIN','ACCOUNTANT'))")
     public ResponseEntity<InvoicePreviewResultDTO> preview(
             @RequestParam(required = false) UUID enterpriseId,
             @RequestParam(required = false) String scope,
@@ -119,7 +119,7 @@ public class ConstructionInvoiceController {
      * {@link ConstructionInvoiceService}.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasRole('ADMIN'))")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasAnyRole('ADMIN','ACCOUNTANT'))")
     public ResponseEntity<InvoiceUploadResultDTO> upload(
             @RequestParam(required = false) UUID enterpriseId,
             @RequestParam(required = false) String scope,
@@ -146,7 +146,7 @@ public class ConstructionInvoiceController {
      * faturas por identificar, que não têm obra.
      */
     @PostMapping("/register")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> register(
             @Valid @RequestBody InvoiceRegisterDTO dto,
             HttpServletRequest request) {
@@ -175,7 +175,7 @@ public class ConstructionInvoiceController {
      * certo; qualquer falha anula tudo.
      */
     @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ExpensesImportResultDTO> importExcel(
             @RequestParam String scope,
             @RequestParam(required = false) UUID enterpriseId,
@@ -205,7 +205,7 @@ public class ConstructionInvoiceController {
      * obra e o PDF do fornecedor são o mesmo documento fiscal.
      */
     @PostMapping(value = "/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<InvoiceUploadResultDTO> addDocument(
             @PathVariable UUID id,
             @RequestPart("file") MultipartFile file,
@@ -226,7 +226,7 @@ public class ConstructionInvoiceController {
      * confirma ou altera as linhas e só depois é que cria a NC com elas.
      */
     @GetMapping("/{originId}/credit-notes/split-preview")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<CreditNoteSplitPreviewDTO> creditNoteSplitPreview(
             @PathVariable UUID originId,
             @RequestParam BigDecimal amount) {
@@ -238,7 +238,7 @@ public class ConstructionInvoiceController {
      * obra da origem; as despesas negativas vêm já confirmadas no corpo.
      */
     @PostMapping("/{originId}/credit-notes")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> createCreditNote(
             @PathVariable UUID originId,
             @Valid @RequestBody CreditNoteCreateDTO dto,
@@ -258,7 +258,7 @@ public class ConstructionInvoiceController {
      * mais urgente é.
      */
     @GetMapping("/unidentified")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public Page<ConstructionInvoiceResponseDTO> listUnidentified(
             @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) String q,
@@ -270,7 +270,7 @@ public class ConstructionInvoiceController {
 
     /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. */
     @GetMapping("/company")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public Page<ConstructionInvoiceResponseDTO> listCompany(
             @RequestParam(required = false) Boolean outstanding,
             @RequestParam(required = false) String q,
@@ -282,11 +282,11 @@ public class ConstructionInvoiceController {
 
     /**
      * A pesquisa global (o modal Ctrl+K do header): todas as obras, a empresa
-     * e a quarentena. Só ADMIN, como as outras listas que atravessam obras.
+     * e a quarentena. Só ADMIN e ACCOUNTANT, como as outras listas que atravessam obras.
      * Menos de 2 caracteres devolve a lista vazia.
      */
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public List<InvoiceSearchResultDTO> searchEverywhere(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "20") int size) {
@@ -295,7 +295,7 @@ public class ConstructionInvoiceController {
     }
 
     @GetMapping("/enterprise/{enterpriseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public Page<ConstructionInvoiceResponseDTO> listByEnterprise(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) Boolean allocated,
@@ -330,7 +330,7 @@ public class ConstructionInvoiceController {
      * plano, que só lê a base de dados.
      */
     @GetMapping("/enterprise/{enterpriseId}/documents/summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<DocumentsExportSummaryDTO> documentsSummary(
             @PathVariable UUID enterpriseId,
             @RequestParam(defaultValue = "ALL") InvoiceDocumentsScope scope,
@@ -379,7 +379,7 @@ public class ConstructionInvoiceController {
      * descarrega-se um ficheiro de cada vez já fora da transação.
      */
     @GetMapping("/enterprise/{enterpriseId}/documents/zip")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<StreamingResponseBody> documentsZip(
             @PathVariable UUID enterpriseId,
             @RequestParam(defaultValue = "ALL") InvoiceDocumentsScope scope,
@@ -418,7 +418,7 @@ public class ConstructionInvoiceController {
      * número que o filtro "Por liquidar" mostra ao lado dos resultados.
      */
     @GetMapping("/enterprise/{enterpriseId}/outstanding-summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummary(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) Boolean allocated,
@@ -445,11 +445,11 @@ public class ConstructionInvoiceController {
 
     /**
      * O que pagar primeiro: as faturas por liquidar de todas as obras e da
-     * empresa, por ordem de vencimento. Só ADMIN, como as outras listas que
+     * empresa, por ordem de vencimento. Só ADMIN e ACCOUNTANT, como as outras listas que
      * atravessam obras.
      */
     @GetMapping("/outstanding")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<OutstandingByUrgencyDTO> outstandingByUrgency(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -460,7 +460,7 @@ public class ConstructionInvoiceController {
     }
 
     @GetMapping("/unidentified/outstanding-summary")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummaryUnidentified(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
@@ -469,7 +469,7 @@ public class ConstructionInvoiceController {
     }
 
     @GetMapping("/company/outstanding-summary")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummaryCompany(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
@@ -483,7 +483,7 @@ public class ConstructionInvoiceController {
      * {@code pending-count} (só o número) até 2026-09-18.
      */
     @GetMapping("/enterprise/{enterpriseId}/pending-summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<PendingInvoicesSummaryDTO> pendingSummary(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) UUID budgetId) {
@@ -495,7 +495,7 @@ public class ConstructionInvoiceController {
      * lançado neste projeto. Devolve 204 quando ainda não há histórico.
      */
     @GetMapping("/enterprise/{enterpriseId}/suggestion")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<BudgetItemSuggestionDTO> suggestion(
             @PathVariable UUID enterpriseId,
             @RequestParam String supplierNif) {
@@ -507,14 +507,14 @@ public class ConstructionInvoiceController {
 
     /** Detalhe. É a única resposta que traz o link assinado do documento completo. */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(service.getDetail(id));
     }
 
     /** Corrige à mão o que o QR não trouxe ou trouxe errado. */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> update(
             @PathVariable UUID id,
             @Valid @RequestBody ConstructionInvoiceUpsertDTO dto,
@@ -530,7 +530,7 @@ public class ConstructionInvoiceController {
 
     /** Substitui o ficheiro — relê o QR e regenera a miniatura. */
     @PostMapping(value = "/{id}/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<InvoiceUploadResultDTO> replaceFile(
             @PathVariable UUID id,
             @RequestPart("file") MultipartFile file,
@@ -553,7 +553,7 @@ public class ConstructionInvoiceController {
      * não são tocados, porque não vêm do QR.
      */
     @PostMapping("/{id}/rescan")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<InvoiceUploadResultDTO> rescan(
             @PathVariable UUID id,
             HttpServletRequest request) {
@@ -568,7 +568,7 @@ public class ConstructionInvoiceController {
 
     /** Liga a fatura a uma rubrica, criando o lançamento. */
     @PatchMapping("/{id}/allocate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> allocate(
             @PathVariable UUID id,
             @RequestParam UUID budgetItemId,
@@ -584,7 +584,7 @@ public class ConstructionInvoiceController {
 
     /** Define o lote da fatura antes de a classificar; sem {@code budgetId} limpa-o. */
     @PatchMapping("/{id}/budget")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> setBudget(
             @PathVariable UUID id,
             @RequestParam(required = false) UUID budgetId) {
@@ -600,7 +600,7 @@ public class ConstructionInvoiceController {
      * fatura não é de obra. Nunca grava nada — quem decide é quem classifica.
      */
     @GetMapping("/{id}/rubric-suggestion")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<RubricSuggestionDTO> rubricSuggestion(@PathVariable UUID id) {
         return service.suggestRubric(id)
                 .map(ResponseEntity::ok)
@@ -615,7 +615,7 @@ public class ConstructionInvoiceController {
      * linhas tem de esgotar o total da fatura — {@code INVOICE_028}.
      */
     @PostMapping("/{id}/expenses/split")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> split(
             @PathVariable UUID id,
             @Valid @RequestBody InvoiceSplitDTO dto,
@@ -638,7 +638,7 @@ public class ConstructionInvoiceController {
      * por isso não há {@code activityLogger} aqui.
      */
     @PostMapping("/{id}/transfer")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceTransferResultDTO> transfer(
             @PathVariable UUID id,
             @Valid @RequestBody InvoiceTransferDTO dto) {
@@ -653,7 +653,7 @@ public class ConstructionInvoiceController {
      * {@link BatchAllocateResultDTO}.
      */
     @PostMapping("/batch-allocate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<BatchAllocateResultDTO> batchAllocate(
             @Valid @RequestBody BatchAllocateDTO dto,
             HttpServletRequest request) {
@@ -669,7 +669,7 @@ public class ConstructionInvoiceController {
 
     /** Devolve a fatura à caixa de entrada, apagando o lançamento. */
     @DeleteMapping("/{id}/allocate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> deallocate(
             @PathVariable UUID id,
             HttpServletRequest request) {
@@ -684,7 +684,7 @@ public class ConstructionInvoiceController {
 
     /** Escreve (ou apaga, se vier vazia) a nota da fatura, sem tocar no resto. */
     @PatchMapping("/{id}/notes")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> setNotes(
             @PathVariable UUID id,
             @Valid @RequestBody InvoiceNotesDTO dto,
@@ -700,7 +700,7 @@ public class ConstructionInvoiceController {
 
     /** Escreve (ou apaga, com null) o vencimento manual da fatura, sem tocar no resto. */
     @PatchMapping("/{id}/due-date")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> setDueDate(
             @PathVariable UUID id,
             @Valid @RequestBody InvoiceDueDateDTO dto,
@@ -716,7 +716,7 @@ public class ConstructionInvoiceController {
 
     /** Aprova a fatura para pagamento, ou retira a aprovação. Não bloqueia o pagamento. */
     @PatchMapping("/{id}/payment-approval")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> setApprovedForPayment(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "true") boolean approved,
@@ -732,7 +732,7 @@ public class ConstructionInvoiceController {
 
     /** Marca/desmarca a fatura como enviada para o contabilista. */
     @PatchMapping("/{id}/accountant")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> setSentToAccountant(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "true") boolean sent,
@@ -751,7 +751,7 @@ public class ConstructionInvoiceController {
      * documento, volta ao estado "sem ficheiro".
      */
     @DeleteMapping("/{id}/documents/{documentId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<Void> deleteDocument(@PathVariable UUID id,
                                                @PathVariable UUID documentId,
                                                HttpServletRequest request) {
@@ -768,7 +768,7 @@ public class ConstructionInvoiceController {
 
     /** Apaga a fatura, o ficheiro, a miniatura e o lançamento que dela nasceu. */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID id, HttpServletRequest request) {
         ConstructionInvoice invoice = service.getById(id);
 

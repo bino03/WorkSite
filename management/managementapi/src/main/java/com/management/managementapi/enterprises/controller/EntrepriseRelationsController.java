@@ -24,12 +24,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 
-// Só ADMIN: são as relações estruturais do projeto (localização, datas/áreas, financeiro,
+// Só ADMIN e ACCOUNTANT: são as relações estruturais do projeto (localização, datas/áreas, financeiro,
 // overview) — sem esta anotação, EnterpriseController/EntrepriseRelationsController eram os
 // únicos controllers sensíveis sem nenhum controlo de role (ver notes/roadmap/pre-deploy-security.md).
 @RestController
 @RequestMapping("/enterprise-relations/{id}")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
 public class EntrepriseRelationsController {
 
     private final EnterpriseRelationsService enterpriseRelationsService;

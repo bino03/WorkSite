@@ -38,7 +38,7 @@ const Fact: FC<{ label: string; children: React.ReactNode }> = ({ label, childre
  * é da fatura, e aqui não há nenhuma.
  */
 export const BudgetExpenseDetailDrawer: FC<Props> = ({ expense, open, onClose, onEdit }) => {
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
 
   return (
     <Drawer
@@ -52,7 +52,7 @@ export const BudgetExpenseDetailDrawer: FC<Props> = ({ expense, open, onClose, o
         </div>
       }
       extra={
-        isAdmin() && expense ? (
+        canManageWorks() && expense ? (
           <Button type="text" icon={<EditOutlined />} onClick={() => onEdit(expense)}>
             Editar
           </Button>

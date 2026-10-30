@@ -28,7 +28,7 @@ const ACCENT = "var(--ind-color-accent)";
  */
 export default function AppLayout() {
   // Gates de permissão passam sempre por aqui — ver backoffice-app-shell-and-auth.md §3.
-  const { isAdmin } = useAuth();
+  const { isAdmin, canManageWorks } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -38,11 +38,11 @@ export default function AppLayout() {
   useEffect(() => rememberSpace("works"), []);
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const admin = isAdmin();
+  const managesWorks = canManageWorks();
 
   // Ctrl+K (⌘K no Mac) abre a pesquisa global de faturas de qualquer página do espaço.
   useEffect(() => {
-    if (!admin) return;
+    if (!managesWorks) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -51,11 +51,11 @@ export default function AppLayout() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [admin]);
+  }, [managesWorks]);
 
   /**
    * "Faturas" — o único dropdown da nav. Junta as listas de faturas que não são
-   * de uma obra só — as sem obra e a "A pagar", que atravessa todas. Só o ADMIN as vê; o gate real de cada rota é o
+   * de uma obra só — as sem obra e a "A pagar", que atravessa todas. Só o ADMIN e a contabilidade as veem; o gate real de cada rota é o
    * `@PreAuthorize` do backend — esconder aqui só evita que um EMPLOYEE bata num 403.
    */
   const invoicesMenuItems: MenuProps["items"] = [
@@ -102,7 +102,7 @@ export default function AppLayout() {
         <NavLink to={`${base}/tasks`} style={navLinkStyle(ACCENT)}>
           <CheckSquareOutlined />{isAdmin() ? "Tarefas" : "Minhas Tarefas"}
         </NavLink>
-        {isAdmin() && (
+        {managesWorks && (
           <Dropdown
             trigger={["click"]}
             menu={{ items: invoicesMenuItems, selectable: true, selectedKeys: [pathname] }}
@@ -112,7 +112,7 @@ export default function AppLayout() {
             </button>
           </Dropdown>
         )}
-        {admin && (
+        {managesWorks && (
           <button
             type="button"
             title="Pesquisar faturas em todas as obras (Ctrl+K)"
@@ -129,7 +129,7 @@ export default function AppLayout() {
         <Outlet />
       </main>
 
-      {admin && <GlobalInvoiceSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />}
+      {managesWorks && <GlobalInvoiceSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />}
     </div>
   );
 }

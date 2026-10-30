@@ -59,7 +59,7 @@ class BudgetItemDeadlineNotifierTest {
     @BeforeEach
     void setUp() {
         notifier = new BudgetItemDeadlineNotifier(budgetItems, profiles, notifications, notificationService, 7);
-        when(profiles.findIdsByRoleAndAccountStatus(ProfileRole.ADMIN, AccountStatus.unlocked))
+        when(profiles.findIdsByRoleInAndAccountStatus(ProfileRole.WORKS_MANAGERS, AccountStatus.unlocked))
                 .thenReturn(List.of(ADMIN_A, ADMIN_B));
     }
 
@@ -127,7 +127,7 @@ class BudgetItemDeadlineNotifierTest {
     @Test
     @DisplayName("Sem admins desbloqueados não consulta rubricas nem cria nada")
     void noAdminsNoWork() {
-        when(profiles.findIdsByRoleAndAccountStatus(ProfileRole.ADMIN, AccountStatus.unlocked)).thenReturn(List.of());
+        when(profiles.findIdsByRoleInAndAccountStatus(ProfileRole.WORKS_MANAGERS, AccountStatus.unlocked)).thenReturn(List.of());
 
         int created = notifier.notifyUpcomingDeadlines(HOJE);
 

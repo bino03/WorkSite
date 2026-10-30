@@ -15,7 +15,8 @@
     "language": "Language",
     "roles": {
       "admin": "Administrator",
-      "employee": "Employee"
+      "employee": "Employee",
+      "accountant": "Accountant"
     }
   },
   "logout": {
@@ -333,9 +334,11 @@
     "roles": {
       "ADMIN": "Administrator",
       "EMPLOYEE": "Employee",
+      "ACCOUNTANT": "Accountant",
       "all": "All",
       "admins": "Administrators",
-      "employees": "Employees"
+      "employees": "Employees",
+      "accountants": "Accountants"
     },
     "status": {
       "unlocked": "Active",

@@ -40,9 +40,9 @@ interface Props {
  * faturas desse NIF que estejam sem nome; as futuras nascem já identificadas.
  */
 export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const confirm = useConfirm();
-  const editable = isAdmin();
+  const editable = canManageWorks();
 
   const [unknownNifs, setUnknownNifs] = useState<UnknownSupplierNif[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

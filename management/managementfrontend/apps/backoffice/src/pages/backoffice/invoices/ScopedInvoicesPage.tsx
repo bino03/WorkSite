@@ -61,11 +61,11 @@ interface Props {
  * Essa é só a ordem por omissão: como na lista de obra, os cabeçalhos "Data"
  * e "Carregada em" ordenam (mais recente → mais antiga → omissão).
  *
- * Ambas são só `ADMIN` — o gate real está no `@PreAuthorize` do backend; o
+ * Ambas são só `ADMIN` e `ACCOUNTANT` — o gate real está no `@PreAuthorize` do backend; o
  * `NavLink` escondido é só para o `EMPLOYEE` não bater num 403.
  */
 const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const confirm = useConfirm();
 
   const [invoices, setInvoices] = useState<ConstructionInvoice[]>([]);
@@ -231,7 +231,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
           <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>{kicker}</h6>
           <h1 style={{ margin: 0 }}>{title}</h1>
         </div>
-        {isAdmin() && (
+        {canManageWorks() && (
           <Space>
             <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
               Importar Excel

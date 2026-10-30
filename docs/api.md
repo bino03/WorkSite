@@ -2,9 +2,21 @@
 
 Base URL (dev): `http://localhost:8080`. Produção: `https://worksite-vilatro.fly.dev` — a mesma origem que serve o Backoffice. Sem `context-path` global (`server.port: ${PORT:8080}`) — todas as rotas são relativas à raiz.
 
-Ver [[security.md]] para as regras de acesso (público vs `ADMIN`/`EMPLOYEE`/autenticado) e [[architecture.md]] para quem consome cada grupo de endpoints.
+Ver [[security.md]] para as regras de acesso (público vs `ADMIN`/`EMPLOYEE`/`ACCOUNTANT`/autenticado) e [[architecture.md]] para quem consome cada grupo de endpoints.
 
 > **Regra base**: `SecurityConfig` termina com `.anyRequest().authenticated()` — tudo o que não estiver explicitamente `permitAll()` exige autenticação. Onde a tabela diz "autenticado", é este default a atuar (o controller não tem `@PreAuthorize` próprio).
+
+> **Role `ACCOUNTANT` (desde a `V47`, 2026-10-30)** — para não a repetir em ~150 linhas, as tabelas
+> abaixo leem-se assim:
+> - onde diz **`ADMIN` ou `EMPLOYEE`**, o `ACCOUNTANT` também acede — em todo o lado;
+> - onde diz só **`ADMIN`** numa secção de **Obras** (Projetos, Relações do projeto, Orçamento,
+>   Despesas, Faturas de obra e as suas subsecções, Pagamentos, Notas de crédito, Classificar,
+>   Transferir, Importar, Inconsistências, Fornecedores), o `ACCOUNTANT` também acede;
+> - onde diz só **`ADMIN`** fora dessas (Administração de contas, escritas em Funcionários, `POST`/`DELETE`
+>   de Tarefas, `/settings/**`, todo o `/attendance/**`), é **mesmo só `ADMIN`**.
+>
+> Quem garante a segunda regra é o `WorksEndpointsRoleGuardTest`: falha se um endpoint de
+> `enterprises.controller` aceitar `ADMIN` sem `ACCOUNTANT`. Ver [[security.md]] → "Autorização".
 
 ---
 
@@ -130,12 +142,12 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 
 | Método | Rota | Acesso |
 |---|---|---|
-| GET | `/enterprises` | autenticado |
-| GET | `/enterprises/active` | autenticado |
-| GET | `/enterprises/basic` | autenticado |
-| GET | `/enterprises/search` | autenticado |
-| GET | `/enterprises/{id}` | autenticado |
-| GET | `/enterprises/{id}/basic` | autenticado |
+| GET | `/enterprises` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
+| GET | `/enterprises/active` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
+| GET | `/enterprises/basic` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
+| GET | `/enterprises/search` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
+| GET | `/enterprises/{id}` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
+| GET | `/enterprises/{id}/basic` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
 | POST | `/enterprises` | `ADMIN` (multipart) |
 | PUT | `/enterprises/{id}` | `ADMIN` |
 | DELETE | `/enterprises/{id}` | `ADMIN` |
@@ -148,7 +160,7 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 > 🧹 **Escrita restringida a `ADMIN` a 2026-09-22** — até aí, `EnterpriseController` e
 > `EntrepriseRelationsController` eram os únicos controllers sensíveis da app sem nenhum
 > `@PreAuthorize`: qualquer `EMPLOYEE` podia criar, editar e **apagar** um projeto inteiro. A
-> leitura (`GET`) continua aberta a `ADMIN`/`EMPLOYEE`. Ver `notes/roadmap/pre-deploy-security.md`.
+> leitura (`GET`) continua aberta a todas as roles — com `@PreAuthorize` explícito desde a `V47`. Ver `notes/roadmap/pre-deploy-security.md`.
 
 > O `GET /enterprises` (`EnterpriseListDTO`) traz `budgetTotal` além do `totalInvestment`: é o
 > mesmo número que o cabeçalho da página do orçamento (`BudgetTreeDTO.budgetTotal`, mesma regra
@@ -358,7 +370,7 @@ Só rubricas com `rowKind = ITEM` aceitam despesas (`EXPENSE_009` caso contrári
 
 A despesa que nasceu de uma fatura traz o objeto `invoice` (`ExpenseInvoiceRefDTO`) com
 fornecedor, número, ATCUD, data, miniatura assinada e estado na contabilidade — incluindo
-`sentToAccountantByRole` (`ADMIN`/`EMPLOYEE` em cru, o cliente é que traduz o rótulo). Vem a
+`sentToAccountantByRole` (`ADMIN`/`EMPLOYEE`/`ACCOUNTANT` em cru, o cliente é que traduz o rótulo). Vem a
 `null` quando o lançamento foi feito à mão: é assim que o cliente distingue "não tem fatura"
 sem ter de adivinhar por campos vazios. O documento completo pede-se a
 `GET /construction-invoices/{id}`, e só quando alguém o abre.
@@ -387,7 +399,7 @@ de entrada.
 
 | Método | Rota | Acesso |
 |---|---|---|
-| POST | `/construction-invoices/preview?enterpriseId=&scope=` | `ADMIN` ou `EMPLOYEE` (`scope` ≠ `PROJECT` só `ADMIN`) — lê o QR e verifica duplicados, não grava nada. Sem `scope` = `PROJECT` e `enterpriseId` obrigatório; `COMPANY`/`UNIDENTIFIED` não levam obra |
+| POST | `/construction-invoices/preview?enterpriseId=&scope=` | `ADMIN` ou `EMPLOYEE` (`scope` ≠ `PROJECT` só `ADMIN`/`ACCOUNTANT`) — lê o QR e verifica duplicados, não grava nada. Sem `scope` = `PROJECT` e `enterpriseId` obrigatório; `COMPANY`/`UNIDENTIFIED` não levam obra |
 | POST | `/construction-invoices?enterpriseId=&scope=&budgetId=` | idem ao preview — multipart `file`; devolve `201`. `budgetId` (desde 2026-10-12, opcional) é o lote da fatura, só em `PROJECT` (senão `INVOICE_SCOPE_NOT_ALLOCATABLE`) e tem de ser um lote vivo da obra (senão `BUDGET_LOT_NOT_FOUND`); sem ele a fatura fica por classificar, como antes |
 | POST | `/construction-invoices/register` | `ADMIN` — regista uma fatura **sem ficheiro** (JSON, não multipart); devolve `201` |
 | POST | `/construction-invoices/import-excel?scope=&enterpriseId=&dryRun=` | `ADMIN` — multipart `file` (o `Despesas - <Obra>.xlsx` do vault) + parte `answers` (JSON, opcional). Importa a folha "Despesas"; ver [[#Importar a folha "Despesas" do Excel (fase 6)]] |
@@ -1467,8 +1479,8 @@ confirmaria a existência a quem não devia sequer saber disso.
 |---|---|---|
 | `task_assigned` | `POST /tasks` e `PUT /tasks/{id}` | Os atribuídos, **menos** os que já estavam atribuídos antes e **menos** quem fez a atribuição |
 | `invoice_pending` | `POST /construction-invoices` (upload) | **Só quem carregou** |
-| `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` desbloqueados**, uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
-| `invoice_due` | Job agendado (`InvoiceDueNotifierConfig`, 07:00 diário **e no arranque**) — faturas por liquidar (as da página "A pagar": obras e empresa, sem quarentena, sem notas de crédito, sem obras `is_test` nem eliminadas) cujo **vencimento** cai em `[hoje, hoje + N]`, `N` = `app.notifications.invoice-due.days-ahead` (7). Para todos os `ADMIN` desbloqueados, **uma vez por fatura e destinatário**. Sem vencimento não avisa; já vencida também não (a lista mostra-as à frente). Avisa de todas, aprovadas ou não — o texto termina em "aprovada para pagamento" ou "por aprovar". Link: `/backoffice/invoices/outstanding`. Mudar o prazo do fornecedor ou o vencimento manual de uma fatura já avisada **não reavisa** |
+| `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` e `ACCOUNTANT` desbloqueados** (`ProfileRole.WORKS_MANAGERS`), uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
+| `invoice_due` | Job agendado (`InvoiceDueNotifierConfig`, 07:00 diário **e no arranque**) — faturas por liquidar (as da página "A pagar": obras e empresa, sem quarentena, sem notas de crédito, sem obras `is_test` nem eliminadas) cujo **vencimento** cai em `[hoje, hoje + N]`, `N` = `app.notifications.invoice-due.days-ahead` (7). Para todos os `ADMIN` e `ACCOUNTANT` desbloqueados (`ProfileRole.WORKS_MANAGERS`), **uma vez por fatura e destinatário**. Sem vencimento não avisa; já vencida também não (a lista mostra-as à frente). Avisa de todas, aprovadas ou não — o texto termina em "aprovada para pagamento" ou "por aprovar". Link: `/backoffice/invoices/outstanding`. Mudar o prazo do fornecedor ou o vencimento manual de uma fatura já avisada **não reavisa** |
 
 > O `budget_item_deadline` corre também no arranque porque a app não está ligada 24h por dia —
 > um cron às 7h numa app que só arranca às 9h nunca dispararia. O link é a página do orçamento da

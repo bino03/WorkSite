@@ -40,6 +40,7 @@ import {
   MailOutlined,
   UserOutlined,
   TeamOutlined,
+  CalculatorOutlined,
   CalendarOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
@@ -394,6 +395,15 @@ export default function ProfileView({
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <UserOutlined style={{ color: '#1890ff' }} />
                                 <span>{t('profileView.employee')}</span>
+                              </div>
+                            )
+                          },
+                          {
+                            value: "ACCOUNTANT",
+                            label: (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <CalculatorOutlined style={{ color: '#52c41a' }} />
+                                <span>{t('profile.roles.accountant')}</span>
                               </div>
                             )
                           },

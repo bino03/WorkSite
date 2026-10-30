@@ -42,11 +42,11 @@ links achatados). Estrutura atual em `AppLayout.tsx`:
 | **Empreendimentos** | todos | `/backoffice/empreendimentos` |
 | **Tarefas** / **Minhas Tarefas** (rótulo por `isAdmin()`) | todos | `/backoffice/tasks` |
 | ~~**Gerir Contas**~~ | — | saiu a 2026-10-07: é o **Funcionários** do espaço Equipa (§5) |
-| **Faturas ▾** (`Dropdown`, `invoicesMenuItems`) | só `ADMIN` | A pagar (`/invoices/outstanding`) · Por identificar (`/invoices/unidentified`) · Despesas da empresa (`/invoices/company`) · Inconsistências (`/invoices/incidents`) |
-| **Pesquisar** `Ctrl K` (botão, `navButtonStyle`) | só `ADMIN` | não é rota: abre o `GlobalInvoiceSearchModal` (pesquisa global de faturas, 2026-10-22) |
+| **Faturas ▾** (`Dropdown`, `invoicesMenuItems`) | `canManageWorks()` — `ADMIN` e `ACCOUNTANT` | A pagar (`/invoices/outstanding`) · Por identificar (`/invoices/unidentified`) · Despesas da empresa (`/invoices/company`) · Inconsistências (`/invoices/incidents`) |
+| **Pesquisar** `Ctrl K` (botão, `navButtonStyle`) | `canManageWorks()` — `ADMIN` e `ACCOUNTANT` | não é rota: abre o `GlobalInvoiceSearchModal` (pesquisa global de faturas, 2026-10-22) |
 
 **Atalho de teclado global**: o `Ctrl+K`/`⌘K` é um listener `keydown` no `document`, registado no
-`AppLayout` só para `ADMIN`. Vale portanto em qualquer página do espaço Obras e não no espaço
+`AppLayout` só para `canManageWorks()`. Vale portanto em qualquer página do espaço Obras e não no espaço
 Equipa. É o único atalho global da app: um próximo entra no layout do espaço onde faz sentido,
 nunca num componente de página. O modal fica montado no layout, ao lado do `<Outlet />`.
 
@@ -94,7 +94,17 @@ Antes desta revisão eram o cartão de perfil **mais três botões de ícone sol
 
 **Não há hoje nenhuma exceção conhecida a esta convenção.**
 
-**Convenção**: qualquer gate de permissão ou variação de UI baseada na role do utilizador **autenticado** passa por `useAuth()` (`isAdmin()`/`isEmployee()`/`hasRole()`) — nunca ler `role`/`userRole` direto do contexto de auth para essa finalidade.
+**`canManageWorks()` ou `isAdmin()`?** (desde 2026-10-30, role `ACCOUNTANT`) — no espaço Obras a
+contabilidade faz o que o ADMIN faz, por isso um gate de funcionalidade de Obras (obras, orçamento,
+despesas, faturas, pagamentos, fornecedores, incidentes) usa **`canManageWorks()`** (`ADMIN` ou
+`ACCOUNTANT`). **`isAdmin()`** fica para o resto: espaço Equipa, Definições, contas/convites, e
+gerir tarefas (o rótulo "Tarefas"/"Minhas Tarefas" e o cartão de Tarefas — o `ACCOUNTANT` tem as
+suas, como o `EMPLOYEE`). Regra prática: o gate segue o `@PreAuthorize` do endpoint por trás — se lá
+está `hasAnyRole('ADMIN','ACCOUNTANT')`, é `canManageWorks()`. Rótulos e cores de role vêm de
+`utils/profile.ts` (`roleToLabel`/`roleToTagColor`, `Record<Role, …>`) — um mapa local de rótulos
+esquece a role seguinte.
+
+**Convenção**: qualquer gate de permissão ou variação de UI baseada na role do utilizador **autenticado** passa por `useAuth()` (`isAdmin()`/`isEmployee()`/`isAccountant()`/`canManageWorks()`/`hasRole()`) — nunca ler `role`/`userRole` direto do contexto de auth para essa finalidade.
 
 **Não confundir** com rotular a role de **outro** perfil num `<Tag>`/badge, que legitimamente lê o `role` do objeto em causa: `AppLayout.tsx:213` (badge do próprio perfil), `utils/profile.ts:13,18`, `InvitesDrawer.tsx:113-121`, `TaskFormDrawer.tsx:167-168`, `MyProfileDrawer.tsx` (tag de role na tira de identidade). Não são gates de permissão.
 
@@ -113,7 +123,7 @@ https://claude.ai/artifact/Pc44vRLcHtYd5qVLFqUEnB.
 | Espaço | Rotas | Layout | Visível a | Identidade |
 |---|---|---|---|---|
 | **Obras** | `/backoffice/*` | `AppLayout` | todos | header claro, azul-aço (`--ind-color-accent`) |
-| **Equipa** | `/team/*` | `TeamLayout` | só `ADMIN` | header escuro (`--ind-team-header-*`), verde-oliva |
+| **Equipa** | `/team/*` | `TeamLayout` | só `ADMIN` (nem o `ACCOUNTANT`) | header escuro (`--ind-team-header-*`), verde-oliva |
 
 Peças em `layouts/shell/`:
 
@@ -141,7 +151,7 @@ Funcionários (`/team/employees`) · **Configuração ▾**
 **configuração** do espaço entram aqui; rotas de trabalho diário entram como link direto.
 
 **Gate**: o espaço Equipa é só `ADMIN` porque os endpoints de assiduidade são `hasRole('ADMIN')`. O
-`TeamLayout` devolve um `EMPLOYEE` a `/backoffice` (o self-service é a fase 5 da assiduidade, por
+`TeamLayout` devolve quem não é `ADMIN` (`EMPLOYEE`, `ACCOUNTANT`) a `/backoffice` (o self-service é a fase 5 da assiduidade, por
 decidir). **Rota nova de topo**: entra na nav do layout do seu espaço — Obras no `AppLayout`, Equipa no
 `TeamLayout`. Segmentos novos em inglês (`/team/...`), como manda a convenção.
 

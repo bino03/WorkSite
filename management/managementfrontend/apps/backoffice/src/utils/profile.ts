@@ -9,13 +9,25 @@ export function getInitials(name?: string | null): string {
   return (first + last).toUpperCase() || "?";
 }
 
-export function roleToLabel(role: Role): "Administrador" | "Funcionário" {
-  return role === "ADMIN" ? "Administrador" : "Funcionário";
+const ROLE_LABELS: Record<Role, string> = {
+  ADMIN: "Administrador",
+  EMPLOYEE: "Funcionário",
+  ACCOUNTANT: "Contabilidade",
+};
+
+export function roleToLabel(role: Role): string {
+  return ROLE_LABELS[role];
 }
 
 // AntD <Tag color> — usar presets (sem Tailwind de cor fixa)
+const ROLE_TAG_COLORS: Record<Role, string> = {
+  ADMIN: "red",
+  EMPLOYEE: "blue",
+  ACCOUNTANT: "green",
+};
+
 export function roleToTagColor(role: Role): string {
-  return role === "ADMIN" ? "red" : "blue";
+  return ROLE_TAG_COLORS[role];
 }
 
 export function statusToLabel(status: AccountStatus): "Ativo" | "Bloqueado" | "Eliminado" {

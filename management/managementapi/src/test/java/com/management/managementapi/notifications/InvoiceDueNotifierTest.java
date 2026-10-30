@@ -62,7 +62,7 @@ class InvoiceDueNotifierTest {
     @BeforeEach
     void setUp() {
         notifier = new InvoiceDueNotifier(invoices, suppliers, profiles, notifications, notificationService, 7);
-        when(profiles.findIdsByRoleAndAccountStatus(ProfileRole.ADMIN, AccountStatus.unlocked))
+        when(profiles.findIdsByRoleInAndAccountStatus(ProfileRole.WORKS_MANAGERS, AccountStatus.unlocked))
                 .thenReturn(List.of(ADMIN_A, ADMIN_B));
 
         Supplier brivel = new Supplier();
@@ -183,7 +183,7 @@ class InvoiceDueNotifierTest {
     @Test
     @DisplayName("Sem admins desbloqueados não consulta faturas nem cria nada")
     void noAdminsNoWork() {
-        when(profiles.findIdsByRoleAndAccountStatus(ProfileRole.ADMIN, AccountStatus.unlocked)).thenReturn(List.of());
+        when(profiles.findIdsByRoleInAndAccountStatus(ProfileRole.WORKS_MANAGERS, AccountStatus.unlocked)).thenReturn(List.of());
 
         assertThat(notifier.notifyUpcomingDueDates(HOJE)).isZero();
         verifyNoInteractions(invoices);

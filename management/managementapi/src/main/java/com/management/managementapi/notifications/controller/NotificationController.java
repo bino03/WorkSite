@@ -45,7 +45,7 @@ public class NotificationController {
 
     @Operation(summary = "As minhas notificações, das mais recentes para as mais antigas")
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public Page<NotificationResponseDTO> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -54,21 +54,21 @@ public class NotificationController {
 
     @Operation(summary = "Quantas estão por ler — é o contador do sino")
     @GetMapping("/unread-count")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public Map<String, Long> unreadCount() {
         return Map.of("count", service.unreadCount(me()));
     }
 
     @Operation(summary = "Marcar uma como lida")
     @PatchMapping("/{id}/read")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public NotificationResponseDTO markRead(@PathVariable UUID id) {
         return service.markRead(id, me());
     }
 
     @Operation(summary = "Marcar todas as minhas como lidas")
     @PatchMapping("/read-all")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<Map<String, Integer>> markAllRead() {
         return ResponseEntity.ok(Map.of("updated", service.markAllRead(me())));
     }

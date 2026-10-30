@@ -32,7 +32,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * Pagamentos de faturas de obra.
  *
- * Tudo restrito a {@code ADMIN}: o ciclo financeiro da fatura (registar,
+ * Tudo restrito a {@code ADMIN} e {@code ACCOUNTANT}: o ciclo financeiro da fatura (registar,
  * associar, pagar, anular) é decisão de gestão. O estado de pagamento da fatura
  * não vive aqui — é derivado das ligações e sai nos DTOs de fatura.
  */
@@ -50,7 +50,7 @@ public class PaymentController {
      */
     @PostMapping(value = "/construction-invoices/{invoiceId}/payments",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<PaymentResponseDTO> markAsPaid(
             @PathVariable UUID invoiceId,
             @Valid @RequestPart("payment") MarkPaidRequestDTO dto,
@@ -73,7 +73,7 @@ public class PaymentController {
      */
     @PostMapping(value = "/construction-invoices/payments",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<AggregatePaymentResultDTO> registerAggregate(
             @Valid @RequestPart("payment") AggregatePaymentRequestDTO dto,
             @RequestPart(value = "proof", required = false) MultipartFile proof,
@@ -91,7 +91,7 @@ public class PaymentController {
 
     /** Anula um pagamento e repõe as faturas por liquidar. Fica em {@code activity_log}. */
     @DeleteMapping("/construction-invoices/payments/{paymentId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID paymentId, HttpServletRequest request) {
         PaymentResponseDTO removed = paymentService.delete(paymentId);
 
@@ -109,7 +109,7 @@ public class PaymentController {
      */
     @PutMapping(value = "/construction-invoices/payments/{paymentId}/proof",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<PaymentResponseDTO> replaceProof(
             @PathVariable UUID paymentId,
             @RequestPart("proof") MultipartFile proof,
@@ -121,7 +121,7 @@ public class PaymentController {
 
     /** Deixa o pagamento sem prova. Idempotente: sem prova já, devolve o pagamento como está. */
     @DeleteMapping("/construction-invoices/payments/{paymentId}/proof")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<PaymentResponseDTO> removeProof(@PathVariable UUID paymentId,
                                                           HttpServletRequest request) {
         PaymentService.ProofChange change = paymentService.removeProof(paymentId);

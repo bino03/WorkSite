@@ -47,6 +47,7 @@ public class EnterpriseController {
     private final EnterpriseService enterpriseService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<Page<EnterpriseListDTO>> getAllEnterprises(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -58,12 +59,14 @@ public class EnterpriseController {
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<List<EnterpriseResponseDTO>> getActiveEnterprises() {
         List<EnterpriseResponseDTO> enterprises = enterpriseService.findAllActive();
         return ResponseEntity.ok(enterprises);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<EnterpriseFullResponseDTO> getEnterpriseById(@PathVariable @NonNull UUID id) {
         EnterpriseFullResponseDTO enterprise = enterpriseService.findById(id);
         return ResponseEntity.ok(enterprise);
@@ -74,6 +77,7 @@ public class EnterpriseController {
      * Útil para dropdowns e seleção de projeto
      */
     @GetMapping("/{id}/basic")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<EnterpriseBasicDTO> getEnterpriseBasicById(@PathVariable @NonNull UUID id) {
         EnterpriseBasicDTO enterprise = enterpriseService.findBasicById(id);
         return ResponseEntity.ok(enterprise);
@@ -84,15 +88,16 @@ public class EnterpriseController {
      * Útil para dropdowns e seleção de projeto
      */
     @GetMapping("/basic")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<List<EnterpriseBasicDTO>> getAllBasicEnterprises() {
         List<EnterpriseBasicDTO> enterprises = enterpriseService.findAllBasic();
         return ResponseEntity.ok(enterprises);
     }
 
-    // Criar/editar/apagar um projeto (e a sua galeria) passou a ADMIN-only em 2026-09-22 —
-    // era o único domínio sensível da app sem nenhum controlo de role. Leitura continua
-    // aberta a ADMIN/EMPLOYEE (default "autenticado"). Ver notes/roadmap/pre-deploy-security.md.
-    @PreAuthorize("hasRole('ADMIN')")
+    // Criar/editar/apagar um projeto (e a sua galeria) passou a ADMIN-only em 2026-09-22 (e ACCOUNTANT desde a V47) —
+    // era o único domínio sensível da app sem nenhum controlo de role. Leitura aberta às três
+    // roles, com @PreAuthorize explícito desde a V47. Ver notes/roadmap/pre-deploy-security.md.
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<EnterpriseDTO> createEnterprise(
             @RequestPart("enterprise") String enterpriseJson,
@@ -122,7 +127,7 @@ public class EnterpriseController {
         return ResponseEntity.status(HttpStatus.CREATED).body(createdEnterprise);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PutMapping("/{id}")
     public ResponseEntity<EnterpriseDTO> updateEnterprise(
             @PathVariable @NonNull UUID id,
@@ -131,7 +136,7 @@ public class EnterpriseController {
         return ResponseEntity.ok(updatedEnterprise);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEnterprise(@PathVariable @NonNull UUID id) {
         enterpriseService.delete(id);
@@ -139,6 +144,7 @@ public class EnterpriseController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<List<EnterpriseDTO>> searchEnterprisesByName(@RequestParam @NonNull String name) {
         List<EnterpriseDTO> enterprises = enterpriseService.findByName(name);
         return ResponseEntity.ok(enterprises);
@@ -197,7 +203,7 @@ public class EnterpriseController {
     /**
      * Adicionar múltiplas fotos à galeria
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/{id}/addPhotos")
     public ResponseEntity<List<MediaResponseDTO>> addPhotosToGallery(
             @PathVariable @NonNull UUID id,
@@ -209,7 +215,7 @@ public class EnterpriseController {
     /**
      * Upload ou atualizar banner
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/{id}/photos/banner")
     public ResponseEntity<EnterpriseFullResponseDTO> uploadOrUpdateBanner(
             @PathVariable @NonNull UUID id,
@@ -221,7 +227,7 @@ public class EnterpriseController {
     /**
      * Eliminar banner
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @DeleteMapping("/{id}/photos/banner")
     public ResponseEntity<EnterpriseFullResponseDTO> deleteBanner(@PathVariable @NonNull UUID id) {
         EnterpriseFullResponseDTO updatedEnterprise = enterpriseService.deleteBanner(id);
@@ -231,7 +237,7 @@ public class EnterpriseController {
     /**
      * Atualizar altText de uma media
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PatchMapping("/{id}/media/{mediaId}")
     public ResponseEntity<MediaResponseDTO> updateMediaAltText(
             @PathVariable @NonNull UUID id,
@@ -245,7 +251,7 @@ public class EnterpriseController {
     /**
      * Eliminar uma media específica
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @DeleteMapping("/{id}/media/{mediaId}")
     public ResponseEntity<Void> deleteMedia(
             @PathVariable @NonNull UUID id,

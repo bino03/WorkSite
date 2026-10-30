@@ -7,6 +7,7 @@ import { notificationService } from '@/services/general/notificationService';
 import { ErrorHandler } from '@/errors/errorHandler';
 import { listAssignableUsers } from '@/services/profileService';
 import type { AssignableEmployee } from '@/services/profileService';
+import { roleToLabel, roleToTagColor } from '@/utils/profile';
 import { searchEnterprises } from '@/services/enterpriseService';
 import type { EnterpriseOption } from '@/services/enterpriseService';
 import type { TaskResponse } from '@/types/task';
@@ -164,8 +165,8 @@ export const TaskFormDrawer: FC<Props> = ({ open, task, onClose, onSaved }) => {
               label: (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <span>{u.name}</span>
-                  <Tag color={u.role === 'ADMIN' ? 'gold' : 'blue'} style={{ marginInlineEnd: 0 }}>
-                    {u.role === 'ADMIN' ? 'Admin' : 'Funcionário'}
+                  <Tag color={roleToTagColor(u.role)} style={{ marginInlineEnd: 0 }}>
+                    {roleToLabel(u.role)}
                   </Tag>
                   <span style={{ opacity: 0.6, fontSize: 12 }}>{u.email}</span>
                 </span>

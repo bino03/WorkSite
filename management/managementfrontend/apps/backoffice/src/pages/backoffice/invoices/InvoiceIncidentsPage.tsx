@@ -15,7 +15,7 @@ import type { InvoiceIncident } from "@/types/incident";
  * "Inconsistências" — o que ficou por acertar entre faturas, tipicamente depois
  * de uma transferência. Lista + detalhe (markdown) + "marcar como resolvida".
  * Criar uma faz-se a partir de uma fatura transferida (ver `IncidentDrawer`).
- * Só ADMIN — o gate real é o `@PreAuthorize` do backend.
+ * Só ADMIN e ACCOUNTANT — o gate real é o `@PreAuthorize` do backend.
  */
 const InvoiceIncidentsPage: FC = () => {
   const confirm = useConfirm();

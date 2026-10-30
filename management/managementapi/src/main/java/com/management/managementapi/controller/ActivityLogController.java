@@ -30,7 +30,7 @@ public class ActivityLogController {
      * Apenas ADMIN e EMPLOYEE têm acesso.
      */
     @GetMapping("/recent")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<Page<ActivityLogListDTO>> getRecentActivities(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
@@ -43,7 +43,7 @@ public class ActivityLogController {
      * ADMIN vê qualquer utilizador; o próprio utilizador vê as suas.
      */
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<Page<ActivityLogListDTO>> getUserActivities(
             @PathVariable UUID userId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
@@ -56,7 +56,7 @@ public class ActivityLogController {
      * Histórico completo de uma entidade (ex: imóvel, contacto).
      */
     @GetMapping("/entity/{entityType}/{entityId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<List<ActivityLogResponseDTO>> getEntityActivities(
             @PathVariable String entityType,
             @PathVariable UUID entityId) {
@@ -69,7 +69,7 @@ public class ActivityLogController {
      * Filtrar atividades por utilizador, tipo, entidade e/ou range de datas.
      */
     @PostMapping("/filter")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public ResponseEntity<Page<ActivityLogListDTO>> filterActivities(
             @RequestBody ActivityLogFilterDTO filter,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)

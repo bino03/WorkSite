@@ -20,10 +20,10 @@ import com.management.managementapi.notifications.repository.NotificationReposit
 import com.management.managementapi.repository.ProfileRepository;
 
 /**
- * Avisa os admins das rubricas de orçamento cujo prazo está a {@code daysAhead}
+ * Avisa os admins e a contabilidade das rubricas de orçamento cujo prazo está a {@code daysAhead}
  * dias ou menos de terminar.
  *
- * Destinatários são todos os {@code ADMIN} porque não existe ligação
+ * Destinatários são todos os {@link ProfileRole#WORKS_MANAGERS} porque não existe ligação
  * funcionário↔obra no modelo ({@code Enterprise.managerId/ownerId} nunca foram
  * usados) — decisão de 2026-09-16. Cada rubrica avisa uma vez por destinatário:
  * o dedupe é por {@code (recipient, type, entity)}, por isso adiar a data de uma
@@ -55,19 +55,19 @@ public class BudgetItemDeadlineNotifier {
 
     /** Devolve quantas notificações foram criadas. */
     public int notifyUpcomingDeadlines(LocalDate today) {
-        List<UUID> admins = profiles.findIdsByRoleAndAccountStatus(ProfileRole.ADMIN, AccountStatus.unlocked);
-        if (admins.isEmpty()) return 0;
+        List<UUID> recipients = profiles.findIdsByRoleInAndAccountStatus(ProfileRole.WORKS_MANAGERS, AccountStatus.unlocked);
+        if (recipients.isEmpty()) return 0;
 
         List<ConstructionBudgetItem> items = budgetItems.findActiveItemsEndingBetween(BudgetRowKind.ITEM, today, today.plusDays(daysAhead));
 
         int created = 0;
         for (ConstructionBudgetItem item : items) {
-            for (UUID admin : admins) {
-                if (notifications.existsByRecipientIdAndTypeAndEntityId(admin, Notification.TYPE_BUDGET_ITEM_DEADLINE, item.getId())) {
+            for (UUID recipient : recipients) {
+                if (notifications.existsByRecipientIdAndTypeAndEntityId(recipient, Notification.TYPE_BUDGET_ITEM_DEADLINE, item.getId())) {
                     continue;
                 }
                 notificationService.notify(
-                        admin,
+                        recipient,
                         Notification.TYPE_BUDGET_ITEM_DEADLINE,
                         "Prazo de rubrica a terminar",
                         descreve(item, today),

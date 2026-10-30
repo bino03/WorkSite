@@ -177,6 +177,7 @@ export default function CreateEmployeeDrawer({ open, onClose, onCreated }: Props
                 options={[
                   { value: "ADMIN", label: t('profile.roles.admin') },
                   { value: "EMPLOYEE", label: t('profile.roles.employee') },
+                  { value: "ACCOUNTANT", label: t('profile.roles.accountant') },
                 ]}
                 aria-label="Perfil"
               />
@@ -209,6 +210,7 @@ export default function CreateEmployeeDrawer({ open, onClose, onCreated }: Props
                 options={[
                   { value: "ADMIN", label: t('profile.roles.admin') },
                   { value: "EMPLOYEE", label: t('profile.roles.employee') },
+                  { value: "ACCOUNTANT", label: t('profile.roles.accountant') },
                 ]}
                 aria-label="Perfil"
               />

@@ -81,7 +81,7 @@ const EnterpriseInvoicesPage: FC = () => {
   // Lê-se **só à entrada**: mudar o dropdown não reescreve a URL, ao contrário da
   // página do orçamento, onde `?lote=` é o estado da aba aberta.
   const [searchParams] = useSearchParams();
-  const { isAdmin } = useAuth();
+  const { canManageWorks } = useAuth();
   const confirm = useConfirm();
 
   const [invoices, setInvoices] = useState<ConstructionInvoice[]>([]);
@@ -478,7 +478,7 @@ const EnterpriseInvoicesPage: FC = () => {
             )}
           </h1>
         </div>
-        {isAdmin() && (
+        {canManageWorks() && (
           <Space>
             {/* A fila de despachar. Fica aqui e não escondida no orçamento
                 porque é daqui que se vê quantas estão à espera. */}
@@ -589,22 +589,22 @@ const EnterpriseInvoicesPage: FC = () => {
             Associar {allocatableSelected.length} à mesma rubrica
           </Button>
         )}
-        {lots.length > 1 && selectedInvoices.length > 0 && isAdmin() && (
+        {lots.length > 1 && selectedInvoices.length > 0 && canManageWorks() && (
           <Button onClick={() => setLotBulkOpen(true)}>
             Associar {selectedInvoices.length} ao lote…
           </Button>
         )}
-        {approvableSelected.length > 0 && isAdmin() && (
+        {approvableSelected.length > 0 && canManageWorks() && (
           <Button onClick={() => paymentApproval.approveMany(approvableSelected)}>
             Aprovar {approvableSelected.length} para pagamento
           </Button>
         )}
-        {payableSelected.length > 0 && isAdmin() && (
+        {payableSelected.length > 0 && canManageWorks() && (
           <Button onClick={() => setAggregatePayOpen(true)}>
             Registar pagamento de {payableSelected.length}
           </Button>
         )}
-        {sendableSelected.length > 0 && isAdmin() && (
+        {sendableSelected.length > 0 && canManageWorks() && (
           <Button onClick={handleBulkSendToAccountant}>
             Marcar {sendableSelected.length} como enviada{sendableSelected.length > 1 ? "s" : ""} à
             contabilidade
