@@ -17,6 +17,22 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 - O tipo `role_enum` na base de dados só define `ADMIN` e `EMPLOYEE`.
 - Autorização fina feita maioritariamente por `@PreAuthorize` em cada controller/método (`hasRole('ADMIN')`, `hasAnyRole('ADMIN','EMPLOYEE')`, `isAuthenticated()`).
 
+### Role `ACCOUNTANT` — decidida a 2026-10-30, por implementar
+
+Uma terceira role para a contabilidade. **No espaço Obras faz tudo o que o ADMIN faz** (obras,
+orçamentos, despesas, faturas — incluindo despesas da empresa e quarentena —, pagamentos,
+aprovação para pagamento, fornecedores, incidentes) e recebe os avisos de Obras (`invoice_due`,
+prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das Definições
+(`/settings/**`), das contas e convites (`/auth/admin/**`, escritas em `/employees`) e da gestão de
+tarefas — em Tarefas comporta-se como EMPLOYEE. Não é trabalhador para a assiduidade.
+
+Como se aplica: `hasAnyRole('ADMIN','ACCOUNTANT')` explícito em cada `@PreAuthorize` de Obras (não
+uma `RoleHierarchy`, que não consegue dizer "ADMIN só em Obras"), e um teste de reflexão que falha
+se um endpoint de `enterprises.controller` aceitar `ADMIN` sem `ACCOUNTANT`. No Backoffice,
+`canManageWorks()` guarda Obras e `isAdmin()` continua a guardar o resto. Desenho e fases em
+`notes/roadmap/role-accountant.md`; quando estiver implementada, esta secção passa a descrever o
+estado real e a tabela de matchers abaixo ganha o `ACCOUNTANT`.
+
 ### Regras globais (`SecurityConfig`)
 
 | Padrão | Acesso |
