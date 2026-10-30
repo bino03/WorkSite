@@ -24,8 +24,8 @@ concurrency:
 
 env:
   FLY_APP: worksite-vilatro
-  # Sem terminal, o `apps create` não pode perguntar a organização. "personal" é a da conta.
-  FLY_ORG: personal
+  # Sem terminal, o `apps create` não pode perguntar a organização. Tem de ser a do FLY_API_TOKEN.
+  FLY_ORG: vilatro
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
 jobs:
