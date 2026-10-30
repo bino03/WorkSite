@@ -32,8 +32,8 @@ Notas que se pagam caro por não se saberem:
 - O `DB_USER` é `postgres.<project-ref>` — o role `postgres` do Supabase, que não está sujeito a RLS.
   É a única ligação à base de dados que existe; ver [[security]] → "Modelo de confiança".
 - O `APP_FRONTEND_URL` é a base dos links que saem nos emails (convite, recuperação de
-  password). O default é `http://localhost:5173`; em produção tem de apontar para o domínio
-  real do Backoffice, caso contrário os links chegam a apontar para localhost.
+  password). O default é `http://localhost:5173`; em produção é `https://worksite-vilatro.fly.dev`
+  (no `fly.toml`) — sem isso os links chegavam a apontar para localhost.
 - A configuração de SMTP **não vive aqui** — está na tabela `settings.email_providers`, gerida no
   Backoffice em *Definições → Provedores de email* (`ADMIN`). Sem um provedor predefinido e ativo
   lá, o convite de funcionário e a recuperação de password falham com `EMAIL_002`.
@@ -47,9 +47,9 @@ Notas que se pagam caro por não se saberem:
   `InvoiceDueNotifierConfig` avisa os `ADMIN` do vencimento de uma fatura por liquidar.
   Ver [[api]] → "Quem gera notificações".
 - `CORS_ALLOWED_ORIGINS` (lista separada por vírgulas, default só as portas de dev): sem valor de
-  produção por omissão de propósito — o domínio real do Backoffice ainda não está decidido. Em
-  produção, preencher com o(s) domínio(s) reais (ex. `https://backoffice.worksite.pt`); nunca
-  deixar os placeholders fictícios que existiam antes hardcoded em `SecurityConfig.java`.
+  produção por omissão de propósito. Em produção é `https://worksite-vilatro.fly.dev` (no
+  `fly.toml`); com um domínio comprado, troca-se lá. Nunca voltar aos placeholders fictícios que
+  existiam antes hardcoded em `SecurityConfig.java`.
 - `logging.level.*` (`application.yml`) fica em `INFO`/`WARN` por omissão desde 2026-09-22 — seguro
   para produção mesmo sem ninguém mudar nada, já que não há `application-{profile}.yml` neste
   projeto. Para depurar localmente com mais detalhe (SQL do Hibernate, logs da app), subir por

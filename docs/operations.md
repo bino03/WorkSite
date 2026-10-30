@@ -201,8 +201,9 @@ vem do `ConstructionInvoiceRepository` (21 queries, 23 `CASE`/`COALESCE`). Fora 
 
 ### Opções de hospedagem pesquisadas (2026-09-23)
 
-Nenhuma decisão tomada ainda — isto é o levantamento para decidir, não uma escolha feita. Preços
-de mercado mudam; confirmar no site antes de assinar.
+> **Histórico** — o levantamento que levou à decisão. Escolhido: Fly.io, 1 GB, backend a servir o
+> Backoffice (sem hospedagem de frontend à parte) — ver "Decidido a 2026-10-29" acima. Os preços
+> abaixo são os de 2026-09-23 e o Fly cobra hoje ~$6/mês pela máquina de 1 GB.
 
 **Backend** (precisa de correr um processo Java persistente — não serve nada serverless tipo
 funções Vercel):
@@ -234,19 +235,24 @@ entra em dois sítios com propósitos diferentes: no registo do domínio é o **
 para o domínio ficar em nome da empresa); na hospedagem (Vercel/Render/Railway/Cloudflare) é só
 para a **fatura** (billing/tax info nas settings de conta), sem relação com a titularidade de nada.
 
-### Variáveis a preencher (produção real)
+### Variáveis de produção (preenchidas a 2026-10-30)
 
-Nenhuma tem valor de produção no repo, de propósito — ver [[environment]] para a lista completa
-com os defaults de dev. As que mudam mesmo:
+Os defaults do `application.yml` são de dev — ver [[environment]] para a lista completa. Em produção:
 
 ```
-COOKIE_SECURE=true                          # false só em dev
-COOKIE_DOMAIN=<domínio real>
-CORS_ALLOWED_ORIGINS=<domínio real>
-APP_FRONTEND_URL=<domínio real>
-SUPABASE_SERVICE_ROLE_KEY, DB_PASS, SUPABASE_JWT_SECRET, APP_EMAIL_CRYPTO_KEY
-                                             # pelo mecanismo de secrets da hospedagem, nunca em ficheiro versionado
+# management/fly.toml → [env] (não são segredos)
+COOKIE_SECURE=true
+COOKIE_DOMAIN=localhost                      # = "sem Domain" → cookie do host exato
+CORS_ALLOWED_ORIGINS=https://worksite-vilatro.fly.dev
+APP_FRONTEND_URL=https://worksite-vilatro.fly.dev
+
+# secret FLY_APP_SECRETS do GitHub → importado no Fly a cada deploy
+DB_URL, DB_USER, DB_PASS, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY,
+SUPABASE_JWT_SECRET, APP_EMAIL_CRYPTO_KEY
 ```
+
+Com um domínio comprado, mudam os três URLs no `fly.toml` e o `COOKIE_DOMAIN` — ver "A decisão que
+destrava o resto", acima.
 
 O histórico do git já foi confirmado limpo (nenhum `.env` alguma vez commitado, `.gitignore` cobre
 `.env`/`.env.local`/`.env.*`) — 2026-09-22.
@@ -265,16 +271,17 @@ O histórico do git já foi confirmado limpo (nenhum `.env` alguma vez commitado
 - **Rate limiting** (login, forgot-password, exportações do orçamento) testado ao vivo com JWT
   real — ver `notes/verificacao-browser-pendente.md` §19.
 
-### Só testável depois de decidir a hospedagem
+### O que estava à espera da hospedagem (estado a 2026-10-30)
 
-- **CORS** com o domínio real (hoje só testado com origens de dev).
-- **`server.forward-headers-strategy`**, se houver TLS-termination num proxy à frente.
-- **Comportamento sob carga concorrente** do `/export/zip` (streaming de documentos) — precisa de
-  produção ou staging reais para fazer sentido; `ab`/`hey` concorrente contra o endpoint, monitorizar
-  heap/threads.
-- Um **provedor SMTP real** configurado em *Definições → Provedores de email* — bloqueia convites
-  de funcionários e recuperação de password até existir; não é do roadmap de segurança, mas é
-  necessário para produção a sério.
+- **CORS** — deixou de pesar: o Backoffice e a API estão na mesma origem, por isso o browser não faz
+  pedidos cross-origin. `CORS_ALLOWED_ORIGINS` fica com o `fly.dev` por segurança.
+- **`server.forward-headers-strategy: native`** — ✅ confirmado: o HSTS sai sobre o HTTPS do Fly.
+- **Login e cookies sobre HTTPS real** — por verificar no browser (§51).
+- **Comportamento sob carga concorrente** do `/export/zip` (streaming de documentos) — por fazer;
+  `ab`/`hey` concorrente contra a app online, a olhar para as Metrics do Fly. Com a máquina de 1 GB
+  e o `HeavyWorkGate`, o risco é menor do que quando isto foi escrito, mas não foi medido.
+- Um **provedor SMTP real** configurado em *Definições → Provedores de email* — por fazer; sem ele
+  não há convites de funcionários nem recuperação de password.
 
 ## Cópia de segurança
 

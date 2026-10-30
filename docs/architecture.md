@@ -11,7 +11,12 @@ Visão geral de como o backend e o frontend se encaixam. Bootstrapped a partir d
 
 Ao contrário do Property-Management, **não existe portal público** — esta é uma ferramenta interna, um único repositório, sem submódulos git.
 
-## Diagrama de comunicação
+**Em produção** (desde 2026-10-30) os dois correm como **um só processo** numa máquina Fly.io, em
+`https://worksite-vilatro.fly.dev`: o `vite build` do Backoffice vai para os estáticos do Spring Boot,
+e a API e as páginas saem da mesma origem (sem CORS, cookie do host exato). O diagrama abaixo é o de
+dev. Como está montado e como se atualiza: [[operations]].
+
+## Diagrama de comunicação (dev)
 
 ```
 ┌────────────────────────┐

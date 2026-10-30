@@ -1,6 +1,6 @@
 # 📡 Referência da API
 
-Base URL (dev): `http://localhost:8080`. Sem `context-path` global e sem `server.port` explícito — todas as rotas são relativas à raiz.
+Base URL (dev): `http://localhost:8080`. Produção: `https://worksite-vilatro.fly.dev` — a mesma origem que serve o Backoffice. Sem `context-path` global (`server.port: ${PORT:8080}`) — todas as rotas são relativas à raiz.
 
 Ver [[security.md]] para as regras de acesso (público vs `ADMIN`/`EMPLOYEE`/autenticado) e [[architecture.md]] para quem consome cada grupo de endpoints.
 

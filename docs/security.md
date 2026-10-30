@@ -44,7 +44,9 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 Configurado via `CorsConfigurationSource` em `SecurityConfig.java`, com as origens permitidas lidas
 de `app.security.cors.allowed-origins` (env var `CORS_ALLOWED_ORIGINS`, lista separada por vírgulas)
 — deixou de haver domínios hardcoded no código desde 2026-09-22. Sem valor de produção por omissão
-de propósito: o domínio real do Backoffice ainda não está decidido. `allowCredentials(true)` está
+de propósito; em produção (desde 2026-10-30) é `https://worksite-vilatro.fly.dev`, no `fly.toml`.
+Como o Backoffice é servido pelo próprio backend, na mesma origem, o browser nem chega a fazer
+pedidos cross-origin — o CORS só pesa em dev (Vite em `:5173`, API em `:8080`). `allowCredentials(true)` está
 ativo, por isso uma origem errada em produção dá a qualquer site acesso à sessão de um utilizador
 autenticado — ver `notes/roadmap/pre-deploy-security.md`.
 

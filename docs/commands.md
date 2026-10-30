@@ -74,6 +74,10 @@ npm run lint      # ESLint
 > `CreditNoteDrawer` a importar o `BudgetItemPickerModal` como default quando ele só tem named
 > export — só rebentava em runtime, ao abrir a repartição de uma nota de crédito).
 
+## Pôr online
+
+Não há comando local: o deploy é o merge do `dev` para o `master` + push (o workflow do GitHub faz o resto). Procedimento e cuidados em [[operations]] → "Atualizar a app (branches e deploy)". Logs da app online: `fly logs -a worksite-vilatro`.
+
 ## Relacionado
 
 - [[environment]] — as variáveis que o backend e o frontend precisam
