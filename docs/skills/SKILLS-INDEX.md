@@ -212,6 +212,16 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - **Use when**: "Tenho uma ideia", "quero adicionar X", planear uma funcionalidade para mais tarde, ou passar uma ideia de `ideas.md` para o ToDo
 - **Nota**: não implementa — é a entrada do ciclo; o `implement-todo` é a saída e lê o bloco `> Decidido` que esta deixa. Veio do Workflow a 2026-09-27, ainda por provar
 
+### [[skill-plan-feature]]
+**Planeia uma feature de várias sessões: entrevista → spec em `notes/roadmap/<slug>.md` → um bullet por fase no ToDo**
+
+- **File**: `docs/skills/process/skill-plan-feature.md`
+- **Time**: ~30-60 min
+- **Tags**: `#process` `#planning` `#spec` `#roadmap`
+- **Covers**: Dimensionar (precisa de spec?) → ler vault e código → entrevista em bloco (problema, fora de âmbito, dados, API, Backoffice, erros, permissões, paridade com o Excel) → desenho concreto → fases com ficheiro/skill/critério → spec no molde do `roadmap/assiduidade` → secção no ToDo + linha no `backlog.md`
+- **Use when**: Uma funcionalidade que atravessa BD → API → Backoffice e não cabe numa sessão; o `refine-idea` diz "grande demais para uma tarefa"
+- **Nota**: não implementa. O estado de execução não vive na spec — é do plano do `implement-todo` e do `backlog.md`. Veio do Workflow (origem: HomeLab) a 2026-10-30, adaptada: spec em `notes/roadmap/` em vez de `docs/features/`, sem tier de modelo, sem ADRs (decisões estruturais → `docs/architecture.md`)
+
 ### [[skill-verify-in-browser]]
 **Ver uma feature do Backoffice a funcionar na app real, pela extensão do Chrome — por DOM + API, nunca por screenshot; escrita só em obra `is_test`**
 
@@ -297,7 +307,7 @@ docs/skills/
 ├── SKILLS-QUICK-REFERENCE.md  ← Fast lookup table
 ├── backend/                   ← 4 skills
 ├── frontend/                  ← 4 skills
-├── process/                   ← 3 skills
+├── process/                   ← 7 skills
 └── references/                ← 3 docs + design/ (8 sub-files), not invocable
 ```
 
@@ -308,15 +318,16 @@ docs/skills/
 | References (not invocable) | 3 (+ 8 design sub-files) |
 | Backend Skills | 4 |
 | Frontend Skills | 4 |
-| Process Skills | 6 |
-| **Total Invocable Skills** | **14** |
+| Process Skills | 7 |
+| **Total Invocable Skills** | **15** |
 
 ---
 
 ## Last Updated
 
-- **Date**: 2026-09-27
-- **Latest**: `skill-refine-idea` (process) — a entrada do ciclo: ideia em linguagem livre → lê o vault → pergunta só o que falta → bullet no ToDo (com `> Decidido`) ou entrada com contexto em `ideas.md` (`/refine-idea`). Veio do Workflow, ainda por provar. `implement-todo` passa a ler o bloco `> Decidido` e as ideias de qualquer `> Contexto (via …)`.
+- **Date**: 2026-10-30
+- **Latest**: `skill-plan-feature` (process) — planear uma feature de várias sessões (`/plan-feature`): entrevista → spec em `notes/roadmap/<slug>.md` no molde do `assiduidade.md` → um bullet por fase no ToDo + linha no `backlog.md`. Veio do Workflow, adaptada ao Worksite, ainda por provar. `refine-idea` encaminha para ela as ideias grandes demais; `implement-todo` lê a spec quando um bullet aponta para ela.
+- **Anterior (2026-09-27)**: `skill-refine-idea` (process) — a entrada do ciclo: ideia em linguagem livre → lê o vault → pergunta só o que falta → bullet no ToDo (com `> Decidido`) ou entrada com contexto em `ideas.md` (`/refine-idea`). Veio do Workflow, ainda por provar. `implement-todo` passa a ler o bloco `> Decidido` e as ideias de qualquer `> Contexto (via …)`.
 - **Anterior (2026-09-25)**: `skill-run` (process) — arranca backend + Backoffice localmente (`/run`), com verificação por log e health check por `curl` em vez de assumir sucesso.
 - **Anterior (2026-09-19)**: `skill-verify-in-browser` (process) — o procedimento da extensão do Chrome que vivia em `notes/learning.md` passa a ser invocável (`/verify-in-browser`) e chamado pelo `implement-todo` na Fase 5.5; a secção frontend de `code-best-practices` fundida no `skill-frontend-design-system` ("Regras de base"); regra "o integration guide apaga-se ao fechar a feature".
 - **Anterior (2026-09-19)**: `skill-add-file-upload` reescrita à volta de `construction_invoice_document` + `payment.proof_*` (a versão anterior ensinava o `/assets/{id}/banner` do Property-Management); `property_asset` e `ConstructionStagesPage` purgados de `skill-add-database-table` e `skill-frontend-design-system`; `implement-todo` Fase 7 passa a alimentar `backlog.md` e `learning.md`.

@@ -83,7 +83,7 @@ não se decide num bullet: marcar "⚠️ decisão estrutural — registar em `d
 | Sabe-se **o que**, **onde** e **como se verifica**; sem perguntas de negócio em aberto | `ToDo.md` |
 | Idem, mas falta um detalhe pequeno (um texto, um limite, um default) | `ToDo.md` com **⚠️** — o `/implement-todo` pergunta antes de implementar |
 | Falta o valor, o âmbito, ou uma decisão estrutural | `ideas.md`, com contexto |
-| Grande demais para uma tarefa (várias sessões, dados → API → UI) | vários bullets numa secção própria do `ToDo.md`, na ordem das dependências, + linha em `notes/roadmap/backlog.md` |
+| Grande demais para uma tarefa (várias sessões, dados → API → UI) | parar aqui e propor `/plan-feature` ([[skill-plan-feature]]) — escreve a spec em `notes/roadmap/<slug>.md`, a secção do `ToDo.md` com um bullet por fase e a linha no `backlog.md`. Passar-lhe o que já se apurou no Step 2 para não voltar a perguntar |
 
 Porquê o teste "o que / onde / como se verifica": é exatamente o que o `/implement-todo` precisa para
 investigar sem voltar a perguntar o básico. Um bullet que falha isto volta a `ideas.md` na Fase 3 dele —

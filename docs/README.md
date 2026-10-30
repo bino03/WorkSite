@@ -21,7 +21,7 @@ Central documentation for the Worksite project (backend + backoffice).
   - **[[SKILLS-INDEX]]** / **[[SKILLS-QUICK-REFERENCE]]** — Master index of all skills and references
   - **backend/** — 4 backend skills (`skill-add-backend-feature`, `skill-add-database-table`, `skill-add-file-upload`, `skill-permissions-and-auth`)
   - **frontend/** — 4 frontend skills (`skill-frontend-design-system`, `skill-frontend-error-handling`, `skill-frontend-integration-guide`, `skill-frontend-structure-brief`)
-  - **process/** — 4 process/workflow skills (`skill-create-new-skill`, `skill-git-commits`, `skill-implement-todo`, `skill-verify-in-browser`)
+  - **process/** — 7 process/workflow skills (`skill-create-new-skill`, `skill-git-commits`, `skill-implement-todo`, `skill-plan-feature`, `skill-refine-idea`, `skill-run`, `skill-verify-in-browser`)
   - **references/** — Conventions docs read by skills, not invocable on their own: [[code-best-practices]], [[frontend-visual-consistency]], and **design/** (8 Backoffice sub-files with verified visual/structural conventions, auditadas contra o código real deste projeto — as sub-files específicas do Portal foram descartadas por este projeto não ter portal público)
 
 ## Keeping this in sync

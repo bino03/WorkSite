@@ -79,6 +79,8 @@ Se "Implementar" ou "Só planear" (diretamente no menu 1.0, ou a partir de "Ver 
 
 Guarda o resultado como a lista de bullets exatos (texto verbatim) em âmbito para as fases seguintes — **com o bloco `> Decidido (via refine-idea, …)`** indentado por baixo, se o tiverem: é esclarecimento já obtido, entra no plano e nas Fases 2-3. Nada fora deste âmbito é tocado.
 
+Se a secção do ToDo aponta para uma spec em `notes/roadmap/<slug>.md` (escrita pelo [[skill-plan-feature]] ou à mão, como a da assiduidade), **lê-a agora**: as decisões, o modelo de dados, os ficheiros e o critério de aceitação de cada fase estão lá. Passa ao prompt da Fase 2 o excerto da fase em âmbito e não voltes a perguntar na Fase 3 o que a spec já decidiu — só o que está em "Em aberto".
+
 ### 1.2 — Orçamento da sessão (só se "Implementar")
 
 `AskUserQuestion` (single-select, 2 opções): **Sem limite (recomendado)** · **Pouco tempo/tokens — otimizar para fechar em segurança**

@@ -17,6 +17,7 @@ This is your starting point. Use the links below or **Ctrl+Shift+F** to search e
 - Time estimates for each skill
 
 👉 **Para uma ideia nova**: [[docs/skills/process/skill-refine-idea]] (`/refine-idea`) — diz o que queres adicionar; fica no [[notes/ToDo.md]] ou em [[notes/ideas.md]]
+👉 **Para uma feature grande (várias sessões)**: [[docs/skills/process/skill-plan-feature]] (`/plan-feature`) — entrevista e spec em `notes/roadmap/`, com as fases no [[notes/ToDo.md]]
 👉 **Para avançar o backlog**: [[docs/skills/process/skill-implement-todo]] (`/implement-todo`) — lê [[notes/ToDo.md]], prioriza e implementa
 👉 **Para ver uma feature a funcionar na app**: [[docs/skills/process/skill-verify-in-browser]] (`/verify-in-browser`) — a passagem em lote sobre [[notes/verificacao-browser-pendente.md]]
 
