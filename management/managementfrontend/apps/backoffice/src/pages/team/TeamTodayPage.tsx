@@ -104,7 +104,12 @@ export default function TeamTodayPage() {
         // "A trabalhar agora" é hoje com entrada picada e ainda sem saída.
         if (day.date === today && day.firstIn && !day.lastOut) workingNow += 1;
 
-        if (day.status === "MISSING") {
+        // O relatório não sabe que dia é hoje: um dia com horário e sem picagens é "MISSING" mesmo
+        // que ainda não tenha chegado, e quem está a trabalhar agora vem como "incompleto". Só se
+        // pede justificação ou correção do que já passou.
+        const hasHappened = day.date < today;
+
+        if (day.status === "MISSING" && hasHappened) {
           missingDays += 1;
           rows.push({
             key: `m-${employee.profileId}-${day.date}`,
@@ -114,7 +119,7 @@ export default function TeamTodayPage() {
             what: `Falta — ${formatLongDate(day.date)}`,
             action: "justify",
           });
-        } else if (day.incomplete) {
+        } else if (day.incomplete && hasHappened) {
           incompleteDays += 1;
           rows.push({
             key: `i-${employee.profileId}-${day.date}`,
