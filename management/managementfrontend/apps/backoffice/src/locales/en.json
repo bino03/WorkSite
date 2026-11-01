@@ -121,8 +121,7 @@
     }
   },
   "auth": {
-    "title": "BackOffice — Property Management",
-    "subtitle": "Property Management",
+    "title": "Vilatro",
     "email": "Email",
     "password": "Password",
     "rememberMe": "Remember me",

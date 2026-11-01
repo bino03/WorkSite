@@ -63,7 +63,6 @@ export const Login = () => {
           <BuildOutlined style={{ fontSize: 28 }} />
           <h1 style={{ margin: 0, fontSize: 36 }}>Worksite</h1>
         </div>
-        <p style={{ margin: 0, maxWidth: 360, opacity: 0.8, fontSize: 15 }}>{t("auth.subtitle")}</p>
       </div>
 
       {/* ── Right panel: login form ── */}
