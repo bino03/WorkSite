@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +17,8 @@ import com.management.managementapi.model.enums.AbsenceStatus;
 @Repository
 public interface AbsenceRepository extends JpaRepository<Absence, UUID> {
 
+    // O mapper lê os nomes fora da transação (no controller) — as três pessoas têm de vir já carregadas.
+    @EntityGraph(attributePaths = {"profile", "requestedBy", "approvedBy"})
     Optional<Absence> findByIdAndDeletedAtIsNull(UUID id);
 
     /**
@@ -28,6 +31,9 @@ public interface AbsenceRepository extends JpaRepository<Absence, UUID> {
      */
     @Query("""
             select a from Absence a
+            join fetch a.profile
+            left join fetch a.requestedBy
+            left join fetch a.approvedBy
             where a.profile.id = :profileId
               and a.deletedAt is null
               and a.startsOn <= :to
@@ -44,6 +50,8 @@ public interface AbsenceRepository extends JpaRepository<Absence, UUID> {
     @Query("""
             select a from Absence a
             join fetch a.profile
+            left join fetch a.requestedBy
+            left join fetch a.approvedBy
             where a.deletedAt is null
               and a.startsOn <= :to
               and a.endsOn >= :from
@@ -57,6 +65,8 @@ public interface AbsenceRepository extends JpaRepository<Absence, UUID> {
     @Query("""
             select a from Absence a
             join fetch a.profile
+            left join fetch a.requestedBy
+            left join fetch a.approvedBy
             where a.deletedAt is null
               and a.status = :status
             order by a.startsOn asc

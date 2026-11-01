@@ -27,7 +27,7 @@ export const LoginLoadingPage = () => {
         const userInfo = await login(email, password);
         sessionStorage.setItem("welcome_name", userInfo.name);
 
-        if (userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE") {
+        if (userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE" || userInfo.role === "ACCOUNTANT") {
           navigate(landingPath(userInfo.role === "ADMIN"), { replace: true });
         } else {
           navigate("/login", {

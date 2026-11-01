@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 
 /**
@@ -13,27 +14,27 @@ export function useAuth() {
   const userId = user?.authUserId ?? null;
   const profileId = user?.profileId || null;
 
-  // Helper functions to check permissions
-  const isAdmin = () => userRole === 'ADMIN';
-  const isEmployee = () => userRole === 'EMPLOYEE';
-  const isAccountant = () => userRole === 'ACCOUNTANT';
-  /**
-   * No espaço Obras a contabilidade faz o que o ADMIN faz (os `@PreAuthorize` de
-   * `enterprises/controller` aceitam as duas). `isAdmin()` continua a guardar o resto:
-   * Equipa, Definições, contas/convites e gerir tarefas.
-   */
-  const canManageWorks = () => isAdmin() || isAccountant();
-  const hasRole = (role: string) => userRole === role;
+  // Memoizadas pela role: há páginas que as põem nas dependências de um useEffect, e uma
+  // função nova a cada render repetia o efeito em ciclo (o BackofficeHome pedia /tasks sem parar).
+  const checks = useMemo(() => {
+    const isAdmin = () => userRole === 'ADMIN';
+    const isEmployee = () => userRole === 'EMPLOYEE';
+    const isAccountant = () => userRole === 'ACCOUNTANT';
+    /**
+     * No espaço Obras a contabilidade faz o que o ADMIN faz (os `@PreAuthorize` de
+     * `enterprises/controller` aceitam as duas). `isAdmin()` continua a guardar o resto:
+     * Equipa, Definições, contas/convites e gerir tarefas.
+     */
+    const canManageWorks = () => isAdmin() || isAccountant();
+    const hasRole = (role: string) => userRole === role;
+    return { isAdmin, isEmployee, isAccountant, canManageWorks, hasRole };
+  }, [userRole]);
 
   return {
     userRole,
     userName,
     userId,
     profileId,
-    isAdmin,
-    isEmployee,
-    isAccountant,
-    canManageWorks,
-    hasRole,
+    ...checks,
   };
 }
