@@ -26,6 +26,11 @@ prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das De
 (`/settings/**`), das contas e convites (`/auth/admin/**`, escritas em `/employees`) e da gestão de
 tarefas — em Tarefas comporta-se como EMPLOYEE. Não é trabalhador para a assiduidade.
 
+**Exceção em Obras (2026-11-01):** a zona de recuperação do orçamento — `GET
+/construction-budget/budgets/{id}/deleted` e `PATCH .../items/{id}/recover`, as rubricas eliminadas
+que ficam 30 dias antes da purga — é só `ADMIN`. A contabilidade não vê nem repõe o que foi
+eliminado; no Backoffice o botão "Eliminadas" só aparece ao ADMIN.
+
 Como se aplica: `hasAnyRole('ADMIN','ACCOUNTANT')` explícito em cada `@PreAuthorize` de Obras (não
 uma `RoleHierarchy`, que não consegue dizer "ADMIN só em Obras"), e `ACCOUNTANT` acrescentado a todo
 o `hasAnyRole('ADMIN','EMPLOYEE')`. Dois testes guardam isto sem contexto Spring nem BD — avaliam as
@@ -34,7 +39,7 @@ nos testes):
 
 - `WorksEndpointsRoleGuardTest` — todo o endpoint de `enterprises.controller` tem `@PreAuthorize`, e
   nenhum aceita `ADMIN` sem aceitar `ACCOUNTANT`. É o que apanha um endpoint novo de Obras escrito só
-  com `hasRole('ADMIN')`.
+  com `hasRole('ADMIN')`. As exceções escolhidas estão listadas por nome em `ADMIN_ONLY_BY_DECISION`.
 - `AccountantAccessTest` — o que abre (faturas da empresa, pagamentos, aprovação) e o que continua
   fechado (todo o `/attendance/**`, `/settings/**`, `/auth/admin/**`, escritas em `/employees`,
   criar/apagar tarefas).

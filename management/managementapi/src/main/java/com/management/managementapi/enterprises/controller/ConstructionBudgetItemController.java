@@ -263,9 +263,12 @@ public class ConstructionBudgetItemController {
         return ResponseEntity.ok(service.getNode(id));
     }
 
-    /** A zona de recuperação: rubricas eliminadas (soft delete) deste lote, mais recente primeiro. */
+    /**
+     * A zona de recuperação: rubricas eliminadas (soft delete) deste lote, mais recente primeiro.
+     * Só ADMIN (decisão de 2026-11-01): a contabilidade não vê nem repõe o que foi eliminado.
+     */
     @GetMapping("/budgets/{budgetId}/deleted")
-    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<BudgetItemDeletedDTO>> getDeleted(@PathVariable UUID budgetId) {
         return ResponseEntity.ok(service.listDeleted(budgetId));
     }
@@ -367,7 +370,7 @@ public class ConstructionBudgetItemController {
 
     /** Repõe uma rubrica eliminada (e a sub-árvore eliminada junto com ela). */
     @PatchMapping("/items/{id}/recover")
-    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BudgetItemNodeDTO> recover(@PathVariable UUID id, HttpServletRequest request) {
         BudgetItemNodeDTO recovered = service.recover(id);
 
