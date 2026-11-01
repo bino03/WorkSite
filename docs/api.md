@@ -1335,7 +1335,8 @@ repartida — somam `workedMinutes`; ver "Relatórios de assiduidade") e um `sta
 | `status` | Significado |
 |---|---|
 | `WORKED` | Há picagens no dia |
-| `MISSING` | O horário previa trabalho e não há picagem nenhuma — **falta por justificar** |
+| `MISSING` | O horário previa trabalho e não há picagem nenhuma, num dia que **já chegou** (hoje incluído) — **falta por justificar** |
+| `UPCOMING` | O horário prevê trabalho mas o dia é **depois de hoje** (fuso `app.attendance.zone`). Desde 2026-11-01 — antes era `MISSING`, e um relatório a meio do mês mostrava faltas para os dias que faltavam. Conta nas horas previstas, **não** nas faltas; no `.xlsx` sai "Por acontecer" |
 | `NOT_SCHEDULED` | O horário não previa trabalho (fim de semana, horário parcial). **Não é falta** |
 | `NO_SCHEDULE` | Não há horário atribuído a cobrir o dia (antes da admissão, ou sem ficha de emprego). Nem falta nem previsão |
 

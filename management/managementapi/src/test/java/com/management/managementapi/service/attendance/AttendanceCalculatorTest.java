@@ -39,6 +39,8 @@ class AttendanceCalculatorTest {
 
     private static final ZoneId LISBOA = ZoneId.of("Europe/Lisbon");
     private static final LocalDate QUARTA_DE_JULHO = LocalDate.of(2026, 7, 15);
+    /** Depois de todos os dias destes testes: nenhum é "por acontecer", salvo onde se diz. */
+    private static final LocalDate HOJE = LocalDate.of(2026, 12, 31);
 
     /** Em julho Lisboa está em UTC+1, logo a hora local menos uma hora dá o instante UTC. */
     private static OffsetDateTime local(int hora, int minuto) {
@@ -62,7 +64,7 @@ class AttendanceCalculatorTest {
     }
 
     private static DayAttendance calcular(List<TimeEntry> entries, WorkScheduleDay scheduled) {
-        return AttendanceCalculator.forDay(QUARTA_DE_JULHO, entries, scheduled, true, null, null, LISBOA);
+        return AttendanceCalculator.forDay(QUARTA_DE_JULHO, entries, scheduled, true, null, null, LISBOA, HOJE);
     }
 
     @Test
@@ -125,6 +127,35 @@ class AttendanceCalculatorTest {
     }
 
     @Test
+    @DisplayName("um dia que ainda não chegou não é falta: fica por acontecer, com as horas previstas")
+    void diaFuturoSemPicagensFicaPorAcontecer() {
+        DayAttendance day = AttendanceCalculator.forDay(QUARTA_DE_JULHO, List.of(), horario("08:00", "17:00", 60),
+                true, null, null, LISBOA, QUARTA_DE_JULHO.minusDays(1));
+
+        assertThat(day.status()).isEqualTo(DayStatus.UPCOMING);
+        assertThat(day.expectedMinutes()).isEqualTo(480);
+        assertThat(day.needsAttention()).isFalse();
+    }
+
+    @Test
+    @DisplayName("hoje sem picagens já é falta — o dia começou")
+    void hojeSemPicagensEhFalta() {
+        DayAttendance day = AttendanceCalculator.forDay(QUARTA_DE_JULHO, List.of(), horario("08:00", "17:00", 60),
+                true, null, null, LISBOA, QUARTA_DE_JULHO);
+
+        assertThat(day.status()).isEqualTo(DayStatus.MISSING);
+    }
+
+    @Test
+    @DisplayName("um feriado futuro continua a ser feriado, não 'por acontecer'")
+    void feriadoFuturoContinuaFeriado() {
+        DayAttendance day = AttendanceCalculator.forDay(QUARTA_DE_JULHO, List.of(), horario("08:00", "17:00", 60),
+                true, feriado("Dia de Portugal"), null, LISBOA, QUARTA_DE_JULHO.minusDays(1));
+
+        assertThat(day.status()).isEqualTo(DayStatus.HOLIDAY);
+    }
+
+    @Test
     @DisplayName("um dia que o horário não previa não é falta — é fim de semana")
     void diaNaoPrevistoNaoEhFalta() {
         DayAttendance day = calcular(List.of(), null);
@@ -138,7 +169,7 @@ class AttendanceCalculatorTest {
     @DisplayName("sem horário atribuído nenhum, o dia não é falta nem fim de semana")
     void semHorarioAtribuido() {
         DayAttendance day = AttendanceCalculator.forDay(
-                QUARTA_DE_JULHO, List.of(), null, false, null, null, LISBOA);
+                QUARTA_DE_JULHO, List.of(), null, false, null, null, LISBOA, HOJE);
 
         assertThat(day.status()).isEqualTo(DayStatus.NO_SCHEDULE);
         assertThat(day.needsAttention()).isFalse();
@@ -238,7 +269,7 @@ class AttendanceCalculatorTest {
     void feriadoNaoEhFalta() {
         DayAttendance day = AttendanceCalculator.forDay(
                 QUARTA_DE_JULHO, List.of(), horario("08:00", "17:00", 60), true,
-                feriado("Dia de Portugal"), null, LISBOA);
+                feriado("Dia de Portugal"), null, LISBOA, HOJE);
 
         assertThat(day.status()).isEqualTo(DayStatus.HOLIDAY);
         assertThat(day.holidayName()).isEqualTo("Dia de Portugal");
@@ -251,7 +282,7 @@ class AttendanceCalculatorTest {
     void feriasNaoSaoFalta() {
         DayAttendance day = AttendanceCalculator.forDay(
                 QUARTA_DE_JULHO, List.of(), horario("08:00", "17:00", 60), true,
-                null, ausencia(AbsenceType.VACATION, AbsenceHalfDay.NONE), LISBOA);
+                null, ausencia(AbsenceType.VACATION, AbsenceHalfDay.NONE), LISBOA, HOJE);
 
         assertThat(day.status()).isEqualTo(DayStatus.ON_LEAVE);
         assertThat(day.absenceType()).isEqualTo(AbsenceType.VACATION);
@@ -264,7 +295,7 @@ class AttendanceCalculatorTest {
     void meiaAusenciaDeixaMeioDiaPrevisto() {
         DayAttendance day = AttendanceCalculator.forDay(
                 QUARTA_DE_JULHO, List.of(), horario("08:00", "17:00", 60), true,
-                null, ausencia(AbsenceType.VACATION, AbsenceHalfDay.MORNING), LISBOA);
+                null, ausencia(AbsenceType.VACATION, AbsenceHalfDay.MORNING), LISBOA, HOJE);
 
         assertThat(day.expectedMinutes()).isEqualTo(240);
     }
@@ -276,7 +307,7 @@ class AttendanceCalculatorTest {
                 QUARTA_DE_JULHO,
                 List.of(entry(TimeDirection.IN, 9, 30), entry(TimeDirection.OUT, 13, 30)),
                 horario("08:00", "17:00", 60), true,
-                feriado("Dia de Portugal"), null, LISBOA);
+                feriado("Dia de Portugal"), null, LISBOA, HOJE);
 
         assertThat(day.status()).isEqualTo(DayStatus.WORKED);
         assertThat(day.expectedMinutes()).isZero();
@@ -292,7 +323,7 @@ class AttendanceCalculatorTest {
         // isso aqui a ausência chega como null — este teste documenta o contrato.
         DayAttendance day = AttendanceCalculator.forDay(
                 QUARTA_DE_JULHO, List.of(), horario("08:00", "17:00", 60), true,
-                null, null, LISBOA);
+                null, null, LISBOA, HOJE);
 
         assertThat(day.status()).isEqualTo(DayStatus.MISSING);
         assertThat(day.needsAttention()).isTrue();
@@ -315,7 +346,7 @@ class AttendanceCalculatorTest {
         out.setHappenedAt(saida);
 
         DayAttendance day = AttendanceCalculator.forDay(
-                LocalDate.of(2026, 3, 29), List.of(in, out), null, true, null, null, LISBOA);
+                LocalDate.of(2026, 3, 29), List.of(in, out), null, true, null, null, LISBOA, HOJE);
 
         // O cálculo é sobre instantes, por isso dá o tempo real decorrido (6h30),
         // não a diferença das horas de parede (que seria 7h30).

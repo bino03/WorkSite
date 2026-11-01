@@ -104,9 +104,9 @@ export default function TeamTodayPage() {
         // "A trabalhar agora" é hoje com entrada picada e ainda sem saída.
         if (day.date === today && day.firstIn && !day.lastOut) workingNow += 1;
 
-        // O relatório não sabe que dia é hoje: um dia com horário e sem picagens é "MISSING" mesmo
-        // que ainda não tenha chegado, e quem está a trabalhar agora vem como "incompleto". Só se
-        // pede justificação ou correção do que já passou.
+        // Os dias futuros já vêm do backend como "UPCOMING", mas hoje conta lá como dia começado:
+        // sem picagens é "MISSING", e quem está a trabalhar agora vem como "incompleto". Aqui só se
+        // pede justificação ou correção do que já terminou.
         const hasHappened = day.date < today;
 
         if (day.status === "MISSING" && hasHappened) {

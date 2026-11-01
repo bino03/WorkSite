@@ -46,6 +46,11 @@ public record DayAttendance(
         WORKED,
         /** O horário previa trabalho e não há picagem nenhuma — falta por justificar. */
         MISSING,
+        /**
+         * O horário prevê trabalho mas o dia ainda não chegou. Era {@code MISSING} até 2026-11-01:
+         * um relatório tirado a meio do mês mostrava faltas para amanhã e para o dia 30.
+         */
+        UPCOMING,
         /** O horário não previa trabalho neste dia (fim de semana, horário parcial). */
         NOT_SCHEDULED,
         /** Não há horário atribuído que cubra este dia: nada a esperar, nada a cobrar. */

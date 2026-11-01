@@ -47,6 +47,9 @@ public final class AttendanceCalculator {
      * @param absence   a ausência <b>aprovada</b> que cobre este dia, ou null. Uma
      *                  ausência pendente não entra: enquanto não for decidida, o dia
      *                  continua a ser o que as picagens dizem
+     * @param today     o dia de hoje no fuso da assiduidade — um dia depois dele sem picagens é
+     *                  {@code UPCOMING}, não {@code MISSING}. Recebido, não lido do relógio, para
+     *                  o cálculo continuar puro
      */
     public static DayAttendance forDay(LocalDate day,
                                        List<TimeEntry> entries,
@@ -54,7 +57,8 @@ public final class AttendanceCalculator {
                                        boolean hasSchedule,
                                        Holiday holiday,
                                        Absence absence,
-                                       ZoneId zone) {
+                                       ZoneId zone,
+                                       LocalDate today) {
 
         long expectedMinutes = expected(scheduled, holiday, absence);
         LocalTime firstIn = firstLocalTime(entries, TimeDirection.IN, zone);
@@ -74,7 +78,7 @@ public final class AttendanceCalculator {
                 expectedMinutes,
                 Math.max(0, workedMinutes - expectedMinutes),
                 lateness(firstIn, scheduled, holiday, absence),
-                status(entries, scheduled, hasSchedule, holiday, absence),
+                status(day, today, entries, scheduled, hasSchedule, holiday, absence),
                 firstIn,
                 lastOut,
                 incomplete,
@@ -186,8 +190,9 @@ public final class AttendanceCalculator {
      * férias aparecia como falta. Mas <b>não</b> ganham a "trabalhou": quem foi
      * trabalhar num feriado trabalhou, e o dia tem de o dizer.
      */
-    private static DayStatus status(List<TimeEntry> entries, WorkScheduleDay scheduled,
-                                   boolean hasSchedule, Holiday holiday, Absence absence) {
+    private static DayStatus status(LocalDate day, LocalDate today, List<TimeEntry> entries,
+                                   WorkScheduleDay scheduled, boolean hasSchedule,
+                                   Holiday holiday, Absence absence) {
         if (!entries.isEmpty()) {
             return DayStatus.WORKED;
         }
@@ -200,7 +205,12 @@ public final class AttendanceCalculator {
         if (!hasSchedule) {
             return DayStatus.NO_SCHEDULE;
         }
-        return scheduled == null ? DayStatus.NOT_SCHEDULED : DayStatus.MISSING;
+        if (scheduled == null) {
+            return DayStatus.NOT_SCHEDULED;
+        }
+        // Só um dia que já chegou pode ser falta. Hoje conta: o dia começou, e o painel decide
+        // por si se já é cedo demais para cobrar.
+        return day.isAfter(today) ? DayStatus.UPCOMING : DayStatus.MISSING;
     }
 
     private static LocalTime firstLocalTime(List<TimeEntry> entries, TimeDirection direction, ZoneId zone) {

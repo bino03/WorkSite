@@ -27,6 +27,7 @@ interface Row {
 const STATUS_CLASS: Record<DayStatus, string> = {
   WORKED: "ind-tag-accent",
   MISSING: "ind-tag-outline",
+  UPCOMING: "ind-tag-neutral",
   NOT_SCHEDULED: "ind-tag-neutral",
   NO_SCHEDULE: "ind-tag-outline",
   HOLIDAY: "ind-tag-neutral",
