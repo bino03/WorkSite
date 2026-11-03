@@ -44,6 +44,8 @@ public class EnterpriseListDTO {
     private LocalDateTime updatedAt;
     private UUID createdBy;
     private Boolean isActive;
+    /** Obra de teste: os backups não a levam em "Todos", e o seletor marca-a. */
+    private Boolean isTest;
     private String banner;
     private EnterpriseLocationListDTO location; // ← DTO específico para location
     /** Os lotes vivos do projeto — vazio (nunca null) sem nenhum. Para o seletor de lote ao transferir uma fatura. */

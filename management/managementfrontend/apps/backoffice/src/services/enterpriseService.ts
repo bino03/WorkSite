@@ -205,3 +205,26 @@ export async function searchEnterprises(q: string, size = 10): Promise<Enterpris
     })
   );
 }
+
+export interface BackupEnterpriseOption {
+  id: string;
+  name: string;
+  isTest: boolean;
+  lots: EnterpriseLotOption[];
+}
+
+/**
+ * Todos os projetos, para o seletor dos backups. Pede tudo de uma vez e não usa o
+ * `size = 10` de `searchEnterprises`, que cortava obras em silêncio.
+ */
+export async function listEnterprisesForBackup(): Promise<BackupEnterpriseOption[]> {
+  const { data } = await api.get(`/enterprises`, { params: { page: 0, size: 1000 } });
+  return (data?.content ?? []).map(
+    (e: { id: string; name: string; isTest?: boolean; lots?: EnterpriseLotOption[] }) => ({
+      id: e.id,
+      name: e.name,
+      isTest: e.isTest === true,
+      lots: e.lots ?? [],
+    })
+  );
+}

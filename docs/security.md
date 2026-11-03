@@ -58,6 +58,7 @@ continua a guardar o resto. Desenho e fases em `notes/roadmap/role-accountant.md
 | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/accept-invite`, `/auth/forgot-password`, `/auth/reset-password` | público |
 | `POST /auth/admin/**` | `ADMIN` |
 | `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
+| `/backups/**` | `ADMIN` — download em massa de todas as faturas; reforçado com `@PreAuthorize` em cada método, `BackupAccessTest` |
 | `GET /employees/**` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
 | `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. O self-service do funcionário é a fase 5 de [[../notes/roadmap/assiduidade]] |
 | `/auth/me` | qualquer utilizador autenticado |
@@ -70,7 +71,7 @@ continua a guardar o resto. Desenho e fases em `notes/roadmap/role-accountant.md
 - **`CookieJwtFilter`** — lê o cookie `access_token` e injeta-o como header `Authorization` se ainda não existir.
 - **Filtro Bearer JWT (OAuth2 Resource Server)** — valida assinatura/expiração e constrói as authorities.
 - **`AccountLockFilter`** — corre depois da autenticação. Dois ramos: (1) lê `account_status` do claim `app_metadata` do JWT — nunca é escrito (não há sincronização com o Supabase Auth), por isso nunca dispara; é o ramo morto. (2) compara `iat` do JWT com `profile.last_token_reset_at`, lido da BD a cada pedido — **este é o mecanismo real de corte de sessão**, e é imediato. Desde 2026-09-22, `blockProfile`/`deleteProfile` (`EmployeeServiceImpl`) escrevem `last_token_reset_at = now()` no mesmo `UPDATE` que muda o `account_status` — o mesmo padrão já usado no reset de password. Antes disso, bloquear/eliminar uma conta não cortava sessões já abertas.
-- **`ExportRateLimitFilter`** — corre depois da autenticação; limita os exports pesados — `/export` e `/export/zip` do orçamento, o export de um lote, o `/documents/zip` das faturas e o `/attendance/reports/month/export` — por utilizador autenticado (não por IP — app interna). Ver `docs/api.md` → "Orçamento de Construção".
+- **`ExportRateLimitFilter`** — corre depois da autenticação; limita os exports pesados — `/export` e `/export/zip` do orçamento, o export de um lote, o `/documents/zip` das faturas, o `/attendance/reports/month/export` e o `POST /backups/download` — por utilizador autenticado (não por IP — app interna). Ver `docs/api.md` → "Orçamento de Construção".
 
 ## CORS
 

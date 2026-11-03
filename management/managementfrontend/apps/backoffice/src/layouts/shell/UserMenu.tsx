@@ -3,6 +3,7 @@ import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import { useTranslation } from "react-i18next";
 import {
+  CloudDownloadOutlined,
   GlobalOutlined,
   LogoutOutlined,
   MailOutlined,
@@ -12,6 +13,7 @@ import {
 import MyProfileDrawer from "@/components/profile/MyProfileDrawer";
 import { SuppliersDrawer } from "@/components/suppliers/SuppliersDrawer";
 import { EmailProvidersDrawer } from "@/components/settings/EmailProvidersDrawer";
+import { BackupsDrawer } from "@/components/settings/BackupsDrawer";
 import { useAuthContext } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
@@ -36,6 +38,7 @@ export function UserMenu() {
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isSuppliersDrawerOpen, setIsSuppliersDrawerOpen] = useState(false);
   const [isEmailProvidersDrawerOpen, setIsEmailProvidersDrawerOpen] = useState(false);
+  const [isBackupsDrawerOpen, setIsBackupsDrawerOpen] = useState(false);
 
   const userName = user?.name ?? t("common.user");
   const userRole = user?.role ?? null;
@@ -82,6 +85,12 @@ export function UserMenu() {
                 icon: <MailOutlined />,
                 label: "Provedores de email",
                 onClick: () => setIsEmailProvidersDrawerOpen(true),
+              },
+              {
+                key: "backups",
+                icon: <CloudDownloadOutlined />,
+                label: "Backups",
+                onClick: () => setIsBackupsDrawerOpen(true),
               },
             ]
           : []),
@@ -155,6 +164,8 @@ export function UserMenu() {
         open={isEmailProvidersDrawerOpen}
         onClose={() => setIsEmailProvidersDrawerOpen(false)}
       />
+
+      <BackupsDrawer open={isBackupsDrawerOpen} onClose={() => setIsBackupsDrawerOpen(false)} />
 
       <SuppliersDrawer open={isSuppliersDrawerOpen} onClose={() => setIsSuppliersDrawerOpen(false)} />
     </>

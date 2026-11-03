@@ -302,7 +302,9 @@ entre os dois exports:
 - na "Despesas" e no painel entram **só as linhas das rubricas desse lote**, mais as faturas **por
   classificar cujo lote (`construction_invoice.budget_id`) é este**. As dos outros lotes e as faturas
   por classificar sem lote ficam de fora, com um aviso que diz quantas linhas caíram, porque o total da
-  "Despesas" deixa de ser o da obra. Numa obra de um só lote as por classificar continuam fora, como antes;
+  "Despesas" deixa de ser o da obra. A regra é a mesma numa obra com um só lote com rubricas (desde
+  2026-11-03), e é a dos PDFs do mesmo lote. O ficheiro de um lote **vazio** não leva as faturas classificadas do
+  outro lote, que antes levava;
 - a coluna `Rubrica` **mantém** o prefixo `<Lote> · `, apesar de haver um só lote no ficheiro: é o que
   mantém as linhas inequívocas se o ficheiro for reimportado numa obra com vários lotes (o
   `DespesasExcelImportService` recusa-se a adivinhar o lote) e o que faz as `SUMIFS` do painel bater.
@@ -1517,6 +1519,56 @@ gravada, a notificação também não existe.
 | GET | `/activities/user/{userId}` | `ADMIN` ou `EMPLOYEE` |
 | GET | `/activities/entity/{entityType}/{entityId}` | `ADMIN` ou `EMPLOYEE` |
 | POST | `/activities/filter` | `ADMIN` ou `EMPLOYEE` |
+
+---
+
+## Backups (`BackupController`, `/backups`)
+
+Um download à mão de obras e lotes, num só zip, com a data do backup no nome das pastas. Não substitui
+a cópia de segurança técnica ([[operations]]): leva faturas e orçamentos, não utilizadores nem
+assiduidade. Desenho em `notes/roadmap/backups.md`.
+
+| Método | Rota | Acesso | Descrição |
+|---|---|---|---|
+| POST | `/backups/preview` | `ADMIN` | O que o backup vai levar. Não vai ao Storage e não conta para o limite de exportações |
+| POST | `/backups/download` | `ADMIN` | `application/zip` em streaming. Conta para o `ExportRateLimitFilter` (`429`, `ERR_011`) |
+
+**Pedido das duas rotas**: `{ all, selections: [{ enterpriseId, budgetId? }], includeCompany, includeUnidentified, includeWorkbooks, includeDocuments }`.
+Com `all`, a API ignora `selections` e os dois `include*` de âmbito e leva todas as obras ativas com
+`is_test = false`, as despesas da empresa e a quarentena.
+
+**Resposta do preview**: `{ fileName, folders: [{ name, workbookName, documentCount, invoicesWithoutDocument, warnings }], totalDocuments, warnings }`.
+Conta ficheiros e não MB, porque a tabela de documentos não guarda o tamanho. `warnings` da raiz diz o que ficou de fora.
+
+**Nome do zip**: uma só pasta de topo dá `<pasta>.zip`; várias dão `Backup Vilatro - <AAAA-MM-DD>.zip`.
+A data é a de Lisboa no momento do pedido. Uma obra de teste, só possível se escolhida à mão, leva `TESTE - `.
+
+| Seleção | Pasta | Excel |
+|---|---|---|
+| Obra com até um lote | `<Obra> - <data>/` | `Despesas - <Obra>.xlsx`, com todas as faturas |
+| Obra com vários lotes | `<Obra> - <data>/<Lote>/` por lote | `Orçamento - <Obra> - <Lote>.xlsx`, com as faturas desse lote, associadas ou não |
+| O mesmo, faturas sem lote | `<Obra> - <data>/Sem lote/`, só se existirem | `Despesas - <Obra> - Sem lote.xlsx` |
+| Um lote escolhido à mão | `<Obra> - <Lote> - <data>/` | como o lote acima; o preview avisa se a obra tiver faturas sem lote |
+| Despesas da empresa | `Despesas da empresa - <data>/` | `Despesas da empresa.xlsx` |
+| Quarentena | `Faturas por identificar - <data>/` | `Faturas por identificar.xlsx` |
+
+Os documentos vão para `Faturas/Lançadas/` dentro de cada pasta, exceto na quarentena, que no vault é só `Lançadas/`.
+Sem orçamento só sai a folha `Despesas`. Sem orçamento nem faturas não há pasta, e o preview avisa. O mesmo com a
+empresa ou a quarentena sem faturas.
+
+**Falhas a meio**: os cabeçalhos já seguiram, por isso um documento que o Storage não devolva vai para o
+`_EM-FALTA.txt` dessa pasta, e um Excel que não se gere vai para o `_ERROS.txt` na raiz do zip.
+
+**Limite conhecido**: numa obra com vários lotes, uma despesa numa rubrica eliminada fica no Excel "Sem lote", e o
+PDF dela na pasta do lote. Se a obra não tiver faturas sem lote, essa pasta não existe e a linha não sai em nenhum Excel.
+
+| Código | HTTP | Quando |
+|---|---|---|
+| `BACKUP_001` | 400 | Sem seleção e sem `all` |
+| `BACKUP_002` | 400 | Sem Excel nem ficheiros |
+| `BACKUP_003` | 400 | Um lote que não é da obra, ou a obra e um lote dela ao mesmo tempo |
+| `BACKUP_004` | 400 | `/download` de uma seleção sem nada para levar. O `/preview` responde na mesma, com os avisos |
+| `BUDGET_ENTERPRISE_NOT_FOUND` | 400 | Obra que não existe |
 
 ---
 

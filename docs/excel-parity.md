@@ -321,6 +321,11 @@ A exportação app → pasta produz **exatamente** a estrutura do Vilatro: `Empr
 + `Faturas\Lançadas\<ficheiros renomeados>`, na raiz da pasta. É o que permite recomeçar no Excel
 a partir da app.
 
+**O backup do menu da conta** (`/backups`, [[api]] → "Backups") leva a mesma estrutura, com a data no nome da
+pasta de topo: numa obra com até um lote, basta tirar a data para repor no vault. **Numa obra com vários lotes não
+é uma pasta do vault**: tem uma subpasta e um Excel por lote, a pedido do utilizador (2026-11-03), e o vault tem um
+livro por vila. Para essa troca continua a servir o export da obra.
+
 > ✅ **Feito a 2026-09-20** (`InvoiceDocumentsExportService`, `GET …/export/zip`, opção "Incluir documentos"
 > do modal de exportação). Como ficou: um `original_filename` que **já obedece** ao nome do vault
 > (`^\d{8}(-\d{8})?_<nº>_<resto>.<ext>`, sem espaços — os 206 documentos migrados) mantém-se tal e qual;
@@ -459,14 +464,22 @@ prosa lá — não assumir que a tabela é exaustiva para o histórico.
 | Coluna | App |
 |---|---|
 | `Empreendimento` (dropdown: slug de obra ou `Despesas da empresa`) | vazio → fica em quarentena. Preenchido → entra em `UNIDENTIFIED` e é **transferida na mesma transação** para essa obra (`PROJECT`) ou para `COMPANY`, com razão automática no `activity_log` — o mesmo que "preencher a obra" na app. Slug sem obra, ou obra `is_test` → erro por linha, bloqueia: criar a obra primeiro, com o nome da pasta |
-| `Fornecedor` | `supplier_name` (sem `NIF`: a quarentena não o tem) |
+| `Fornecedor` | `supplier_name`. A quarentena do vault não tem `NIF`; o livro que a app gera leva-o (ver abaixo) e o importador aceita-o |
 | `Obras possíveis` | `possible_enterprises` |
 | `Perguntar a` | `ask_whom` |
-| `Aqui desde` | não tem coluna (`created_at` é a data da importação) → `notes` ganha "Em quarentena desde dd-mm-aaaa." a seguir ao que a Vilatro escreveu |
+| `Aqui desde` | não tem coluna (`created_at` é a data da importação) → `notes` ganha "Em quarentena desde dd-mm-aaaa." a seguir ao que a Vilatro escreveu. Se as notas já trazem a frase, fica a primeira: um livro que saiu da app não a acumula |
 
 Tudo o resto (nº, NC, `Liquidada`, `Observações`, duplicados globais, totais da tabela) é igual à
 `Despesas`. Os PDFs de `Lançadas\` juntam-se depois, um a um, como nas obras (passo 7). O que está
 em `Por lançar\` e `Não Reconhecido\` não entra — não está no Excel.
+
+**App → estes dois livros** (`UnassignedInvoicesWorkbookService`, desde 2026-11-03, só no backup do menu da
+conta): `Despesas da empresa.xlsx` (`Despesas`/`TabelaDespesas`, sem `Rubrica`) e `Faturas por identificar.xlsx`
+(`Por identificar`/`TabelaPorIdentificar`, sem a folha `Listas` nem a dropdown). `Empreendimento` sai **sempre
+vazio**, porque preenchido transferia a fatura ao voltar a entrar. A quarentena leva `NIF` a mais do que o vault,
+a pedido do utilizador, para o backup não perder o dado. `Aqui desde` é o `created_at`, no fuso de Lisboa. Provado
+por teste de ida e volta (`UnassignedInvoicesWorkbookServiceTest`), com mocks: contra a BD real, cada nº já existente
+dá erro de duplicado, mesmo em `dryRun`.
 
 ### App → Excel (exportação, fase 6)
 

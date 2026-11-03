@@ -89,6 +89,11 @@ public class InvoiceDocumentsExportService {
             int renamed = (int) entries.stream().filter(Entry::renamed).count();
             return new DocumentsExportSummaryDTO(entries.size(), invoicesWithoutDocument, renamed, List.copyOf(warnings));
         }
+
+        /** Sem faturas no âmbito. Um documento sem ficheiro no Storage deixa um aviso, e por isso conta. */
+        public boolean isEmpty() {
+            return entries.isEmpty() && invoicesWithoutDocument == 0 && warnings.isEmpty();
+        }
     }
 
     // ── nomes ─────────────────────────────────────────────────
@@ -162,6 +167,23 @@ public class InvoiceDocumentsExportService {
     @Transactional(readOnly = true)
     public Plan plan(UUID enterpriseId, InvoiceDocumentsScope scope, UUID budgetId, String folder) {
         return plan(enterpriseId, scope, budgetId, null, folder);
+    }
+
+    /** As faturas por classificar que também não têm lote: nenhum ficheiro de lote as leva. */
+    @Transactional(readOnly = true)
+    public Plan planWithoutLot(UUID enterpriseId, String folder) {
+        List<ConstructionInvoice> all = invoiceRepository.findAllByEnterpriseIdForExport(enterpriseId);
+        List<ConstructionInvoice> withoutLot = filterByScope(all, InvoiceDocumentsScope.UNCLASSIFIED, null, null)
+                .stream()
+                .filter(invoice -> invoice.getBudgetId() == null)
+                .toList();
+        return planFor(withoutLot, folder);
+    }
+
+    /** As faturas sem obra: despesas da empresa ou quarentena. */
+    @Transactional(readOnly = true)
+    public Plan planWithoutEnterprise(ConstructionInvoice.Scope scope, String folder) {
+        return planFor(invoiceRepository.findAllByScopeWithoutEnterprise(scope), folder);
     }
 
     /** As faturas do âmbito pedido, pela sua classificação em rubricas. */
@@ -355,40 +377,48 @@ public class InvoiceDocumentsExportService {
     }
 
     private void writeEntries(String workbookName, byte[] workbook, Plan plan, OutputStream out) throws IOException {
-        List<String> missing = new ArrayList<>();
         try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
             if (workbookName != null && workbook != null) {
                 zip.putNextEntry(new ZipEntry(workbookName));
                 zip.write(workbook);
                 zip.closeEntry();
             }
+            writeDocuments(zip, plan);
+        }
+    }
 
-            for (Entry entry : plan.entries()) {
-                byte[] content;
-                try {
-                    content = storageService.download(entry.bucket(), entry.storageKey());
-                } catch (IOException | RuntimeException e) {
-                    log.warn("Documento {} não veio do Storage para o zip: {}", entry.documentId(), e.getMessage());
-                    // o prefixo depende do âmbito (pasta do vault ou raiz), por isso
-                    // tira-se o que lá estiver em vez de assumir o `FOLDER`
-                    int slash = entry.path().lastIndexOf('/');
-                    missing.add(entry.path().substring(slash + 1) + " (documento " + entry.documentId() + ")");
-                    continue;
-                }
-                zip.putNextEntry(new ZipEntry(entry.path()));
-                zip.write(content);
-                zip.closeEntry();
+    /**
+     * Os documentos de um plano num zip já aberto, para o backup juntar vários planos
+     * no mesmo zip. Só uma falha do Storage fica no {@code _EM-FALTA.txt}: uma falha a
+     * escrever no zip propaga-se, e é isso que para o trabalho quando o browser cancela.
+     */
+    public void writeDocuments(ZipOutputStream zip, Plan plan) throws IOException {
+        List<String> missing = new ArrayList<>();
+        for (Entry entry : plan.entries()) {
+            byte[] content;
+            try {
+                content = storageService.download(entry.bucket(), entry.storageKey());
+            } catch (IOException | RuntimeException e) {
+                log.warn("Documento {} não veio do Storage para o zip: {}", entry.documentId(), e.getMessage());
+                // o prefixo depende do âmbito (pasta do vault ou raiz), por isso
+                // tira-se o que lá estiver em vez de assumir o `FOLDER`
+                int slash = entry.path().lastIndexOf('/');
+                missing.add(entry.path().substring(slash + 1) + " (documento " + entry.documentId() + ")");
+                continue;
             }
+            zip.putNextEntry(new ZipEntry(entry.path()));
+            zip.write(content);
+            zip.closeEntry();
+        }
 
-            if (!missing.isEmpty()) {
-                // o relatório fica ao lado dos documentos, seja na pasta do vault ou na raiz
-                String first = plan.entries().isEmpty() ? FOLDER : plan.entries().get(0).path();
-                String folder = first.substring(0, first.lastIndexOf('/') + 1);
-                zip.putNextEntry(new ZipEntry(folder + MISSING_REPORT));
-                zip.write(("Documentos que o Storage não devolveu — não estão neste zip:\n"
-                        + String.join("\n", missing) + "\n").getBytes(StandardCharsets.UTF_8));
-                zip.closeEntry();
-            }
+        if (!missing.isEmpty()) {
+            // o relatório fica ao lado dos documentos, seja na pasta do vault ou na raiz
+            String first = plan.entries().isEmpty() ? FOLDER : plan.entries().get(0).path();
+            String folder = first.substring(0, first.lastIndexOf('/') + 1);
+            zip.putNextEntry(new ZipEntry(folder + MISSING_REPORT));
+            zip.write(("Documentos que o Storage não devolveu — não estão neste zip:\n"
+                    + String.join("\n", missing) + "\n").getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
         }
     }
 

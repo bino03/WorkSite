@@ -143,8 +143,8 @@ public class BudgetExcelExportService {
     private static final String COMPANY_EMAIL = "Email: gestao.vilatro@gmail.com";
 
     // as cores das folhas do vault
-    private static final String COLOR_WHITE = "FFFFFF";
-    private static final String COLOR_HEADER_DARK = "3A3838";  // cabeçalho da "Despesas"
+    static final String COLOR_WHITE = "FFFFFF";
+    static final String COLOR_HEADER_DARK = "3A3838";  // cabeçalho da "Despesas"
     private static final String COLOR_CHAPTER = "C6E0B4";      // capítulos do orçamento
     private static final String COLOR_DONE = "92D050";         // Liquidada / Bizdocs com "x"
     private static final String COLOR_PANEL_HEADER = "00B0F0"; // cabeçalho do painel
@@ -170,10 +170,10 @@ public class BudgetExcelExportService {
      * código que a coluna Valor do vault já usa — o {@code #.##0,00 €} do
      * contrato original falha acima de 1 000 000 € (armadilha 16 do vault).
      */
-    private static final String FORMAT_CURRENCY = "#,##0.00\\ \"€\"";
-    private static final String FORMAT_DATE = "dd/mm/yyyy";
+    static final String FORMAT_CURRENCY = "#,##0.00\\ \"€\"";
+    static final String FORMAT_DATE = "dd/mm/yyyy";
     private static final String FORMAT_PERCENT = "0.0%";
-    private static final String FORMAT_TEXT = "@";
+    static final String FORMAT_TEXT = "@";
     private static final String TABLE_STYLE = "TableStyleMedium2";
 
     private static final int LABEL_MAX_LENGTH = 70;
@@ -297,9 +297,10 @@ public class BudgetExcelExportService {
      * Numa obra de vários lotes, as faturas por classificar entram só se o lote
      * delas (o {@code budget_id}) for este; as de outro lote, e as despesas numa
      * rubrica eliminada, ficam de fora. Isso faz o total da "Despesas" do ficheiro
-     * do lote não bater com o da obra, e quem o abre tem de saber porquê. Numa obra
-     * de um só lote não há lote a escolher, e as faturas por classificar continuam
-     * fora, como antes.
+     * do lote não bater com o da obra, e quem o abre tem de saber porquê. A regra é
+     * a mesma numa obra com um só lote com rubricas, a dos PDFs do mesmo lote
+     * ({@code InvoiceDocumentsExportService.filterByScope}): por classificar, conta
+     * o {@code budget_id}; sem lote, só saem no ficheiro da obra.
      *
      * Quem avisa é o <b>modal</b>, antes do download, que é onde o aviso serve para
      * algo. Aqui só se registra no log: um {@code model.warnings.add} não chegaria a
@@ -314,14 +315,16 @@ public class BudgetExcelExportService {
         if (model.lots.isEmpty()) {
             // Obra de um só lote: o `load` sai como antes da V39 — não marca o lote
             // em nada (`lot == null`) e as etiquetas não levam prefixo. Filtrar pelo
-            // nome do lote apagava tudo. Já está tudo deste lote, por isso só se
-            // tiram as linhas sem rubrica, e o `lots` fica vazio de propósito: o
-            // escritor mantém-se no modo de um lote (sem coluna Lote, folha
-            // "Orçamento inicial", SUMIFS sobre $A), coerente com as etiquetas.
-            // "um só lote" aqui conta os lotes com rubricas; um lote vazio não faz a obra ser de vários
-            boolean severalLots = budgetService.listLots(model.enterprise.getId()).size() > 1;
-            model.rows.removeIf(row -> row.rubric() == null
-                    && !(severalLots && lotName.equals(row.lot())));
+            // nome do lote apagava tudo. As linhas com rubrica são do único lote com
+            // rubricas: deste, se ele as tiver, e de outro, se este estiver vazio. O
+            // `lots` fica vazio de propósito: o escritor mantém-se no modo de um lote
+            // (sem coluna Lote, folha "Orçamento inicial", SUMIFS sobre $A), coerente
+            // com as etiquetas.
+            boolean lotHasRubrics = model.tree.itemCount() > 0;
+            model.rows.removeIf(row -> row.rubric() == null ? !lotName.equals(row.lot()) : !lotHasRubrics);
+            if (!lotHasRubrics) {
+                model.rubrics.clear();
+            }
         } else {
             model.lots.removeIf(l -> !l.name().equals(lotName));
             model.rubrics.removeIf(rubric -> !lotName.equals(rubric.lot()));
@@ -342,6 +345,30 @@ public class BudgetExcelExportService {
     static String lotFileName(Enterprise enterprise, String lotName) {
         return testPrefix(enterprise) + "Orçamento - " + folderName(enterprise)
                 + " - " + safeName(lotName) + ".xlsx";
+    }
+
+    /**
+     * As linhas que não são de lote nenhum, numa obra com vários lotes: faturas por
+     * classificar sem lote, e despesas numa rubrica eliminada. O backup partido por
+     * lotes perdia-as sem este ficheiro. Só a "Despesas": não há orçamento a mostrar.
+     */
+    @Transactional
+    public ExportFile exportWithoutLot(UUID enterpriseId) {
+        return heavyWork.run("exportação Excel das faturas sem lote", () -> doExportWithoutLot(enterpriseId));
+    }
+
+    private ExportFile doExportWithoutLot(UUID enterpriseId) {
+        Model model = load(enterpriseId);
+        model.lots.clear();
+        model.rubrics.clear();
+        model.rows.removeIf(row -> row.rubric() != null || row.lot() != null);
+        model.fileName = withoutLotFileName(model.enterprise);
+        return new ExportFile(model.fileName, write(model, EnumSet.of(BudgetExportSheet.EXPENSES)));
+    }
+
+    /** {@code Despesas - <Obra> - Sem lote.xlsx}; {@code TESTE - } à frente numa obra de teste. */
+    static String withoutLotFileName(Enterprise enterprise) {
+        return testPrefix(enterprise) + "Despesas - " + folderName(enterprise) + " - Sem lote.xlsx";
     }
 
     /**
@@ -559,6 +586,49 @@ public class BudgetExcelExportService {
         List<ConstructionInvoice> invoices = invoiceRepository.findAllByEnterpriseIdForExport(enterpriseId);
         model.invoiceCount = invoices.size();
 
+        Map<UUID, List<ConstructionExpense>> expensesByInvoice = new HashMap<>();
+        List<ConstructionExpense> manual = new ArrayList<>();
+        for (ConstructionExpense expense : expenseRepository.findAllByEnterpriseId(enterpriseId)) {
+            if (expense.getInvoice() == null) {
+                manual.add(expense);
+            } else {
+                expensesByInvoice.computeIfAbsent(expense.getInvoice().getId(), k -> new ArrayList<>()).add(expense);
+            }
+        }
+        Comparator<ConstructionExpense> byCreation = Comparator.comparing(ConstructionExpense::getCreatedAt,
+                Comparator.nullsLast(Comparator.naturalOrder()));
+        expensesByInvoice.values().forEach(list -> list.sort(byCreation));
+
+        addRowsOfInvoices(model, invoices, expensesByInvoice);
+
+        manual.sort(Comparator.comparing(ConstructionExpense::getExpenseDate,
+                Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(byCreation));
+        for (ConstructionExpense expense : manual) {
+            model.manualExpenseCount++;
+            model.rows.add(new ExpenseRow(null, expense.getExpenseDate(), expenseDescription(expense),
+                    expense.getTotalPrice(), false, null, false,
+                    "Despesa registada à mão na app, sem fatura.",
+                    rubricLabelOf(expense, model), null, null, lotOf(expense, model)));
+        }
+
+        // a tabela do vault está ordenada pela Data, da mais recente para a mais antiga;
+        // a ordenação é estável, por isso as linhas de uma fatura repartida ficam juntas
+        model.rows.sort(Comparator.comparing(ExpenseRow::date, Comparator.nullsLast(Comparator.reverseOrder())));
+    }
+
+    /**
+     * Uma linha por fatura, pela ordem recebida, para os livros das faturas sem obra
+     * ({@link UnassignedInvoicesWorkbookService}): não têm rubricas, e o pagamento e as
+     * observações têm de ser os mesmos, porque o importador lê essas frases de volta.
+     */
+    public List<ExpenseRow> rowsOfInvoicesWithoutRubrics(List<ConstructionInvoice> invoices) {
+        Model model = new Model();
+        addRowsOfInvoices(model, invoices, Map.of());
+        return model.rows;
+    }
+
+    private void addRowsOfInvoices(Model model, List<ConstructionInvoice> invoices,
+                                   Map<UUID, List<ConstructionExpense>> expensesByInvoice) {
         Map<UUID, ConstructionInvoice> byId = invoices.stream()
                 .collect(Collectors.toMap(ConstructionInvoice::getId, invoice -> invoice));
         Map<UUID, BigDecimal> creditedByInvoice = new HashMap<>();
@@ -575,37 +645,10 @@ public class BudgetExcelExportService {
                                 InvoicePaymentRepository.InvoicePaidSum::getPaid));
         Map<UUID, List<InvoicePaymentSummaryDTO>> paymentsByInvoice = paymentService.paymentsForInvoices(ids, false);
 
-        Map<UUID, List<ConstructionExpense>> expensesByInvoice = new HashMap<>();
-        List<ConstructionExpense> manual = new ArrayList<>();
-        for (ConstructionExpense expense : expenseRepository.findAllByEnterpriseId(enterpriseId)) {
-            if (expense.getInvoice() == null) {
-                manual.add(expense);
-            } else {
-                expensesByInvoice.computeIfAbsent(expense.getInvoice().getId(), k -> new ArrayList<>()).add(expense);
-            }
-        }
-        Comparator<ConstructionExpense> byCreation = Comparator.comparing(ConstructionExpense::getCreatedAt,
-                Comparator.nullsLast(Comparator.naturalOrder()));
-        expensesByInvoice.values().forEach(list -> list.sort(byCreation));
-
         for (ConstructionInvoice invoice : invoices) {
             addInvoiceRows(model, invoice, byId, creditedByInvoice, paidByInvoice, paymentsByInvoice,
                     expensesByInvoice.getOrDefault(invoice.getId(), List.of()));
         }
-
-        manual.sort(Comparator.comparing(ConstructionExpense::getExpenseDate,
-                Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(byCreation));
-        for (ConstructionExpense expense : manual) {
-            model.manualExpenseCount++;
-            model.rows.add(new ExpenseRow(null, expense.getExpenseDate(), expenseDescription(expense),
-                    expense.getTotalPrice(), false, null, false,
-                    "Despesa registada à mão na app, sem fatura.",
-                    rubricLabelOf(expense, model), null, null, lotOf(expense, model)));
-        }
-
-        // a tabela do vault está ordenada pela Data, da mais recente para a mais antiga;
-        // a ordenação é estável, por isso as linhas de uma fatura repartida ficam juntas
-        model.rows.sort(Comparator.comparing(ExpenseRow::date, Comparator.nullsLast(Comparator.reverseOrder())));
     }
 
     private void addInvoiceRows(Model model, ConstructionInvoice invoice,
@@ -1057,7 +1100,15 @@ public class BudgetExcelExportService {
             }
         }
 
-        // Liquidada e Bizdocs: o "x" pinta a célula de verde (letra da cor do fundo), como no vault
+        paintDoneMarks(sheet, totalsRow);
+
+        double[] widths = {20.66, 12.66, 55.66, 13.55, 14.66, 14.66, 10.33, 40.55, 28.66, 30, 14.66};
+        for (int c = 0; c < widths.length; c++) sheet.setColumnWidth(c, width(widths[c]));
+        return sheet;
+    }
+
+    /** Liquidada e Bizdocs: o "x" pinta a célula de verde (letra da cor do fundo), como no vault. */
+    static void paintDoneMarks(XSSFSheet sheet, int totalsRow) {
         int lastData = Math.max(totalsRow - 1, 1);
         XSSFSheetConditionalFormatting formatting = sheet.getSheetConditionalFormatting();
         for (int c : new int[] {4, 6}) {
@@ -1066,10 +1117,6 @@ public class BudgetExcelExportService {
             rule.createPatternFormatting().setFillBackgroundColor(rgb(COLOR_DONE));
             formatting.addConditionalFormatting(new CellRangeAddress[] {new CellRangeAddress(1, lastData, c, c)}, rule);
         }
-
-        double[] widths = {20.66, 12.66, 55.66, 13.55, 14.66, 14.66, 10.33, 40.55, 28.66, 30, 14.66};
-        for (int c = 0; c < widths.length; c++) sheet.setColumnWidth(c, width(widths[c]));
-        return sheet;
     }
 
     // "Rubricas" ─────────────────────────────────────────────
@@ -1291,7 +1338,7 @@ public class BudgetExcelExportService {
     // ── POI helpers ───────────────────────────────────────────
 
     /** Troca o tema do livro pelo do vault (as cores de tema das tabelas vêm daqui). */
-    private static void applyVaultTheme(XSSFWorkbook workbook) throws IOException {
+    static void applyVaultTheme(XSSFWorkbook workbook) throws IOException {
         workbook.getStylesSource().ensureThemesTable();
         try (InputStream in = resource(THEME_RESOURCE)) {
             workbook.getTheme().readFrom(in);
@@ -1323,7 +1370,7 @@ public class BudgetExcelExportService {
         return new XSSFColor(HexFormat.of().parseHex(hex), null);
     }
 
-    private static XSSFTable createTable(XSSFSheet sheet, String name, int firstRow, int lastRow,
+    static XSSFTable createTable(XSSFSheet sheet, String name, int firstRow, int lastRow,
                                          int lastCol, boolean withTotals) {
         AreaReference area = new AreaReference(new CellReference(firstRow, 0), new CellReference(lastRow, lastCol),
                 SpreadsheetVersion.EXCEL2007);
@@ -1355,27 +1402,27 @@ public class BudgetExcelExportService {
         }
     }
 
-    private static void cell(Row row, int col, String value, CellStyle style) {
+    static void cell(Row row, int col, String value, CellStyle style) {
         if (value == null && style == null) return;
         Cell cell = row.createCell(col);
         if (value != null) cell.setCellValue(value);
         if (style != null) cell.setCellStyle(style);
     }
 
-    private static void cell(Row row, int col, BigDecimal value, CellStyle style) {
+    static void cell(Row row, int col, BigDecimal value, CellStyle style) {
         if (value == null && style == null) return;
         Cell cell = row.createCell(col);
         if (value != null) cell.setCellValue(value.doubleValue());
         if (style != null) cell.setCellStyle(style);
     }
 
-    private static void cell(Row row, int col, LocalDate value, CellStyle style) {
+    static void cell(Row row, int col, LocalDate value, CellStyle style) {
         Cell cell = row.createCell(col);
         if (value != null) cell.setCellValue(value);
         if (style != null) cell.setCellStyle(style);
     }
 
-    private static void formula(Row row, int col, String formula, CellStyle style) {
+    static void formula(Row row, int col, String formula, CellStyle style) {
         Cell cell = row.createCell(col);
         cell.setCellFormula(formula);
         if (style != null) cell.setCellStyle(style);
@@ -1413,7 +1460,7 @@ public class BudgetExcelExportService {
     }
 
     /** Os estilos partilhados do livro — o POI limita o nº de estilos, por isso criam-se uma vez. */
-    private static final class Styles {
+    static final class Styles {
         final CellStyle bold, boldWrap, italic, title, text, textBold, date,
                 currency, currencyBold, percent, kpiCurrency, kpiPercent;
 

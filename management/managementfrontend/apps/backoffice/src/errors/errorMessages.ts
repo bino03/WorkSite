@@ -255,6 +255,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'BUDGET_027': 'Esta obra não tem orçamento — só a folha "Despesas" pode ser exportada.',
   'BUDGET_028': 'Não foi possível gerar o ficheiro Excel.',
 
+  // ── Backups ───────────────────────────────────────────────────────────────
+  'BACKUP_001': 'Escolha pelo menos um empreendimento ou lote.',
+  'BACKUP_002': 'Escolha o Excel, os ficheiros, ou os dois.',
+  'BACKUP_003': 'A seleção tem um lote que não pertence à obra, ou a obra e o lote ao mesmo tempo.',
+  'BACKUP_004': 'A seleção não tem nada para descarregar.',
+
   // ── Despesas de construção ────────────────────────────────────────────────
   'EXPENSE_001': 'Despesa não encontrada.',
   'EXPENSE_002': 'Não foi possível criar a despesa.',

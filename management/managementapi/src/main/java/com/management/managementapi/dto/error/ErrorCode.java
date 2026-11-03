@@ -241,6 +241,14 @@ public enum ErrorCode {
     BUDGET_EXPORT_WRITE_ERROR("BUDGET_028", "Não foi possível gerar o ficheiro Excel"),
 
     // ========================================================================
+    // BACKUPS (BACKUP_xxx)
+    // ========================================================================
+    BACKUP_NO_SELECTION("BACKUP_001", "Escolha pelo menos um empreendimento ou lote"),
+    BACKUP_NO_CONTENT_TYPE("BACKUP_002", "Escolha o Excel, os ficheiros, ou os dois"),
+    BACKUP_INVALID_SELECTION("BACKUP_003", "A seleção tem um lote que não pertence à obra, ou a obra e o lote ao mesmo tempo"),
+    BACKUP_NOTHING_TO_DOWNLOAD("BACKUP_004", "A seleção não tem nada para descarregar"),
+
+    // ========================================================================
     // DESPESAS DE CONSTRUÇÃO (EXPENSE_xxx)
     // ========================================================================
     EXPENSE_NOT_FOUND("EXPENSE_001", "Despesa não encontrada"),
