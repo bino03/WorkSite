@@ -10,8 +10,7 @@ import java.util.function.Supplier;
 /**
  * Uma operação pesada em memória de cada vez: leitura de QR das faturas, miniaturas,
  * import/export de Excel. Em produção o backend corre numa máquina de 1 GB
- * (Fly.io — ver docs/operations.md → "Memória"), com a heap perto do pico do arranque;
- * cada uma destas sozinha cabe, várias em simultâneo podem não caber e o processo é
+ * (Fly.io — ver docs/operations.md → "Memória"); cada uma destas sozinha cabe, várias em simultâneo podem não caber e o processo é
  * morto. Com o portão os picos não se somam — o segundo pedido espera uns segundos em
  * vez de derrubar a app.
  *

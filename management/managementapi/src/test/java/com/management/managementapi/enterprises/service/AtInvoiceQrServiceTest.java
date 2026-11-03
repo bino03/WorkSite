@@ -49,6 +49,41 @@ class AtInvoiceQrServiceTest {
     private final AtInvoiceQrService service = new AtInvoiceQrService(new WeChatQrCodeService(), new HeavyWorkGate());
 
     @Test
+    @DisplayName("Uma folha A4 mantém os 300 DPI; um talão comprido fica abaixo do teto de píxeis")
+    void capsTheDpiOfVeryLongPages() {
+        assertThat(AtInvoiceQrService.cappedDpi(595f, 842f, 300)).isEqualTo(300f);
+
+        float capped = AtInvoiceQrService.cappedDpi(1200f, 8463f, 300);
+        double pixels = (1200f / 72f * capped) * (8463f / 72f * capped);
+        assertThat(capped).isLessThan(100f);
+        assertThat(pixels).isLessThanOrEqualTo(15_000_001d);
+    }
+
+    @Test
+    @DisplayName("O QR de um talão comprido lê-se na mesma com o teto de píxeis")
+    void readsTheQrOfAVeryLongPage() throws Exception {
+        BitMatrix matrix = new QRCodeWriter().encode(AT_QR, BarcodeFormat.QR_CODE, 300, 300);
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(MatrixToImageWriter.toBufferedImage(matrix), "png", png);
+
+        ByteArrayOutputStream pdf = new ByteArrayOutputStream();
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage(new PDRectangle(1200f, 8463f));
+            document.addPage(page);
+            PDImageXObject qr = PDImageXObject.createFromByteArray(document, png.toByteArray(), "qr.png");
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                content.drawImage(qr, 450f, 300f, 300f, 300f);
+            }
+            document.save(pdf);
+        }
+
+        Optional<AtInvoiceQrService.AtInvoiceData> data = service.read(pdf.toByteArray(), "application/pdf");
+
+        assertThat(data).isPresent();
+        assertThat(data.get().documentNumber()).isEqualTo("FT 2026/114");
+    }
+
+    @Test
     @DisplayName("lê os campos fiscais de um QR numa imagem")
     void readsFieldsFromImage() throws Exception {
         var data = service.read(qrAsPng(AT_QR), "image/png").orElseThrow();

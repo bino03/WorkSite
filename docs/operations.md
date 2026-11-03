@@ -189,11 +189,34 @@ gera montanhas de lixo temporário e guarda uma cache de ~60 MB (`ATNConfig`) pa
 vem do `ConstructionInvoiceRepository` (21 queries, 23 `CASE`/`COALESCE`). Fora da heap: metaspace
 ~108 MB, code cache ~17 MB, ~26 threads, mais a memória nativa do OpenCV.
 
-- **Por isso 1 GB, heap a 60%** (`JAVA_TOOL_OPTIONS` no `Dockerfile`: `SerialGC`, tetos ao metaspace
+- **1 GB, heap a 40%** (`JAVA_TOOL_OPTIONS` no `Dockerfile`, desde 2026-11-03; antes era 60%). Prefere-se
+  memória a velocidade, por decisão do utilizador. Medido no Windows, com a mesma JVM e opções, app parada:
+
+  | | Heap 60%, C2 | Heap 40%, só C1 |
+  |---|---|---|
+  | Memória do processo, parado | 872 MB | 474 MB |
+  | Pico no arranque | 965 MB | 620 MB |
+  | Arranque | 35 s | 47–61 s |
+  | Leitura pesada de QR (FT S26/224), processo só com o leitor | 451 MB, 2,2 s | 341 MB, 4,1 s |
+
+  A heap não precisa dos 516 MB que atinge sem teto: arranca com 400 MB, e ocupa ~200 MB depois disso. As opções
+  `MinHeapFreeRatio`/`MaxHeapFreeRatio` fazem-na devolver memória e o `TieredStopAtLevel=1` tira o compilador C2
+  (app mais lenta em CPU). O `grace_period` do `fly.toml` subiu para 180 s por causa do arranque. Linux pode dar valores
+  um pouco diferentes. **Por medir online.** Os Backups (geram livros Excel na heap) também.
+- **Leitura de QR** (`AtInvoiceQrService`): páginas em cinzento, nenhuma guardada entre passagens, a WeChat tenta
+  primeiro a 200 DPI e o OpenCV usa uma thread. Teto de 15 milhões de píxeis por página: os talões compridos (1200×8463
+  pontos) davam 175 milhões a 300 DPI e esgotavam a heap. Contra 225 faturas do vault Vilatro, sem erros de memória com
+  400 MB de heap: 208 lidas, contra 207 com o código anterior (ganhou 3, perdeu `1 2600/000318` e `FR 2026A24/1681`, que
+  ficam para preenchimento manual).
+- Opções em comum: `SerialGC`, tetos ao metaspace
   e code cache, `ExitOnOutOfMemoryError`).
 - **`HeavyWorkGate`**: leitura de QR, miniaturas e import/export de Excel correm uma de cada vez
   (`ReentrantLock` justo, reentrante, desiste do portão ao fim de 5 min). Fica de fora o `writeZip`,
   que é streaming e pode durar minutos.
+- **Margem curta (2026-11-03)**: o limite real é o da VM, não o da heap. O kernel matou o Java com `anon-rss`
+  de ~886 MB (`Out of memory: Killed process`, exit 137), sem passar pelo `ExitOnOutOfMemoryError`, porque a heap
+  não chegou a esgotar-se. O utilizador vê um **502** do proxy do Fly, e essa máquina fica ~1 min a reiniciar. Este
+  502 não vem do `GlobalExceptionHandler`. Confirma-se com `fly machines list --json` (`oom_killed`) e `fly logs`.
 - **Alternativa testada e não adotada**: `spring.data.jpa.repositories.bootstrap-mode=lazy` arranca
   com ~51 MB — mas só adia o pico para o primeiro pedido que use cada repositório, e um erro numa
   query deixa de aparecer no arranque. Só faria sentido para voltar a 512 MB, e aí reescrever as

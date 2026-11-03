@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +27,7 @@ import javax.imageio.ImageIO;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -78,6 +81,16 @@ public class AtInvoiceQrService {
      * só se pagam quando a primeira passagem falhou.
      */
     private static final int[] PDF_RENDER_DPI = { 200, 300 };
+
+    /**
+     * Teto de píxeis por página rasterizada; um A4 a 300 DPI são 8,7 milhões. Os
+     * talões compridos têm páginas de 1200×8463 pontos: a 300 DPI seriam 175 milhões
+     * de píxeis, o que esgota a heap sozinho e reinicia a máquina. A imagem lá
+     * dentro só tem 1200 px de largura, por isso rasterizar acima disto não acrescenta
+     * nada ao QR.
+     */
+    private static final long MAX_RENDER_PIXELS = 15_000_000L;
+    private static final float POINTS_PER_INCH = 72f;
 
     /** O QR costuma estar na primeira ou última página; não vale a pena varrer tudo. */
     private static final int MAX_PDF_PAGES = 5;
@@ -164,8 +177,15 @@ public class AtInvoiceQrService {
     /**
      * Escalada em quatro degraus, do barato para o caro: páginas inteiras a
      * 200 DPI, depois a 300, o mosaico, e só então a WeChat sobre a página
-     * inteira à DPI mais fina — o degrau caro fica para o fim, e o PDF
-     * nascido de um ERP resolve-se logo no primeiro.
+     * inteira — o degrau caro fica para o fim, e o PDF nascido de um ERP
+     * resolve-se logo no primeiro.
+     *
+     * Poupa memória à custa de tempo, de propósito: a máquina de produção tem
+     * 1 GB, e uma leitura que passa do limite mata o processo (502 para toda a
+     * gente; ver docs/operations.md → "Memória"). Por isso as páginas saem em
+     * cinzento, um terço de um RGB, que o QR não precisa de cor; nenhuma página
+     * fica guardada entre passagens, volta-se a rasterizar; e a WeChat tenta
+     * primeiro na resolução mais baixa.
      */
     private void decodeFromPdf(byte[] content, List<String> found) throws Exception {
         try (PDDocument document = Loader.loadPDF(content)) {
@@ -174,28 +194,42 @@ public class AtInvoiceQrService {
 
             for (int dpi : PDF_RENDER_DPI) {
                 for (int page = 0; page < pages; page++) {
-                    if (decodeWholeImage(renderer.renderImageWithDPI(page, dpi), found)) {
+                    if (decodeWholeImage(renderPage(document, renderer, page, dpi), found)) {
                         return;
                     }
                 }
             }
 
             int finestDpi = PDF_RENDER_DPI[PDF_RENDER_DPI.length - 1];
-            List<BufferedImage> rendered = new ArrayList<>();
             for (int page = 0; page < pages; page++) {
-                BufferedImage image = renderer.renderImageWithDPI(page, finestDpi);
-                rendered.add(image);
-                if (decodeInTiles(image, found)) {
+                if (decodeInTiles(renderPage(document, renderer, page, finestDpi), found)) {
                     return;
                 }
             }
 
-            for (BufferedImage image : rendered) {
-                if (decodeWithWeChat(image, found)) {
-                    return;
+            for (int dpi : PDF_RENDER_DPI) {
+                for (int page = 0; page < pages; page++) {
+                    if (decodeWithWeChat(renderPage(document, renderer, page, dpi), found)) {
+                        return;
+                    }
                 }
             }
         }
+    }
+
+    private static BufferedImage renderPage(PDDocument document, PDFRenderer renderer, int page, int dpi)
+            throws IOException {
+        PDRectangle box = document.getPage(page).getCropBox();
+        return renderer.renderImageWithDPI(page, cappedDpi(box.getWidth(), box.getHeight(), dpi), ImageType.GRAY);
+    }
+
+    /** A DPI pedida, ou a que deixa a página dentro de {@link #MAX_RENDER_PIXELS}. */
+    static float cappedDpi(float widthPoints, float heightPoints, int dpi) {
+        double squareInches = (widthPoints / POINTS_PER_INCH) * (heightPoints / POINTS_PER_INCH);
+        if (squareInches <= 0) {
+            return dpi;
+        }
+        return (float) Math.min(dpi, Math.sqrt(MAX_RENDER_PIXELS / squareInches));
     }
 
     /**

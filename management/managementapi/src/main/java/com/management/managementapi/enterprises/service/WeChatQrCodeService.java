@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.service;
 
 import lombok.extern.slf4j.Slf4j;
 
+import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_core.StringVector;
@@ -97,7 +98,9 @@ public class WeChatQrCodeService {
         // interna do detetor nativo.
         synchronized (WeChatQrCodeService.class) {
             try (Mat buffer = new Mat(encoded);
-                 Mat image2 = opencv_imgcodecs.imdecode(buffer, opencv_imgcodecs.IMREAD_COLOR)) {
+                 // Cinzento: o detetor converteria a cor na mesma, e assim a imagem
+                 // nativa ocupa um terço (a memória do OpenCV vive fora da heap).
+                 Mat image2 = opencv_imgcodecs.imdecode(buffer, opencv_imgcodecs.IMREAD_GRAYSCALE)) {
                 if (image2 == null || image2.empty()) {
                     return List.of();
                 }
@@ -134,6 +137,9 @@ public class WeChatQrCodeService {
             }
             try {
                 Path dir = extractModels();
+                // Uma thread: mais lento, mas cada thread do OpenCV tem as suas áreas de
+                // memória nativa, e a máquina de produção só tem um vCPU partilhado.
+                opencv_core.setNumThreads(1);
                 detector = new WeChatQRCode(
                         dir.resolve(DETECT_PROTOTXT).toString(),
                         dir.resolve(DETECT_CAFFEMODEL).toString(),
