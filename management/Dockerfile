@@ -28,14 +28,21 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=backend /app/target/*.jar app.jar
 EXPOSE 8080
-# Afinado para a máquina de 1 GB do Fly.io (ver docs/operations.md → "Memória"):
-# - heap a 60% (~614 MB): o arranque chega a ~516 MB (o parser HQL do Hibernate a
-#   preparar as queries); o resto fica para metaspace (~110 MB), threads e a memória
-#   nativa do OpenCV (QR das faturas), que vive fora da heap;
+# Afinado para a máquina de 1 GB do Fly.io, a preferir memória a velocidade (ver
+# docs/operations.md → "Memória"; com a heap a 60%, a app parada já ocupava ~870 MB e
+# uma leitura de QR pesada fazia o kernel matar o processo):
+# - heap a 40% (~400 MB): o arranque não precisa de mais, só usa o que lhe derem; o resto
+#   fica para metaspace (~110 MB), threads e a memória nativa do OpenCV, fora da heap;
+# - MinHeapFreeRatio/MaxHeapFreeRatio: a heap devolve a memória em vez de ficar inchada;
+# - TieredStopAtLevel=1: só o compilador C1. A app fica mais lenta em CPU, mas sem o C2 e
+#   a sua code cache o processo ocupa bem menos;
 # - SerialGC: o de menor overhead, chega para uma app interna de poucos utilizadores;
+# - -Xss512k: cerca de 26 threads, com metade da pilha;
 # - tetos ao metaspace e à code cache, para a memória fora da heap não crescer sem limite;
 # - ExitOnOutOfMemoryError: sem memória, o processo sai e o Fly reinicia a máquina, em vez
-#   de ficar meio-vivo a responder erros.
+#   de ficar meio-vivo a responder erros;
+# - MALLOC_ARENA_MAX: a glibc cria áreas de memória por thread, e o OpenCV aloca por lá.
 # Substituível por um secret/env JAVA_TOOL_OPTIONS no Fly (ex. ao mudar o tamanho da máquina).
-ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:MaxRAMPercentage=60 -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+ExitOnOutOfMemoryError"
+ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:MaxRAMPercentage=40 -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=25 -XX:TieredStopAtLevel=1 -Xss512k -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=48m -XX:+ExitOnOutOfMemoryError"
+ENV MALLOC_ARENA_MAX=2
 ENTRYPOINT ["java", "-jar", "app.jar"]

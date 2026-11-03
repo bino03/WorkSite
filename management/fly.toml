@@ -32,8 +32,9 @@ primary_region = "lhr"
     path = "/actuator/health"
     interval = "30s"
     timeout = "5s"
-    # O arranque mede ~45 s numa máquina rápida; numa CPU partilhada pode ir além.
-    grace_period = "120s"
+    # Só com o compilador C1 o arranque é mais lento: ~60 s numa máquina rápida, mais
+    # numa CPU partilhada (ver docs/operations.md → "Memória").
+    grace_period = "180s"
 
 # 1 GB: o arranque chega a ~516 MB de heap (medido a 2026-10-29 — o parser HQL do
 # Hibernate a preparar as queries); 512 MB não chegava.
