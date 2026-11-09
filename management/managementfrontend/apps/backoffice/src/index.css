@@ -466,32 +466,54 @@ h6 { letter-spacing: 0.08em; text-transform: uppercase; }
   color: var(--ind-neutral-700);
 }
 
-/* ── Telemóvel: o header de três secções passa a duas linhas ──────────
-   Linha 1: lançador + wordmark | sino + utilizador. Linha 2: a nav, com
-   scroll horizontal. Os estilos inline do ShellHeader ficam por omissão
-   em desktop; aqui só se sobrepõem por baixo de 768px. */
+/* ── Telemóvel (< 768px): shell ───────────────────────────────────────
+   O header cabe numa linha: ☰ + wordmark | sino + utilizador. A nav e o
+   lançador de espaços vivem num Drawer (ShellHeader, via `useIsMobile`). */
 @media (max-width: 767px) {
-  .shell-header { flex-wrap: wrap; padding: 8px 12px !important; row-gap: 6px; }
+  .shell-header { padding: 8px 12px !important; }
   .shell-left, .shell-right { flex: 1 1 auto !important; }
-  .shell-nav {
-    order: 3; flex: 0 0 100%; gap: 20px !important; overflow-x: auto; white-space: nowrap;
-    padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  }
-  .shell-nav::-webkit-scrollbar { display: none; }
-  .shell-nav kbd { display: none; }
   .shell-main { padding: 16px 12px !important; }
   html, body { overflow-x: hidden; }
   input, select, textarea { font-size: 16px; } /* o iOS faz zoom em campos < 16px */
+
+  .shell-burger {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; margin-left: -8px; font-size: 18px;
+    background: none; border: none; color: inherit; cursor: pointer;
+  }
+  .shell-nav-launcher { margin-bottom: 8px; }
+  .shell-nav-launcher .space-launcher-trigger { min-height: 44px; min-width: 44px; }
+  .shell-nav-mobile { display: flex; flex-direction: column; gap: 0; }
+  .shell-nav-mobile > a, .shell-nav-mobile > button {
+    min-height: 48px; font-size: 16px !important; width: 100%; text-align: left;
+    border-bottom: 1px solid var(--ind-color-divider);
+  }
+  .shell-nav-mobile kbd { display: none; }
+}
+
+/* ── Telemóvel: drawers e modais a ecrã inteiro ───────────────────────
+   Há ~54 drawers e ~19 modais com larguras de 480–900px inline; uma regra
+   global trata de todos. Exceções: o drawer da nav, o lançador de espaços
+   (painel transparente, fecha no mask), o `ConfirmDialogContext` e os `ant-modal-confirm`. */
+@media (max-width: 767px) {
+  .ant-drawer:not(.shell-nav-drawer) .ant-drawer-content-wrapper { width: 100vw !important; max-width: 100vw; }
+  .ant-modal-root:not(.space-launcher-modal):not(.confirm-dialog-modal) .ant-modal:not(.ant-modal-confirm) { width: 100vw !important; max-width: 100vw !important; margin: 0 !important; top: 0 !important; padding: 0; }
+  .ant-modal-root:not(.space-launcher-modal):not(.confirm-dialog-modal) .ant-modal:not(.ant-modal-confirm) .ant-modal-content {
+    min-height: 100dvh; border-radius: 0; display: flex; flex-direction: column;
+  }
+  .ant-modal-root:not(.space-launcher-modal):not(.confirm-dialog-modal) .ant-modal:not(.ant-modal-confirm) .ant-modal-body { flex: 1 1 auto; }
+  .space-launcher-modal .ant-modal, .confirm-dialog-modal .ant-modal { width: calc(100vw - 16px) !important; max-width: calc(100vw - 16px) !important; margin-inline: auto !important; }
+  .ant-modal-close, .ant-drawer-close { min-width: 44px; min-height: 44px; }
 }
 
 /* ── Telemóvel: grelhas inline e tabelas ──────────────────────────────
    Várias páginas declaram `gridTemplateColumns` inline com N colunas fixas
-   (cartões de métricas, "Hoje" da equipa…). Em ecrã estreito empilham-se. */
+   (cartões de métricas, "Hoje" da equipa…). Em ecrã estreito empilham-se,
+   salvo as que levam `.keep-cols` (pares de campos que andam sempre juntos). */
 @media (max-width: 767px) {
-  [style*="grid-template-columns"]:not(.login-grid) { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns"]:not(.login-grid):not(.keep-cols) { grid-template-columns: 1fr !important; }
   .ant-table-wrapper { max-width: 100%; }
   .ant-table-content, .ant-table-body { overflow-x: auto !important; }
-  .ant-modal { max-width: calc(100vw - 16px) !important; margin-inline: auto; }
   .ant-picker, .ant-select, .ant-input-number { max-width: 100%; }
   .ant-picker-panels { flex-direction: column; }
   .ant-picker-dropdown { max-width: 100vw; }

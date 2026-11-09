@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FC, KeyboardEvent } from "react";
 import { Empty, Input, Modal, Spin } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 import { searchAllInvoices } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
@@ -34,6 +35,7 @@ function whereLabel(row: InvoiceSearchResult): string {
  * `BudgetItemPickerModal`. Só `ADMIN` e `ACCOUNTANT` — o gate real é o `@PreAuthorize`.
  */
 export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
+  const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<InvoiceSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,13 +103,13 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
         open={open}
         onCancel={onClose}
         footer={null}
-        closable={false}
+        closable={isMobile}
         destroyOnClose
         width="min(640px, 94vw)"
-        styles={{ body: { display: "flex", flexDirection: "column", gap: "10.2px", maxHeight: "70vh" } }}
+        styles={{ body: { display: "flex", flexDirection: "column", gap: "10.2px", maxHeight: isMobile ? undefined : "70vh" } }}
       >
         <Input
-          autoFocus
+          autoFocus={!isMobile}
           allowClear
           size="large"
           prefix={<SearchOutlined />}
@@ -118,7 +120,7 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
         />
 
         <Spin spinning={loading}>
-          <div style={{ maxHeight: "56vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ maxHeight: isMobile ? "calc(100dvh - 180px)" : "56vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
             {tooShort && (
               <div style={{ fontSize: 12, opacity: 0.55, padding: "4px 2px" }}>
                 Procura em todas as obras, nas despesas da empresa e em "Por identificar".

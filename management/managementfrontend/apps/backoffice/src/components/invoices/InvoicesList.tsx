@@ -13,6 +13,8 @@ import {
   ListActionPrimary,
 } from "@/components/common/ListActions";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import MobileCardList from "@/components/common/MobileCardList";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import type {
   ConstructionInvoice,
@@ -85,6 +87,61 @@ interface Props {
 }
 
 /**
+ * O cartão de uma fatura no telemóvel (`MobileCardList`): fornecedor, número, data,
+ * total, pagamento e rubrica/obra. O resto abre no detalhe, que é o toque no cartão.
+ */
+const InvoiceCard: FC<{
+  row: ConstructionInvoice;
+  isProject: boolean;
+  enterpriseNames?: Record<string, string>;
+}> = ({ row, isProject, enterpriseNames }) => {
+  const isCredit = row.documentType === "CREDIT_NOTE";
+  const docStatus = DOCUMENT_STATUS[row.documentStatus];
+  let rubric: { label: string; cls: string } | null = null;
+  if (isProject) {
+    if (!row.allocated) rubric = { label: row.needsReview ? "por rever" : "por associar", cls: "ind-tag-outline" };
+    else if (row.allocations.length > 1) rubric = { label: `${row.allocations.length} rubricas`, cls: "ind-tag-accent-2" };
+    else rubric = { label: row.budgetItemCode ?? row.budgetItemName ?? "rubrica", cls: "ind-tag-accent" };
+  }
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, minWidth: 0, overflowWrap: "anywhere" }}>
+          {isCredit && <span className="ind-tag ind-tag-neutral" style={{ fontSize: 10, marginRight: 6 }}>NC</span>}
+          {row.supplierName ?? row.supplierNif ?? row.originalFilename ?? "—"}
+        </span>
+        <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, whiteSpace: "nowrap" }}>
+          {row.totalAmount != null ? formatCurrency(row.totalAmount) : "—"}
+        </span>
+      </div>
+      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
+        {[row.invoiceNumber, row.invoiceDate ? formatDate(row.invoiceDate) : null].filter(Boolean).join(" · ") ||
+          "sem identificação"}
+      </div>
+      {row.description && (
+        <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {row.description}
+        </div>
+      )}
+      {enterpriseNames && (
+        <div style={{ fontSize: 12, marginTop: 2 }}>
+          {row.enterpriseId ? (enterpriseNames[row.enterpriseId] ?? "—") : <span style={{ opacity: 0.6 }}>Empresa</span>}
+        </div>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8 }}>
+        {!isCredit && <span className={`ind-tag ${PAYMENT_STATUS[row.paymentStatus].cls}`}>{PAYMENT_STATUS[row.paymentStatus].label}</span>}
+        {!isCredit && row.approvedForPayment && row.paymentStatus !== "PAID" && (
+          <span className="ind-tag ind-tag-accent-2" style={{ fontSize: 10 }}>aprovada</span>
+        )}
+        {rubric && <span className={`ind-tag ${rubric.cls}`}>{rubric.label}</span>}
+        {docStatus && <span className={`ind-tag ${docStatus.cls}`} style={{ fontSize: 10 }}>{docStatus.label}</span>}
+        {!isCredit && <InvoiceDueDateCell invoice={row} />}
+      </div>
+    </>
+  );
+};
+
+/**
  * A caixa de entrada.
  *
  * A miniatura é a primeira coluna porque numa fatura mal preenchida é ela que
@@ -118,6 +175,7 @@ export const InvoicesList: FC<Props> = ({
 }) => {
   const { canManageWorks } = useAuth();
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const isProject = scope === "PROJECT";
   const isQuarantine = scope === "UNIDENTIFIED";
   const [menu, setMenu] = useState<{ x: number; y: number; invoice: ConstructionInvoice } | null>(null);
@@ -430,6 +488,19 @@ export const InvoicesList: FC<Props> = ({
         onMarkPaid={onMarkPaid}
         onAddNote={onAddNote}
       />
+      {isMobile ? (
+        <MobileCardList<ConstructionInvoice>
+          items={invoices}
+          rowKey={(row) => row.id}
+          emptyText="Nenhuma fatura corresponde a estes filtros."
+          onOpen={onView}
+          onMore={(row, e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setMenu({ x: rect.right, y: rect.bottom, invoice: row });
+          }}
+          renderCard={(row) => <InvoiceCard row={row} isProject={isProject} enterpriseNames={enterpriseNames} />}
+        />
+      ) : (
       <Table<ConstructionInvoice>
         rowKey="id"
         columns={columns}
@@ -476,6 +547,7 @@ export const InvoicesList: FC<Props> = ({
           ),
         }}
       />
+      )}
 
       <div
         style={{
@@ -494,7 +566,8 @@ export const InvoicesList: FC<Props> = ({
           current={pagination.currentPage + 1}
           total={pagination.totalElements}
           pageSize={pagination.pageSize}
-          showSizeChanger
+          simple={isMobile}
+          showSizeChanger={!isMobile}
           onChange={(page, size) => onPageChange(page - 1, size)}
         />
       </div>

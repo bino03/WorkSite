@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Modal, Space, Typography } from "antd";
 import { FileTextOutlined, ZoomInOutlined, ZoomOutOutlined } from "@ant-design/icons";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const { Text } = Typography;
 
@@ -19,6 +20,7 @@ interface InvoicePreviewModalProps {
 
 export default function InvoicePreviewModal({ open, onClose, invoiceUrl, mimeType, filename }: InvoicePreviewModalProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const [zoom, setZoom] = useState(1);
   const isImage = mimeType?.startsWith("image/") ?? false;
 
@@ -56,7 +58,7 @@ export default function InvoicePreviewModal({ open, onClose, invoiceUrl, mimeTyp
           </Space>
         ) : null
       }
-      bodyStyle={{ padding: 0, maxHeight: "75vh", overflow: "auto" }}
+      bodyStyle={{ padding: 0, maxHeight: isMobile ? undefined : "75vh", overflow: "auto" }}
       destroyOnClose
     >
       {invoiceUrl ? (
@@ -67,7 +69,16 @@ export default function InvoicePreviewModal({ open, onClose, invoiceUrl, mimeTyp
             style={{ width: `${zoom * 100}%`, display: "block", margin: "0 auto" }}
           />
         ) : (
-          <embed src={invoiceUrl} type="application/pdf" style={{ width: "100%", height: "75vh", display: "block" }} />
+          isMobile ? (
+            // O `<embed>` de PDF não renderiza no iOS: abre-se no visualizador nativo.
+            <div style={{ padding: 24, textAlign: "center" }}>
+              <Button type="primary" size="large" href={invoiceUrl} target="_blank" rel="noopener noreferrer">
+                Abrir PDF
+              </Button>
+            </div>
+          ) : (
+            <embed src={invoiceUrl} type="application/pdf" style={{ width: "100%", height: "75vh", display: "block" }} />
+          )
         )
       ) : (
         <div style={{ padding: 24 }}>

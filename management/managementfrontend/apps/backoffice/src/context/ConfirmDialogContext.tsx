@@ -59,6 +59,7 @@ export const ConfirmDialogProvider = ({ children }: { children: ReactNode }) => 
         open={open}
         onCancel={close}
         closable={false}
+        rootClassName="confirm-dialog-modal"
         footer={null}
         centered
         width={440}

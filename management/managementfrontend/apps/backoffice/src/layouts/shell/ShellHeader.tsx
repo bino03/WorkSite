@@ -1,5 +1,9 @@
-import type { CSSProperties, ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { Drawer } from "antd";
+import { MenuOutlined } from "@ant-design/icons";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SpaceLauncher } from "./SpaceLauncher";
 import { UserMenu } from "./UserMenu";
@@ -20,6 +24,18 @@ interface ShellHeaderProps {
  * iguais, o que mantém a nav no centro real. Só a nav e as cores mudam por espaço.
  */
 export function ShellHeader({ spaceName, homePath, dark = false, children }: ShellHeaderProps) {
+  const isMobile = useIsMobile();
+  const [navOpen, setNavOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  // Navegar (ou sair do telemóvel) fecha o drawer da nav.
+  useEffect(() => setNavOpen(false), [pathname, isMobile]);
+
+  /** Um link, ou um botão marcado com `data-close-nav`, fecha o drawer; o trigger de um dropdown não. */
+  const closeOnAction = (e: MouseEvent<HTMLElement>) => {
+    if ((e.target as HTMLElement).closest("a, [data-close-nav]")) setNavOpen(false);
+  };
+
   const headerStyle: CSSProperties = {
     display: "flex",
     alignItems: "center",
@@ -36,7 +52,19 @@ export function ShellHeader({ spaceName, homePath, dark = false, children }: She
   return (
     <header className={`shell-header${dark ? " space-team-header" : ""}`} style={headerStyle}>
       <div className="shell-left" style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-        <SpaceLauncher />
+        {isMobile ? (
+          <button
+            type="button"
+            className="shell-burger"
+            aria-label="Abrir menu"
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen(true)}
+          >
+            <MenuOutlined />
+          </button>
+        ) : (
+          <SpaceLauncher />
+        )}
         {/* O wordmark é o link para o início do espaço — evita um item "Início" à parte. */}
         <NavLink
           to={homePath}
@@ -61,7 +89,21 @@ export function ShellHeader({ spaceName, homePath, dark = false, children }: She
         </NavLink>
       </div>
 
-      <nav className="shell-nav" style={{ display: "flex", alignItems: "center", gap: 30 }}>{children}</nav>
+      {isMobile ? (
+        <Drawer
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
+          placement="left"
+          width={300}
+          rootClassName="shell-nav-drawer"
+          title={`Worksite · ${spaceName}`}
+        >
+          <div className="shell-nav-launcher"><SpaceLauncher /></div>
+          <nav className="shell-nav-mobile" onClick={closeOnAction}>{children}</nav>
+        </Drawer>
+      ) : (
+        <nav className="shell-nav" style={{ display: "flex", alignItems: "center", gap: 30 }}>{children}</nav>
+      )}
 
       <div className="shell-right"
         style={{
