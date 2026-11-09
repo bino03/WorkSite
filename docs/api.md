@@ -1072,8 +1072,8 @@ scope, enterpriseId}] }`.
 `GET /construction-invoices/search?q=&size=` (2026-10-22) responde a "onde está aquela fatura?" sem
 saber em que obra ela está, ou se está na empresa ou na quarentena. Devolve uma **lista** (não um `Page`) de
 `InvoiceSearchResultDTO`, uma linha leve sem repartições, pagamentos nem miniaturas: `id, documentType,
-scope, enterpriseId, enterpriseName, invoiceNumber, supplierName, supplierNif, invoiceDate,
-totalAmount`. O detalhe vem do `GET /{id}` quando se clica.
+scope, enterpriseId, enterpriseName, budgetName, invoiceNumber, supplierName, supplierNif, invoiceDate,
+totalAmount`. `budgetName` é o lote da fatura **só quando a obra tem mais de um lote vivo** (senão `null`, e o modal mostra só a obra). O detalhe vem do `GET /{id}` quando se clica.
 
 - **Texto**: `lower() like` (distingue acentos, como as outras listas) sobre fornecedor, NIF, número,
   ATCUD, descrição, notas e nome do ficheiro. São os campos do `q` por obra e os do `q` da empresa e da

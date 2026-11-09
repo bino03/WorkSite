@@ -754,13 +754,31 @@ public class ConstructionInvoiceService {
         if (text.length() < GLOBAL_SEARCH_MIN_LENGTH) {
             return List.of();
         }
-        return repository.searchEverywhere(text, parseSearchAmount(text), PageRequest.of(0, limit)).stream()
+        List<ConstructionInvoice> found =
+                repository.searchEverywhere(text, parseSearchAmount(text), PageRequest.of(0, limit));
+        // O lote só vale a pena mostrar numa obra com mais de um: com um só, "Obra · Orçamento" é ruído.
+        List<UUID> enterpriseIds = found.stream()
+                .map(ConstructionInvoice::getEnterprise)
+                .filter(java.util.Objects::nonNull)
+                .map(Enterprise::getId)
+                .distinct()
+                .toList();
+        Map<UUID, Long> liveBudgets = enterpriseIds.isEmpty()
+                ? Map.of()
+                : budgetRepository.findByEnterpriseIdInAndDeletedAtIsNullOrderBySortOrderAsc(enterpriseIds).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                budget -> budget.getEnterprise().getId(), java.util.stream.Collectors.counting()));
+        return found.stream()
                 .map(invoice -> new InvoiceSearchResultDTO(
                         invoice.getId(),
                         invoice.getDocumentType().name(),
                         invoice.getScope().name(),
                         invoice.getEnterprise() == null ? null : invoice.getEnterprise().getId(),
                         invoice.getEnterprise() == null ? null : invoice.getEnterprise().getName(),
+                        invoice.getBudget() != null && invoice.getEnterprise() != null
+                                && liveBudgets.getOrDefault(invoice.getEnterprise().getId(), 0L) > 1
+                                ? invoice.getBudget().getName()
+                                : null,
                         invoice.getInvoiceNumber(),
                         invoice.getSupplierName(),
                         invoice.getSupplierNif(),
