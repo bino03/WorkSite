@@ -61,6 +61,10 @@ O backend é a única fonte de verdade e o único componente com acesso direto �
 - Padrão de UI: operações de criar/ver/editar feitas em `Drawer`s do Ant Design em vez de páginas dedicadas; formulários com React Hook Form + Zod.
 - Convenções visuais e de estrutura em [[skills/references/frontend-visual-consistency]]; onde vive cada ecrã em [[code-map]].
 
+### Backoffice — responsividade
+
+Desde 2026-11-09 o Backoffice passa a ter layout de telemóvel (antes era só desktop). Convenção: **um só breakpoint, `< 768px`** (o `md` do Ant Design e o do CSS). `useIsMobile()` (`src/hooks/useIsMobile.ts`) decide o que muda a *estrutura* — nav num drawer com ☰, tabelas em lista de cartões; tudo o que é só *medida* (larguras, paddings, drawers e modais a ecrã inteiro) vive em media queries no fim de `src/index.css`. Âmbito da 1.ª versão: só o espaço Obras; Equipa, orçamento e Tarefas continuam só-desktop. Fases e o porquê em `notes/roadmap/mobile.md`.
+
 ## Autenticação entre projetos
 
 Ver [[security.md]] para o fluxo completo. Resumo: o Supabase emite o JWT; o Backoffice guarda-o em cookie HttpOnly e injeta-o nos pedidos; o backend valida-o localmente (HS256, sem chamar o Supabase a cada pedido).
