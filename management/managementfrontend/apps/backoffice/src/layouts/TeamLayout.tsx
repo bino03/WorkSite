@@ -95,7 +95,7 @@ export default function TeamLayout() {
           </Dropdown>
         </ShellHeader>
 
-        <main className="container-page" style={{ padding: "27.2px 20.4px" }}>
+        <main className="container-page shell-main" style={{ padding: "27.2px 20.4px" }}>
           <Outlet />
         </main>
       </div>

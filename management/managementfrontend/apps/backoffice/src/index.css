@@ -465,3 +465,34 @@ h6 { letter-spacing: 0.08em; text-transform: uppercase; }
   font-size: 13px;
   color: var(--ind-neutral-700);
 }
+
+/* ── Telemóvel: o header de três secções passa a duas linhas ──────────
+   Linha 1: lançador + wordmark | sino + utilizador. Linha 2: a nav, com
+   scroll horizontal. Os estilos inline do ShellHeader ficam por omissão
+   em desktop; aqui só se sobrepõem por baixo de 768px. */
+@media (max-width: 767px) {
+  .shell-header { flex-wrap: wrap; padding: 8px 12px !important; row-gap: 6px; }
+  .shell-left, .shell-right { flex: 1 1 auto !important; }
+  .shell-nav {
+    order: 3; flex: 0 0 100%; gap: 20px !important; overflow-x: auto; white-space: nowrap;
+    padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .shell-nav::-webkit-scrollbar { display: none; }
+  .shell-nav kbd { display: none; }
+  .shell-main { padding: 16px 12px !important; }
+  html, body { overflow-x: hidden; }
+  input, select, textarea { font-size: 16px; } /* o iOS faz zoom em campos < 16px */
+}
+
+/* ── Telemóvel: grelhas inline e tabelas ──────────────────────────────
+   Várias páginas declaram `gridTemplateColumns` inline com N colunas fixas
+   (cartões de métricas, "Hoje" da equipa…). Em ecrã estreito empilham-se. */
+@media (max-width: 767px) {
+  [style*="grid-template-columns"]:not(.login-grid) { grid-template-columns: 1fr !important; }
+  .ant-table-wrapper { max-width: 100%; }
+  .ant-table-content, .ant-table-body { overflow-x: auto !important; }
+  .ant-modal { max-width: calc(100vw - 16px) !important; margin-inline: auto; }
+  .ant-picker, .ant-select, .ant-input-number { max-width: 100%; }
+  .ant-picker-panels { flex-direction: column; }
+  .ant-picker-dropdown { max-width: 100vw; }
+}
