@@ -34,8 +34,8 @@ export function ShellHeader({ spaceName, homePath, dark = false, children }: She
   };
 
   return (
-    <header className={dark ? "space-team-header" : undefined} style={headerStyle}>
-      <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+    <header className={`shell-header${dark ? " space-team-header" : ""}`} style={headerStyle}>
+      <div className="shell-left" style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
         <SpaceLauncher />
         {/* O wordmark é o link para o início do espaço — evita um item "Início" à parte. */}
         <NavLink
@@ -61,9 +61,9 @@ export function ShellHeader({ spaceName, homePath, dark = false, children }: She
         </NavLink>
       </div>
 
-      <nav style={{ display: "flex", alignItems: "center", gap: 30 }}>{children}</nav>
+      <nav className="shell-nav" style={{ display: "flex", alignItems: "center", gap: 30 }}>{children}</nav>
 
-      <div
+      <div className="shell-right"
         style={{
           flex: "1 1 0",
           display: "flex",
