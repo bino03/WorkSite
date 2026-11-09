@@ -90,7 +90,7 @@ export const BackofficeHome = () => {
         {t("common.welcome", { defaultValue: "Bem-vindo" })}{user?.name ? `, ${user.name}` : ""}
       </h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${metrics.length || 3}, 1fr)`, gap: "13.6px", marginBottom: "27.2px" }}>
+      <div className="keep-cols" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "13.6px", marginBottom: "27.2px" }}>
         {metrics.map((m) => (
           <BlueprintCard key={m.label} style={{ padding: "13.6px" }}>
             <span className="ind-card-kicker">{m.label}</span>
@@ -101,7 +101,7 @@ export const BackofficeHome = () => {
       </div>
 
       <h6 style={{ color: "var(--ind-accent-700)" }}>Navegação</h6>
-      <div style={{ display: "grid", gridTemplateColumns: isAdmin() ? "repeat(3, 1fr)" : "repeat(2, 1fr)", gap: "13.6px" }}>
+      <div className="keep-cols" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "13.6px" }}>
         <Link to="/backoffice/empreendimentos" style={{ color: "inherit" }}>
           <BlueprintCard style={{ padding: "13.6px" }}>
             <BuildOutlined style={{ fontSize: 22, color: "var(--ind-color-accent)" }} />

@@ -50,6 +50,7 @@ export function SpaceLauncher() {
         onCancel={() => setOpen(false)}
         footer={null}
         closable={false}
+        rootClassName="space-launcher-modal"
         centered
         width={700}
         title={null}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, FC, ReactNode } from "react";
-import { Button, DatePicker, Drawer, Input, InputNumber, Select, Space, Spin, Tooltip } from "antd";
+import { Button, DatePicker, Drawer, Input, InputNumber, Segmented, Select, Space, Spin, Tooltip } from "antd";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
@@ -30,6 +30,7 @@ import {
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { parseApiError } from "@/utils/apiError";
 import { formatCurrency, formatDate } from "@/utils/formatters";
@@ -106,6 +107,10 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const confirm = useConfirm();
   const { t } = useTranslation();
 
+  const isMobile = useIsMobile();
+  /** No telemóvel o documento e os campos não cabem lado a lado: um separador de cada vez. */
+  const [mobileTab, setMobileTab] = useState<"data" | "doc">("data");
+  useEffect(() => setMobileTab("data"), [open, invoiceId]);
   const [invoice, setInvoice] = useState<ConstructionInvoice | null>(null);
   const [values, setValues] = useState<Values | null>(null);
   const [loading, setLoading] = useState(false);
@@ -322,7 +327,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
       <Drawer
         open={open}
         onClose={onClose}
-        width={showInlinePreview ? "min(1500px, 96vw)" : 640}
+        width={isMobile ? "100%" : showInlinePreview ? "min(1500px, 96vw)" : 640}
         styles={showInlinePreview ? { body: { padding: "13.6px 20.4px" } } : undefined}
         destroyOnClose
         title={
@@ -353,18 +358,32 @@ export const InvoiceDetailDrawer: FC<Props> = ({
       >
         <Spin spinning={loading}>
           {invoice && values && (
-            <div style={{ display: "flex", gap: "10.2px", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", gap: "10.2px", alignItems: "flex-start", flexDirection: isMobile ? "column" : "row" }}>
+              {isMobile && showInlinePreview && (
+                <Segmented
+                  block
+                  value={mobileTab}
+                  onChange={(v) => setMobileTab(v as "data" | "doc")}
+                  options={[
+                    { label: "Dados", value: "data" },
+                    { label: "Documento", value: "doc" },
+                  ]}
+                  style={{ width: "100%" }}
+                />
+              )}
               {showInlinePreview && (
                 <div
                   style={{
                     flex: "1 1 60%",
-                    position: "sticky",
+                    position: isMobile ? "static" : "sticky",
                     top: 0,
                     borderRadius: 2,
                     overflow: "hidden",
-                    maxHeight: "calc(100vh - 140px)",
+                    maxHeight: isMobile ? undefined : "calc(100vh - 140px)",
                     overflowY: "auto",
                     background: "var(--ind-color-surface)",
+                    width: isMobile ? "100%" : undefined,
+                    display: isMobile && mobileTab !== "doc" ? "none" : undefined,
                   }}
                 >
                   {invoice.fileUrl ? (
@@ -374,6 +393,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                         alt={invoice.originalFilename ?? "fatura"}
                         style={{ width: "100%", display: "block" }}
                       />
+                    ) : isMobile ? (
+                      // O `<embed>` de PDF não renderiza no iOS: abre-se no visualizador nativo.
+                      <div style={{ padding: 24, textAlign: "center" }}>
+                        <Button type="primary" href={invoice.fileUrl} target="_blank" rel="noopener noreferrer">
+                          Abrir documento (PDF)
+                        </Button>
+                      </div>
                     ) : (
                       <embed
                         src={invoice.fileUrl}
@@ -393,7 +419,8 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                 style={{
                   flex: "1 1 40%",
                   minWidth: 0,
-                  display: "flex",
+                  width: isMobile ? "100%" : undefined,
+                  display: isMobile && showInlinePreview && mobileTab === "doc" ? "none" : "flex",
                   flexDirection: "column",
                   gap: "13.6px",
                 }}
@@ -533,7 +560,7 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               />
 
               {canManageWorks() && (
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {invoice.allocated ? (
                     <Button onClick={handleDeallocate}>
                       {invoice.allocations.length > 1
@@ -884,7 +911,7 @@ const InvoiceFields: FC<{
       : INVOICE_TYPES;
 
   const supplier = (
-    <div style={PAIR}>
+    <div className="keep-cols" style={PAIR}>
       <Field id="invoice-supplier" label="Fornecedor" hint="Nome que vem no topo da fatura.">
         <SupplierNameInput
           id="invoice-supplier"
@@ -913,7 +940,7 @@ const InvoiceFields: FC<{
   );
 
   const amounts = (
-    <div style={PAIR}>
+    <div className="keep-cols" style={PAIR}>
       <Field
         id="invoice-date"
         label="Data da fatura"
@@ -958,7 +985,7 @@ const InvoiceFields: FC<{
   );
 
   const numbers = (
-    <div style={PAIR}>
+    <div className="keep-cols" style={PAIR}>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 0.6fr) 1fr", gap: 6 }}>
         <Field id="invoice-type" label="Tipo">
           <Select

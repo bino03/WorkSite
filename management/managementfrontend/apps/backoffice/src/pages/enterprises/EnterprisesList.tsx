@@ -15,6 +15,8 @@ import { BudgetExportModal } from "@/components/budget/BudgetExportModal";
 import { normalizeSpringPage, type SpringPage } from "@/utils/springPage";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { ListActions, ListActionPrimary, ListActionSecondary, ListActionDanger } from "@/components/common/ListActions";
+import MobileCardList from "@/components/common/MobileCardList";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 // Tipos baseados na resposta da API
 export type EnterpriseStatus = 'planning' | 'under_construction' | 'completed' | 'suspended' | 'cancelled';
@@ -94,6 +96,7 @@ export default function EnterprisesList() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const isMobile = useIsMobile();
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<EnterpriseStatus | "">("");
   const [data, setData] = useState<Enterprise[]>([]);
@@ -311,7 +314,7 @@ export default function EnterprisesList() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "20.4px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 10, marginBottom: "20.4px" }}>
         <div>
           <h6 style={{ color: "var(--ind-accent-700)" }}>Projetos</h6>
           <h1 style={{ margin: 0 }}>Empreendimentos</h1>
@@ -321,20 +324,21 @@ export default function EnterprisesList() {
         </Button>
       </div>
 
-      <div style={{ display: "flex", gap: "10.2px", alignItems: "center", marginBottom: "13.6px" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "10.2px", alignItems: "center", marginBottom: "13.6px" }}>
         <Input
           allowClear
           placeholder="Pesquisar empreendimentos…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
-          style={{ maxWidth: 320 }}
+          style={{ maxWidth: isMobile ? "100%" : 320, flex: isMobile ? "1 1 100%" : undefined }}
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as EnterpriseStatus | "")}
           style={{
             maxWidth: 200,
+            flex: isMobile ? "1 1 0" : undefined,
             minHeight: 36,
             padding: "6px 10px",
             background: "var(--ind-color-surface)",
@@ -350,7 +354,46 @@ export default function EnterprisesList() {
         <Button onClick={clearFilters}>Limpar</Button>
       </div>
 
-      <div style={{ borderTop: "1px solid var(--ind-color-divider)" }}>
+      <div style={{ borderTop: "1px solid var(--ind-color-divider)", paddingTop: isMobile ? 12 : 0 }}>
+        {isMobile ? (
+          <MobileCardList<Enterprise>
+            items={data}
+            rowKey={(e) => e.id}
+            loading={loading}
+            emptyText={t('enterprises.loadError')}
+            onOpen={(e) => handleViewEnterprise(e.id)}
+            onMore={(record, e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setCtxMenu({ visible: true, x: rect.right, y: rect.bottom, record });
+            }}
+            renderCard={(record) => {
+              const typeInfo = TYPE_MAP[record.type];
+              const statusInfo = record.status ? STATUS_MAP[record.status] : undefined;
+              return (
+                <>
+                  <div style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, fontSize: 16 }}>{record.name}</div>
+                  {record.internalReference && (
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>{record.internalReference}</div>
+                  )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                    {statusInfo && <span className={`ind-tag ${statusInfo.cls}`}>{statusInfo.label}</span>}
+                    {typeInfo && <span className={`ind-tag ${typeInfo.cls}`}>{typeInfo.label}</span>}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 8, fontSize: 13 }}>
+                    <span style={{ opacity: 0.7 }}>{record.location?.city || "—"}</span>
+                    <span>{formatCurrency(record.budgetTotal, record.currency)}</span>
+                  </div>
+                </>
+              );
+            }}
+            pagination={{
+              current: pagination.current ?? 1,
+              pageSize: pagination.pageSize ?? DEFAULT_PAGE_SIZE,
+              total: pagination.total ?? 0,
+              onChange: (current, pageSize) => onTableChange({ current, pageSize }),
+            }}
+          />
+        ) : (
         <Table<Enterprise>
           rowKey="id"
           columns={columns}
@@ -369,6 +412,7 @@ export default function EnterprisesList() {
             )
           }}
         />
+        )}
       </div>
       <p style={{ fontSize: 12, opacity: 0.6, marginTop: "10.2px" }}>{pagination.total ?? 0} resultado(s)</p>
 

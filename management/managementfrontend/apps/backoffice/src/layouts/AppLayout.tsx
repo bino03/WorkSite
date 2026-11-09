@@ -115,6 +115,7 @@ export default function AppLayout() {
         {managesWorks && (
           <button
             type="button"
+            data-close-nav
             title="Pesquisar faturas em todas as obras (Ctrl+K)"
             onClick={() => setSearchOpen(true)}
             style={navButtonStyle(searchOpen, ACCENT)}

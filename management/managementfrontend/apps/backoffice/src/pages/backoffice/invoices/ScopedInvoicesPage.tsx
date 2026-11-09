@@ -15,6 +15,7 @@ import {
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
@@ -66,6 +67,7 @@ interface Props {
  */
 const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const { canManageWorks } = useAuth();
+  const isMobile = useIsMobile();
   const confirm = useConfirm();
 
   const [invoices, setInvoices] = useState<ConstructionInvoice[]>([]);
@@ -267,7 +269,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
             setPage(0);
             void fetch(0, pageSize, "", outstanding, uploaded, sort);
           }}
-          style={{ maxWidth: 320 }}
+          style={{ maxWidth: 320, ...(isMobile ? { maxWidth: "100%", flex: "1 1 100%" } : {}) }}
         />
         <Button onClick={search}>Pesquisar</Button>
         <DatePicker.RangePicker
@@ -284,7 +286,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
               range?.[1] ? range[1].format("YYYY-MM-DD") : null,
             ])
           }
-          style={{ width: 260 }}
+          style={{ width: isMobile ? "100%" : 260 }}
         />
         <Button size="small" type={outstanding ? "primary" : "default"} onClick={toggleOutstanding}>
           Por liquidar

@@ -202,7 +202,9 @@ vem do `ConstructionInvoiceRepository` (21 queries, 23 `CASE`/`COALESCE`). Fora 
   A heap não precisa dos 516 MB que atinge sem teto: arranca com 400 MB, e ocupa ~200 MB depois disso. As opções
   `MinHeapFreeRatio`/`MaxHeapFreeRatio` fazem-na devolver memória e o `TieredStopAtLevel=1` tira o compilador C2
   (app mais lenta em CPU). O `grace_period` do `fly.toml` subiu para 180 s por causa do arranque. Linux pode dar valores
-  um pouco diferentes. **Por medir online.** Os Backups (geram livros Excel na heap) também.
+  um pouco diferentes. **Online (deploy de 2026-11-03)**: arranque de **~160 s**, contra ~52 s antes, muito perto do
+  `grace_period`; se passar dos 180 s, o deploy pode falhar. A memória online está por medir, e os Backups (geram livros
+  Excel na heap) também.
 - **Leitura de QR** (`AtInvoiceQrService`): páginas em cinzento, nenhuma guardada entre passagens, a WeChat tenta
   primeiro a 200 DPI e o OpenCV usa uma thread. Teto de 15 milhões de píxeis por página: os talões compridos (1200×8463
   pontos) davam 175 milhões a 300 DPI e esgotavam a heap. Contra 225 faturas do vault Vilatro, sem erros de memória com
