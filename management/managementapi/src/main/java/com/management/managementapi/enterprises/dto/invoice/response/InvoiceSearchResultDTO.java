@@ -11,6 +11,7 @@ import java.util.UUID;
  * não assina miniaturas nem carrega repartições a cada tecla.
  *
  * @param enterpriseName nulo nas despesas da empresa e na quarentena
+ * @param budgetName o lote da fatura, só quando a obra tem mais de um lote vivo (senão nulo: não distingue nada)
  */
 public record InvoiceSearchResultDTO(
         UUID id,
@@ -18,6 +19,7 @@ public record InvoiceSearchResultDTO(
         String scope,
         UUID enterpriseId,
         String enterpriseName,
+        String budgetName,
         String invoiceNumber,
         String supplierName,
         String supplierNif,

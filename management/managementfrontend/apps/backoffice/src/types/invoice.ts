@@ -739,6 +739,8 @@ export interface InvoiceSearchResult {
   scope: InvoiceScope;
   enterpriseId: string | null;
   enterpriseName: string | null;
+  /** O lote, só quando a obra tem mais de um. */
+  budgetName?: string | null;
   invoiceNumber: string | null;
   supplierName: string | null;
   supplierNif: string | null;

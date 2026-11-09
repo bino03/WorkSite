@@ -18,11 +18,12 @@ interface Props {
   onClose: () => void;
 }
 
-/** Onde a fatura está, em palavras: a obra, ou o âmbito quando não tem obra. */
+/** Onde a fatura está, em palavras: a obra (e o lote, se a obra tem vários), ou o âmbito quando não tem obra. */
 function whereLabel(row: InvoiceSearchResult): string {
   if (row.scope === "COMPANY") return "Despesas da empresa";
   if (row.scope === "UNIDENTIFIED") return "Por identificar";
-  return row.enterpriseName ?? "Obra";
+  const enterprise = row.enterpriseName ?? "Obra";
+  return row.budgetName ? `${enterprise} · ${row.budgetName}` : enterprise;
 }
 
 /**

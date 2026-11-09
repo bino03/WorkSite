@@ -1,8 +1,10 @@
 package com.management.managementapi.enterprises.service;
 
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceSearchResultDTO;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
+import com.management.managementapi.enterprises.repository.ConstructionBudgetRepository;
 import com.management.managementapi.enterprises.repository.ConstructionInvoiceRepository;
 
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.when;
 class GlobalInvoiceSearchTest {
 
     @Mock private ConstructionInvoiceRepository repository;
+    @Mock private ConstructionBudgetRepository budgetRepository;
 
     @InjectMocks private ConstructionInvoiceService service;
 
@@ -105,6 +108,43 @@ class GlobalInvoiceSearchTest {
         assertThat(rows.get(0).scope()).isEqualTo("PROJECT");
         assertThat(rows.get(1).enterpriseName()).isNull();
         assertThat(rows.get(1).documentType()).isEqualTo("CREDIT_NOTE");
+    }
+
+    @Test
+    @DisplayName("o lote só aparece numa obra com mais de um lote vivo")
+    void showsBudgetNameOnlyWhenEnterpriseHasSeveral() {
+        Enterprise villa = new Enterprise();
+        villa.setId(UUID.randomUUID());
+        villa.setName("Vila Aleu");
+        Enterprise single = new Enterprise();
+        single.setId(UUID.randomUUID());
+        single.setName("Vila Petrus");
+
+        ConstructionBudget lotA = budget(villa, "Lote A");
+        ConstructionBudget lotB = budget(villa, "Lote B");
+        ConstructionBudget only = budget(single, "Orçamento");
+        when(budgetRepository.findByEnterpriseIdInAndDeletedAtIsNullOrderBySortOrderAsc(any()))
+                .thenReturn(List.of(lotA, lotB, only));
+
+        ConstructionInvoice inLot = invoice(ConstructionInvoice.Scope.PROJECT, villa);
+        inLot.setBudget(lotB);
+        ConstructionInvoice noLot = invoice(ConstructionInvoice.Scope.PROJECT, villa);
+        ConstructionInvoice inSingle = invoice(ConstructionInvoice.Scope.PROJECT, single);
+        inSingle.setBudget(only);
+        when(repository.searchEverywhere(anyString(), any(), any())).thenReturn(List.of(inLot, noLot, inSingle));
+
+        List<InvoiceSearchResultDTO> rows = service.searchEverywhere("ft", 20);
+
+        assertThat(rows.get(0).budgetName()).isEqualTo("Lote B");
+        assertThat(rows.get(1).budgetName()).isNull();
+        assertThat(rows.get(2).budgetName()).isNull();
+    }
+
+    private static ConstructionBudget budget(Enterprise enterprise, String name) {
+        ConstructionBudget budget = new ConstructionBudget();
+        budget.setEnterprise(enterprise);
+        budget.setName(name);
+        return budget;
     }
 
     private static ConstructionInvoice invoice(ConstructionInvoice.Scope scope, Enterprise enterprise) {
