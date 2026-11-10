@@ -10,8 +10,9 @@ import java.util.UUID;
  * convém pagá-las: vencidas primeiro, depois as que vencem mais cedo, e no fim
  * as que não têm vencimento.
  *
- * Os quatro números do resumo são da lista inteira, não da página — é o que
- * responde a "quanto está em atraso?" sem percorrer as páginas todas.
+ * Os quatro números do resumo são da lista filtrada inteira, não da página — é
+ * o que responde a "quanto está em atraso?" (ou "quanto devo à Brivel?") sem
+ * percorrer as páginas todas. Sem filtros, é a lista inteira.
  *
  * @param invoices            a página pedida, já na ordem de urgência
  * @param enterpriseNames     o nome de cada obra que aparece na página, por id;
@@ -21,6 +22,8 @@ import java.util.UUID;
  * @param overdueCount        quantas já passaram o vencimento
  * @param overdueTotal        Σ (líquido − pago) das vencidas
  * @param withoutDueDateCount quantas não têm vencimento — ficam no fim da lista
+ * @param suppliers           os fornecedores com faturas por liquidar dentro dos outros filtros
+ *                            (todos menos o de fornecedor), por nome — as opções desse filtro
  */
 public record OutstandingByUrgencyDTO(
         List<ConstructionInvoiceResponseDTO> invoices,
@@ -31,5 +34,6 @@ public record OutstandingByUrgencyDTO(
         BigDecimal total,
         long overdueCount,
         BigDecimal overdueTotal,
-        long withoutDueDateCount
+        long withoutDueDateCount,
+        List<OutstandingSupplierDTO> suppliers
 ) {}

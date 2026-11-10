@@ -407,8 +407,8 @@ de entrada.
 | DELETE | `/construction-invoices/{id}/documents/{documentId}` | `ADMIN` — remove **um** documento; devolve `204` |
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro (por omissão; `sort=invoiceDate,desc`, `createdAt,asc`… como na lista de obra) |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro (idem) |
-| GET | `/construction-invoices/search?q=&size=` | `ADMIN` — **pesquisa global** (o modal Ctrl+K do header): todas as obras, a empresa e a quarentena, notas de crédito incluídas, sem obras `is_test` nem eliminadas. Ver [[#Pesquisa global de faturas]] |
-| GET | `/construction-invoices/outstanding?page=&size=` | `ADMIN` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
+| GET | `/construction-invoices/search?q=&enterpriseId=&scope=&supplierNif=&paymentStatus=&size=` | `ADMIN`, `ACCOUNTANT` — **pesquisa global** (o modal Ctrl+K do header): todas as obras, a empresa e a quarentena, notas de crédito incluídas, sem obras `is_test` nem eliminadas. Ver [[#Pesquisa global de faturas]] |
+| GET | `/construction-invoices/outstanding?enterpriseId=&company=&supplierNif=&dueBucket=&approvedForPayment=&sentToAccountant=&page=&size=` | `ADMIN`, `ACCOUNTANT` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
@@ -1073,14 +1073,27 @@ scope, enterpriseId}] }`.
 saber em que obra ela está, ou se está na empresa ou na quarentena. Devolve uma **lista** (não um `Page`) de
 `InvoiceSearchResultDTO`, uma linha leve sem repartições, pagamentos nem miniaturas: `id, documentType,
 scope, enterpriseId, enterpriseName, budgetName, invoiceNumber, supplierName, supplierNif, invoiceDate,
-totalAmount`. `budgetName` é o lote da fatura **só quando a obra tem mais de um lote vivo** (senão `null`, e o modal mostra só a obra). O detalhe vem do `GET /{id}` quando se clica.
+totalAmount, paymentStatus`. `budgetName` é o lote da fatura **só quando a obra tem mais de um lote vivo** (senão `null`, e o modal mostra só a obra). O detalhe vem do `GET /{id}` quando se clica.
+
+**Filtros** (2026-11-10), todos opcionais e combináveis (`GlobalInvoiceSearchFilter`):
+
+| Parâmetro | Filtra |
+|---|---|
+| `enterpriseId` | só as faturas desta obra |
+| `scope` | `COMPANY` ou `UNIDENTIFIED` — é o "Despesas da empresa" / "Por identificar" do select de obra do modal, que é um só select com `enterpriseId` |
+| `supplierNif` | NIF exato |
+| `paymentStatus` | `PAID`, `PARTIAL`, `UNPAID`, ou `OUTSTANDING` (= por pagar + parcial). Com ele ativo **as notas de crédito saem**, como no `search` por obra, e o JPQL é o mesmo (pagamentos + NC ≥ total = paga) |
+
+**Com pelo menos um filtro, o `q` deixa de ser obrigatório**: a lista sai só dos filtros. O modal pede então
+`size=50` e, com 50 resultados, avisa "A mostrar as 50 mais recentes". Um valor de `scope` que não converte dá
+`400`, não `500` (`GlobalExceptionHandler`, `MethodArgumentTypeMismatchException`).
 
 - **Texto**: `lower() like` (distingue acentos, como as outras listas) sobre fornecedor, NIF, número,
   ATCUD, descrição, notas e nome do ficheiro. São os campos do `q` por obra e os do `q` da empresa e da
   quarentena juntos; essas duas listas não mudaram.
 - **Valor exato**: se o `q` se lê como valor (`1 234,56 €`, `1.234,56`, `1234,56`, `1234.56`), também
   casa `total_amount =` esse valor (`ConstructionInvoiceService.parseSearchAmount`).
-- **Mínimo de 2 caracteres**: abaixo disso devolve `[]` sem consultar a BD. `size` vai de 1 a 50 (20 por omissão).
+- **Mínimo de 2 caracteres**, sem filtros: abaixo disso devolve `[]` sem consultar a BD. `size` vai de 1 a 50 (20 por omissão).
 - Ordem: `invoice_date desc nulls last`, depois `created_at desc`.
 
 ### A pagar: por liquidar em todas as obras
@@ -1094,9 +1107,25 @@ pesquisa global também as atravessa, mas é uma lista curta, sem paginação). 
 | `invoices` | a página pedida (`ConstructionInvoiceResponseDTO`), **já ordenada** |
 | `enterpriseNames` | `{ enterpriseId: nome }` das obras que aparecem na página; uma despesa da empresa tem `enterpriseId` nulo e não entra |
 | `page`, `size`, `totalElements` | paginação (`size` 1–100, por omissão 20) |
-| `total` | Σ (líquido − pago) de **toda** a lista |
-| `overdueCount`, `overdueTotal` | as que já passaram o vencimento (vencer hoje ainda não é estar vencida) |
-| `withoutDueDateCount` | as que não têm vencimento |
+| `total` | Σ (líquido − pago) de **toda** a lista filtrada |
+| `overdueCount`, `overdueTotal` | as que já passaram o vencimento (vencer hoje ainda não é estar vencida), dentro do filtrado |
+| `withoutDueDateCount` | as que não têm vencimento, dentro do filtrado |
+| `suppliers` | `[{nif, name}]` — as opções do select de fornecedor: quem tem faturas por liquidar **dentro dos outros filtros**, calculado antes de filtrar por fornecedor (escolher um não esvazia a própria lista) |
+
+**Filtros** (2026-11-10, `OutstandingFilter`), todos opcionais; aplicam-se em memória **depois** de ordenar
+por urgência e **antes** dos totais e da paginação — os totais do topo são do filtrado e a ordem mantém-se:
+
+| Parâmetro | Filtra |
+|---|---|
+| `enterpriseId` | só esta obra |
+| `company=true` | só as despesas da empresa. Com `enterpriseId` ao mesmo tempo → `400` |
+| `supplierNif` | NIF exato |
+| `dueBucket` | `OVERDUE` (antes de hoje) · `WEEK` (hoje..hoje+7) · `MONTH` (hoje..hoje+30, **inclui** a semana) · `NONE` (sem vencimento). As faixas não incluem as vencidas. Valor inválido → `400` |
+| `approvedForPayment` | `true` só as aprovadas, `false` só as por aprovar |
+| `sentToAccountant` | `true` só as enviadas, `false` só as por enviar |
+
+O `findOutstandingExcludingScope` não mudou de assinatura: o `InvoiceDueNotifier` usa-o também. Na página,
+os filtros são só estado local (nem URL, nem `localStorage`).
 
 - **O que entra**: a mesma definição de "por liquidar" do filtro `outstanding=true` (pago + notas de
   crédito < total, ou ainda sem total), em `PROJECT` e `COMPANY`. **Ficam de fora** a quarentena

@@ -228,13 +228,21 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
      * {@link #search} (com o nome do ficheiro) e a descrição do
      * {@link #searchByScope}. O {@code amount} é o mesmo texto lido como valor
      * ("1 234,56 €"), quando se deixa ler; casa o total exato.
+     *
+     * Os filtros (2026-11-10) são todos opcionais e o texto também ({@code q}
+     * nulo = sem texto). O {@code paymentStatus} é o mesmo bloco do
+     * {@link #search}, mais {@code OUTSTANDING} (por pagar + parcial, ou ainda
+     * sem total); com ele ativo as notas de crédito saem. A obra vai com uma
+     * flag porque um UUID nulo não tem tipo para o Postgres; o âmbito vai como
+     * texto porque a coluna é um enum nomeado.
      */
     @Query("""
             select i from ConstructionInvoice i
             left join fetch i.enterprise e
             where (e is null or ((e.isTest is null or e.isTest = false)
                    and e.status <> com.management.managementapi.enterprises.model.enums.EnterPriseStatus.deleted))
-              and (lower(i.supplierName)  like lower(concat('%', :q, '%'))
+              and (:q is null
+                   or lower(i.supplierName)  like lower(concat('%', :q, '%'))
                    or lower(i.supplierNif)   like lower(concat('%', :q, '%'))
                    or lower(i.invoiceNumber) like lower(concat('%', :q, '%'))
                    or lower(i.invoiceAtcud)  like lower(concat('%', :q, '%'))
@@ -244,10 +252,40 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                               where d.invoice = i
                                 and lower(d.originalFilename) like lower(concat('%', :q, '%')))
                    or (:amount is not null and i.totalAmount = :amount))
+              and (:enterpriseFilter = false or e.id = :enterpriseId)
+              and (:scope is null or cast(i.scope as string) = :scope)
+              and (:supplierNif is null or i.supplierNif = :supplierNif)
+              and (:paymentStatus is null
+                   or (i.relatedInvoiceId is null and (
+                        (:paymentStatus = 'PAID' and i.totalAmount is not null
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                >= i.totalAmount)
+                     or (:paymentStatus = 'PARTIAL' and i.totalAmount is not null
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) > 0
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                < i.totalAmount)
+                     or (:paymentStatus = 'UNPAID'
+                             and coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0) = 0
+                             and (i.totalAmount is null
+                                  or coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                     < i.totalAmount))
+                     or (:paymentStatus = 'OUTSTANDING'
+                             and (i.totalAmount is null
+                                  or coalesce((select sum(ip.amount) from InvoicePayment ip where ip.invoice = i), 0)
+                                     + coalesce((select sum(cn.totalAmount) from ConstructionInvoice cn where cn.relatedInvoiceId = i.id), 0)
+                                     < i.totalAmount))
+                   )))
             order by i.invoiceDate desc nulls last, i.createdAt desc
             """)
     List<ConstructionInvoice> searchEverywhere(@Param("q") String q,
                                                @Param("amount") BigDecimal amount,
+                                               @Param("enterpriseFilter") boolean enterpriseFilter,
+                                               @Param("enterpriseId") UUID enterpriseId,
+                                               @Param("scope") String scope,
+                                               @Param("supplierNif") String supplierNif,
+                                               @Param("paymentStatus") String paymentStatus,
                                                Pageable pageable);
 
     /** Quantas faturas do projeto ainda estão por associar — alimenta o contador no orçamento. Com lote, só as desse lote. */

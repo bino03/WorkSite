@@ -1,7 +1,9 @@
 package com.management.managementapi.enterprises.service;
 
+import com.management.managementapi.enterprises.dto.invoice.request.OutstandingFilter;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.OutstandingSupplierDTO;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.model.Supplier;
@@ -92,7 +94,7 @@ class OutstandingByUrgencyTest {
     @Test
     @DisplayName("vencidas primeiro, depois as mais próximas, e as sem vencimento no fim, da mais antiga para a mais recente")
     void ordersByUrgency() {
-        OutstandingByUrgencyDTO result = service.outstandingByUrgency(0, 20, TODAY);
+        OutstandingByUrgencyDTO result = service.outstandingByUrgency(OutstandingFilter.NONE, 0, 20, TODAY);
 
         assertThat(result.invoices()).extracting(ConstructionInvoiceResponseDTO::id).containsExactly(
                 overdue.getId(), dueSoon.getId(), dueLaterByHand.getId(),
@@ -102,7 +104,7 @@ class OutstandingByUrgencyTest {
     @Test
     @DisplayName("o resumo é da lista inteira: total, vencidas e sem vencimento")
     void summaryCoversTheWholeList() {
-        OutstandingByUrgencyDTO result = service.outstandingByUrgency(0, 2, TODAY);
+        OutstandingByUrgencyDTO result = service.outstandingByUrgency(OutstandingFilter.NONE, 0, 2, TODAY);
 
         assertThat(result.totalElements()).isEqualTo(5);
         assertThat(result.total()).isEqualByComparingTo("3100");
@@ -114,7 +116,7 @@ class OutstandingByUrgencyTest {
     @Test
     @DisplayName("uma fatura que vence hoje ainda não está vencida")
     void dueTodayIsNotOverdue() {
-        OutstandingByUrgencyDTO result = service.outstandingByUrgency(0, 20, LocalDate.of(2026, 10, 1));
+        OutstandingByUrgencyDTO result = service.outstandingByUrgency(OutstandingFilter.NONE, 0, 20, LocalDate.of(2026, 10, 1));
 
         assertThat(result.overdueCount()).isZero();
     }
@@ -122,20 +124,110 @@ class OutstandingByUrgencyTest {
     @Test
     @DisplayName("a paginação corta a lista já ordenada, e uma página para lá do fim vem vazia")
     void paginatesTheOrderedList() {
-        OutstandingByUrgencyDTO second = service.outstandingByUrgency(1, 2, TODAY);
+        OutstandingByUrgencyDTO second = service.outstandingByUrgency(OutstandingFilter.NONE, 1, 2, TODAY);
 
         assertThat(second.invoices()).extracting(ConstructionInvoiceResponseDTO::id)
                 .containsExactly(dueLaterByHand.getId(), noDueDateOlder.getId());
-        assertThat(service.outstandingByUrgency(9, 2, TODAY).invoices()).isEmpty();
+        assertThat(service.outstandingByUrgency(OutstandingFilter.NONE, 9, 2, TODAY).invoices()).isEmpty();
     }
 
     @Test
     @DisplayName("traz o nome das obras da página; uma despesa da empresa não tem obra")
     void carriesEnterpriseNames() {
-        OutstandingByUrgencyDTO result = service.outstandingByUrgency(0, 20, TODAY);
+        OutstandingByUrgencyDTO result = service.outstandingByUrgency(OutstandingFilter.NONE, 0, 20, TODAY);
 
         assertThat(result.enterpriseNames()).containsOnlyKeys(petrus.getId());
         assertThat(result.enterpriseNames().get(petrus.getId())).isEqualTo("Vila Petrus");
+    }
+
+    @Test
+    @DisplayName("filtrado por fornecedor, os totais do topo são só dele")
+    void supplierFilterNarrowsTheTotals() {
+        OutstandingByUrgencyDTO result = service.outstandingByUrgency(
+                new OutstandingFilter(null, false, " " + NIF_30_DAYS + " ", null, null, null), 0, 20, TODAY);
+
+        assertThat(result.invoices()).extracting(ConstructionInvoiceResponseDTO::id)
+                .containsExactly(overdue.getId(), dueSoon.getId());
+        assertThat(result.totalElements()).isEqualTo(2);
+        assertThat(result.total()).isEqualByComparingTo("300");
+        assertThat(result.overdueCount()).isEqualTo(1);
+        assertThat(result.overdueTotal()).isEqualByComparingTo("100");
+        assertThat(result.withoutDueDateCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("as faixas de vencimento são cumulativas e não incluem as vencidas")
+    void dueBuckets() {
+        assertThat(idsFor(dueOnly(OutstandingFilter.DueBucket.OVERDUE))).containsExactly(overdue.getId());
+        // 15 out e 20 out: hoje + 7 = 20 out, inclusive.
+        assertThat(idsFor(dueOnly(OutstandingFilter.DueBucket.WEEK)))
+                .containsExactly(dueSoon.getId(), dueLaterByHand.getId());
+        assertThat(idsFor(dueOnly(OutstandingFilter.DueBucket.MONTH)))
+                .containsExactly(dueSoon.getId(), dueLaterByHand.getId());
+
+        OutstandingByUrgencyDTO none = service.outstandingByUrgency(dueOnly(OutstandingFilter.DueBucket.NONE), 0, 20, TODAY);
+        assertThat(none.invoices()).extracting(ConstructionInvoiceResponseDTO::id)
+                .containsExactly(noDueDateOlder.getId(), noDueDateNewer.getId());
+        assertThat(none.total()).isEqualByComparingTo("2400");
+        assertThat(none.overdueCount()).isZero();
+        assertThat(none.withoutDueDateCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("por obra fica só a dessa obra; \"despesas da empresa\" deixa as obras de fora")
+    void enterpriseAndCompanyFilters() {
+        overdue.setScope(ConstructionInvoice.Scope.PROJECT);
+
+        assertThat(idsFor(new OutstandingFilter(petrus.getId(), false, null, null, null, null)))
+                .containsExactly(overdue.getId());
+        assertThat(idsFor(new OutstandingFilter(null, true, null, null, null, null)))
+                .doesNotContain(overdue.getId())
+                .hasSize(4);
+    }
+
+    @Test
+    @DisplayName("aprovada para pagamento e enviada ao contabilista filtram nos dois sentidos")
+    void approvalAndAccountantFilters() {
+        dueSoon.setApprovedForPayment(true);
+        noDueDateOlder.setSentToAccountant(true);
+
+        assertThat(idsFor(new OutstandingFilter(null, false, null, null, true, null))).containsExactly(dueSoon.getId());
+        assertThat(idsFor(new OutstandingFilter(null, false, null, null, false, null))).hasSize(4);
+        assertThat(idsFor(new OutstandingFilter(null, false, null, null, null, true))).containsExactly(noDueDateOlder.getId());
+        assertThat(idsFor(new OutstandingFilter(null, false, null, null, false, false))).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("as opções de fornecedor são só quem tem faturas por liquidar, e não encolhem ao escolher um")
+    void suppliersAreOnlyThoseWithOutstandingInvoices() {
+        noDueDateOlder.setSupplierNif("509299466");
+        noDueDateOlder.setSupplierName("Paulo Dinis");
+
+        OutstandingByUrgencyDTO all = service.outstandingByUrgency(OutstandingFilter.NONE, 0, 20, TODAY);
+        // Brivel vem do catálogo; Paulo Dinis, sem ficha, do nome na fatura; as sem NIF não dão opção.
+        assertThat(all.suppliers()).containsExactly(
+                new OutstandingSupplierDTO(NIF_30_DAYS, "Brivel"),
+                new OutstandingSupplierDTO("509299466", "Paulo Dinis"));
+
+        OutstandingByUrgencyDTO oneSupplier = service.outstandingByUrgency(
+                new OutstandingFilter(null, false, "509299466", null, null, null), 0, 20, TODAY);
+        assertThat(oneSupplier.suppliers()).hasSize(2);
+        assertThat(oneSupplier.totalElements()).isEqualTo(1);
+
+        // Os outros filtros, esses, estreitam as opções: nas vencidas só há a da Brivel.
+        assertThat(service.outstandingByUrgency(dueOnly(OutstandingFilter.DueBucket.OVERDUE), 0, 20, TODAY).suppliers())
+                .extracting(OutstandingSupplierDTO::nif)
+                .containsExactly(NIF_30_DAYS);
+    }
+
+    private static OutstandingFilter dueOnly(OutstandingFilter.DueBucket bucket) {
+        return new OutstandingFilter(null, false, null, bucket, null, null);
+    }
+
+    private List<UUID> idsFor(OutstandingFilter filter) {
+        return service.outstandingByUrgency(filter, 0, 20, TODAY).invoices().stream()
+                .map(ConstructionInvoiceResponseDTO::id)
+                .toList();
     }
 
     private static ConstructionInvoice invoice(String total, String supplierNif, LocalDate invoiceDate) {

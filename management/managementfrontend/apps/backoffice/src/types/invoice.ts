@@ -707,7 +707,7 @@ export interface PendingInvoicesSummary {
 /**
  * `GET /construction-invoices/outstanding` — as faturas por liquidar de todas as
  * obras e da empresa, já pela ordem de urgência. Os números são da lista
- * inteira, não da página.
+ * filtrada inteira, não da página.
  */
 export interface OutstandingByUrgency {
   invoices: ConstructionInvoice[];
@@ -720,6 +720,30 @@ export interface OutstandingByUrgency {
   overdueCount: number;
   overdueTotal: number;
   withoutDueDateCount: number;
+  /**
+   * Os fornecedores com faturas por liquidar dentro dos outros filtros (todos
+   * menos o de fornecedor), por nome — as opções desse filtro. `name` é nulo
+   * quando nem o catálogo nem a fatura o têm.
+   */
+  suppliers: { nif: string; name: string | null }[];
+}
+
+/**
+ * As faixas de vencimento de "A pagar", cumulativas: `MONTH` (hoje a hoje+30)
+ * inclui `WEEK` (hoje a hoje+7); nenhuma inclui as vencidas.
+ */
+export type DueBucket = "OVERDUE" | "WEEK" | "MONTH" | "NONE";
+
+/** `enterpriseId` e `company` excluem-se — o backend devolve 400 aos dois juntos. */
+export interface OutstandingByUrgencyParams {
+  enterpriseId?: string;
+  company?: boolean;
+  supplierNif?: string;
+  dueBucket?: DueBucket;
+  approvedForPayment?: boolean;
+  sentToAccountant?: boolean;
+  page: number;
+  size: number;
 }
 
 export interface OutstandingInvoicesSummary {
@@ -746,4 +770,19 @@ export interface InvoiceSearchResult {
   supplierNif: string | null;
   invoiceDate: string | null;
   totalAmount: number | null;
+  paymentStatus: PaymentStatus;
+}
+
+/**
+ * Os filtros da pesquisa global (2026-11-10). Com qualquer um, `q` deixa de ser
+ * obrigatório. `OUTSTANDING` = por pagar + parcial; com o filtro de pagamento
+ * ativo, as notas de crédito saem.
+ */
+export interface GlobalInvoiceSearchParams {
+  q?: string;
+  enterpriseId?: string;
+  scope?: InvoiceScope;
+  supplierNif?: string;
+  paymentStatus?: PaymentStatus | "OUTSTANDING";
+  size?: number;
 }

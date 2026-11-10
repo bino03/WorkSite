@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.management.managementapi.dto.error.ErrorResponseDTO;
@@ -298,6 +299,25 @@ public class GlobalExceptionHandler {
             HttpStatus.BAD_REQUEST.value(),
             "Bad Request",
             "Parâmetro obrigatório em falta: '" + ex.getParameterName() + "'",
+            request.getRequestURI(),
+            ErrorCode.BAD_REQUEST.getCode()
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /** Um parâmetro que não se converte (um UUID mal escrito, um valor fora do enum) é erro do pedido, não 500. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponseDTO> handleArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request) {
+
+        log.warn("Invalid value for parameter '{}' on '{}'", ex.getName(), request.getRequestURI());
+
+        ErrorResponseDTO error = new ErrorResponseDTO(
+            HttpStatus.BAD_REQUEST.value(),
+            "Bad Request",
+            "Valor inválido no parâmetro '" + ex.getName() + "'",
             request.getRequestURI(),
             ErrorCode.BAD_REQUEST.getCode()
         );
