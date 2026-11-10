@@ -39,6 +39,8 @@ curl -s -m 3 http://localhost:8080/ping        # backend
 curl -s -m 3 -o /dev/null -w "%{http_code}" http://localhost:5173/   # Vite → 200
 ```
 
+O `/ping` responde com o corpo vazio — confirmar pelo código HTTP (`-w "%{http_code}"`), não pelo texto. Um "Port 8080 was already in use" quer dizer que já havia um backend: com o devtools, ele recarrega-se a cada compile e corre o código atual; confirmar por um comportamento novo da API em vez de o matar.
+
 Se o backend não estiver a correr, arrancá-lo em background e esperar por `Started ManagementApiApplication` no log — e ler o bloco do Flyway: **uma migração pendente aplica-se neste arranque** ([[operations]] → "Migração má" se não for essa a intenção).
 
 ---
@@ -123,7 +125,11 @@ Registar por item: ✅ / 🔴 com o que se esperava vs. o que apareceu, e o erro
 > usar `curl -i`/`curl -D-` a partir do Bash — várias rotas (logout, `permitAll`) toleram um `curl`
 > sem sessão nenhuma, e não é preciso passar pelo browser para isto.
 
-Chamadas longas (importações, exportações) ficam assíncronas em `window.__x = fetch(...)` e lêem-se depois; se a página recarregar entretanto, repetir — o backend é transacional, a chamada anterior ou entrou inteira ou não entrou.
+Chamadas longas (importações, exportações) ficam assíncronas em `window.__x = fetch(...)` e lêem-se depois; se a página recarregar entretanto, repetir — o backend é transacional, a chamada anterior ou entrou inteira ou não entrou. O mesmo para **várias chamadas em série**: o `javascript_tool` desiste ao fim de ~30 s ("did not respond in time") — lançar um `(async()=>{… window.__res = …})()` e ler `window.__res` depois.
+
+**Devolver contagens e estados, não objetos da API**: um resultado com URLs assinados, tokens ou dados pessoais volta `[BLOCKED: Cookie/query string data]`. Comparar no próprio script (UI vs API, filtro vs cálculo local) e devolver só `n=`, totais e `match=`.
+
+**390px**: o `resize_window` não faz nada com a janela maximizada. Em vez dele, um iframe da mesma origem: `document.body.innerHTML=''` e um `<iframe src="/backoffice/…" style="width:390px;height:844px;position:fixed;top:0;left:0">`; a sessão vai junta, e o DOM lê-se por `iframe.contentDocument`.
 
 `file_upload` **só aceita ficheiros de dentro do repo**: copiar o ficheiro para uma pasta temporária git-ignored (`notes/tmp-browser/`), carregar dali, apagar a pasta no Step 6.
 

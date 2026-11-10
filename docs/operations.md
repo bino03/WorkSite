@@ -326,9 +326,10 @@ deixa os perfis a apontar para utilizadores que podem não existir — ver "Repo
 
 ### Base de dados — `pg_dump`
 
-> ⚠️ **Por testar nesta máquina** (2026-09-19): não há `pg_dump` instalado e o instalador
-> (`winget install PostgreSQL.PostgreSQL.17`) precisa de aceitar um pedido de UAC, o que ficou
-> para depois. O comando abaixo é o padrão para Supabase; confirmar na primeira execução real e
+> ⚠️ **`pg_dump` por testar nesta máquina.** O PostgreSQL 17 já está instalado
+> (`C:\Program Files\PostgreSQL\17\bin`, fora do `PATH`), e o `psql` dali liga à BD real pelo
+> session pooler `5432` com o `DB_USER`/`DB_PASS` do `.env` (usado a 2026-11-10 para a auditoria
+> de NIFs). O comando abaixo é o padrão para Supabase; confirmar na primeira execução real e
 > apagar este aviso.
 
 Ligar pelo **session pooler (porta `5432`)** ou pela ligação direta — nunca pelo pooler em modo
