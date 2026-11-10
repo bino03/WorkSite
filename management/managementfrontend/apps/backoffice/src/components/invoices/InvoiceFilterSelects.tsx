@@ -3,7 +3,7 @@ import type { CSSProperties, FC } from "react";
 import { Select } from "antd";
 
 import { listSuppliers, listUnknownSupplierNifs } from "@/services/supplierService";
-import { listEnterprisesForBackup } from "@/services/enterpriseService";
+import { listEnterpriseOptions } from "@/services/enterpriseService";
 import type { Supplier, UnknownSupplierNif } from "@/types/supplier";
 import type { InvoiceScope } from "@/types/invoice";
 
@@ -119,7 +119,7 @@ export const WorkFilterSelect: FC<WorkFilterSelectProps> = ({ value, onChange, i
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    listEnterprisesForBackup()
+    listEnterpriseOptions()
       .then((all) => setWorks(all.filter((e) => !e.isTest).map((e) => ({ id: e.id, name: e.name }))))
       .catch(() => setWorks([]))
       .finally(() => setLoading(false));

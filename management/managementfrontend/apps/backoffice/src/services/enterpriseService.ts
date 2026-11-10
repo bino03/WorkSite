@@ -206,6 +206,19 @@ export async function searchEnterprises(q: string, size = 10): Promise<Enterpris
   );
 }
 
+/**
+ * Todas as obras (id, nome, se é de teste), numa chamada só, para os selects de
+ * filtro das listas de faturas. Sem o `size = 10` de `searchEnterprises`.
+ */
+export async function listEnterpriseOptions(): Promise<{ id: string; name: string; isTest: boolean }[]> {
+  const { data } = await api.get(`/enterprises`, { params: { page: 0, size: 1000 } });
+  return (data?.content ?? []).map((e: { id: string; name: string; isTest?: boolean }) => ({
+    id: e.id,
+    name: e.name,
+    isTest: e.isTest === true,
+  }));
+}
+
 export interface BackupEnterpriseOption {
   id: string;
   name: string;
