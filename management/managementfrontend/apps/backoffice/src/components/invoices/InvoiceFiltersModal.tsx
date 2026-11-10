@@ -4,9 +4,8 @@ import { Button, DatePicker, InputNumber, Modal, Radio, Select } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 
-import { listSuppliers, listUnknownSupplierNifs } from "@/services/supplierService";
 import { RubricSearchField } from "@/components/invoices/RubricSearchField";
-import type { Supplier, UnknownSupplierNif } from "@/types/supplier";
+import { loadSupplierOptions, type SupplierOption } from "@/components/invoices/InvoiceFilterSelects";
 import type { InvoiceFilters } from "@/types/invoice";
 import { ADVANCED_INVOICE_FILTER_KEYS } from "@/types/invoice";
 import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/invoices/invoiceFilters";
@@ -68,20 +67,6 @@ const DATE_PRESETS: { label: string; value: [Dayjs, Dayjs] }[] = [
   { label: "Ano passado", value: [dayjs().subtract(1, "year").startOf("year"), dayjs().subtract(1, "year").endOf("year")] },
 ];
 
-/** Uma entrada do Select de fornecedor: do catálogo, ou um NIF visto nas faturas sem ficha. */
-interface SupplierOption {
-  nif: string;
-  name: string | null;
-}
-
-function mergeSupplierOptions(catalog: Supplier[], unknown: UnknownSupplierNif[]): SupplierOption[] {
-  const known = new Set(catalog.map((s) => s.nif));
-  return [
-    ...catalog.map((s) => ({ nif: s.nif, name: s.name })),
-    ...unknown.filter((u) => !known.has(u.nif)).map((u) => ({ nif: u.nif, name: u.suggestedName })),
-  ];
-}
-
 /** Um NIF português: 9 dígitos. Escrito à mão, serve mesmo que não esteja em lista nenhuma. */
 const NIF_RE = /^\d{9}$/;
 
@@ -112,12 +97,9 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
     if (!open) return;
     setDraft(filters);
     // O catálogo é pequeno (dezenas); pede-se uma vez e filtra-se no cliente.
-    // Junta-se os NIFs vistos em faturas que ainda não têm ficha — um
-    // fornecedor novo aparece nas faturas semanas antes de alguém lhe dar nome,
-    // e sem isto o filtro não o encontrava (visto na verificação de 2026-09-21).
     setSuppliersLoading(true);
-    Promise.all([listSuppliers(), listUnknownSupplierNifs().catch(() => [] as UnknownSupplierNif[])])
-      .then(([catalog, unknown]) => setSuppliers(mergeSupplierOptions(catalog, unknown)))
+    loadSupplierOptions()
+      .then(setSuppliers)
       .catch(() => setSuppliers([]))
       .finally(() => setSuppliersLoading(false));
   }, [open, filters]);

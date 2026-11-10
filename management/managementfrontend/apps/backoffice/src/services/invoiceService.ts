@@ -14,6 +14,8 @@ import type {
   InvoicePreviewResult,
   InvoiceRegisterPayload,
   InvoiceSearchResult,
+  GlobalInvoiceSearchParams,
+  OutstandingByUrgencyParams,
   InvoiceSplitLine,
   InvoiceTransferPayload,
   InvoiceTransferResult,
@@ -192,10 +194,11 @@ export async function listUnidentifiedInvoices(
 
 /**
  * "A pagar": por liquidar em todas as obras e na empresa, vencidas primeiro e
- * sem prazo no fim. A ordem é do servidor — não há `sort`. Só `ADMIN`.
+ * sem prazo no fim. A ordem é do servidor — não há `sort`. Os totais da resposta
+ * são do filtrado. Só `ADMIN` e `ACCOUNTANT`.
  */
 export async function listOutstandingByUrgency(
-  params: { page: number; size: number }
+  params: OutstandingByUrgencyParams
 ): Promise<OutstandingByUrgency> {
   const response = await api.get(`/construction-invoices/outstanding`, { params });
   return response.data;
@@ -204,10 +207,11 @@ export async function listOutstandingByUrgency(
 /**
  * A pesquisa global (Ctrl+K): todas as obras, a empresa e a quarentena, as mais
  * recentes primeiro. Um texto que se lê como valor ("1 234,56") também casa o
- * total exato. Menos de 2 caracteres devolve `[]`. Só `ADMIN`.
+ * total exato. Sem filtros, menos de 2 caracteres devolve `[]`; com um filtro
+ * (obra, âmbito, fornecedor, pagamento) o texto é opcional. Só `ADMIN` e `ACCOUNTANT`.
  */
-export async function searchAllInvoices(q: string, size = 20): Promise<InvoiceSearchResult[]> {
-  const response = await api.get(`/construction-invoices/search`, { params: { q, size } });
+export async function searchAllInvoices(params: GlobalInvoiceSearchParams): Promise<InvoiceSearchResult[]> {
+  const response = await api.get(`/construction-invoices/search`, { params });
   return response.data;
 }
 

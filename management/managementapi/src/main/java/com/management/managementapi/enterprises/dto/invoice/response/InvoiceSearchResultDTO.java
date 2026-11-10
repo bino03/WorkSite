@@ -12,6 +12,7 @@ import java.util.UUID;
  *
  * @param enterpriseName nulo nas despesas da empresa e na quarentena
  * @param budgetName o lote da fatura, só quando a obra tem mais de um lote vivo (senão nulo: não distingue nada)
+ * @param paymentStatus {@code PAID} / {@code PARTIAL} / {@code UNPAID}, a mesma conta do detalhe da fatura
  */
 public record InvoiceSearchResultDTO(
         UUID id,
@@ -24,5 +25,6 @@ public record InvoiceSearchResultDTO(
         String supplierName,
         String supplierNif,
         LocalDate invoiceDate,
-        BigDecimal totalAmount
+        BigDecimal totalAmount,
+        String paymentStatus
 ) {}

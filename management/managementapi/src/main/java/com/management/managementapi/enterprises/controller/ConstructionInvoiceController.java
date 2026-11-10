@@ -15,7 +15,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.GlobalInvoiceSearchFilter;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSearchFilter;
+import com.management.managementapi.enterprises.dto.invoice.request.OutstandingFilter;
 import com.management.managementapi.enterprises.dto.invoice.request.ExpensesImportAnswersDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ExpensesImportResultDTO;
 import com.management.managementapi.enterprises.service.DespesasExcelImportService;
@@ -283,15 +285,22 @@ public class ConstructionInvoiceController {
     /**
      * A pesquisa global (o modal Ctrl+K do header): todas as obras, a empresa
      * e a quarentena. Só ADMIN e ACCOUNTANT, como as outras listas que atravessam obras.
-     * Menos de 2 caracteres devolve a lista vazia.
+     * Sem filtro nenhum, menos de 2 caracteres devolve a lista vazia; com um
+     * filtro, o texto é opcional.
      */
     @GetMapping("/search")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public List<InvoiceSearchResultDTO> searchEverywhere(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID enterpriseId,
+            @RequestParam(required = false) ConstructionInvoice.Scope scope,
+            @RequestParam(required = false) String supplierNif,
+            @RequestParam(required = false) String paymentStatus,
             @RequestParam(defaultValue = "20") int size) {
         // Limite aqui e não por anotação: o controlador não é @Validated.
-        return service.searchEverywhere(q, Math.min(Math.max(size, 1), 50));
+        return service.searchEverywhere(
+                new GlobalInvoiceSearchFilter(q, enterpriseId, scope, supplierNif, paymentStatus),
+                Math.min(Math.max(size, 1), 50));
     }
 
     @GetMapping("/enterprise/{enterpriseId}")
@@ -446,17 +455,29 @@ public class ConstructionInvoiceController {
     /**
      * O que pagar primeiro: as faturas por liquidar de todas as obras e da
      * empresa, por ordem de vencimento. Só ADMIN e ACCOUNTANT, como as outras listas que
-     * atravessam obras.
+     * atravessam obras. Os filtros são todos opcionais e os totais da resposta
+     * são do filtrado; {@code enterpriseId} e {@code company=true} excluem-se.
      */
     @GetMapping("/outstanding")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<OutstandingByUrgencyDTO> outstandingByUrgency(
+            @RequestParam(required = false) UUID enterpriseId,
+            @RequestParam(defaultValue = "false") boolean company,
+            @RequestParam(required = false) String supplierNif,
+            @RequestParam(required = false) OutstandingFilter.DueBucket dueBucket,
+            @RequestParam(required = false) Boolean approvedForPayment,
+            @RequestParam(required = false) Boolean sentToAccountant,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        if (enterpriseId != null && company) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "enterpriseId e company não se combinam");
+        }
+        OutstandingFilter filter = new OutstandingFilter(
+                enterpriseId, company, supplierNif, dueBucket, approvedForPayment, sentToAccountant);
         // Limites aqui e não por anotação: o controlador não é @Validated, e um
         // @Max num @RequestParam seria ignorado em silêncio.
         return ResponseEntity.ok(service.outstandingByUrgency(
-                Math.max(page, 0), Math.min(Math.max(size, 1), 100), LocalDate.now()));
+                filter, Math.max(page, 0), Math.min(Math.max(size, 1), 100), LocalDate.now()));
     }
 
     @GetMapping("/unidentified/outstanding-summary")

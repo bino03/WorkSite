@@ -7,7 +7,9 @@ import com.management.managementapi.config.CacheConfig;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.ConstructionInvoiceUpsertDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteCreateDTO;
+import com.management.managementapi.enterprises.dto.invoice.request.GlobalInvoiceSearchFilter;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSearchFilter;
+import com.management.managementapi.enterprises.dto.invoice.request.OutstandingFilter;
 import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteExpenseLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
@@ -26,6 +28,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.InvoicePrev
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceSearchResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.OutstandingSupplierDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
@@ -741,21 +744,36 @@ public class ConstructionInvoiceService {
                 false));
     }
 
-    /** Abaixo disto a pesquisa global devolveria meia base de dados a cada tecla. */
+    /** Abaixo disto, e sem filtro nenhum, a pesquisa global devolveria meia base de dados a cada tecla. */
     static final int GLOBAL_SEARCH_MIN_LENGTH = 2;
 
     /**
      * A pesquisa global de faturas — "onde está aquela fatura?" sem saber em
      * que obra, ou se na empresa ou na quarentena. As mais recentes primeiro.
+     * Com um filtro (obra, âmbito, fornecedor, pagamento) o texto é opcional;
+     * sem filtro, abaixo de {@link #GLOBAL_SEARCH_MIN_LENGTH} não pesquisa.
      */
     @Transactional(readOnly = true)
-    public List<InvoiceSearchResultDTO> searchEverywhere(String q, int limit) {
-        String text = isBlank(q) ? "" : q.trim();
-        if (text.length() < GLOBAL_SEARCH_MIN_LENGTH) {
+    public List<InvoiceSearchResultDTO> searchEverywhere(GlobalInvoiceSearchFilter filter, int limit) {
+        String text = isBlank(filter.q()) ? "" : filter.q().trim();
+        boolean hasFilter = filter.hasFilter();
+        if (!hasFilter && text.length() < GLOBAL_SEARCH_MIN_LENGTH) {
             return List.of();
         }
-        List<ConstructionInvoice> found =
-                repository.searchEverywhere(text, parseSearchAmount(text), PageRequest.of(0, limit));
+        List<ConstructionInvoice> found = repository.searchEverywhere(
+                text.isEmpty() ? null : text,
+                text.isEmpty() ? null : parseSearchAmount(text),
+                filter.enterpriseId() != null,
+                filter.enterpriseId() != null ? filter.enterpriseId() : new UUID(0L, 0L),
+                filter.scope() == null ? null : filter.scope().name(),
+                isBlank(filter.supplierNif()) ? null : filter.supplierNif().trim(),
+                isBlank(filter.paymentStatus()) ? null : filter.paymentStatus().trim().toUpperCase(),
+                PageRequest.of(0, limit));
+        List<UUID> ids = found.stream().map(ConstructionInvoice::getId).toList();
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments = ids.isEmpty()
+                ? Map.of()
+                : paymentService.paymentsForInvoices(ids, false);
+        Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
         // O lote só vale a pena mostrar numa obra com mais de um: com um só, "Obra · Orçamento" é ruído.
         List<UUID> enterpriseIds = found.stream()
                 .map(ConstructionInvoice::getEnterprise)
@@ -783,8 +801,27 @@ public class ConstructionInvoiceService {
                         invoice.getSupplierName(),
                         invoice.getSupplierNif(),
                         invoice.getInvoiceDate(),
-                        invoice.getTotalAmount()))
+                        invoice.getTotalAmount(),
+                        paymentStatusOf(invoice,
+                                creditNotes.getOrDefault(invoice.getId(), List.of()),
+                                payments.getOrDefault(invoice.getId(), List.of()))))
                 .toList();
+    }
+
+    /** O estado de pagamento como o {@link #toResponseDTO} o calcula: pago vs. total − notas de crédito. */
+    private static String paymentStatusOf(ConstructionInvoice invoice, List<ConstructionInvoice> creditNotes,
+                                          List<InvoicePaymentSummaryDTO> payments) {
+        BigDecimal creditNoteTotal = creditNotes.stream()
+                .map(ConstructionInvoice::getTotalAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal netAmount = invoice.getTotalAmount() == null
+                ? null
+                : invoice.getTotalAmount().subtract(creditNoteTotal);
+        BigDecimal paidAmount = payments.stream()
+                .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return PaymentService.deriveStatus(netAmount, paidAmount).name();
     }
 
     private static final Pattern AMOUNT_WITH_THOUSANDS = Pattern.compile("\\d{1,3}(\\.\\d{3})+(,\\d{1,2})?");
@@ -1143,9 +1180,12 @@ public class ConstructionInvoiceService {
      * fornecedor ou escrito à mão) e não há coluna por onde a base de dados o
      * ordene. Só a página pedida passa por {@link #toResponseDTO}, que é a parte
      * cara (miniaturas assinadas).
+     *
+     * Os filtros aplicam-se a seguir à ordenação e antes dos totais e da
+     * paginação: os números do topo são do filtrado, e a ordem de urgência fica.
      */
     @Transactional(readOnly = true)
-    public OutstandingByUrgencyDTO outstandingByUrgency(int page, int size, LocalDate today) {
+    public OutstandingByUrgencyDTO outstandingByUrgency(OutstandingFilter filter, int page, int size, LocalDate today) {
         List<ConstructionInvoice> outstanding =
                 repository.findOutstandingExcludingScope(ConstructionInvoice.Scope.UNIDENTIFIED);
 
@@ -1168,7 +1208,19 @@ public class ConstructionInvoiceService {
                         .thenComparing(ConstructionInvoice::getInvoiceDate,
                                 Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(ConstructionInvoice::getId))
+                .filter(invoice -> matchesOutstandingFilter(invoice, dueDates.get(invoice.getId()), filter, today))
                 .toList();
+
+        // As opções do filtro de fornecedor saem daqui, antes de filtrar por ele:
+        // só quem tem alguma coisa por liquidar (dentro dos outros filtros), e
+        // escolher um fornecedor não esvazia a própria lista.
+        List<OutstandingSupplierDTO> suppliers = outstandingSuppliers(ordered, suppliersByNif);
+        if (!isBlank(filter.supplierNif())) {
+            String nif = filter.supplierNif().trim();
+            ordered = ordered.stream()
+                    .filter(invoice -> invoice.getSupplierNif() != null && nif.equals(invoice.getSupplierNif().trim()))
+                    .toList();
+        }
 
         List<ConstructionInvoice> overdue = ordered.stream()
                 .filter(invoice -> {
@@ -1213,7 +1265,51 @@ public class ConstructionInvoiceService {
                 summarizeOutstanding(ordered).total(),
                 overdue.size(),
                 summarizeOutstanding(overdue).total(),
-                withoutDueDate);
+                withoutDueDate,
+                suppliers);
+    }
+
+    /**
+     * Os fornecedores (por NIF) das faturas dadas, por nome. O nome é o do
+     * catálogo; sem ficha, o que vem na fatura; sem nenhum, só o NIF. As
+     * faturas sem NIF não dão opção — não há por onde filtrar.
+     */
+    private static List<OutstandingSupplierDTO> outstandingSuppliers(List<ConstructionInvoice> invoices,
+                                                                     Map<String, Supplier> suppliersByNif) {
+        Map<String, String> namesByNif = new HashMap<>();
+        for (ConstructionInvoice invoice : invoices) {
+            if (isBlank(invoice.getSupplierNif())) {
+                continue;
+            }
+            String nif = invoice.getSupplierNif().trim();
+            Supplier catalog = suppliersByNif.get(nif);
+            String name = catalog != null && !isBlank(catalog.getName()) ? catalog.getName() : invoice.getSupplierName();
+            namesByNif.merge(nif, isBlank(name) ? null : name, (kept, next) -> kept != null ? kept : next);
+        }
+        return namesByNif.entrySet().stream()
+                .map(entry -> new OutstandingSupplierDTO(entry.getKey(), entry.getValue()))
+                .sorted(Comparator.comparing((OutstandingSupplierDTO s) -> s.name() == null ? s.nif() : s.name(),
+                        String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /** Todos os filtros menos o de fornecedor, que o chamador aplica à parte. */
+    private static boolean matchesOutstandingFilter(ConstructionInvoice invoice, LocalDate dueDate,
+                                                    OutstandingFilter filter, LocalDate today) {
+        if (filter.enterpriseId() != null
+                && (invoice.getEnterprise() == null || !filter.enterpriseId().equals(invoice.getEnterprise().getId()))) {
+            return false;
+        }
+        if (filter.company() && invoice.getScope() != ConstructionInvoice.Scope.COMPANY) {
+            return false;
+        }
+        if (filter.dueBucket() != null && !filter.dueBucket().matches(dueDate, today)) {
+            return false;
+        }
+        if (filter.approvedForPayment() != null && filter.approvedForPayment() != invoice.isApprovedForPayment()) {
+            return false;
+        }
+        return filter.sentToAccountant() == null || filter.sentToAccountant() == invoice.isSentToAccountant();
     }
 
     private OutstandingInvoicesSummaryDTO summarizeOutstanding(List<ConstructionInvoice> invoices) {

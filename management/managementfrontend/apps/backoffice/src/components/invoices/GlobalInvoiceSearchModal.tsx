@@ -1,17 +1,53 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FC, KeyboardEvent } from "react";
-import { Empty, Input, Modal, Spin } from "antd";
+import { Empty, Input, Modal, Select, Spin } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 import { searchAllInvoices } from "@/services/invoiceService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
-import type { InvoiceSearchResult } from "@/types/invoice";
+import {
+  ALL_WORKS,
+  SupplierFilterSelect,
+  WorkFilterSelect,
+  type WorkFilter,
+} from "@/components/invoices/InvoiceFilterSelects";
+import type { GlobalInvoiceSearchParams, InvoiceSearchResult } from "@/types/invoice";
 
-/** O mesmo mínimo do backend (`GLOBAL_SEARCH_MIN_LENGTH`): abaixo disto nem se pede. */
+/** O mesmo mínimo do backend (`GLOBAL_SEARCH_MIN_LENGTH`): sem filtros, abaixo disto nem se pede. */
 const MIN_LENGTH = 2;
+/** Com texto chega a lista curta; só com filtros pede-se o máximo do backend. */
+const TEXT_LIMIT = 20;
+const FILTER_ONLY_LIMIT = 50;
+
+type PaymentFilter = NonNullable<GlobalInvoiceSearchParams["paymentStatus"]>;
+
+const PAYMENT_OPTIONS: { value: PaymentFilter; label: string }[] = [
+  { value: "OUTSTANDING", label: "Por liquidar" },
+  { value: "UNPAID", label: "Nada pago" },
+  { value: "PARTIAL", label: "Parcialmente pagas" },
+  { value: "PAID", label: "Pagas" },
+];
+
+interface Filters {
+  work: WorkFilter;
+  supplierNif: string | null;
+  paymentStatus: PaymentFilter | null;
+}
+
+const NO_FILTERS: Filters = { work: ALL_WORKS, supplierNif: null, paymentStatus: null };
+
+function hasAnyFilter(filters: Filters): boolean {
+  return (
+    filters.work.enterpriseId !== null ||
+    filters.work.scope !== null ||
+    filters.supplierNif !== null ||
+    filters.paymentStatus !== null
+  );
+}
 
 interface Props {
   open: boolean;
@@ -29,34 +65,47 @@ function whereLabel(row: InvoiceSearchResult): string {
 /**
  * A pesquisa global de faturas, aberta pelo botão do header ou por Ctrl+K:
  * "onde está aquela fatura?" sem saber em que obra, ou se na empresa ou na
- * quarentena. Um campo e uma lista curta; clicar abre o `InvoiceDetailDrawer`
- * por cima, e fechá-lo volta aos resultados.
+ * quarentena. Um campo, três filtros pequenos por baixo (obra, fornecedor,
+ * pagamento — 2026-11-10) e uma lista curta; clicar abre o `InvoiceDetailDrawer`
+ * por cima, e fechá-lo volta aos resultados. Com um filtro, o texto é opcional.
  *
  * Modal e não página, de propósito: é um utilitário de passagem, como o
  * `BudgetItemPickerModal`. Só `ADMIN` e `ACCOUNTANT` — o gate real é o `@PreAuthorize`.
  */
 export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [results, setResults] = useState<InvoiceSearchResult[]>([]);
+  const [limitUsed, setLimitUsed] = useState(TEXT_LIMIT);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [detailId, setDetailId] = useState<string | null>(null);
   /** Só a pesquisa mais recente escreve no estado — ver `RubricSearchField`. */
   const requestId = useRef(0);
 
-  const run = useCallback(async (text: string) => {
+  const run = useCallback(async (text: string, current: Filters) => {
     const mine = ++requestId.current;
-    if (text.length < MIN_LENGTH) {
+    if (!hasAnyFilter(current) && text.length < MIN_LENGTH) {
       setResults([]);
       setLoading(false);
       return;
     }
+    const size = text ? TEXT_LIMIT : FILTER_ONLY_LIMIT;
     setLoading(true);
     try {
-      const found = await searchAllInvoices(text);
+      const found = await searchAllInvoices({
+        q: text || undefined,
+        enterpriseId: current.work.enterpriseId ?? undefined,
+        scope: current.work.scope ?? undefined,
+        supplierNif: current.supplierNif ?? undefined,
+        paymentStatus: current.paymentStatus ?? undefined,
+        size,
+      });
       if (mine === requestId.current) {
         setResults(found);
+        setLimitUsed(size);
         setActiveIndex(0);
       }
     } catch (error) {
@@ -70,14 +119,15 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void run(query.trim()), 250);
+    const timer = window.setTimeout(() => void run(query.trim(), filters), 250);
     return () => window.clearTimeout(timer);
-  }, [query, run]);
+  }, [query, filters, run]);
 
   // Cada abertura começa do zero: o Ctrl+K é para uma pesquisa nova.
   useEffect(() => {
     if (open) {
       setQuery("");
+      setFilters(NO_FILTERS);
       setResults([]);
     }
   }, [open]);
@@ -96,7 +146,8 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
     }
   };
 
-  const tooShort = query.trim().length < MIN_LENGTH;
+  const idle = !hasAnyFilter(filters) && query.trim().length < MIN_LENGTH;
+  const selectWidth = isMobile ? "100%" : 180;
 
   return (
     <>
@@ -120,15 +171,40 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
           onKeyDown={handleKeyDown}
         />
 
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6.8 }}>
+          <WorkFilterSelect
+            includeUnidentified
+            value={filters.work}
+            onChange={(work) => setFilters((prev) => ({ ...prev, work }))}
+            style={{ width: selectWidth }}
+          />
+          <SupplierFilterSelect
+            value={filters.supplierNif}
+            onChange={(supplierNif) => setFilters((prev) => ({ ...prev, supplierNif }))}
+            style={{ width: selectWidth }}
+          />
+          <Select
+            allowClear
+            size="small"
+            placeholder="Pagamento"
+            value={filters.paymentStatus ?? undefined}
+            onChange={(paymentStatus?: PaymentFilter) =>
+              setFilters((prev) => ({ ...prev, paymentStatus: paymentStatus ?? null }))
+            }
+            options={PAYMENT_OPTIONS}
+            style={{ width: isMobile ? "100%" : 160 }}
+          />
+        </div>
+
         <Spin spinning={loading}>
-          <div style={{ maxHeight: isMobile ? "calc(100dvh - 180px)" : "56vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-            {tooShort && (
+          <div style={{ maxHeight: isMobile ? "calc(100dvh - 240px)" : "52vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+            {idle && (
               <div style={{ fontSize: 12, opacity: 0.55, padding: "4px 2px" }}>
                 Procura em todas as obras, nas despesas da empresa e em "Por identificar".
               </div>
             )}
 
-            {!tooShort && !loading && results.length === 0 && (
+            {!idle && !loading && results.length === 0 && (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma fatura encontrada" />
             )}
 
@@ -160,9 +236,23 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, opacity: 0.7, marginTop: 2 }}>
-                  {row.documentType === "CREDIT_NOTE" && (
+                  {row.documentType === "CREDIT_NOTE" ? (
                     <span className="ind-tag ind-tag-outline" style={{ fontSize: 10 }}>
                       Nota de crédito
+                    </span>
+                  ) : (
+                    // As mesmas cores do selo no detalhe da fatura.
+                    <span
+                      className={`ind-tag ${
+                        row.paymentStatus === "PAID"
+                          ? "ind-tag-accent-2"
+                          : row.paymentStatus === "PARTIAL"
+                            ? "ind-tag-accent"
+                            : "ind-tag-outline"
+                      }`}
+                      style={{ fontSize: 10 }}
+                    >
+                      {t(`invoices.payment.status.${row.paymentStatus}`)}
                     </span>
                   )}
                   <span>{whereLabel(row)}</span>
@@ -171,6 +261,12 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
                 </div>
               </button>
             ))}
+
+            {!loading && results.length >= limitUsed && (
+              <div style={{ fontSize: 12, opacity: 0.55, padding: "4px 2px" }}>
+                A mostrar as {limitUsed} mais recentes — afine a pesquisa para ver outras.
+              </div>
+            )}
           </div>
         </Spin>
       </Modal>
@@ -180,7 +276,7 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
         open={detailId !== null}
         onClose={() => setDetailId(null)}
         // Apagada ou transferida, a fatura muda de sítio ou desaparece: repete-se a pesquisa.
-        onChanged={() => void run(query.trim())}
+        onChanged={() => void run(query.trim(), filters)}
         // Classificar é dentro da obra; aqui só se encontra.
         onAllocate={() => undefined}
       />
