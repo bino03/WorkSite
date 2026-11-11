@@ -3502,11 +3502,17 @@
       "fieldReason": "Reason",
       "enterprisePlaceholder": "Type to search for the project…",
       "lotPlaceholder": "Pick a lot to classify right after…",
+      "fieldTargetRubric": "Budget item (optional)",
+      "clearRubric": "Remove",
+      "successWithRubric": "Invoice transferred and assigned to the budget item.",
+      "allocateFailed": "The invoice was transferred but not assigned to the lot/budget item. Assign it on the destination project.",
+      "warningOutsideProject": "The invoice leaves this list and moves to the chosen destination. Linked credit notes are transferred along with it.",
       "scope": {
         "PROJECT": "Another project",
         "COMPANY": "Company expenses",
         "UNIDENTIFIED": "Unidentified",
-        "RUBRIC": "Another item on this project"
+        "RUBRIC": "Another item on this project",
+        "PROJECT_ANY": "A project"
       }
     },
     "payment": {

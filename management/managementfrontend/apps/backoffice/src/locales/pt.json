@@ -3533,11 +3533,17 @@
       "fieldReason": "Razão",
       "enterprisePlaceholder": "Escrever para procurar a obra…",
       "lotPlaceholder": "Escolher um lote para classificar logo a seguir…",
+      "fieldTargetRubric": "Rubrica (opcional)",
+      "clearRubric": "Tirar",
+      "successWithRubric": "Fatura transferida e associada à rubrica.",
+      "allocateFailed": "A fatura foi transferida, mas não ficou associada ao lote/rubrica. Associa-a na obra de destino.",
+      "warningOutsideProject": "A fatura sai desta lista e passa para o destino escolhido. As notas de crédito ligadas são transferidas junto.",
       "scope": {
         "PROJECT": "Outra obra",
         "COMPANY": "Despesas da empresa",
         "UNIDENTIFIED": "Por identificar",
-        "RUBRIC": "Outra rubrica desta obra"
+        "RUBRIC": "Outra rubrica desta obra",
+        "PROJECT_ANY": "Uma obra"
       }
     },
     "payment": {

@@ -20,8 +20,6 @@ const { Text } = Typography;
 interface Props {
   open: boolean;
   invoice: ConstructionInvoice | null;
-  /** Fluxo da quarentena: "atribuir uma obra" é transferir, com o âmbito fixo em `PROJECT`. */
-  lockToProject?: boolean;
   onClose: () => void;
   /**
    * Depois de transferir — o pai fecha o detalhe, recarrega, e trata do
@@ -51,14 +49,15 @@ const SCOPE_LABEL: Record<InvoiceScope, string> = {
  * pelo `transfer` do backend, por isso não pede razão nem apaga as despesas
  * das NC ligadas. Só faz sentido numa fatura de obra — na quarentena e na
  * empresa a opção nem aparece.
+ *
+ * É o mesmo modal em todo o lado (pedido de 2026-11-11): a quarentena deixou de
+ * o fixar em "obra" e passa a poder mandar a fatura para a empresa. O âmbito de
+ * origem some da lista quando não é `PROJECT` — "por identificar → por
+ * identificar" só daria `INVOICE_032` depois de submeter. Com destino numa obra
+ * pode escolher-se já, opcionalmente, o lote e a rubrica: a fatura fica
+ * associada logo a seguir à transferência, sem passar pelo picker.
  */
-export const TransferInvoiceDrawer: FC<Props> = ({
-  open,
-  invoice,
-  lockToProject = false,
-  onClose,
-  onTransferred,
-}) => {
+export const TransferInvoiceDrawer: FC<Props> = ({ open, invoice, onClose, onTransferred }) => {
   const { t } = useTranslation();
   const [options, setOptions] = useState<EnterpriseOption[]>([]);
   const [searching, setSearching] = useState(false);
@@ -68,9 +67,11 @@ export const TransferInvoiceDrawer: FC<Props> = ({
   const [moving, setMoving] = useState(false);
   /** O lote do destino, só quando este tem mais do que um — atalho de UX (ver `onTransferred`). */
   const [targetLotId, setTargetLotId] = useState<string | null>(null);
+  /** Rubrica opcional na obra de destino — associa a fatura logo depois de a transferir. */
+  const [targetRubric, setTargetRubric] = useState<BudgetItemSearchResult | null>(null);
 
-  const canMoveWithinProject =
-    !lockToProject && invoice?.scope === "PROJECT" && !!invoice.enterpriseId;
+  const sourceScope = invoice?.scope ?? "PROJECT";
+  const canMoveWithinProject = sourceScope === "PROJECT" && !!invoice?.enterpriseId;
 
   const {
     control,
@@ -91,7 +92,15 @@ export const TransferInvoiceDrawer: FC<Props> = ({
   // O lote só faz sentido para o empreendimento escolhido — muda de obra, esquece o lote.
   useEffect(() => {
     setTargetLotId(null);
+    setTargetRubric(null);
   }, [targetEnterpriseId]);
+
+  // A rubrica tem de ser do lote escolhido — muda o lote, esquece a rubrica se não bater.
+  useEffect(() => {
+    setTargetRubric((current) =>
+      current && targetLotId && current.budgetId !== targetLotId ? null : current
+    );
+  }, [targetLotId]);
 
   useEffect(() => {
     if (!open) return;
@@ -99,6 +108,7 @@ export const TransferInvoiceDrawer: FC<Props> = ({
     setToRubric(false);
     setRubric(null);
     setTargetLotId(null);
+    setTargetRubric(null);
     reset({ targetScope: "PROJECT", targetEnterpriseId: null, reason: "" });
   }, [open, reset]);
 
@@ -144,13 +154,31 @@ export const TransferInvoiceDrawer: FC<Props> = ({
           values.targetScope === "PROJECT" ? values.targetEnterpriseId : null,
         reason: values.reason.trim(),
       });
-      if (values.targetScope === "PROJECT" && targetLotId) {
-        await setInvoiceBudget(result.invoice.id, targetLotId);
+      const toProject = values.targetScope === "PROJECT";
+      // Numa obra de vários lotes o backend recusa a rubrica sem lote
+      // (`INVOICE_BUDGET_REQUIRED`): sem lote escolhido, usa-se o da rubrica.
+      const lotId = toProject ? (targetLotId ?? targetRubric?.budgetId ?? null) : null;
+      let allocated = false;
+      try {
+        if (lotId) await setInvoiceBudget(result.invoice.id, lotId);
+        if (toProject && targetRubric) {
+          await splitInvoice(result.invoice.id, [
+            { budgetItemId: targetRubric.id, amount: result.invoice.totalAmount },
+          ]);
+          allocated = true;
+        }
+        notificationService.success(
+          t(allocated ? "invoices.transfer.successWithRubric" : "invoices.transfer.success")
+        );
+      } catch (error) {
+        // A transferência já está feita — só a associação falhou. Avisa e segue,
+        // para o pai recarregar e a pessoa associar à mão.
+        notificationService.warning(t("invoices.transfer.allocateFailed"));
+        ErrorHandler.handle(error);
       }
-      notificationService.success(t("invoices.transfer.success"));
       // Se `suggestIncident`, o pai (`InvoiceDetailDrawer` → página) abre o
-      // `IncidentDrawer` já com esta fatura.
-      onTransferred(result, values.targetScope === "PROJECT" ? targetLotId : null);
+      // `IncidentDrawer` já com esta fatura. Já associada, não há picker a abrir.
+      onTransferred(result, toProject && !allocated ? lotId : null);
       onClose();
     } catch (error) {
       ErrorHandler.handle(error);
@@ -192,11 +220,16 @@ export const TransferInvoiceDrawer: FC<Props> = ({
         <Alert
           type="warning"
           showIcon
-          message={t(toRubric ? "invoices.transfer.rubricWarning" : "invoices.transfer.warning")}
+          message={t(
+            toRubric
+              ? "invoices.transfer.rubricWarning"
+              : sourceScope === "PROJECT"
+                ? "invoices.transfer.warning"
+                : "invoices.transfer.warningOutsideProject"
+          )}
         />
 
-        {!lockToProject && (
-          <div>
+        <div>
             <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldScope")}</label>
             <Controller
               name="targetScope"
@@ -218,14 +251,20 @@ export const TransferInvoiceDrawer: FC<Props> = ({
                   {canMoveWithinProject && (
                     <Radio value="RUBRIC">{t("invoices.transfer.scope.RUBRIC")}</Radio>
                   )}
-                  <Radio value="PROJECT">{t(SCOPE_LABEL.PROJECT)}</Radio>
-                  <Radio value="COMPANY">{t(SCOPE_LABEL.COMPANY)}</Radio>
-                  <Radio value="UNIDENTIFIED">{t(SCOPE_LABEL.UNIDENTIFIED)}</Radio>
+                  {/* Vinda de fora de uma obra, "Outra obra" não faz sentido — é "Uma obra". */}
+                  <Radio value="PROJECT">
+                    {t(sourceScope === "PROJECT" ? SCOPE_LABEL.PROJECT : "invoices.transfer.scope.PROJECT_ANY")}
+                  </Radio>
+                  {sourceScope !== "COMPANY" && (
+                    <Radio value="COMPANY">{t(SCOPE_LABEL.COMPANY)}</Radio>
+                  )}
+                  {sourceScope !== "UNIDENTIFIED" && (
+                    <Radio value="UNIDENTIFIED">{t(SCOPE_LABEL.UNIDENTIFIED)}</Radio>
+                  )}
                 </Radio.Group>
               )}
             />
           </div>
-        )}
 
         {toRubric && invoice?.enterpriseId && (
           <div>
@@ -277,6 +316,36 @@ export const TransferInvoiceDrawer: FC<Props> = ({
               style={{ width: "100%", marginTop: 4 }}
               options={targetLots.map((lot) => ({ value: lot.id, label: lot.name }))}
             />
+          </div>
+        )}
+
+        {!toRubric && targetScope === "PROJECT" && targetEnterpriseId && (
+          <div>
+            <label style={{ fontSize: 12, opacity: 0.7 }}>
+              {t("invoices.transfer.fieldTargetRubric")}
+            </label>
+            {targetRubric && (
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, margin: "4px 0", fontSize: 13 }}>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <Text strong>
+                    {targetRubric.code ? `${targetRubric.code} · ` : ""}
+                    {targetRubric.name}
+                  </Text>
+                </span>
+                <Button size="small" type="link" onClick={() => setTargetRubric(null)}>
+                  {t("invoices.transfer.clearRubric")}
+                </Button>
+              </div>
+            )}
+            <div style={{ marginTop: 4 }}>
+              <RubricSearchField
+                key={`${targetEnterpriseId}-${targetLotId ?? ""}`}
+                enterpriseId={targetEnterpriseId}
+                budgetId={targetLotId}
+                selectedId={targetRubric?.id}
+                onPick={setTargetRubric}
+              />
+            </div>
           </div>
         )}
 
