@@ -339,8 +339,6 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
       <TransferInvoiceDrawer
         open={transferInvoice !== null}
         invoice={transferInvoice}
-        // Na quarentena "atribuir uma obra" é transferir com o âmbito fixo em obra.
-        lockToProject={scope === "UNIDENTIFIED"}
         onClose={() => setTransferInvoice(null)}
         onTransferred={(result) => {
           setTransferInvoice(null);
