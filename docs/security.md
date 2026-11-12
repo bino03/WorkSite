@@ -17,6 +17,15 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 - O tipo `role_enum` na base de dados define `ADMIN`, `EMPLOYEE` e — desde a `V47` — `ACCOUNTANT`.
 - Autorização fina feita maioritariamente por `@PreAuthorize` em cada controller/método (`hasRole('ADMIN')`, `hasAnyRole('ADMIN','EMPLOYEE')`, `isAuthenticated()`).
 
+### Role `SITE_MANAGER` — planeada (2026-11-12, ainda não implementada)
+
+O gestor de obra, dono de uma folha de caixa (`notes/roadmap/folha-de-caixa.md`). **Não entra na app**:
+é um perfil **sem conta** (`profile.auth_user_id` nulo), criado pelo ADMIN em `POST
+/employees/site-managers`; o convite e a mudança de role não oferecem `SITE_MANAGER`. Existe para
+identificar quem tem a caixa e para uma interface própria futura — nessa altura liga-se uma conta ao perfil
+que já existe em vez de criar outro. As folhas de caixa são só `ADMIN` (package `cashsheet`, fora de
+`enterprises.controller`, por isso fora do `WorksEndpointsRoleGuardTest`).
+
 ### Role `ACCOUNTANT` — desde 2026-10-30 (`V47`)
 
 Uma terceira role para a contabilidade. **No espaço Obras faz tudo o que o ADMIN faz** (obras,
