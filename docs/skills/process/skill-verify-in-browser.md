@@ -118,7 +118,7 @@ Por cada item da lista do Step 0, o mesmo par:
 
   Exceção: **abrir/fechar de modais e dropdowns decide-se por screenshot**, e o "Aplicar"/"Cancelar" clica-se com o rato (`computer` → `left_click` com `ref`), não por `element.click()` — com a janela do Chrome sem foco a animação de saída do AntD nunca acaba e o DOM diz "aberto" para sempre (ver [[learning]] 2026-09-21). Popups presos fecham-se com `key Escape` antes do passo seguinte.
 
-Registar por item: ✅ / 🔴 com o que se esperava vs. o que apareceu, e o erro da consola ou da rede (`read_console_messages` com `pattern`, `read_network_requests`) se houver. Uma 🔴 vai para `notes/ToDo.md` como bullet ⚠️ com esse detalhe — não se corrige a meio da passagem, senão a passagem nunca acaba.
+Registar por item: ✅ / 🔴 com o que se esperava vs. o que apareceu, e o erro da consola ou da rede (`read_console_messages` com `pattern`, `read_network_requests`) se houver. Uma 🔴 vai para `notes/ToDo.md` como bullet ⚠️ com esse detalhe e com tier (`sonnet` se a causa é clara pelo erro; `opus` se o que falha é a regra e não o código — [[skill-implement-todo#Tiers de modelo]]) — não se corrige a meio da passagem, senão a passagem nunca acaba.
 
 > **`read_network_requests` não mostra headers de resposta** (`Set-Cookie`, CORS) e o `statusCode`
 > que devolve pode divergir do que o `fetch()` da página recebeu de facto. Para inspecionar headers,
