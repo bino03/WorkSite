@@ -93,6 +93,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1226,6 +1227,7 @@ public class ConstructionInvoiceService {
                         .thenComparing(ConstructionInvoice::getId))
                 .filter(invoice -> matchesOutstandingFilter(invoice, dueDates.get(invoice.getId()), filter, today))
                 .toList();
+        ordered = applyAdvancedOutstandingFilter(ordered, filter);
 
         // As opções do filtro de fornecedor saem daqui, antes de filtrar por ele:
         // só quem tem alguma coisa por liquidar (dentro dos outros filtros), e
@@ -1310,6 +1312,97 @@ public class ConstructionInvoiceService {
     }
 
     /** Todos os filtros menos o de fornecedor, que o chamador aplica à parte. */
+    /**
+     * A pesquisa avançada de "A pagar" (2026-11-13): os mesmos campos do modal da
+     * lista da obra, com a semântica do {@code ConstructionInvoiceRepository.search},
+     * mas em memória — a lista já está carregada e ordenada por urgência, e são
+     * dezenas de faturas. Pagamentos, repartições e documentos só se carregam se
+     * o filtro que os precisa estiver ligado.
+     */
+    private List<ConstructionInvoice> applyAdvancedOutstandingFilter(List<ConstructionInvoice> invoices,
+                                                                     OutstandingFilter f) {
+        if (!f.hasAdvanced() || invoices.isEmpty()) {
+            return invoices;
+        }
+        List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
+        String q = isBlank(f.q()) ? null : f.q().trim().toLowerCase();
+
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments =
+                f.paymentStatus() != null ? paymentService.paymentsForInvoices(ids, false) : Map.of();
+        Map<UUID, List<ConstructionExpense>> allocations =
+                f.allocationStatus() != null || f.budgetItemId() != null ? loadAllocations(ids) : Map.of();
+        Map<UUID, List<ConstructionInvoiceDocument>> documents = q != null ? loadDocuments(ids) : Map.of();
+        Set<UUID> budgetItemIds = f.budgetItemId() == null
+                ? Set.of()
+                : new HashSet<>(subtreeIds(f.enterpriseId(), f.budgetItemId()));
+
+        return invoices.stream().filter(invoice -> {
+            if (q != null && !matchesText(invoice, documents.getOrDefault(invoice.getId(), List.of()), q)) {
+                return false;
+            }
+            if (f.documentStatus() != null && (invoice.getDocumentStatus() == null
+                    || !f.documentStatus().equals(invoice.getDocumentStatus().name()))) {
+                return false;
+            }
+            BigDecimal total = invoice.getTotalAmount();
+            if (f.minAmount() != null && (total == null || total.compareTo(f.minAmount()) < 0)) {
+                return false;
+            }
+            if (f.maxAmount() != null && (total == null || total.compareTo(f.maxAmount()) > 0)) {
+                return false;
+            }
+            LocalDate date = invoice.getInvoiceDate();
+            if (f.from() != null && (date == null || date.isBefore(f.from()))) {
+                return false;
+            }
+            if (f.to() != null && (date == null || date.isAfter(f.to()))) {
+                return false;
+            }
+            if (f.paymentStatus() != null) {
+                BigDecimal paid = payments.getOrDefault(invoice.getId(), List.of()).stream()
+                        .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                // Tudo aqui está por liquidar: "PAID" nunca casa; "PARTIAL" pede um total.
+                boolean matches = switch (f.paymentStatus()) {
+                    case "UNPAID" -> paid.signum() == 0;
+                    case "PARTIAL" -> paid.signum() > 0 && total != null;
+                    default -> false;
+                };
+                if (!matches) {
+                    return false;
+                }
+            }
+            List<ConstructionExpense> lines = allocations.getOrDefault(invoice.getId(), List.of());
+            if (f.allocationStatus() != null) {
+                BigDecimal allocated = lines.stream()
+                        .map(ConstructionExpense::getTotalPrice)
+                        .filter(java.util.Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal unallocated = total == null ? BigDecimal.ZERO : total.subtract(allocated);
+                if (!f.allocationStatus().equals(allocationStatus(invoice, lines, unallocated))) {
+                    return false;
+                }
+            }
+            return f.budgetItemId() == null || lines.stream().anyMatch(line ->
+                    line.getBudgetItem() != null && budgetItemIds.contains(line.getBudgetItem().getId()));
+        }).toList();
+    }
+
+    /** Os mesmos campos do texto do {@code ConstructionInvoiceRepository.search}. */
+    private static boolean matchesText(ConstructionInvoice invoice, List<ConstructionInvoiceDocument> documents,
+                                       String q) {
+        return containsIgnoreCase(invoice.getSupplierName(), q)
+                || containsIgnoreCase(invoice.getSupplierNif(), q)
+                || containsIgnoreCase(invoice.getInvoiceNumber(), q)
+                || containsIgnoreCase(invoice.getInvoiceAtcud(), q)
+                || containsIgnoreCase(invoice.getNotes(), q)
+                || documents.stream().anyMatch(d -> containsIgnoreCase(d.getOriginalFilename(), q));
+    }
+
+    private static boolean containsIgnoreCase(String value, String lowerQuery) {
+        return value != null && value.toLowerCase().contains(lowerQuery);
+    }
+
     private static boolean matchesOutstandingFilter(ConstructionInvoice invoice, LocalDate dueDate,
                                                     OutstandingFilter filter, LocalDate today) {
         if (filter.enterpriseId() != null

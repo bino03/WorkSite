@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.dto.invoice.request;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -14,6 +15,19 @@ import java.util.UUID;
  * @param dueBucket          por vencimento — ver {@link DueBucket}
  * @param approvedForPayment só as aprovadas ({@code true}) ou só as por aprovar ({@code false})
  * @param sentToAccountant   só as enviadas ao contabilista ({@code true}) ou só as por enviar ({@code false})
+ *
+ * <p>Os da pesquisa avançada (2026-11-13 — o mesmo modal da lista de faturas da obra),
+ * com o significado que têm no {@code ConstructionInvoiceRepository.search}:
+ *
+ * @param q                texto: fornecedor, NIF, nº, ATCUD, notas, nome do ficheiro
+ * @param documentStatus   {@code ARCHIVED}, {@code MISSING}, {@code TO_PRINT}, {@code TO_REQUEST}
+ * @param paymentStatus    {@code UNPAID} (nada pago) ou {@code PARTIAL}; {@code PAID} nunca casa aqui
+ * @param allocationStatus {@code NONE}, {@code PROVISIONAL}, {@code PARTIAL}, {@code COMPLETE}
+ * @param from             data da fatura, desde (inclusive)
+ * @param to               data da fatura, até (inclusive)
+ * @param minAmount        total, desde
+ * @param maxAmount        total, até
+ * @param budgetItemId     rubrica e sub-árvore; só com {@code enterpriseId}
  */
 public record OutstandingFilter(
         UUID enterpriseId,
@@ -21,10 +35,33 @@ public record OutstandingFilter(
         String supplierNif,
         DueBucket dueBucket,
         Boolean approvedForPayment,
-        Boolean sentToAccountant
+        Boolean sentToAccountant,
+        String q,
+        String documentStatus,
+        String paymentStatus,
+        String allocationStatus,
+        LocalDate from,
+        LocalDate to,
+        BigDecimal minAmount,
+        BigDecimal maxAmount,
+        UUID budgetItemId
 ) {
 
     public static final OutstandingFilter NONE = new OutstandingFilter(null, false, null, null, null, null);
+
+    /** Só os filtros da barra, sem pesquisa avançada. */
+    public OutstandingFilter(UUID enterpriseId, boolean company, String supplierNif, DueBucket dueBucket,
+                             Boolean approvedForPayment, Boolean sentToAccountant) {
+        this(enterpriseId, company, supplierNif, dueBucket, approvedForPayment, sentToAccountant,
+                null, null, null, null, null, null, null, null, null);
+    }
+
+    /** Algum filtro que obriga a carregar pagamentos, repartições ou documentos. */
+    public boolean hasAdvanced() {
+        return (q != null && !q.isBlank()) || documentStatus != null || paymentStatus != null
+                || allocationStatus != null || from != null || to != null
+                || minAmount != null || maxAmount != null || budgetItemId != null;
+    }
 
     /**
      * As faixas de vencimento, cumulativas (decidido a 2026-11-10): "este mês"

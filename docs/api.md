@@ -410,7 +410,7 @@ de entrada.
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, pela data da fatura, mais recentes primeiro (por omissão; `sort=createdAt,asc`… como na lista de obra) |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, pela data da fatura, mais recentes primeiro (idem) |
 | GET | `/construction-invoices/search?q=&enterpriseId=&scope=&supplierNif=&paymentStatus=&size=` | `ADMIN`, `ACCOUNTANT` — **pesquisa global** (o modal Ctrl+K do header): todas as obras, a empresa e a quarentena, notas de crédito incluídas, sem obras `is_test` nem eliminadas. Ver [[#Pesquisa global de faturas]] |
-| GET | `/construction-invoices/outstanding?enterpriseId=&company=&supplierNif=&dueBucket=&approvedForPayment=&sentToAccountant=&page=&size=` | `ADMIN`, `ACCOUNTANT` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
+| GET | `/construction-invoices/outstanding?enterpriseId=&company=&supplierNif=&dueBucket=&approvedForPayment=&sentToAccountant=&q=&documentStatus=&paymentStatus=&allocationStatus=&from=&to=&minAmount=&maxAmount=&budgetItemId=&page=&size=` | `ADMIN`, `ACCOUNTANT` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada. Por omissão `invoiceDate,desc` (sem data no fim) e depois `createdAt,desc` — ver [[#Ordem das listas de faturas]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
@@ -1139,6 +1139,21 @@ por urgência e **antes** dos totais e da paginação — os totais do topo são
 | `dueBucket` | `OVERDUE` (antes de hoje) · `WEEK` (hoje..hoje+7) · `MONTH` (hoje..hoje+30, **inclui** a semana) · `NONE` (sem vencimento). As faixas não incluem as vencidas. Valor inválido → `400` |
 | `approvedForPayment` | `true` só as aprovadas, `false` só as por aprovar |
 | `sentToAccountant` | `true` só as enviadas, `false` só as por enviar |
+
+**Pesquisa avançada** (2026-11-13 — o modal "Filtros" da lista da obra, `variant="outstanding"`), com a
+semântica dos filtros da caixa de entrada (ver "Filtros da caixa de entrada"), mas em memória
+(`applyAdvancedOutstandingFilter`). Pagamentos, repartições e documentos só se carregam quando o filtro
+que os usa está ligado:
+
+| Parâmetro | Filtra |
+|---|---|
+| `q` | fornecedor, NIF, nº, ATCUD, notas ou nome do ficheiro (contém, sem maiúsculas) |
+| `documentStatus` | `ARCHIVED` · `MISSING` · `TO_PRINT` · `TO_REQUEST` |
+| `paymentStatus` | `UNPAID` (nada pago) · `PARTIAL` (algum pago, com total). `PAID` nunca casa: tudo aqui está por liquidar |
+| `allocationStatus` | `NONE` · `PROVISIONAL` · `PARTIAL` · `COMPLETE`, a mesma regra do `allocationStatus` da resposta |
+| `from`, `to` | data da fatura, inclusive; as sem data saem |
+| `minAmount`, `maxAmount` | total, inclusive; as sem total saem |
+| `budgetItemId` | rubrica **e sub-árvore**. Só com `enterpriseId`: sem a obra → `400` |
 
 O `findOutstandingExcludingScope` não mudou de assinatura: o `InvoiceDueNotifier` usa-o também. Na página,
 os filtros são só estado local (nem URL, nem `localStorage`).

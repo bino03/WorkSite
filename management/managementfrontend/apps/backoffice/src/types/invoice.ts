@@ -557,6 +557,9 @@ export interface InvoiceFilters {
   /** Rubrica; o backend apanha também tudo o que está por baixo dela. `budgetItemLabel` é só para mostrar. */
   budgetItemId: string | null;
   budgetItemLabel: string | null;
+  /** Só em "A pagar" (2026-11-13): o modal mostra-os só lá, e a lista da obra ignora-os. */
+  dueBucket: DueBucket | null;
+  approvedForPayment: boolean | null;
   /** Lote da fatura; só faz sentido numa obra com vários. Apanha também as que ainda não têm rubrica. */
   budgetId: string | null;
 }
@@ -582,6 +585,8 @@ export const ADVANCED_INVOICE_FILTER_KEYS = [
   "minAmount",
   "maxAmount",
   "budgetItemId",
+  "dueBucket",
+  "approvedForPayment",
 ] as const satisfies readonly (keyof InvoiceFilters)[];
 
 /** Nada ligado, primeira página — o ponto de partida de qualquer lista. `size` é a do chamador. */
@@ -605,6 +610,8 @@ export const EMPTY_INVOICE_FILTERS: InvoiceFilters = {
   minAmount: null,
   maxAmount: null,
   budgetItemId: null,
+  dueBucket: null,
+  approvedForPayment: null,
   budgetId: null,
   budgetItemLabel: null,
 };
@@ -742,6 +749,17 @@ export interface OutstandingByUrgencyParams {
   dueBucket?: DueBucket;
   approvedForPayment?: boolean;
   sentToAccountant?: boolean;
+  // A pesquisa avançada (2026-11-13), o mesmo que a lista da obra aceita.
+  q?: string;
+  documentStatus?: InvoiceDocumentStatus;
+  paymentStatus?: PaymentStatus;
+  allocationStatus?: AllocationStatus;
+  from?: string;
+  to?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  /** Só com `enterpriseId` — o backend devolve 400 sem a obra. */
+  budgetItemId?: string;
   page: number;
   size: number;
 }
