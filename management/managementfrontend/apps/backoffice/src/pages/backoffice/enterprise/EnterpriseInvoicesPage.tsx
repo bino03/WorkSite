@@ -63,16 +63,16 @@ const wantsOutstandingTotal = (f: InvoiceFilters) =>
 
 const initialFilters: InvoiceFilters = {
   ...EMPTY_INVOICE_FILTERS,
-  allocated: false,
+  allocated: null,
   size: DEFAULT_PAGE_SIZE,
 };
 
 /**
  * Caixa de entrada de faturas do projeto.
  *
- * Abre em "Por associar" porque é essa a pergunta do dia-a-dia: o que entrou e
- * ainda não foi classificado. Carregar não pede nada além dos ficheiros;
- * associar é uma ação da lista, feita depois e em bloco quando dá.
+ * Abre em "Todas" (pedido do utilizador, 2026-11-13; até aí abria em "Por
+ * associar"). Carregar não pede nada além dos ficheiros; associar é uma ação
+ * da lista, feita depois e em bloco quando dá — o separador "Por associar" continua lá.
  */
 const EnterpriseInvoicesPage: FC = () => {
   const { enterpriseId } = useParams<{ enterpriseId: string }>();
@@ -93,7 +93,7 @@ const EnterpriseInvoicesPage: FC = () => {
     ...initialFilters,
     budgetId: searchParams.get("lote"),
   }));
-  const [view, setView] = useState<ViewKey>("pending");
+  const [view, setView] = useState<ViewKey>("all");
   /** `null` = ordem por omissão do backend (data da fatura, mais recente primeiro; sem data no fim). */
   const [sort, setSort] = useState<{ field: "invoiceDate" | "createdAt"; order: "ascend" | "descend" } | null>(
     null
