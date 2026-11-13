@@ -94,7 +94,7 @@ const EnterpriseInvoicesPage: FC = () => {
     budgetId: searchParams.get("lote"),
   }));
   const [view, setView] = useState<ViewKey>("pending");
-  /** `null` = ordem por omissão do backend (data de carregamento, mais recente primeiro). */
+  /** `null` = ordem por omissão do backend (data da fatura, mais recente primeiro; sem data no fim). */
   const [sort, setSort] = useState<{ field: "invoiceDate" | "createdAt"; order: "ascend" | "descend" } | null>(
     null
   );

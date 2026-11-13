@@ -74,6 +74,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -716,8 +717,8 @@ public class ConstructionInvoiceService {
 
     /**
      * As listas que não são de obra nenhuma: a quarentena ("Por identificar") e
-     * as despesas da empresa. A quarentena vê-se da mais antiga para a mais
-     * recente — quanto mais tempo lá está, mais urgente é.
+     * as despesas da empresa. Ordem por omissão (do controlador): data da fatura,
+     * da mais recente para a mais antiga — também na quarentena, desde 2026-11-13.
      */
     @Transactional(readOnly = true)
     public Page<ConstructionInvoiceResponseDTO> searchByScope(ConstructionInvoice.Scope scope,
@@ -728,7 +729,7 @@ public class ConstructionInvoiceService {
                 scope, outstanding, isBlank(q) ? null : q.trim(),
                 uploadedFrom == null ? null : zone.startOfDay(uploadedFrom),
                 uploadedTo == null ? null : zone.startOfNextDay(uploadedTo),
-                pageable);
+                undatedLast(pageable));
 
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
         Map<UUID, List<ConstructionExpense>> allocations = loadAllocations(ids);
@@ -1127,7 +1128,22 @@ public class ConstructionInvoiceService {
                 budgetItemIds.isEmpty() ? List.of(new UUID(0L, 0L)) : budgetItemIds,
                 f.budgetId() != null,
                 f.budgetId() != null ? f.budgetId() : new UUID(0L, 0L),
-                pageable);
+                undatedLast(pageable));
+    }
+
+    /**
+     * Faturas sem data vão para o fim, nos dois sentidos: o Postgres põe os
+     * {@code NULL} à frente num {@code desc}, e a lista abria com as faturas por
+     * rever em vez das mais recentes. Igual ao {@code nulls last} das queries fixas.
+     */
+    static Pageable undatedLast(Pageable pageable) {
+        if (pageable.getSort().getOrderFor("invoiceDate") == null) {
+            return pageable;
+        }
+        Sort sort = Sort.by(pageable.getSort().stream()
+                .map(order -> "invoiceDate".equals(order.getProperty()) ? order.nullsLast() : order)
+                .toList());
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
     }
 
     /** A rubrica e tudo o que está por baixo dela (vivas), na obra dada; vazio se não for desta obra. */

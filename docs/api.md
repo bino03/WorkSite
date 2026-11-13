@@ -407,11 +407,11 @@ de entrada.
 | POST | `/construction-invoices/import-excel?scope=&enterpriseId=&dryRun=` | `ADMIN` — multipart `file` (o `Despesas - <Obra>.xlsx` do vault) + parte `answers` (JSON, opcional). Importa a folha "Despesas"; ver [[#Importar a folha "Despesas" do Excel (fase 6)]] |
 | POST | `/construction-invoices/{id}/documents` | `ADMIN` ou `EMPLOYEE` — multipart `file`, **junta** mais um documento; devolve `201` |
 | DELETE | `/construction-invoices/{id}/documents/{documentId}` | `ADMIN` — remove **um** documento; devolve `204` |
-| GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, mais antigas primeiro (por omissão; `sort=invoiceDate,desc`, `createdAt,asc`… como na lista de obra) |
-| GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, mais recentes primeiro (idem) |
+| GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, pela data da fatura, mais recentes primeiro (por omissão; `sort=createdAt,asc`… como na lista de obra) |
+| GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, pela data da fatura, mais recentes primeiro (idem) |
 | GET | `/construction-invoices/search?q=&enterpriseId=&scope=&supplierNif=&paymentStatus=&size=` | `ADMIN`, `ACCOUNTANT` — **pesquisa global** (o modal Ctrl+K do header): todas as obras, a empresa e a quarentena, notas de crédito incluídas, sem obras `is_test` nem eliminadas. Ver [[#Pesquisa global de faturas]] |
 | GET | `/construction-invoices/outstanding?enterpriseId=&company=&supplierNif=&dueBucket=&approvedForPayment=&sentToAccountant=&page=&size=` | `ADMIN`, `ACCOUNTANT` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
-| GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada |
+| GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada. Por omissão `invoiceDate,desc` (sem data no fim) e depois `createdAt,desc` — ver [[#Ordem das listas de faturas]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/pending-summary[?budgetId=]` | `ADMIN` ou `EMPLOYEE` — `{ count, total }` das faturas por associar (NC não entram); com `budgetId`, só as desse lote: o contador do botão "Faturas" e o cartão "Por classificar" ao lado do "Gasto" no orçamento. Era `pending-count` (só o número) até 2026-09-18 |
@@ -523,8 +523,8 @@ trouxer dados que divergem dos que a fatura já tem, o resultado traz `qrDiverge
 sobreposto**: só os campos vazios são preenchidos.
 
 `GET /unidentified` e `GET /company` são **só `ADMIN`** (o `NavLink` do Backoffice também tem
-gate, mas o gate real é este). A quarentena ordena por `createdAt` **ascendente** por omissão —
-quanto mais tempo lá está, mais urgente é — e mostra `possibleEnterprises` e `askWhom`, as duas
+gate, mas o gate real é este). Desde 2026-11-13 a quarentena ordena como as outras listas ([[#Ordem das listas de faturas]]); antes era por `createdAt` ascendente,
+"quanto mais tempo lá está, mais urgente é". Mostra `possibleEnterprises` e `askWhom`, as duas
 notas em texto livre de quem recebeu a fatura sem saber de quem era.
 
 ### Duplicados — bloqueio, em três chaves
@@ -1068,6 +1068,20 @@ a criação é sempre à mão. Tudo `ADMIN`. Ver [[database.md]] → `invoice_in
 `InvoiceIncidentResponseDTO`: `{ id, title, body, resolvedAt, resolvedBy, resolvedByName,
 createdBy, createdByName, createdAt, updatedAt, invoices: [{id, invoiceNumber, supplierName,
 scope, enterpriseId}] }`.
+
+### Ordem das listas de faturas
+
+Decidido a 2026-11-13: **as listas de faturas abrem pela data da fatura, da mais recente para a mais
+antiga**. As faturas sem data ficam no fim e o desempate é pela data de upload (`createdAt`), também a
+mais recente primeiro. Vale para a obra (`/enterprise/{id}`), a empresa (`/company`) e a quarentena
+(`/unidentified`, que até então vinha da mais antiga para a mais recente) por omissão do `@SortDefault`, e para as
+queries fixas (pesquisa global, notas de crédito), que já faziam `invoice_date desc nulls last, created_at desc`.
+
+- Um `sort=` explícito continua a mandar (o clique nas colunas "Data" e "Carregada em" do `InvoicesList`).
+  Sempre que o `sort` inclui `invoiceDate`, `ConstructionInvoiceService.undatedLast` acrescenta-lhe
+  `nulls last` nos dois sentidos, porque num `desc` o Postgres põe os `NULL` à frente (`InvoiceListOrderTest`).
+- **Exceção, de propósito**: "A pagar" (`/outstanding`) continua por urgência de vencimento — ver abaixo.
+- A exportação para o Excel e os backups seguem a ordem do vault (ascendente), que não mudou.
 
 ### Pesquisa global de faturas
 

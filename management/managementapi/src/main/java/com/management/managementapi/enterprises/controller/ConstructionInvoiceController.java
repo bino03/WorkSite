@@ -55,6 +55,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.data.web.SortDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -255,9 +256,9 @@ public class ConstructionInvoiceController {
     }
 
     /**
-     * A quarentena: faturas que ainda não se sabe de quem são. Ordenadas da
-     * mais antiga para a mais recente por omissão — quanto mais tempo lá está,
-     * mais urgente é.
+     * A quarentena: faturas que ainda não se sabe de quem são. Como todas as
+     * listas de faturas, por omissão vêm pela data da fatura, da mais recente
+     * para a mais antiga (sem data no fim) — decidido a 2026-11-13.
      */
     @GetMapping("/unidentified")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
@@ -266,7 +267,10 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedTo,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+            @SortDefault.SortDefaults({
+                    @SortDefault(sort = "invoiceDate", direction = Sort.Direction.DESC),
+                    @SortDefault(sort = "createdAt", direction = Sort.Direction.DESC)})
+            @PageableDefault(size = 20) Pageable pageable) {
         return service.searchByScope(ConstructionInvoice.Scope.UNIDENTIFIED, outstanding, q, uploadedFrom, uploadedTo, pageable);
     }
 
@@ -278,7 +282,10 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate uploadedTo,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @SortDefault.SortDefaults({
+                    @SortDefault(sort = "invoiceDate", direction = Sort.Direction.DESC),
+                    @SortDefault(sort = "createdAt", direction = Sort.Direction.DESC)})
+            @PageableDefault(size = 20) Pageable pageable) {
         return service.searchByScope(ConstructionInvoice.Scope.COMPANY, outstanding, q, uploadedFrom, uploadedTo, pageable);
     }
 
@@ -324,7 +331,10 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) BigDecimal maxAmount,
             @RequestParam(required = false) UUID budgetItemId,
             @RequestParam(required = false) UUID budgetId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @SortDefault.SortDefaults({
+                    @SortDefault(sort = "invoiceDate", direction = Sort.Direction.DESC),
+                    @SortDefault(sort = "createdAt", direction = Sort.Direction.DESC)})
+            @PageableDefault(size = 20) Pageable pageable) {
         return service.search(enterpriseId, new InvoiceSearchFilter(
                 allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
