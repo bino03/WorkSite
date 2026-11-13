@@ -89,16 +89,24 @@ Porquê o teste "o que / onde / como se verifica": é exatamente o que o `/imple
 investigar sem voltar a perguntar o básico. Um bullet que falha isto volta a `ideas.md` na Fase 3 dele —
 mais vale lá ficar já.
 
+**Tier de modelo** (só para o que vai para o `ToDo.md`): `opus` ou `sonnet`, pelos critérios de
+[[skill-implement-todo#Tiers de modelo]]. `haiku` nunca, e na dúvida sobe-se. A razão vai numa frase, para se
+poder rever mais tarde.
+
+- **Item misto** (uma decisão e muito trabalho que vem depois dela) → **dois bullets**: o `opus` que decide e,
+  por baixo, o `sonnet` que implementa a partir da decisão.
+- Uma entrada em `ideas.md` **não leva tier**: ainda não se sabe o que é.
+
 ## Step 4: Mostrar, confirmar, escrever
 
-Mostrar **o texto exato** e o sítio (ficheiro + secção), e perguntar: **Gravar** · **Ajustar o texto**
-· **Mudar de destino** (ToDo ↔ ideas).
+Mostrar **o texto exato**, com o tier e a razão, e o sítio (ficheiro + secção), e perguntar: **Gravar**
+· **Ajustar o texto** (inclui mudar o tier) · **Mudar de destino** (ToDo ↔ ideas).
 
 **No `ToDo.md`** — na secção temática que **existe** e encaixa (criar uma só se nenhuma encaixa):
 
 ```markdown
-- [ ] <verbo + o quê, na linguagem do utilizador> — <porquê, numa frase>
-  > Decidido (via refine-idea, AAAA-MM-DD): <respostas do Step 2 que importam para implementar>; ⚠️ <o que falta, se falta>
+- [ ] `<tier>` <verbo + o quê, na linguagem do utilizador> — <porquê, numa frase>
+  > Decidido (via refine-idea, AAAA-MM-DD): <respostas do Step 2 que importam para implementar>; tier: <razão numa frase>; ⚠️ <o que falta, se falta>
 ```
 
 **No `ideas.md`**:
@@ -136,6 +144,7 @@ Não há commit: `notes/` é git-ignored.
 | A mesma ideia em `ideas.md` e no ToDo | Os dois divergem; um deles fica a mentir |
 | Decisão estrutural escondida no bullet | O porquê perde-se e volta a discutir-se |
 | Começar a implementar no fim | Salta o planeamento, a priorização e o bookkeeping do `/implement-todo` |
+| Tier por baixo "para poupar", ou um item misto inteiro em `opus` | No primeiro caso o modelo adivinha uma decisão e há retrabalho; no segundo paga-se o modelo caro pelo trabalho mecânico |
 
 ## Final Checklist
 
@@ -144,6 +153,7 @@ Não há commit: `notes/` é git-ignored.
 - [ ] Duplicados, "já feito" e conflitos com regras registadas detetados e ditos
 - [ ] Perguntas em bloco, com defaults, só o que faltava; "não sei" registado, nunca inventado
 - [ ] Destino decidido pelo teste "o que / onde / como se verifica"
+- [ ] Item do ToDo com tier e razão (`opus`/`sonnet`, nunca `haiku`); item misto partido em dois
 - [ ] Texto exato mostrado e confirmado antes de escrever
 - [ ] Edição pontual; a ideia vive num só sítio (saiu de `ideas.md` se foi promovida)
 - [ ] Nada implementado; próximo passo dito

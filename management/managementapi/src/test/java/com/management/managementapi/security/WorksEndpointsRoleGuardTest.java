@@ -39,10 +39,22 @@ class WorksEndpointsRoleGuardTest {
                 .filter(method -> expressionOf(method).isPresent())
                 .filter(method -> allows("ADMIN", method, arguments) && !allows("ACCOUNTANT", method, arguments))
                 .map(WorksEndpointsRoleGuardTest::describe)
+                .filter(endpoint -> !ADMIN_ONLY_BY_DECISION.contains(endpoint))
                 .toList();
 
         assertThat(adminOnly).isEmpty();
     }
+
+    /**
+     * As exceções escolhidas, uma a uma. A zona de recuperação do orçamento (rubricas eliminadas,
+     * 30 dias) é só do ADMIN desde 2026-11-01; os backups, um download em massa de todas as
+     * faturas, desde 2026-11-03.
+     */
+    private static final List<String> ADMIN_ONLY_BY_DECISION = List.of(
+            "ConstructionBudgetItemController.getDeleted",
+            "ConstructionBudgetItemController.recover",
+            "BackupController.preview",
+            "BackupController.download");
 
     @Test
     void scansTheWorksControllers() {

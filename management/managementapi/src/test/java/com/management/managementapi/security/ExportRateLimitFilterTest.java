@@ -100,6 +100,41 @@ class ExportRateLimitFilterTest {
     }
 
     @Test
+    void contaODownloadDoBackup_masNaoAPreVisualizacao() throws ServletException, IOException {
+        ExportRateLimitFilter filter = new ExportRateLimitFilter(1, 10);
+        authenticateAs("user-1");
+        AtomicInteger passed = new AtomicInteger();
+
+        for (int i = 0; i < 3; i++) {
+            filter.doFilter(new MockHttpServletRequest("POST", "/backups/preview"),
+                    new MockHttpServletResponse(), countingChain(passed));
+        }
+        assertThat(passed.get()).isEqualTo(3);
+
+        MockHttpServletResponse first = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("POST", "/backups/download"), first, countingChain(passed));
+        assertThat(first.getStatus()).isEqualTo(200);
+
+        MockHttpServletResponse second = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("POST", "/backups/download"), second, countingChain(passed));
+        assertThat(second.getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    void umPostNumaRotaDeExportacaoGetNaoConta() throws ServletException, IOException {
+        ExportRateLimitFilter filter = new ExportRateLimitFilter(1, 10);
+        authenticateAs("user-1");
+        AtomicInteger passed = new AtomicInteger();
+        String path = "/construction-budget/enterprise/8d3e7a2f-a24f-4faa-8429-dba7ca3ab82e/export/zip";
+
+        for (int i = 0; i < 2; i++) {
+            filter.doFilter(new MockHttpServletRequest("POST", path), new MockHttpServletResponse(), countingChain(passed));
+        }
+
+        assertThat(passed.get()).isEqualTo(2);
+    }
+
+    @Test
     void semUtilizadorAutenticadoDeixaPassar() throws ServletException, IOException {
         // Não deve acontecer na prática (a rota exige autenticação antes deste filtro correr),
         // mas o filtro não deve rebentar nem bloquear silenciosamente se isso falhar.

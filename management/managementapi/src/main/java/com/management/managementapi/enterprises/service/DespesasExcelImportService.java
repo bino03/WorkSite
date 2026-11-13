@@ -135,6 +135,7 @@ public class DespesasExcelImportService {
     static final String HEADER_QUARANTINED_SINCE = "Aqui desde";
     /** O valor da dropdown que manda a fatura para as despesas da empresa em vez de uma obra. */
     static final String TARGET_COMPANY = "Despesas da empresa";
+    private static final String QUARANTINED_SINCE_NOTE = "Em quarentena desde ";
 
     private static final List<String> REQUIRED_HEADERS = List.of(
             HEADER_NUMBER, HEADER_DATE, HEADER_DESCRIPTION, HEADER_AMOUNT, HEADER_PAID,
@@ -246,7 +247,7 @@ public class DespesasExcelImportService {
         return scope == Scope.UNIDENTIFIED ? SHEET_QUARANTINE : SHEET_EXPENSES;
     }
 
-    private static String tableNameFor(Scope scope) {
+    static String tableNameFor(Scope scope) {
         return scope == Scope.UNIDENTIFIED ? TABLE_QUARANTINE : TABLE_EXPENSES;
     }
 
@@ -896,12 +897,15 @@ public class DespesasExcelImportService {
     /**
      * "Aqui desde" não tem coluna na app ({@code created_at} é a data da
      * importação) — fica nas notas, depois do que a Vilatro escreveu, para não
-     * se perder quanto tempo a fatura já esteve à espera.
+     * se perder quanto tempo a fatura já esteve à espera. Um livro que saiu da app já
+     * traz a frase nas observações: fica a primeira, que é a data mais antiga, senão
+     * cada ida e volta acrescentava outra.
      */
     private static void noteQuarantinedSince(Model model) {
         for (Group group : model.groups) {
             if (group.quarantinedSince == null) continue;
-            String since = "Em quarentena desde " + NOTE_DATE.format(group.quarantinedSince) + ".";
+            if (group.notes != null && group.notes.contains(QUARANTINED_SINCE_NOTE)) continue;
+            String since = QUARANTINED_SINCE_NOTE + NOTE_DATE.format(group.quarantinedSince) + ".";
             group.notes = group.notes == null ? since : group.notes + NOTE_SEPARATOR + since;
         }
     }

@@ -317,6 +317,7 @@ public class AttendanceExcelExportService {
         return switch (status) {
             case WORKED -> "Trabalhou";
             case MISSING -> "Falta";
+            case UPCOMING -> "Por acontecer";
             case NOT_SCHEDULED -> "Folga";
             case NO_SCHEDULE -> "Sem horário";
             case HOLIDAY -> "Feriado";

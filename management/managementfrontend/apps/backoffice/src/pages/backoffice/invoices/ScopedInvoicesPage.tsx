@@ -38,7 +38,7 @@ import type { IncidentInvoiceRef } from "@/types/incident";
 
 type UploadedRange = [string | null, string | null];
 const NO_RANGE: UploadedRange = [null, null];
-/** `null` = a ordem por omissão do backend (carregamento; ver o comentário do componente). */
+/** `null` = a ordem por omissão do backend (data da fatura, mais recente primeiro; sem data no fim). */
 type ScopedSort = { field: "invoiceDate" | "createdAt"; order: "ascend" | "descend" } | null;
 
 interface Props {
@@ -54,10 +54,10 @@ interface Props {
  * As duas listas de faturas que não pertencem a nenhuma obra.
  *
  * São o mesmo ecrã com um `scope` diferente porque a diferença entre elas é
- * mesmo só essa: a quarentena ordena da mais antiga (é uma fila de trabalho) e
- * mostra as notas de quem a recebeu; as despesas da empresa ordenam da mais
- * recente, como qualquer arquivo. Duplicar o ficheiro para isso não se
- * justificava.
+ * mesmo só essa: a quarentena mostra as notas de quem a recebeu. As duas
+ * ordenam como todas as listas de faturas — data da fatura, mais recente
+ * primeiro (desde 2026-11-13; a quarentena vinha da mais antiga). Duplicar o
+ * ficheiro para isso não se justificava.
  *
  * Essa é só a ordem por omissão: como na lista de obra, os cabeçalhos "Data"
  * e "Carregada em" ordenam (mais recente → mais antiga → omissão).

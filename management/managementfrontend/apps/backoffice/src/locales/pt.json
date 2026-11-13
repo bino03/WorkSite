@@ -121,8 +121,7 @@
     }
   },
   "auth": {
-    "title": "BackOffice — Gestão de Imóveis",
-    "subtitle": "Gestão de Imóveis",
+    "title": "Vilatro",
     "email": "Email",
     "password": "Password",
     "rememberMe": "Lembrar-me",

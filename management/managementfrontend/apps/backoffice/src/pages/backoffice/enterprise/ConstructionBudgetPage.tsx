@@ -52,7 +52,7 @@ const DESC_CLAMP = 150;
 const ConstructionBudgetPage: FC = () => {
   const { enterpriseId } = useParams<{ enterpriseId: string }>();
   const navigate = useNavigate();
-  const { canManageWorks } = useAuth();
+  const { canManageWorks, isAdmin } = useAuth();
   const confirm = useConfirm();
 
   // Um orçamento por lote (edifício). O lote aberto vive na URL (`?lote=`), para
@@ -202,11 +202,12 @@ const ConstructionBudgetPage: FC = () => {
   }, [enterpriseId, pendingLotId]);
 
   const refreshDeletedCount = useCallback(() => {
-    if (!lotId || !canManageWorks()) return;
+    // A zona de recuperação é só do ADMIN (2026-11-01): a contabilidade não vê o que foi eliminado.
+    if (!lotId || !isAdmin()) return;
     listDeletedBudgetItems(lotId)
       .then((items) => setDeletedCount(items.length))
       .catch(() => setDeletedCount(0));
-  }, [lotId, canManageWorks]);
+  }, [lotId, isAdmin]);
 
   useEffect(() => {
     refreshDeletedCount();
@@ -559,7 +560,7 @@ const ConstructionBudgetPage: FC = () => {
               Faturas
             </Button>
           </Badge>
-          {canManageWorks() && (
+          {isAdmin() && (
             <Badge count={deletedCount} overflowCount={99} offset={[-4, 2]}>
               <Button icon={<UndoOutlined />} onClick={() => setRecycleBinOpen(true)}>
                 Eliminadas

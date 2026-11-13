@@ -17,6 +17,15 @@ Autenticação centralizada no backend (`managementapi`), baseada em JWTs emitid
 - O tipo `role_enum` na base de dados define `ADMIN`, `EMPLOYEE` e — desde a `V47` — `ACCOUNTANT`.
 - Autorização fina feita maioritariamente por `@PreAuthorize` em cada controller/método (`hasRole('ADMIN')`, `hasAnyRole('ADMIN','EMPLOYEE')`, `isAuthenticated()`).
 
+### Role `SITE_MANAGER` — planeada (2026-11-12, ainda não implementada)
+
+O gestor de obra, dono de uma folha de caixa (`notes/roadmap/folha-de-caixa.md`). **Não entra na app**:
+é um perfil **sem conta** (`profile.auth_user_id` nulo), criado pelo ADMIN em `POST
+/employees/site-managers`; o convite e a mudança de role não oferecem `SITE_MANAGER`. Existe para
+identificar quem tem a caixa e para uma interface própria futura — nessa altura liga-se uma conta ao perfil
+que já existe em vez de criar outro. As folhas de caixa são só `ADMIN` (package `cashsheet`, fora de
+`enterprises.controller`, por isso fora do `WorksEndpointsRoleGuardTest`).
+
 ### Role `ACCOUNTANT` — desde 2026-10-30 (`V47`)
 
 Uma terceira role para a contabilidade. **No espaço Obras faz tudo o que o ADMIN faz** (obras,
@@ -26,6 +35,11 @@ prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das De
 (`/settings/**`), das contas e convites (`/auth/admin/**`, escritas em `/employees`) e da gestão de
 tarefas — em Tarefas comporta-se como EMPLOYEE. Não é trabalhador para a assiduidade.
 
+**Exceção em Obras (2026-11-01):** a zona de recuperação do orçamento — `GET
+/construction-budget/budgets/{id}/deleted` e `PATCH .../items/{id}/recover`, as rubricas eliminadas
+que ficam 30 dias antes da purga — é só `ADMIN`. A contabilidade não vê nem repõe o que foi
+eliminado; no Backoffice o botão "Eliminadas" só aparece ao ADMIN.
+
 Como se aplica: `hasAnyRole('ADMIN','ACCOUNTANT')` explícito em cada `@PreAuthorize` de Obras (não
 uma `RoleHierarchy`, que não consegue dizer "ADMIN só em Obras"), e `ACCOUNTANT` acrescentado a todo
 o `hasAnyRole('ADMIN','EMPLOYEE')`. Dois testes guardam isto sem contexto Spring nem BD — avaliam as
@@ -34,7 +48,7 @@ nos testes):
 
 - `WorksEndpointsRoleGuardTest` — todo o endpoint de `enterprises.controller` tem `@PreAuthorize`, e
   nenhum aceita `ADMIN` sem aceitar `ACCOUNTANT`. É o que apanha um endpoint novo de Obras escrito só
-  com `hasRole('ADMIN')`.
+  com `hasRole('ADMIN')`. As exceções escolhidas estão listadas por nome em `ADMIN_ONLY_BY_DECISION`.
 - `AccountantAccessTest` — o que abre (faturas da empresa, pagamentos, aprovação) e o que continua
   fechado (todo o `/attendance/**`, `/settings/**`, `/auth/admin/**`, escritas em `/employees`,
   criar/apagar tarefas).
@@ -53,6 +67,7 @@ continua a guardar o resto. Desenho e fases em `notes/roadmap/role-accountant.md
 | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/accept-invite`, `/auth/forgot-password`, `/auth/reset-password` | público |
 | `POST /auth/admin/**` | `ADMIN` |
 | `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
+| `/backups/**` | `ADMIN` — download em massa de todas as faturas; reforçado com `@PreAuthorize` em cada método, `BackupAccessTest` |
 | `GET /employees/**` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
 | `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. O self-service do funcionário é a fase 5 de [[../notes/roadmap/assiduidade]] |
 | `/auth/me` | qualquer utilizador autenticado |
@@ -65,7 +80,7 @@ continua a guardar o resto. Desenho e fases em `notes/roadmap/role-accountant.md
 - **`CookieJwtFilter`** — lê o cookie `access_token` e injeta-o como header `Authorization` se ainda não existir.
 - **Filtro Bearer JWT (OAuth2 Resource Server)** — valida assinatura/expiração e constrói as authorities.
 - **`AccountLockFilter`** — corre depois da autenticação. Dois ramos: (1) lê `account_status` do claim `app_metadata` do JWT — nunca é escrito (não há sincronização com o Supabase Auth), por isso nunca dispara; é o ramo morto. (2) compara `iat` do JWT com `profile.last_token_reset_at`, lido da BD a cada pedido — **este é o mecanismo real de corte de sessão**, e é imediato. Desde 2026-09-22, `blockProfile`/`deleteProfile` (`EmployeeServiceImpl`) escrevem `last_token_reset_at = now()` no mesmo `UPDATE` que muda o `account_status` — o mesmo padrão já usado no reset de password. Antes disso, bloquear/eliminar uma conta não cortava sessões já abertas.
-- **`ExportRateLimitFilter`** — corre depois da autenticação; limita os exports pesados — `/export` e `/export/zip` do orçamento, o export de um lote, o `/documents/zip` das faturas e o `/attendance/reports/month/export` — por utilizador autenticado (não por IP — app interna). Ver `docs/api.md` → "Orçamento de Construção".
+- **`ExportRateLimitFilter`** — corre depois da autenticação; limita os exports pesados — `/export` e `/export/zip` do orçamento, o export de um lote, o `/documents/zip` das faturas, o `/attendance/reports/month/export` e o `POST /backups/download` — por utilizador autenticado (não por IP — app interna). Ver `docs/api.md` → "Orçamento de Construção".
 
 ## CORS
 

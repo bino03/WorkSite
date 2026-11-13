@@ -58,6 +58,14 @@ public class ExportRateLimitFilter extends OncePerRequestFilter {
             new PathPatternParser().parse("/attendance/reports/month/export")
     );
 
+    /**
+     * O backup é POST porque a seleção não cabe bem num query string, e é o mais pesado
+     * de todos. O {@code /backups/preview} fica de fora: só lê a base de dados.
+     */
+    private static final List<PathPattern> POST_PATTERNS = List.of(
+            new PathPatternParser().parse("/backups/download")
+    );
+
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
             .expireAfterAccess(30, TimeUnit.MINUTES)
             .maximumSize(10_000)
@@ -73,9 +81,16 @@ public class ExportRateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-        if (!"GET".equalsIgnoreCase(request.getMethod())) return true;
+        List<PathPattern> limited;
+        if ("GET".equalsIgnoreCase(request.getMethod())) {
+            limited = PATTERNS;
+        } else if ("POST".equalsIgnoreCase(request.getMethod())) {
+            limited = POST_PATTERNS;
+        } else {
+            return true;
+        }
         var path = org.springframework.http.server.PathContainer.parsePath(request.getRequestURI());
-        return PATTERNS.stream().noneMatch(p -> p.matches(path));
+        return limited.stream().noneMatch(p -> p.matches(path));
     }
 
     @Override

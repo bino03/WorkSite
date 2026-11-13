@@ -156,16 +156,24 @@ Duas notas que vieram daqui:
   em memória, sem pedido novo). Mudar de mês arrasta o dia escolhido para dentro do mês novo, senão a
   vista fica vazia a apontar para fora do que foi carregado.
 
-## 10. Mapa mensal (grelha funcionário × dia) — `TeamAbsenceMap` (2026-10-08)
+## 10. Mapa mensal (calendário de parede) — `TeamAbsenceMap` (2026-10-08, calendário desde 2026-11-01)
 
-Para "quem falta quando" não se usa um calendário de biblioteca: é uma **grelha CSS**
-(`gridTemplateColumns: 160px repeat(N, 1fr)`), uma linha por pessoa, uma coluna por dia do mês, com
-`<button>`s de 14px de altura como barras. Fins de semana levam fundo `--ind-neutral-100` para a
-grelha se ler como um calendário, cada barra tem `Tooltip` e `aria-label`, e o contentor faz
-`overflow-x` com `minWidth` para não espremer em ecrã estreito.
+Para "quem falta quando" não se usa um calendário de biblioteca: é uma **grelha CSS de 7 colunas**,
+uma linha por semana, **segunda a domingo** (`(day() + 6) % 7` — o dayjs conta do domingo e não há
+plugin `isoWeek` carregado). Os dias de fora do mês são células vazias. Em cada dia, um `<button>`
+por pessoa ausente com o nome (`Tooltip` com tipo · estado · datas, `aria-label`); **até 3 por dia**,
+o resto atrás de um "+N outros" que abre um `Popover` com a lista inteira. Ordenados por nome, para a
+mesma pessoa ficar na mesma posição de dia para dia. Fim de semana com fundo `--ind-neutral-100`;
+**hoje** com contorno `--ind-color-accent` e "· hoje" ao lado do número; "½" no nome marca meio dia.
+O contentor faz `overflow-x` com `minWidth: 640`.
 
-**A barra diz o estado, não o tipo** (preenchido = aprovado, tracejado = pendente, neutro = recusado),
-com a exceção que muda o que se faz a seguir — a baixa, que leva o segundo acento.
+Era uma grelha funcionário × dia (uma linha por pessoa, uma coluna por dia, barras de 14px) até
+2026-11-01: lia-se bem "quando falta o João", mas "quem falta na quarta?" obrigava a contar colunas
+estreitas sem dia da semana. Escolha do utilizador entre calendário, linha do tempo melhorada e
+calendário + lista do dia.
+
+**O nome diz o estado, não o tipo** (preenchido = aprovado, tracejado = pendente, neutro e riscado =
+recusado), com a exceção que muda o que se faz a seguir — a baixa, que leva o segundo acento.
 
 **Uma vista, um pedido**: o mapa e a lista da mesma página servem-se do **mesmo** array já carregado
 (`listTeamAbsences(from, to)` sem filtro de estado, porque o mapa precisa de todas); trocar de vista,

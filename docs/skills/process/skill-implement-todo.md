@@ -33,7 +33,7 @@ Lê `notes/ToDo.md` **sempre no momento da invocação** — nunca assumas o con
 
 Faz também, a baixo custo (leituras/greps rápidos, sem subagentes — isto alimenta o menu da Fase 1):
 
-1. **Contagem por tema**: quantos itens `- [ ]` existem em cada secção temática do `ToDo.md`. Se o ficheiro não tiver nenhum item (só a secção "How to Use"), guarda esse facto — afeta que opções fazem sentido no menu.
+1. **Contagem por tema e por tier**: quantos itens `- [ ]` existem em cada secção temática do `ToDo.md`, e quantos são `` `opus` ``, `` `sonnet` `` e sem marca ([[#Tiers de modelo]]). Se o ficheiro não tiver nenhum item (só a secção "How to Use"), guarda esse facto — afeta que opções fazem sentido no menu.
 2. **Planos por retomar**: lista `notes/roadmap/plans/` (pode não existir ainda — nesse caso não há nada a retomar). Qualquer ficheiro com `**Estado**: em curso` é candidato a retoma.
 3. **Ideias com contexto já recolhido**: grep rápido a `notes/ideas.md` por `> Contexto (via ` (deixadas por esta skill ou pelo [[skill-refine-idea]]). Guarda quantas encontraste (não precisas de as ler todas agora, só confirmar que existem e quantas).
 4. **Últimas entradas do work log**: as 1-3 entradas mais recentes de `notes/whatIveDone.md` (só os títulos `## AAAA-MM-DD — ...`, não o conteúdo todo).
@@ -67,7 +67,7 @@ Se "Implementar" ou "Só planear" (diretamente no menu 1.0, ou a partir de "Ver 
 
 ### 1.1 — Âmbito
 
-`AskUserQuestion` (single-select, 3 opções): **Tudo** · **Só um tema** · **Só um item específico**
+`AskUserQuestion` (single-select, 4 opções): **Tudo** · **Só um tema** · **Só um item específico** · **Só um tier** (ex.: só os `sonnet`, para uma sessão barata)
 
 **Se "Só um tema"**: segunda chamada `AskUserQuestion` com 2 perguntas multiSelect (o limite é 4 perguntas/4 opções por chamada, e os temas deste ToDo são mais do que 4 — divide-os em dois grupos). Os temas atuais de `notes/ToDo.md` são:
 - Pergunta A (multiSelect, 4 opções): Projetos (Enterprises) · Construção & Despesas · Funcionários & Perfis · Tarefas
@@ -75,7 +75,9 @@ Se "Implementar" ou "Só planear" (diretamente no menu 1.0, ou a partir de "Ver 
 
 **Estes grupos não são fixos** — se o utilizador tiver criado/removido secções no `ToDo.md`, usa as secções que existirem realmente no ficheiro lido na Fase 0, não esta lista.
 
-**Se "Só um item específico"**: imprime a lista atual do ToDo numerada (é texto que já tens em mãos, sem custo) e pergunta por intervalo(s) numérico(s) como opções (ex.: "#1-3" · "#4-6" · "#7-9 + soltos").
+**Se "Só um tier"**: os itens com essa marca, de todos os temas. Os itens sem marca não entram — ainda não se sabe o tier deles, e só a Fase 2 o diz.
+
+**Se "Só um item específico"**: imprime a lista atual do ToDo numerada, com o tier de cada item (é texto que já tens em mãos, sem custo) e pergunta por intervalo(s) numérico(s) como opções (ex.: "#1-3" · "#4-6" · "#7-9 + soltos").
 
 Guarda o resultado como a lista de bullets exatos (texto verbatim) em âmbito para as fases seguintes — **com o bloco `> Decidido (via refine-idea, …)`** indentado por baixo, se o tiverem: é esclarecimento já obtido, entra no plano e nas Fases 2-3. Nada fora deste âmbito é tocado.
 
@@ -86,6 +88,18 @@ Se a secção do ToDo aponta para uma spec em `notes/roadmap/<slug>.md` (escrita
 `AskUserQuestion` (single-select, 2 opções): **Sem limite (recomendado)** · **Pouco tempo/tokens — otimizar para fechar em segurança**
 
 Se "Pouco tempo/tokens": isto não muda o que é investigado/perguntado (Fases 2-3 continuam completas — a ambiguidade não desaparece por haver pouco orçamento), mas muda a Fase 4 (ordenação enviesada para tarefas curtas primeiro, dentro do que as dependências permitirem) e a Fase 5 (parar entre tarefas em vez de a meio, ver Fase 5).
+
+### 1.3 — Modelo da sessão (aviso, uma vez)
+
+Compara o modelo em que esta sessão corre (sabes-o pelo ambiente) com o **tier mais alto** dos itens em âmbito ([[#Tiers de modelo]]). A skill não muda de modelo sozinha: avisa uma vez, em texto, e segue com o modelo que estiver.
+
+| Sessão | Âmbito | Aviso |
+|---|---|---|
+| Opus | Só `sonnet` | "O âmbito é todo `sonnet`: `/model` para Sonnet poupa tokens sem perder o contexto desta sessão." |
+| Sonnet | Tem itens `opus` | "Há itens `opus`: `/model` para Opus antes deles, ou reduzir o âmbito aos `sonnet` e deixá-los para uma sessão Opus." |
+| Haiku | Qualquer | "Esta skill orquestra (investiga, pergunta, encadeia skills) e não deve correr em Haiku: `/model` para Sonnet ou Opus." |
+
+Itens sem marca não contam para o aviso; a Fase 4 volta a comparar, já com os tiers confirmados. O aviso nunca bloqueia.
 
 ---
 
@@ -122,6 +136,12 @@ deste tema, se algum.
 
 ### Effort Estimate
 S/M/L + 1 linha de justificação.
+### Tier
+Por bullet: opus | sonnet + 1 linha de razão. Se o bullet já tem tier, confirma-o ou
+contesta-o com o que o código mostrou. Um bullet com uma decisão e muito trabalho mecânico
+→ diz "misto" e propõe a divisão. Critérios: opus = decisão em aberto, contrato partilhado,
+schema, segurança, permissões, efeito largo; sonnet = o quê/onde/como se verifica já se
+sabem. Nunca haiku. Na dúvida, opus.
 ```
 
 Isto mantém o contexto principal barato — quem orquestra nunca lê os ficheiros de código diretamente, só os relatórios estruturados que voltam.
@@ -153,9 +173,12 @@ Constrói a ordem de implementação:
 
 1. **Dependências duras primeiro** — topological sort usando o campo `Dependencies` de cada relatório da Fase 2 (ex.: expor as tarefas no GET do utilizador tem de vir antes das notificações por utilizador, porque a notificação precisa da relação já exposta).
 2. **Agrupar por ficheiro partilhado ("hot file")** — cruza as tabelas `Files Likely Touched` de todos os temas em âmbito; qualquer ficheiro que apareça em mais do que um tema é um hot file (candidatos previsíveis neste repo: `SecurityConfig.java`, `ErrorCode.java`, `main.tsx`, entidades/DTOs de `Profile`, `Enterprise`, `Task`, `ConstructionStage`). Tarefas que partilham um hot file ficam adjacentes na ordem.
-3. **Desempate** — esforço (S antes de L), depois impacto. **Se o orçamento da sessão (Fase 1.2) for "pouco"**, o desempate por esforço passa a critério principal (não só desempate) dentro de cada grupo que as dependências permitirem — o objetivo é fechar o máximo de tarefas completas possível nesta sessão, nunca fazer uma tarefa grande pela metade.
+3. **Agrupar por tier**, dentro do que as dependências deixam — os `opus` juntos e, de preferência, antes dos `sonnet` que deles dependem (as decisões desbloqueiam a implementação). Assim a sessão muda de modelo uma só vez, ou para no fim do bloco `opus` e o resto retoma-se noutra sessão.
+4. **Desempate** — esforço (S antes de L), depois impacto. **Se o orçamento da sessão (Fase 1.2) for "pouco"**, o desempate por esforço passa a critério principal (não só desempate) dentro de cada grupo que as dependências permitirem — o objetivo é fechar o máximo de tarefas completas possível nesta sessão, nunca fazer uma tarefa grande pela metade.
 
-Apresenta a ordem final como lista numerada com 1 linha de razão por item. Pergunta via `AskUserQuestion` (single-select, 3 opções): **Confirmar** · **Reordenar** (segue-se pergunta de texto livre) · **Remover um item desta ronda**. Repete até o utilizador confirmar.
+**Tiers**: cada tarefa leva o tier confirmado pela Fase 2. Quando difere do que o bullet tinha, di-lo na linha da tarefa ("era `sonnet`, passa a `opus`: o código mostrou que falta decidir X"). Um item "misto" → propõe a divisão em dois bullets e, se o utilizador aceitar, reescreve o bullet no ToDo (edição pontual) antes de gravar o plano. Se os tiers confirmados mudaram o quadro da 1.3, repete o aviso de modelo, uma vez.
+
+Apresenta a ordem final como lista numerada com o tier e 1 linha de razão por item. Pergunta via `AskUserQuestion` (single-select, 3 opções): **Confirmar** · **Reordenar** (segue-se pergunta de texto livre) · **Remover um item desta ronda**. Repete até o utilizador confirmar.
 
 **Grava o plano confirmado** em `notes/roadmap/plans/AAAA-MM-DD-<slug-curto-do-âmbito>.md` (cria a pasta `plans/` se ainda não existir), formato:
 
@@ -165,13 +188,14 @@ Apresenta a ordem final como lista numerada com 1 linha de razão por item. Perg
 **Estado**: em curso
 **Âmbito escolhido**: <descrição>
 **Orçamento da sessão**: sem limite | pouco
+**Modelo**: tarefas 1-2 `opus` · 3-5 `sonnet` (mudar com `/model` entre os blocos, ou retomar noutra sessão)
 
 ## Esclarecimentos já obtidos
 - <pergunta> → <resposta>
 
 ## Ordem confirmada
-1. [ ] <tarefa> — por começar
-2. [ ] <tarefa> — por começar
+1. [ ] `opus` <tarefa> — por começar
+2. [ ] `sonnet` <tarefa> — por começar
 ...
 
 ## Próximo passo
@@ -200,6 +224,7 @@ Por tarefa, na ordem confirmada:
 8. **Checkpoint "concluída"**: marca a tarefa como `[x]` concluída no ficheiro de plano.
 9. Se surgir uma ambiguidade que só o código revelou (não era visível na Fase 2/3), **para e pergunta** — não assumas.
 10. **Se o orçamento da sessão é "pouco"**: antes de começar a próxima tarefa, avalia se cabe com folga no que resta de sessão (usa o `Effort Estimate` como proxy). Se houver dúvida, **para aqui entre tarefas** (nunca a meio de uma) — o checkpoint do passo 1 já garante que o plano fica correto para a próxima sessão continuar "a todo o gás" sem repetir Fases 1-4.
+11. **Na fronteira entre blocos de tier** (o plano passa de `opus` a `sonnet`, ou o contrário), lembra uma vez a linha **Modelo** do plano. Uma tarefa `sonnet` que afinal esconde uma decisão de desenho é o caso do passo 9: para, di-lo, e decide com o utilizador se se decide já ou noutra sessão.
 
 ---
 
@@ -238,6 +263,31 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 
 ---
 
+## Tiers de modelo
+
+Cada item de `notes/ToDo.md` começa por um **tier**: o modelo **mínimo** que o faz bem, e portanto o modelo
+em que se abre a sessão, que é onde se gasta quase tudo (orquestração, leitura do vault, perguntas). Esta
+secção é a única cópia dos critérios no projeto; as outras skills linkam para aqui.
+
+| Tier | Quando | Exemplo |
+|---|---|---|
+| `opus` | Há uma decisão em aberto; contrato partilhado, schema, segurança, permissões; código com efeito largo (`SecurityConfig`, `ErrorCode`, entidades partilhadas, configuração central); um ⚠️ que é de desenho | Decidir que role vê uma área nova |
+| `sonnet` | Sabe-se **o quê, onde e como se verifica**; os ficheiros são conhecidos; a correção está descrita ou há um teste que a fecha | Um filtro novo numa lista, com o endpoint já existente |
+| `haiku` | **Nunca num item do ToDo**: uma sessão sobre um item é orquestração (investigar, perguntar, encadear skills), e o Haiku a errar aí custa mais do que poupou | — |
+
+- **Na dúvida, sobe-se um tier.** Um tier errado para baixo dá retrabalho, que custa mais do que se poupou.
+- **Um item misto parte-se em dois**: um `opus` que decide e grava a decisão (bloco `> Decidido` ou `docs/`), e por
+  baixo um `sonnet` que implementa a partir dela. Sem a divisão, o item inteiro corre no modelo caro por causa
+  de uma fração de desenho.
+- **Marca no início do bullet**, em minúsculas e entre crases: `` - [ ] `sonnet` Filtrar … ``. Quem escreve no
+  ToDo põe-na: o [[skill-refine-idea]], o [[skill-plan-feature]] (uma por fase), o [[skill-verify-in-browser]] (os 🔴).
+- **Sem marca, o tier está por decidir** — não é um erro. Esta skill propõe-no depois de investigar (Fase 2).
+- **Nomes de tier, não versões** (`opus`, não o número da geração), para o ToDo não envelhecer.
+- Convenção nova (2026-11-12, vinda do Workflow), ainda por provar. Um tier que se revelou errado é uma lição
+  para [[learning]].
+
+---
+
 ## Final Checklist
 
 - [ ] Menu principal (retomar / implementar / só planear / ver estado) apresentado antes de qualquer investigação
@@ -246,7 +296,8 @@ No fim da execução (ou se o utilizador parar a meio, ou se o orçamento aperta
 - [ ] Investigação feita em paralelo, por tema, via subagentes (não leste os ficheiros de código diretamente)
 - [ ] Todas as perguntas de esclarecimento feitas em bloco, antes da Fase 5
 - [ ] Itens que ficaram sem resposta possível movidos para `ideas.md` com contexto, não deixados presos
-- [ ] Ordem de prioridade construída por dependências + hot files + esforço/impacto (e esforço em primeiro lugar se orçamento apertado), e confirmada pelo utilizador
+- [ ] Tier de cada item confirmado pela investigação, mudanças ditas, itens mistos partidos; aviso de modelo dado (1.3 e, se mudou, Fase 4)
+- [ ] Ordem de prioridade construída por dependências + hot files + tier + esforço/impacto (e esforço em primeiro lugar se orçamento apertado), e confirmada pelo utilizador
 - [ ] Plano gravado em `notes/roadmap/plans/` antes de implementar
 - [ ] Implementação sempre sequencial, uma tarefa de cada vez, com checkpoint no plano antes/depois de cada tarefa
 - [ ] Cada tarefa testada (testes de backend a passar / UI verificada no browser) antes do bookkeeping — nunca saltado, mesmo com pouco orçamento

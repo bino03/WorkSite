@@ -89,9 +89,10 @@ Cada fase **entra em uso sozinha** (como as fases do [[roadmap/assiduidade]]) e 
 |---|---|
 | **Ficheiros concretos** | `management/managementapi/src/main/java/com/management/managementapi/<domínio>/controller/XController.java`, não "o controller" |
 | **Skill a seguir** | `add-database-table`, `add-backend-feature`, `add-file-upload`, `permissions-and-auth`, `frontend-integration-guide`, `frontend-design-system`, `frontend-error-handling` — a que cobre a fase |
+| **Tier de modelo** | `opus` (a fase ainda tem uma decisão, ou mexe em permissões, schema partilhado, `SecurityConfig`) · `sonnet` (o desenho já está fechado na spec). Critérios em [[skill-implement-todo#Tiers de modelo]]; na dúvida, `opus` |
 | **Critério de aceitação** | Verificável: um teste que passa (`./mvnw test -Dtest=…`) e/ou um comportamento a ver no browser (vai para `/verify-in-browser`). Uma fase sem isto fica "quase feita" para sempre |
 
-Fases **sequenciais** — tocam nos mesmos ficheiros. Paralelismo só na investigação.
+Fases **sequenciais** — tocam nos mesmos ficheiros. Paralelismo só na investigação. Fases do mesmo tier **seguidas** sempre que as dependências o permitam: a spec diz em que modelo abrir cada sessão (linha **Sessões** em "As fases").
 
 ## Step 5: Escrever a spec
 
@@ -134,9 +135,12 @@ Criar `notes/roadmap/<slug-kebab>.md` com esta forma:
 
 ## As fases, na ordem das dependências
 
+**Sessões**: fases <1-2> em `opus` · <3-5> em `sonnet` — abrir cada sessão no modelo do bloco que vai fazer.
+
 ### Fase 1 — <o que passa a ser possível>
 - **Ficheiros**: `<caminhos concretos>`
 - **Skills**: `<skill>`
+- **Tier**: `sonnet`
 - **Aceite quando**: <critério verificável>
 
 ## Em aberto (não é fase)
@@ -159,7 +163,7 @@ Criar `notes/roadmap/<slug-kebab>.md` com esta forma:
 
 - [ ] **`notes/ToDo.md`** — uma secção própria (como "Assiduidade & Férias"): um parágrafo a apontar para a spec com **"ler antes de implementar qualquer fase"**, e **um bullet por fase**, na ordem, cada um com o critério de aceitação:
   ```markdown
-  - [ ] Fase 1 — <título> — <critério de aceitação numa frase> · [[roadmap/<slug>]] → "Fase 1"
+  - [ ] `sonnet` Fase 1 — <título> — <critério de aceitação numa frase> · [[roadmap/<slug>]] → "Fase 1"
   ```
 - [ ] **`notes/roadmap/backlog.md`** — linha da iniciativa em "Em curso" ou "Por começar" (estado + data + o que a desbloqueia)
 - [ ] **Entradas absorvidas** — se a spec funde bullets do ToDo ou entradas de `ideas.md`, retirá-las (edição pontual) e dizê-lo no `📌` da spec
@@ -195,7 +199,8 @@ Três linhas: onde ficou a spec; quantas fases e o que cada uma entrega; como ar
 - [ ] Sete secções da entrevista cobertas, em bloco, com defaults; paridade com o Excel se aplicável
 - [ ] Desenho concreto (SQL, rotas, DTOs, ficheiros do Backoffice, códigos de erro)
 - [ ] `notes/roadmap/<slug>.md` escrita e passa o teste da sessão nova
-- [ ] Secção no `ToDo.md` com um bullet por fase + linha no `backlog.md`
+- [ ] Cada fase com tier e a linha **Sessões** preenchida
+- [ ] Secção no `ToDo.md` com um bullet por fase (com o tier da fase) + linha no `backlog.md`
 - [ ] Decisões estruturais em `docs/`; commit na `dev` se `docs/` mudou
 - [ ] Entrega em três linhas, sem implementar
 

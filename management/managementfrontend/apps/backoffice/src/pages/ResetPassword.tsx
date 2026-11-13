@@ -82,9 +82,6 @@ export const ResetPassword = () => {
           >
             Worksite
           </h1>
-          <p style={{ fontSize: "1.06rem", lineHeight: 1.6, color: "rgba(250,249,245,0.80)", maxWidth: "24rem" }}>
-            {t("auth.subtitle")}
-          </p>
         </div>
       </div>
 
@@ -104,9 +101,6 @@ export const ResetPassword = () => {
             >
               Worksite
             </h1>
-            <p style={{ fontSize: "0.75rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "#87867f" }}>
-              {t("auth.subtitle")}
-            </p>
           </div>
 
           <div

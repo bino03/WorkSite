@@ -5,9 +5,9 @@ import ScopedInvoicesPage from "@/pages/backoffice/invoices/ScopedInvoicesPage";
 /**
  * A quarentena: chegou uma fatura e ainda não se sabe de quem é.
  *
- * Ordenada da mais antiga para a mais recente pelo backend — quanto mais tempo
- * uma fatura aqui está, mais urgente é identificá-la. É uma fila de trabalho,
- * não um arquivo.
+ * Ordenada pela data da fatura, da mais recente para a mais antiga, como as
+ * outras listas de faturas (até 2026-11-13 vinha da mais antiga). É uma fila
+ * de trabalho, não um arquivo.
  */
 const UnidentifiedInvoicesPage: FC = () => (
   <ScopedInvoicesPage

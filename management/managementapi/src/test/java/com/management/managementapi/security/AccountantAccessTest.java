@@ -5,6 +5,7 @@ import com.management.managementapi.controller.ActivityLogController;
 import com.management.managementapi.controller.EmailProviderController;
 import com.management.managementapi.controller.EmployeesController;
 import com.management.managementapi.controller.TaskController;
+import com.management.managementapi.enterprises.controller.ConstructionBudgetItemController;
 import com.management.managementapi.enterprises.controller.ConstructionInvoiceController;
 import com.management.managementapi.enterprises.controller.PaymentController;
 import com.management.managementapi.notifications.controller.NotificationController;
@@ -60,6 +61,13 @@ class AccountantAccessTest {
         assertThat(allows(ACCOUNTANT, endpoint(TaskController.class, "updateStatus"))).isTrue();
         assertThat(allows(ACCOUNTANT, endpoint(TaskController.class, "create"))).isFalse();
         assertThat(allows(ACCOUNTANT, endpoint(TaskController.class, "delete"))).isFalse();
+    }
+
+    @Test
+    void closesTheBudgetRecycleBin() {
+        assertThat(allows(ACCOUNTANT, endpoint(ConstructionBudgetItemController.class, "getDeleted"))).isFalse();
+        assertThat(allows(ACCOUNTANT, endpoint(ConstructionBudgetItemController.class, "recover"))).isFalse();
+        assertThat(allows("ADMIN", endpoint(ConstructionBudgetItemController.class, "recover"))).isTrue();
     }
 
     @Test

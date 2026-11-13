@@ -75,6 +75,7 @@ sub-recursos) não entram no nav.
 | Minha Conta | abre o `MyProfileDrawer` |
 | *Definições* (grupo) → Fornecedores | abre a `SuppliersDrawer` |
 | *Definições* (grupo) → Provedores de email | abre a `EmailProvidersDrawer`; a entrada só é montada se `isAdmin()` — o endpoint por trás é `ADMIN` e mostrá-la a um `EMPLOYEE` só lhe dava um 403 |
+| *Definições* (grupo) → Backups | abre a `BackupsDrawer`; só `isAdmin()`, como a de cima |
 | Idioma ▸ Português / English | `i18n.changeLanguage` + `localStorage`; o idioma activo fica `disabled` |
 | Terminar sessão | `useConfirm()` → `logout` |
 

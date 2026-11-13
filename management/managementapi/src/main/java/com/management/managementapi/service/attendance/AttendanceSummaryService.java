@@ -97,6 +97,7 @@ public class AttendanceSummaryService {
         List<DayAttendance> days = new ArrayList<>();
         Set<UUID> schedulesSeen = new HashSet<>();
 
+        LocalDate today = zone.today();
         for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
             EmploymentTerm term = employment == null ? null : employment.termOn(day);
             WorkScheduleDay scheduled = scheduledDay(term, day);
@@ -112,7 +113,8 @@ public class AttendanceSummaryService {
                     term != null,
                     holidays.get(day),
                     absenceCovering(approvedAbsences, day),
-                    zone.zoneId()));
+                    zone.zoneId(),
+                    today));
         }
 
         return summarise(profileId, employment, from, to, days, schedulesSeen.size());

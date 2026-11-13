@@ -308,6 +308,48 @@ O histórico do git já foi confirmado limpo (nenhum `.env` alguma vez commitado
 - Um **provedor SMTP real** configurado em *Definições → Provedores de email* — por fazer; sem ele
   não há convites de funcionários nem recuperação de password.
 
+## Limites do plano Free da Supabase (pesquisado a 2026-11-13)
+
+O projeto está no plano **Free**. O Pro custa 25 $/mês — a pergunta "tenho de pagar?" já foi feita
+uma vez; a resposta e o plano B estão aqui.
+
+**Os limites que contam** (Dashboard → *Organization → Usage*; o ciclo de faturação começa **dia 8**):
+
+| | Free | Nota |
+|---|---|---|
+| Egress não-cached | 5 GB/mês | tudo o que **sai** da Supabase: queries do backend (Fly **e** local, a BD é partilhada), downloads do Storage, `pg_dump` |
+| Egress cached | 5 GB/mês | só ficheiros do Storage servidos pela CDN em cache; quota separada |
+| Tamanho da BD | 500 MB | acumulado, não reinicia no ciclo |
+| File storage | 1 GB | acumulado — **é o que vai bater primeiro** (PDFs das faturas) |
+
+**Ao exceder no Free**: não há cobrança. Vem um email e um período de tolerância (duração não
+documentada oficialmente); se continuar acima, a API responde **HTTP 402** até o ciclo reiniciar ou
+haver upgrade. Os dados não se apagam. O medidor do dashboard pode atrasar ~1 h.
+
+**Medido a 2026-11-13** (5 dias de ciclo): egress 0,25 GB (projeção ~1,4–1,5 GB/mês, ~30 %),
+BD 35 MB, storage 0,14 GB, 4 MAU. Folga larga em tudo.
+
+### Plano B quando o storage se aproximar de 1 GB — não pagar o Pro
+
+Decisão: **tirar só os ficheiros** da Supabase; BD e Auth ficam no Free (folga enorme). Pagar 25 $/mês
+só por storage não compensa. Gatilho para agir: storage a passar ~700 MB.
+
+| Serviço | Grátis | Egress | |
+|---|---|---|---|
+| **Cloudflare R2** | 10 GB | ilimitado grátis | **a escolha** — S3-compatível; depois ~0,015 $/GB/mês |
+| Backblaze B2 | 10 GB | grátis até 3× o armazenado | S3-compatível |
+| Tigris (Fly.io) | 5 GB | grátis | no mesmo sítio que a app, mas menos espaço |
+
+(Números de sites comparativos em 2026 — confirmar nas páginas oficiais antes de migrar.)
+
+**Âmbito da migração**: todo o acesso a ficheiros passa por
+`integrations/supabase/SupabaseStorageService.java` e `SignedUrlService.java` — reescrever com o AWS
+SDK S3 (serve R2 e B2), mudar variáveis de ambiente, copiar os ficheiros (os scripts
+`backup-storage.mjs`/`restore-storage.mjs` abaixo são o ponto de partida). A BD guarda
+`bucket + key`, nunca URLs — **não há migração de dados**. Sair da Supabase de vez obrigaria também
+a trocar a autenticação (`SupabaseAuthClient.java`) e o Postgres (Neon, Fly Postgres) — muito mais
+trabalho, não compensa com estes números.
+
 ## Cópia de segurança
 
 ### O que há para guardar

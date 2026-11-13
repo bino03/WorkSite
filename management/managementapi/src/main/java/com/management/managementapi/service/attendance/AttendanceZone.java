@@ -34,6 +34,11 @@ public class AttendanceZone {
         return zoneId;
     }
 
+    /** O dia de hoje neste fuso — a fronteira entre uma falta e um dia que ainda não chegou. */
+    public LocalDate today() {
+        return LocalDate.now(zoneId);
+    }
+
     /** O dia de calendário local a que um instante pertence. */
     public LocalDate dateOf(OffsetDateTime instant) {
         return instant.atZoneSameInstant(zoneId).toLocalDate();

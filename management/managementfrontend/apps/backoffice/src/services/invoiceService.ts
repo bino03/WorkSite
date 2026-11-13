@@ -182,7 +182,7 @@ export interface ScopedInvoiceParams {
 
 /**
  * A quarentena: faturas que chegaram e ainda não se sabe de quem são. Vêm da
- * mais antiga para a mais recente — quanto mais tempo lá está, mais urgente é.
+ * mais recente para a mais antiga pela data da fatura, como as outras listas.
  * Só `ADMIN`.
  */
 export async function listUnidentifiedInvoices(
@@ -255,8 +255,8 @@ function invoiceFilterParams(filters: InvoiceFilters, includeOutstanding: boolea
 export async function listInvoices(
   enterpriseId: string,
   filters: InvoiceFilters,
-  // A obra ordena por `createdAt` (data de carregamento) por omissão — o
-  // backend já aceita o `sort` do Spring `Pageable`, só faltava expô-lo.
+  // Por omissão o backend ordena pela data da fatura (mais recente primeiro,
+  // sem data no fim); o `sort` do Spring `Pageable` troca-a.
   sort?: { field: string; order: "asc" | "desc" }
 ): Promise<InvoicePage> {
   const params = invoiceFilterParams(filters, true);

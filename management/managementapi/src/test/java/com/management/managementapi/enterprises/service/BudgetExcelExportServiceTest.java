@@ -896,4 +896,75 @@ class BudgetExcelExportServiceTest {
             assertThat(hasRowWithNumber(expenses, "FT X/2")).isFalse();
         }
     }
+
+    @Test
+    @DisplayName("Obra de um só lote: o ficheiro do lote leva as por classificar desse lote, não as sem lote")
+    void exportLotOnSingleLotEnterpriseKeepsItsUnclassifiedInvoices() throws Exception {
+        ConstructionBudget lot = lot("Moradia 2");
+        when(budgetService.getLot(lot.getId())).thenReturn(lot);
+        when(budgetService.getBudgetTree(lot.getId())).thenReturn(tree());
+        when(budgetService.listLots(ENTERPRISE_ID)).thenReturn(List.of(
+                new BudgetLotDTO(lot.getId(), "Moradia 2", 0, 11, BigDecimal.TEN, BigDecimal.ZERO)));
+
+        ConstructionInvoice doLote = invoice("FT M/1", "2026-09-01", "100", "Casa A");
+        doLote.setBudget(lot);
+        invoice("FT M/2", "2026-09-02", "200", "Casa B");
+
+        BudgetExcelExportService.ExportFile file = service.exportLot(lot.getId(),
+                EnumSet.of(BudgetExportSheet.EXPENSES));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            Sheet expenses = wb.getSheet("Despesas");
+            assertThat(hasRowWithNumber(expenses, "FT M/1")).isTrue();
+            assertThat(hasRowWithNumber(expenses, "FT M/2")).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("O ficheiro de um lote vazio não leva as faturas classificadas do outro lote")
+    void exportOfAnEmptyLotLeavesOutTheOtherLotsInvoices() throws Exception {
+        ConstructionBudget lotWithRubrics = lot("Lote 3");
+        ConstructionBudget emptyLot = lot("Lote 1");
+        when(budgetService.listLots(ENTERPRISE_ID)).thenReturn(List.of(
+                new BudgetLotDTO(lotWithRubrics.getId(), "Lote 3", 0, 11, BigDecimal.TEN, BigDecimal.ZERO),
+                new BudgetLotDTO(emptyLot.getId(), "Lote 1", 1, 0, BigDecimal.ZERO, BigDecimal.ZERO)));
+        when(budgetService.getBudgetTree(emptyLot.getId())).thenReturn(
+                new BudgetTreeDTO(ENTERPRISE_ID, "Lote 1", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                        BigDecimal.ZERO, 0, 0, 0, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, List.of()));
+        when(budgetService.getLot(emptyLot.getId())).thenReturn(emptyLot);
+
+        ConstructionInvoice classified = invoice("FT Y/1", "2026-09-01", "100", "Casa A");
+        expense(classified, item11, "100");
+        ConstructionInvoice ofTheEmptyLot = invoice("FT Y/2", "2026-09-02", "200", "Casa B");
+        ofTheEmptyLot.setBudget(emptyLot);
+
+        BudgetExcelExportService.ExportFile file = service.exportLot(emptyLot.getId(),
+                EnumSet.of(BudgetExportSheet.EXPENSES));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            Sheet expenses = wb.getSheet("Despesas");
+            assertThat(hasRowWithNumber(expenses, "FT Y/1")).isFalse();
+            assertThat(hasRowWithNumber(expenses, "FT Y/2")).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("O ficheiro \"Sem lote\" leva só as faturas sem lote nem rubrica")
+    void exportWithoutLotCarriesOnlyTheInvoicesWithoutALot() throws Exception {
+        ConstructionBudget lotA = twoLots();
+        ConstructionInvoice ofLotA = invoice("FT S/1", "2026-09-01", "100", "Casa A");
+        ofLotA.setBudget(lotA);
+        invoice("FT S/2", "2026-09-02", "200", "Casa B");
+
+        BudgetExcelExportService.ExportFile file = service.exportWithoutLot(ENTERPRISE_ID);
+
+        assertThat(file.fileName()).isEqualTo("Despesas - Vila Teste - Sem lote.xlsx");
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(file.content()))) {
+            assertThat(sheetNames(wb)).containsExactly("Despesas");
+            Sheet expenses = wb.getSheet("Despesas");
+            assertThat(hasRowWithNumber(expenses, "FT S/2")).isTrue();
+            assertThat(hasRowWithNumber(expenses, "FT S/1")).isFalse();
+            assertThat(hasRowWithNumber(expenses, "FT L/2")).isFalse();
+        }
+    }
 }

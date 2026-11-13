@@ -271,11 +271,12 @@ export interface VacationBalance {
 
 // ── Resumos e relatórios ──────────────────────────────────
 
-export type DayStatus = "WORKED" | "MISSING" | "NOT_SCHEDULED" | "NO_SCHEDULE" | "HOLIDAY" | "ON_LEAVE";
+export type DayStatus = "WORKED" | "MISSING" | "UPCOMING" | "NOT_SCHEDULED" | "NO_SCHEDULE" | "HOLIDAY" | "ON_LEAVE";
 
 export const DAY_STATUS_LABEL: Record<DayStatus, string> = {
   WORKED: "Trabalhou",
   MISSING: "Falta",
+  UPCOMING: "Por acontecer",
   NOT_SCHEDULED: "Folga",
   NO_SCHEDULE: "Sem horário",
   HOLIDAY: "Feriado",
