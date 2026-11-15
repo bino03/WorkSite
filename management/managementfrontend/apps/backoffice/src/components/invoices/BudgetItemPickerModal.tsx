@@ -112,7 +112,10 @@ export const BudgetItemPickerModal: FC<Props> = ({
     // Sem lote inicial, ou com um só lote (onde não há nó de lote nenhum para
     // abrir), `pathTo` não encontra o id e cai no topo sozinho — seguro nos
     // dois casos.
-    setParentId(initialLotId ?? null);
+    // Os lotes entram na árvore com o id `lot:<id>` (`lotAsNode`); o id cru não
+    // batia com nada e o picker abria na raiz (2026-11-15). Numa obra de um só
+    // lote não há nó de lote — não bate, e o picker abre na raiz, como deve.
+    setParentId(initialLotId ? `lot:${initialLotId}` : null);
     fetchTree();
 
     if (supplierNif) {
