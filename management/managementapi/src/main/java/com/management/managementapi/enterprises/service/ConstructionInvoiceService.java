@@ -14,6 +14,7 @@ import com.management.managementapi.enterprises.dto.invoice.request.CreditNoteEx
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceLotMovePreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceSplitLineDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BatchAllocateResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteRefDTO;
@@ -93,6 +94,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -459,8 +461,21 @@ public class ConstructionInvoiceService {
         ConstructionInvoice.Scope fromScope = invoice.getScope();
         UUID fromEnterpriseId = invoice.getEnterpriseId();
         UUID toEnterpriseId = targetEnterprise == null ? null : targetEnterprise.getId();
-        if (fromScope == targetScope && Objects.equals(fromEnterpriseId, toEnterpriseId)) {
+        if (dto.targetBudgetId() != null && targetEnterprise == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "O lote só se escolhe com destino numa obra.");
+        }
+        ConstructionBudget targetLot = dto.targetBudgetId() == null ? null
+                : liveLotOf(targetEnterprise.getId(), dto.targetBudgetId());
+        // Mesma obra só é "mesmo destino" se o lote também não muda — a comparação
+        // ignorava o lote e mudar do lote 4 para o 5 dava INVOICE_032 (2026-11-15).
+        boolean sameProject = fromScope == targetScope && Objects.equals(fromEnterpriseId, toEnterpriseId);
+        if (sameProject && (targetLot == null || targetLot.getId().equals(invoice.getBudgetId()))) {
             throw new BusinessException(ErrorCode.INVOICE_TRANSFER_SAME_TARGET);
+        }
+        // Mudar de lote não sai da obra — a regra da obra de teste (não meter lá
+        // faturas reais) não se aplica, e dentro de uma obra de teste é legítimo.
+        if (sameProject) {
+            return moveLot(invoice, targetLot, reason, Boolean.TRUE.equals(dto.keepRubrics()));
         }
         if (targetEnterprise != null && Boolean.TRUE.equals(targetEnterprise.getIsTest())) {
             throw new BusinessException(ErrorCode.INVOICE_TRANSFER_TEST_TARGET);
@@ -482,7 +497,7 @@ public class ConstructionInvoiceService {
         //    seguir, o rollback leva o log também — nunca fica um registo de uma
         //    transferência que não aconteceu.
         writeTransferLog(invoice, fromScope, fromEnterpriseId, targetScope, targetEnterprise,
-                reason, oldAllocations);
+                lotName(invoice.getBudget()), lotName(targetLot), false, reason, oldAllocations);
 
         // 3. Apaga as despesas (fatura + NC): sem obra não há rubrica a que pertençam.
         expenseRepository.deleteAll(invoiceAllocations);
@@ -491,9 +506,9 @@ public class ConstructionInvoiceService {
         }
 
         // 4. Move o âmbito/obra da fatura e das NC.
-        applyScope(invoice, targetScope, targetEnterprise);
+        applyScope(invoice, targetScope, targetEnterprise, targetLot);
         for (ConstructionInvoice creditNote : creditNotes) {
-            applyScope(creditNote, targetScope, targetEnterprise);
+            applyScope(creditNote, targetScope, targetEnterprise, targetLot);
             repository.save(creditNote);
         }
         ConstructionInvoice saved = repository.save(invoice);
@@ -502,12 +517,123 @@ public class ConstructionInvoiceService {
         return new InvoiceTransferResultDTO(toResponseDTO(saved, true), suggestIncident);
     }
 
-    private void applyScope(ConstructionInvoice invoice, ConstructionInvoice.Scope scope, Enterprise enterprise) {
+    /**
+     * Muda a fatura (e as NC ligadas) de lote sem sair da obra. Com
+     * {@code keepRubrics} cada despesa passa para a rubrica com o mesmo código
+     * no lote de destino — a mesma linha, só com outra rubrica; sem ele, as
+     * despesas apagam-se e a fatura fica por associar no lote novo. Em ambos
+     * os casos a repartição antiga fica no log, como numa transferência.
+     */
+    private InvoiceTransferResultDTO moveLot(ConstructionInvoice invoice, ConstructionBudget targetLot,
+                                             String reason, boolean keepRubrics) {
+        List<ConstructionInvoice> creditNotes = repository.findCreditNotesFor(invoice.getId());
+        Map<String, List<ConstructionExpense>> allocationsByDoc = new LinkedHashMap<>();
+        allocationsByDoc.put(invoice.getId().toString(), findAllocations(invoice.getId()));
+        for (ConstructionInvoice creditNote : creditNotes) {
+            allocationsByDoc.put(creditNote.getId().toString(), findAllocations(creditNote.getId()));
+        }
+        List<ConstructionExpense> all = allocationsByDoc.values().stream().flatMap(List::stream).toList();
+
+        Map<UUID, ConstructionBudgetItem> matches = matchInLot(all, targetLot.getId());
+        boolean keep = keepRubrics && !all.isEmpty();
+        if (keep && matches.size() < all.size()) {
+            throw new BusinessException(ErrorCode.INVOICE_LOT_RUBRICS_MISSING);
+        }
+
+        Map<String, List<AllocationSnapshot>> oldAllocations = new LinkedHashMap<>();
+        allocationsByDoc.forEach((docId, allocations) -> oldAllocations.put(docId, snapshotAllocations(allocations)));
+        Enterprise enterprise = invoice.getEnterprise();
+        writeTransferLog(invoice, invoice.getScope(), enterprise.getId(), invoice.getScope(), enterprise,
+                lotName(invoice.getBudget()), lotName(targetLot), keep, reason, oldAllocations);
+
+        if (keep) {
+            all.forEach(expense -> expense.setBudgetItem(matches.get(expense.getId())));
+            expenseRepository.saveAll(all);
+        } else {
+            allocationsByDoc.values().forEach(expenseRepository::deleteAll);
+        }
+
+        for (ConstructionInvoice creditNote : creditNotes) {
+            creditNote.setBudget(targetLot);
+            repository.save(creditNote);
+        }
+        invoice.setBudget(targetLot);
+        ConstructionInvoice saved = repository.save(invoice);
+        // Dentro da mesma obra não há pagamentos nem NC fora do sítio — nada a propor.
+        return new InvoiceTransferResultDTO(toResponseDTO(saved, true), false);
+    }
+
+    /**
+     * Antes de mudar de lote: que rubrica do destino corresponde a cada despesa.
+     * Não escreve nada — serve ao modal para decidir se pergunta "a rubrica
+     * continua a ser a mesma?".
+     */
+    @Transactional(readOnly = true)
+    public InvoiceLotMovePreviewDTO lotMovePreview(UUID invoiceId, UUID targetBudgetId) {
+        ConstructionInvoice invoice = getById(invoiceId);
+        if (invoice.getEnterpriseId() == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "A fatura não está numa obra.");
+        }
+        ConstructionBudget targetLot = liveLotOf(invoice.getEnterpriseId(), targetBudgetId);
+
+        List<ConstructionExpense> invoiceAllocations = findAllocations(invoiceId);
+        List<ConstructionExpense> creditNoteAllocations = repository.findCreditNotesFor(invoiceId).stream()
+                .flatMap(creditNote -> findAllocations(creditNote.getId()).stream())
+                .toList();
+        List<ConstructionExpense> all = new ArrayList<>(invoiceAllocations);
+        all.addAll(creditNoteAllocations);
+        Map<UUID, ConstructionBudgetItem> matches = matchInLot(all, targetLot.getId());
+
+        List<InvoiceLotMovePreviewDTO.Line> lines = all.stream()
+                .map(expense -> {
+                    ConstructionBudgetItem from = expense.getBudgetItem();
+                    ConstructionBudgetItem to = matches.get(expense.getId());
+                    return new InvoiceLotMovePreviewDTO.Line(
+                            creditNoteAllocations.contains(expense),
+                            from == null ? null : from.getCode(),
+                            from == null ? null : from.getName(),
+                            expense.getTotalPrice(),
+                            to == null ? null : to.getId(),
+                            to == null ? null : to.getCode(),
+                            to == null ? null : to.getName());
+                })
+                .toList();
+        return new InvoiceLotMovePreviewDTO(!all.isEmpty() && matches.size() == all.size(), lines);
+    }
+
+    /**
+     * Para cada despesa, a rubrica com o mesmo código no lote dado — o código é
+     * único por lote ({@code uq_budget_item_code}, V39). Só entram as que
+     * aceitam despesas; as sem código ou sem par ficam de fora do mapa.
+     */
+    private Map<UUID, ConstructionBudgetItem> matchInLot(List<ConstructionExpense> expenses, UUID lotId) {
+        Map<String, Optional<ConstructionBudgetItem>> byCode = new HashMap<>();
+        Map<UUID, ConstructionBudgetItem> matches = new HashMap<>();
+        for (ConstructionExpense expense : expenses) {
+            ConstructionBudgetItem from = expense.getBudgetItem();
+            String code = from == null ? null : trimToNull(from.getCode());
+            if (code == null) {
+                continue;
+            }
+            byCode.computeIfAbsent(code, c -> budgetItemRepository.findByBudgetIdAndCode(lotId, c)
+                            .filter(item -> item.getRowKind().acceptsExpenses()))
+                    .ifPresent(item -> matches.put(expense.getId(), item));
+        }
+        return matches;
+    }
+
+    private static String lotName(ConstructionBudget lot) {
+        return lot == null ? null : lot.getName();
+    }
+
+    private void applyScope(ConstructionInvoice invoice, ConstructionInvoice.Scope scope, Enterprise enterprise,
+                            ConstructionBudget chosenLot) {
         invoice.setScope(scope);
         invoice.setEnterprise(enterprise); // null em COMPANY/UNIDENTIFIED — o check ck_invoice_scope_enterprise
-        // O lote é da obra de origem: muda com ela. Só numa obra de um lote é que se deduz.
-        List<ConstructionBudget> lots = enterprise == null ? List.of() : liveLotsOf(enterprise.getId());
-        invoice.setBudget(lots.size() == 1 ? lots.get(0) : null);
+        // O lote é da obra de origem: muda com ela. O escolhido no modal, se houver;
+        // senão só numa obra de um lote é que se deduz.
+        List<ConstructionBudget> lots = enterprise == null || chosenLot != null ? List.of() : liveLotsOf(enterprise.getId());
+        invoice.setBudget(chosenLot != null ? chosenLot : lots.size() == 1 ? lots.get(0) : null);
         if (scope != ConstructionInvoice.Scope.UNIDENTIFIED) {
             invoice.setPossibleEnterprises(null);
             invoice.setAskWhom(null);
@@ -530,12 +656,14 @@ public class ConstructionInvoiceService {
     private void writeTransferLog(ConstructionInvoice invoice,
                                   ConstructionInvoice.Scope fromScope, UUID fromEnterpriseId,
                                   ConstructionInvoice.Scope toScope, Enterprise toEnterprise,
+                                  String fromLotName, String toLotName, boolean keptRubrics,
                                   String reason, Map<String, List<AllocationSnapshot>> oldAllocations) {
         String fromName = fromEnterpriseId == null ? null : enterpriseName(fromEnterpriseId);
         String toName = toEnterprise == null ? null : toEnterprise.getName();
         TransferMetadata meta = new TransferMetadata(
                 fromScope.name(), fromEnterpriseId, fromName,
                 toScope.name(), toEnterprise == null ? null : toEnterprise.getId(), toName,
+                fromLotName, toLotName, keptRubrics,
                 reason, oldAllocations);
         String json;
         try {
@@ -550,8 +678,8 @@ public class ConstructionInvoiceService {
         UUID userId = authContext.currentProfileId()
                 .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED));
         String userName = authContext.currentUserName().orElse("(desconhecido)");
-        String label = (fromName != null ? fromName : fromScope.name())
-                + " → " + (toName != null ? toName : toScope.name());
+        String label = (fromName != null ? fromName : fromScope.name()) + withLot(fromLotName)
+                + " → " + (toName != null ? toName : toScope.name()) + withLot(toLotName);
         activityLogService.createActivity(new ActivityLogCreateDTO(
                 userId, userName, ActivityType.TRANSFER,
                 EntityType.CONSTRUCTION_INVOICE, invoice.getId(), descreveFatura(invoice),
@@ -571,6 +699,7 @@ public class ConstructionInvoiceService {
                                 entry.getCreatedAt(),
                                 meta.fromScope(), meta.fromEnterpriseId(), meta.fromEnterpriseName(),
                                 meta.toScope(), meta.toEnterpriseId(), meta.toEnterpriseName(),
+                                meta.fromLotName(), meta.toLotName(),
                                 meta.reason(), entry.getUserName());
                     } catch (JsonProcessingException e) {
                         log.warn("activity_log {} com metadata de transferência ilegível: {}",
@@ -586,9 +715,15 @@ public class ConstructionInvoiceService {
         return enterpriseRepository.findById(enterpriseId).map(Enterprise::getName).orElse(null);
     }
 
+    private static String withLot(String lotName) {
+        return lotName == null ? "" : " (" + lotName + ")";
+    }
+
+    /** Os campos de lote vêm a null nas entradas anteriores a 2026-11-15. */
     private record TransferMetadata(
             String fromScope, UUID fromEnterpriseId, String fromEnterpriseName,
             String toScope, UUID toEnterpriseId, String toEnterpriseName,
+            String fromLotName, String toLotName, Boolean keptRubrics,
             String reason,
             Map<String, List<AllocationSnapshot>> oldAllocations) {}
 
@@ -1226,6 +1361,7 @@ public class ConstructionInvoiceService {
                         .thenComparing(ConstructionInvoice::getId))
                 .filter(invoice -> matchesOutstandingFilter(invoice, dueDates.get(invoice.getId()), filter, today))
                 .toList();
+        ordered = applyAdvancedOutstandingFilter(ordered, filter);
 
         // As opções do filtro de fornecedor saem daqui, antes de filtrar por ele:
         // só quem tem alguma coisa por liquidar (dentro dos outros filtros), e
@@ -1310,6 +1446,97 @@ public class ConstructionInvoiceService {
     }
 
     /** Todos os filtros menos o de fornecedor, que o chamador aplica à parte. */
+    /**
+     * A pesquisa avançada de "A pagar" (2026-11-13): os mesmos campos do modal da
+     * lista da obra, com a semântica do {@code ConstructionInvoiceRepository.search},
+     * mas em memória — a lista já está carregada e ordenada por urgência, e são
+     * dezenas de faturas. Pagamentos, repartições e documentos só se carregam se
+     * o filtro que os precisa estiver ligado.
+     */
+    private List<ConstructionInvoice> applyAdvancedOutstandingFilter(List<ConstructionInvoice> invoices,
+                                                                     OutstandingFilter f) {
+        if (!f.hasAdvanced() || invoices.isEmpty()) {
+            return invoices;
+        }
+        List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
+        String q = isBlank(f.q()) ? null : f.q().trim().toLowerCase();
+
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments =
+                f.paymentStatus() != null ? paymentService.paymentsForInvoices(ids, false) : Map.of();
+        Map<UUID, List<ConstructionExpense>> allocations =
+                f.allocationStatus() != null || f.budgetItemId() != null ? loadAllocations(ids) : Map.of();
+        Map<UUID, List<ConstructionInvoiceDocument>> documents = q != null ? loadDocuments(ids) : Map.of();
+        Set<UUID> budgetItemIds = f.budgetItemId() == null
+                ? Set.of()
+                : new HashSet<>(subtreeIds(f.enterpriseId(), f.budgetItemId()));
+
+        return invoices.stream().filter(invoice -> {
+            if (q != null && !matchesText(invoice, documents.getOrDefault(invoice.getId(), List.of()), q)) {
+                return false;
+            }
+            if (f.documentStatus() != null && (invoice.getDocumentStatus() == null
+                    || !f.documentStatus().equals(invoice.getDocumentStatus().name()))) {
+                return false;
+            }
+            BigDecimal total = invoice.getTotalAmount();
+            if (f.minAmount() != null && (total == null || total.compareTo(f.minAmount()) < 0)) {
+                return false;
+            }
+            if (f.maxAmount() != null && (total == null || total.compareTo(f.maxAmount()) > 0)) {
+                return false;
+            }
+            LocalDate date = invoice.getInvoiceDate();
+            if (f.from() != null && (date == null || date.isBefore(f.from()))) {
+                return false;
+            }
+            if (f.to() != null && (date == null || date.isAfter(f.to()))) {
+                return false;
+            }
+            if (f.paymentStatus() != null) {
+                BigDecimal paid = payments.getOrDefault(invoice.getId(), List.of()).stream()
+                        .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                // Tudo aqui está por liquidar: "PAID" nunca casa; "PARTIAL" pede um total.
+                boolean matches = switch (f.paymentStatus()) {
+                    case "UNPAID" -> paid.signum() == 0;
+                    case "PARTIAL" -> paid.signum() > 0 && total != null;
+                    default -> false;
+                };
+                if (!matches) {
+                    return false;
+                }
+            }
+            List<ConstructionExpense> lines = allocations.getOrDefault(invoice.getId(), List.of());
+            if (f.allocationStatus() != null) {
+                BigDecimal allocated = lines.stream()
+                        .map(ConstructionExpense::getTotalPrice)
+                        .filter(java.util.Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal unallocated = total == null ? BigDecimal.ZERO : total.subtract(allocated);
+                if (!f.allocationStatus().equals(allocationStatus(invoice, lines, unallocated))) {
+                    return false;
+                }
+            }
+            return f.budgetItemId() == null || lines.stream().anyMatch(line ->
+                    line.getBudgetItem() != null && budgetItemIds.contains(line.getBudgetItem().getId()));
+        }).toList();
+    }
+
+    /** Os mesmos campos do texto do {@code ConstructionInvoiceRepository.search}. */
+    private static boolean matchesText(ConstructionInvoice invoice, List<ConstructionInvoiceDocument> documents,
+                                       String q) {
+        return containsIgnoreCase(invoice.getSupplierName(), q)
+                || containsIgnoreCase(invoice.getSupplierNif(), q)
+                || containsIgnoreCase(invoice.getInvoiceNumber(), q)
+                || containsIgnoreCase(invoice.getInvoiceAtcud(), q)
+                || containsIgnoreCase(invoice.getNotes(), q)
+                || documents.stream().anyMatch(d -> containsIgnoreCase(d.getOriginalFilename(), q));
+    }
+
+    private static boolean containsIgnoreCase(String value, String lowerQuery) {
+        return value != null && value.toLowerCase().contains(lowerQuery);
+    }
+
     private static boolean matchesOutstandingFilter(ConstructionInvoice invoice, LocalDate dueDate,
                                                     OutstandingFilter filter, LocalDate today) {
         if (filter.enterpriseId() != null

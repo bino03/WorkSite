@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FC } from "react";
-import { Button, Select, Tooltip } from "antd";
+import { Badge, Button, Input, Tooltip } from "antd";
+import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 
 import {
   deleteInvoice,
@@ -23,13 +24,11 @@ import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvo
 import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import { formatCurrency } from "@/utils/formatters";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import {
-  ALL_WORKS,
-  SupplierFilterSelect,
-  WorkFilterSelect,
-  type WorkFilter,
-} from "@/components/invoices/InvoiceFilterSelects";
-import type { ConstructionInvoice, DueBucket, OutstandingByUrgency } from "@/types/invoice";
+import { ALL_WORKS, WorkFilterSelect, type WorkFilter } from "@/components/invoices/InvoiceFilterSelects";
+import { InvoiceFiltersModal } from "@/components/invoices/InvoiceFiltersModal";
+import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/invoices/invoiceFilters";
+import { EMPTY_INVOICE_FILTERS } from "@/types/invoice";
+import type { ConstructionInvoice, InvoiceFilters, OutstandingByUrgency } from "@/types/invoice";
 
 /**
  * "A pagar": as faturas por liquidar de todas as obras e da empresa, pela
@@ -37,10 +36,14 @@ import type { ConstructionInvoice, DueBucket, OutstandingByUrgency } from "@/typ
  * cedo, e as sem vencimento no fim.
  *
  * A ordem vem do servidor e não se muda aqui: é a razão de ser da página. Os
- * filtros (obra, fornecedor, vencimento, aprovação, contabilidade — 2026-11-10)
- * estreitam a lista sem mudar a ordem, e os números do topo passam a ser do
- * filtrado: "quanto devo à Brivel, e quanto disso está vencido?". Ficam só na
+ * filtros estreitam a lista sem mudar a ordem, e os números do topo passam a ser
+ * do filtrado: "quanto devo à Brivel, e quanto disso está vencido?". Ficam só na
  * página — saindo, perdem-se, como nas outras listas.
+ *
+ * A barra é a da lista de faturas da obra (pedido do utilizador, 2026-11-13):
+ * pesquisa de texto, o select de obra no lugar do de lote, e o botão "Filtros"
+ * com o mesmo modal (`variant="outstanding"`, que acrescenta vencimento e
+ * aprovação). Até aí eram cinco selects soltos.
  *
  * Só `ADMIN` e `ACCOUNTANT` — o gate real é o `@PreAuthorize` do backend.
  */
@@ -53,7 +56,10 @@ const OutstandingInvoicesPage: FC = () => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [filters, setFilters] = useState<OutstandingFilters>(NO_FILTERS);
+  const [filters, setFilters] = useState<InvoiceFilters>(NO_FILTERS);
+  /** Só obra ou "Despesas da empresa": a quarentena não entra nesta lista. */
+  const [work, setWork] = useState<WorkFilter>(ALL_WORKS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -61,46 +67,71 @@ const OutstandingInvoicesPage: FC = () => {
   const [noteInvoice, setNoteInvoice] = useState<ConstructionInvoice | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
 
-  const fetch = useCallback(async (nextPage: number, nextSize: number, current: OutstandingFilters) => {
-    setLoading(true);
-    try {
-      setData(
-        await listOutstandingByUrgency({
-          enterpriseId: current.work.enterpriseId ?? undefined,
-          company: current.work.scope === "COMPANY" ? true : undefined,
-          supplierNif: current.supplierNif ?? undefined,
-          dueBucket: current.dueBucket ?? undefined,
-          approvedForPayment: toBoolean(current.approval),
-          sentToAccountant: toBoolean(current.accountant),
-          page: nextPage,
-          size: nextSize,
-        })
-      );
-      // Pagar ou aprovar tira linhas da página: uma seleção antiga apontaria
-      // para faturas que já cá não estão.
-      setSelectedIds([]);
-    } catch (error) {
-      ErrorHandler.handle(error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetch = useCallback(
+    async (nextPage: number, nextSize: number, current: InvoiceFilters, currentWork: WorkFilter) => {
+      setLoading(true);
+      try {
+        const q = current.q.trim();
+        setData(
+          await listOutstandingByUrgency({
+            enterpriseId: currentWork.enterpriseId ?? undefined,
+            company: currentWork.scope === "COMPANY" ? true : undefined,
+            supplierNif: current.supplierNif ?? undefined,
+            dueBucket: current.dueBucket ?? undefined,
+            approvedForPayment: current.approvedForPayment ?? undefined,
+            sentToAccountant: current.sentToAccountant ?? undefined,
+            q: q || undefined,
+            documentStatus: current.documentStatus ?? undefined,
+            paymentStatus: current.paymentStatus ?? undefined,
+            allocationStatus: current.allocationStatus ?? undefined,
+            from: current.from ?? undefined,
+            to: current.to ?? undefined,
+            minAmount: current.minAmount ?? undefined,
+            maxAmount: current.maxAmount ?? undefined,
+            // A rubrica é de uma obra; sem obra o backend recusa-a.
+            budgetItemId: currentWork.enterpriseId ? (current.budgetItemId ?? undefined) : undefined,
+            page: nextPage,
+            size: nextSize,
+          }),
+        );
+        // Pagar ou aprovar tira linhas da página: uma seleção antiga apontaria
+        // para faturas que já cá não estão.
+        setSelectedIds([]);
+      } catch (error) {
+        ErrorHandler.handle(error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    void fetch(0, DEFAULT_PAGE_SIZE, NO_FILTERS);
+    void fetch(0, DEFAULT_PAGE_SIZE, NO_FILTERS, ALL_WORKS);
   }, [fetch]);
 
-  const reload = useCallback(() => void fetch(page, pageSize, filters), [fetch, page, pageSize, filters]);
+  const reload = useCallback(() => void fetch(page, pageSize, filters, work), [fetch, page, pageSize, filters, work]);
 
   /** Um filtro novo volta à primeira página: a página 3 do filtrado pode nem existir. */
-  const changeFilters = (changes: Partial<OutstandingFilters>) => {
+  const applyFilters = (changes: Partial<InvoiceFilters>) => {
     const next = { ...filters, ...changes };
     setFilters(next);
     setPage(0);
-    void fetch(0, pageSize, next);
+    void fetch(0, pageSize, next, work);
   };
 
-  const filtered = hasAnyFilter(filters);
+  /** Trocar de obra larga a rubrica: era da árvore da obra anterior. */
+  const changeWork = (nextWork: WorkFilter) => {
+    const next = { ...filters, budgetItemId: null, budgetItemLabel: null };
+    setWork(nextWork);
+    setFilters(next);
+    setPage(0);
+    void fetch(0, pageSize, next, nextWork);
+  };
+
+  const activeFilterCount = countActiveInvoiceFilters(filters);
+  const filtered =
+    activeFilterCount > 0 || filters.q.trim() !== "" || work.enterpriseId !== null || work.scope !== null;
 
   // O prazo de um fornecedor muda o vencimento — e portanto a ordem desta lista.
   useEffect(() => {
@@ -158,7 +189,7 @@ const OutstandingInvoicesPage: FC = () => {
   const selected = invoices.filter((invoice) => selectedIds.includes(invoice.id));
   const approvableSelected = selected.filter(canApproveForPayment);
   const payableSelected = selected.filter(
-    (invoice) => invoice.netAmount != null && invoice.paidAmount < invoice.netAmount
+    (invoice) => invoice.netAmount != null && invoice.paidAmount < invoice.netAmount,
   );
   // Um pagamento agregado é de uma obra só (ou só de despesas da empresa): o
   // backend recusa a mistura com INVOICE_PAYMENT_CROSS_ENTERPRISE, e aqui é
@@ -170,57 +201,70 @@ const OutstandingInvoicesPage: FC = () => {
       <div style={{ marginBottom: "20.4px" }}>
         <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>Faturas</h6>
         <h1 style={{ margin: 0 }}>A pagar</h1>
-        <p style={{ fontSize: 13, opacity: 0.7, margin: "6.8px 0 0", maxWidth: 720 }}>
-          As faturas por liquidar de todas as obras e da empresa, pela ordem do vencimento: as vencidas
-          primeiro, as sem prazo no fim. O vencimento vem do prazo do fornecedor (menu → Fornecedores)
-          ou do que estiver escrito à mão na fatura.
+        <p
+          style={{
+            fontSize: 13,
+            opacity: 0.7,
+            margin: "6.8px 0 0",
+            maxWidth: 720,
+          }}
+        >
+          As faturas por liquidar de todas as obras e da empresa, pela ordem do vencimento: as vencidas primeiro, as sem
+          prazo no fim. O vencimento vem do prazo do fornecedor (menu → Fornecedores) ou do que estiver escrito à mão na
+          fatura.
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: "10.2px", alignItems: "center", flexWrap: "wrap", marginBottom: "13.6px" }}>
-        <WorkFilterSelect
-          size="middle"
-          value={filters.work}
-          onChange={(work) => changeFilters({ work })}
-          style={{ width: isMobile ? "100%" : 220 }}
-        />
-        <SupplierFilterSelect
-          size="middle"
-          options={data?.suppliers ?? []}
-          value={filters.supplierNif}
-          onChange={(supplierNif) => changeFilters({ supplierNif })}
-          style={{ width: isMobile ? "100%" : 240 }}
-        />
-        <Select
+      <div
+        style={{
+          display: "flex",
+          gap: "10.2px",
+          alignItems: "center",
+          flexWrap: "wrap",
+          marginBottom: "13.6px",
+        }}
+      >
+        {/* A mesma barra da lista de faturas da obra: texto, o eixo de navegação
+            (aqui a obra, lá o lote) fora do modal e do "Limpar filtros", e o resto
+            no modal "Filtros" com a contagem. */}
+        <Input
+          placeholder="Fornecedor, NIF, nº da fatura…"
+          prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
+          value={filters.q}
+          onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
+          onPressEnter={() => applyFilters({})}
           allowClear
-          placeholder="Vencimento"
-          value={filters.dueBucket ?? undefined}
-          onChange={(dueBucket?: DueBucket) => changeFilters({ dueBucket: dueBucket ?? null })}
-          options={DUE_OPTIONS}
-          style={{ width: isMobile ? "100%" : 170 }}
+          onClear={() => applyFilters({ q: "" })}
+          style={{ maxWidth: 320 }}
         />
-        <Select
-          allowClear
-          placeholder="Aprovação"
-          value={filters.approval ?? undefined}
-          onChange={(approval?: YesNo) => changeFilters({ approval: approval ?? null })}
-          options={APPROVAL_OPTIONS}
-          style={{ width: isMobile ? "100%" : 170 }}
-        />
-        <Select
-          allowClear
-          placeholder="Contabilidade"
-          value={filters.accountant ?? undefined}
-          onChange={(accountant?: YesNo) => changeFilters({ accountant: accountant ?? null })}
-          options={ACCOUNTANT_OPTIONS}
-          style={{ width: isMobile ? "100%" : 170 }}
-        />
-        {filtered && (
-          <Button type="link" size="small" onClick={() => changeFilters(NO_FILTERS)}>
+        <Button onClick={() => applyFilters({})}>Pesquisar</Button>
+
+        <WorkFilterSelect size="middle" value={work} onChange={changeWork} style={{ width: isMobile ? "100%" : 220 }} />
+
+        <Badge count={activeFilterCount} size="small" color="var(--ind-color-accent)">
+          <Button
+            icon={<FilterOutlined />}
+            type={activeFilterCount > 0 ? "primary" : "default"}
+            onClick={() => setFiltersOpen(true)}
+          >
+            Filtros
+          </Button>
+        </Badge>
+        {activeFilterCount > 0 && (
+          <Button type="text" size="small" onClick={() => applyFilters(clearedInvoiceFilters())}>
             Limpar filtros
           </Button>
         )}
       </div>
+
+      <InvoiceFiltersModal
+        open={filtersOpen}
+        variant="outstanding"
+        enterpriseId={work.enterpriseId}
+        filters={filters}
+        onClose={() => setFiltersOpen(false)}
+        onApply={applyFilters}
+      />
 
       {data && (
         <div
@@ -245,7 +289,14 @@ const OutstandingInvoicesPage: FC = () => {
       )}
 
       {canManageWorks() && selected.length > 0 && (
-        <div style={{ display: "flex", gap: "10.2px", flexWrap: "wrap", marginBottom: "13.6px" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "10.2px",
+            flexWrap: "wrap",
+            marginBottom: "13.6px",
+          }}
+        >
           {approvableSelected.length > 0 && (
             <Button onClick={() => paymentApproval.approveMany(approvableSelected)}>
               Aprovar {approvableSelected.length} para pagamento
@@ -280,13 +331,17 @@ const OutstandingInvoicesPage: FC = () => {
         // "Associar", que só fazem sentido dentro de uma obra.
         scope="COMPANY"
         enterpriseNames={data?.enterpriseNames ?? {}}
-        pagination={{ currentPage: page, totalElements: data?.totalElements ?? 0, pageSize }}
+        pagination={{
+          currentPage: page,
+          totalElements: data?.totalElements ?? 0,
+          pageSize,
+        }}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);
           setPageSize(nextSize);
-          void fetch(nextPage, nextSize, filters);
+          void fetch(nextPage, nextSize, filters, work);
         }}
         onView={(invoice) => setDetailId(invoice.id)}
         onImageClick={(invoiceId) => void handleOpenPreview(invoiceId)}
@@ -328,66 +383,21 @@ const OutstandingInvoicesPage: FC = () => {
   );
 };
 
-type YesNo = "YES" | "NO";
-
-interface OutstandingFilters {
-  /** Só obra ou "Despesas da empresa": a quarentena não entra nesta lista. */
-  work: WorkFilter;
-  supplierNif: string | null;
-  dueBucket: DueBucket | null;
-  approval: YesNo | null;
-  accountant: YesNo | null;
-}
-
-const NO_FILTERS: OutstandingFilters = {
-  work: ALL_WORKS,
-  supplierNif: null,
-  dueBucket: null,
-  approval: null,
-  accountant: null,
+/** O ponto de partida: nada ligado. `page`/`size` do `InvoiceFilters` não se usam aqui — a página tem os seus. */
+const NO_FILTERS: InvoiceFilters = {
+  ...EMPTY_INVOICE_FILTERS,
+  size: DEFAULT_PAGE_SIZE,
 };
-
-function hasAnyFilter(filters: OutstandingFilters): boolean {
-  return (
-    filters.work.enterpriseId !== null ||
-    filters.work.scope !== null ||
-    filters.supplierNif !== null ||
-    filters.dueBucket !== null ||
-    filters.approval !== null ||
-    filters.accountant !== null
-  );
-}
-
-const toBoolean = (value: YesNo | null): boolean | undefined =>
-  value === null ? undefined : value === "YES";
-
-/** Cumulativas: "Vence este mês" inclui a semana; nenhuma inclui as vencidas. */
-const DUE_OPTIONS: { value: DueBucket; label: string }[] = [
-  { value: "OVERDUE", label: "Vencidas" },
-  { value: "WEEK", label: "Vence em 7 dias" },
-  { value: "MONTH", label: "Vence em 30 dias" },
-  { value: "NONE", label: "Sem prazo" },
-];
-
-const APPROVAL_OPTIONS: { value: YesNo; label: string }[] = [
-  { value: "YES", label: "Aprovadas" },
-  { value: "NO", label: "Por aprovar" },
-];
-
-const ACCOUNTANT_OPTIONS: { value: YesNo; label: string }[] = [
-  { value: "YES", label: "Enviadas à contabilidade" },
-  { value: "NO", label: "Por enviar" },
-];
 
 const countLabel = (count: number) => `em ${count} fatura${count === 1 ? "" : "s"}`;
 
 /** Um número do resumo, no mesmo desenho do "Falta pagar" das outras listas. */
-const Figure: FC<{ label: string; value: string; detail: string; strong?: boolean }> = ({
-  label,
-  value,
-  detail,
-  strong = false,
-}) => (
+const Figure: FC<{
+  label: string;
+  value: string;
+  detail: string;
+  strong?: boolean;
+}> = ({ label, value, detail, strong = false }) => (
   <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
     <span style={{ opacity: 0.6 }}>{label}</span>
     <span

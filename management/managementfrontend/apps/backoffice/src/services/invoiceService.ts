@@ -17,6 +17,7 @@ import type {
   GlobalInvoiceSearchParams,
   OutstandingByUrgencyParams,
   InvoiceSplitLine,
+  InvoiceLotMovePreview,
   InvoiceTransferPayload,
   InvoiceTransferResult,
   InvoiceUploadResult,
@@ -386,6 +387,20 @@ export async function transferInvoice(
   payload: InvoiceTransferPayload
 ): Promise<InvoiceTransferResult> {
   const response = await api.post(`/construction-invoices/${id}/transfer`, payload);
+  return response.data;
+}
+
+/**
+ * Antes de mudar a fatura de lote dentro da mesma obra: que rubrica do lote de
+ * destino tem o mesmo código que cada despesa. Só leitura.
+ */
+export async function getLotMovePreview(
+  id: string,
+  targetBudgetId: string
+): Promise<InvoiceLotMovePreview> {
+  const response = await api.get(`/construction-invoices/${id}/lot-move-preview`, {
+    params: { targetBudgetId },
+  });
   return response.data;
 }
 

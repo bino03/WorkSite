@@ -4,7 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.management.managementapi.dto.activity.ActivityLogCreateDTO;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceTransferDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceLotMovePreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTransferResultDTO;
+import com.management.managementapi.enterprises.model.ConstructionBudget;
+import com.management.managementapi.enterprises.model.ConstructionBudgetItem;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
 import com.management.managementapi.enterprises.model.Enterprise;
@@ -279,5 +282,168 @@ class InvoiceTransferServiceTest {
         assertThat(nc.getEnterpriseId()).isEqualTo(TO_ENTERPRISE);
         verify(expenseRepository).deleteAll(List.of(ncExpense));
         verify(repository).save(nc);
+    }
+
+    // ── mudar de lote dentro da mesma obra (2026-11-15) ──────────
+
+    private ConstructionBudget lot(String name) {
+        ConstructionBudget lot = new ConstructionBudget();
+        lot.setId(UUID.randomUUID());
+        lot.setName(name);
+        return lot;
+    }
+
+    private ConstructionBudgetItem item(ConstructionBudget lot, String code, String name) {
+        ConstructionBudgetItem item = new ConstructionBudgetItem();
+        item.setId(UUID.randomUUID());
+        item.setBudget(lot);
+        item.setCode(code);
+        item.setName(name);
+        return item;
+    }
+
+    private ConstructionExpense expenseOn(ConstructionBudgetItem item) {
+        ConstructionExpense e = expense();
+        e.setBudgetItem(item);
+        return e;
+    }
+
+    /** Fatura no lote 4 da Vila Petrus, que tem os lotes 4 e 5. Devolve o lote 5. */
+    private ConstructionBudget invoiceInLot4(ConstructionInvoice inv, ConstructionBudget lot4) {
+        ConstructionBudget lot5 = lot("Lote 5");
+        inv.setBudget(lot4);
+        when(budgetRepository.findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(FROM_ENTERPRISE))
+                .thenReturn(List.of(lot4, lot5));
+        return lot5;
+    }
+
+    @Test
+    @DisplayName("mesma obra, outro lote → deixa de ser INVOICE_032: muda o lote e apaga as despesas")
+    void outroLoteApagaRubricas() {
+        ConstructionInvoice inv = invoiceOnProject();
+        ConstructionBudget lot4 = lot("Lote 4");
+        ConstructionBudget lot5 = invoiceInLot4(inv, lot4);
+        ConstructionExpense antiga = expenseOn(item(lot4, "3.2.1", "Betão"));
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(INVOICE_ID)).thenReturn(List.of(antiga));
+
+        InvoiceTransferResultDTO result = service.transfer(INVOICE_ID,
+                new InvoiceTransferDTO("PROJECT", FROM_ENTERPRISE, "era do lote 5", lot5.getId(), false));
+
+        assertThat(inv.getBudgetId()).isEqualTo(lot5.getId());
+        assertThat(inv.getEnterpriseId()).isEqualTo(FROM_ENTERPRISE);
+        verify(expenseRepository).deleteAll(List.of(antiga));
+        ArgumentCaptor<ActivityLogCreateDTO> log = ArgumentCaptor.forClass(ActivityLogCreateDTO.class);
+        verify(activityLogService).createActivity(log.capture());
+        assertThat(log.getValue().metadata()).contains("Lote 4", "Lote 5", "era do lote 5");
+        assertThat(result.suggestIncident()).isFalse();
+    }
+
+    @Test
+    @DisplayName("mesma obra, outro lote, manter rubricas → a despesa passa para a rubrica com o mesmo código")
+    void outroLoteMantemRubricas() {
+        ConstructionInvoice inv = invoiceOnProject();
+        ConstructionBudget lot4 = lot("Lote 4");
+        ConstructionBudget lot5 = invoiceInLot4(inv, lot4);
+        ConstructionExpense antiga = expenseOn(item(lot4, "3.2.1", "Betão"));
+        ConstructionBudgetItem destino = item(lot5, "3.2.1", "Betão");
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(INVOICE_ID)).thenReturn(List.of(antiga));
+        when(budgetItemRepository.findByBudgetIdAndCode(lot5.getId(), "3.2.1")).thenReturn(Optional.of(destino));
+
+        service.transfer(INVOICE_ID,
+                new InvoiceTransferDTO("PROJECT", FROM_ENTERPRISE, "era do lote 5", lot5.getId(), true));
+
+        assertThat(inv.getBudgetId()).isEqualTo(lot5.getId());
+        assertThat(antiga.getBudgetItem()).isSameAs(destino);
+        assertThat(antiga.getTotalPrice()).isEqualByComparingTo("1000");
+        verify(expenseRepository).saveAll(List.of(antiga));
+        verify(expenseRepository, never()).deleteAll(anyList());
+    }
+
+    @Test
+    @DisplayName("manter rubricas com uma que não existe no destino → INVOICE_053, nada mexido")
+    void manterRubricasTudoOuNada() {
+        ConstructionInvoice inv = invoiceOnProject();
+        ConstructionBudget lot4 = lot("Lote 4");
+        ConstructionBudget lot5 = invoiceInLot4(inv, lot4);
+        ConstructionExpense comPar = expenseOn(item(lot4, "3.2.1", "Betão"));
+        ConstructionExpense semPar = expenseOn(item(lot4, "4.1", "Caixilharia"));
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(INVOICE_ID)).thenReturn(List.of(comPar, semPar));
+        when(budgetItemRepository.findByBudgetIdAndCode(lot5.getId(), "3.2.1"))
+                .thenReturn(Optional.of(item(lot5, "3.2.1", "Betão")));
+        when(budgetItemRepository.findByBudgetIdAndCode(lot5.getId(), "4.1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.transfer(INVOICE_ID,
+                new InvoiceTransferDTO("PROJECT", FROM_ENTERPRISE, "era do lote 5", lot5.getId(), true)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVOICE_LOT_RUBRICS_MISSING);
+
+        assertThat(inv.getBudgetId()).isEqualTo(lot4.getId());
+        verify(expenseRepository, never()).deleteAll(anyList());
+        verify(activityLogService, never()).createActivity(any());
+    }
+
+    @Test
+    @DisplayName("mesma obra e mesmo lote → continua a ser INVOICE_032")
+    void mesmoLote() {
+        ConstructionInvoice inv = invoiceOnProject();
+        ConstructionBudget lot4 = lot("Lote 4");
+        invoiceInLot4(inv, lot4);
+
+        assertThatThrownBy(() -> service.transfer(INVOICE_ID,
+                new InvoiceTransferDTO("PROJECT", FROM_ENTERPRISE, "sem efeito", lot4.getId(), false)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVOICE_TRANSFER_SAME_TARGET);
+    }
+
+    @Test
+    @DisplayName("mudar de lote dentro de uma obra de teste não é INVOICE_031 — não sai da obra")
+    void outroLoteNaObraDeTeste() {
+        ConstructionInvoice inv = invoiceOnProject();
+        inv.getEnterprise().setIsTest(true);
+        ConstructionBudget lot5 = invoiceInLot4(inv, lot("Lote 4"));
+
+        service.transfer(INVOICE_ID,
+                new InvoiceTransferDTO("PROJECT", FROM_ENTERPRISE, "teste", lot5.getId(), false));
+
+        assertThat(inv.getBudgetId()).isEqualTo(lot5.getId());
+    }
+
+    @Test
+    @DisplayName("obra → outra obra com lote escolhido: a fatura fica nesse lote (no próprio pedido)")
+    void outraObraComLote() {
+        ConstructionInvoice inv = invoiceOnProject();
+        target(false);
+        ConstructionBudget destA = lot("Lote A");
+        ConstructionBudget destB = lot("Lote B");
+        when(budgetRepository.findByEnterpriseIdOrderBySortOrderAscCreatedAtAsc(TO_ENTERPRISE))
+                .thenReturn(List.of(destA, destB));
+
+        service.transfer(INVOICE_ID,
+                new InvoiceTransferDTO("PROJECT", TO_ENTERPRISE, "era da Aleu", destB.getId(), null));
+
+        assertThat(inv.getEnterpriseId()).isEqualTo(TO_ENTERPRISE);
+        assertThat(inv.getBudgetId()).isEqualTo(destB.getId());
+    }
+
+    @Test
+    @DisplayName("preview: canKeep só quando todas as despesas têm par no destino")
+    void previewTudoOuNada() {
+        ConstructionInvoice inv = invoiceOnProject();
+        ConstructionBudget lot4 = lot("Lote 4");
+        ConstructionBudget lot5 = invoiceInLot4(inv, lot4);
+        ConstructionExpense comPar = expenseOn(item(lot4, "3.2.1", "Betão"));
+        ConstructionExpense semPar = expenseOn(item(lot4, "4.1", "Caixilharia"));
+        when(expenseRepository.findByInvoiceIdOrderByCreatedAtAsc(INVOICE_ID)).thenReturn(List.of(comPar, semPar));
+        when(budgetItemRepository.findByBudgetIdAndCode(lot5.getId(), "3.2.1"))
+                .thenReturn(Optional.of(item(lot5, "3.2.1", "Betão")));
+
+        InvoiceLotMovePreviewDTO preview = service.lotMovePreview(INVOICE_ID, lot5.getId());
+
+        assertThat(preview.canKeep()).isFalse();
+        assertThat(preview.lines()).hasSize(2);
+        assertThat(preview.lines().get(0).toCode()).isEqualTo("3.2.1");
+        assertThat(preview.lines().get(1).toBudgetItemId()).isNull();
     }
 }

@@ -146,6 +146,9 @@ export interface InvoiceTransferSummary {
   toScope: InvoiceScope;
   toEnterpriseId: string | null;
   toEnterpriseName: string | null;
+  /** Nulos nas transferências antigas e quando a obra não tinha lote. */
+  fromLotName: string | null;
+  toLotName: string | null;
   reason: string;
   byName: string;
 }
@@ -350,6 +353,28 @@ export interface InvoiceTransferPayload {
   targetScope: InvoiceScope;
   targetEnterpriseId?: string | null;
   reason: string;
+  /** Lote de destino (só `PROJECT`). Na mesma obra é o que torna isto uma mudança de lote. */
+  targetBudgetId?: string | null;
+  /** Mudança de lote: passar as despesas para as rubricas com o mesmo código no destino. */
+  keepRubrics?: boolean;
+}
+
+/**
+ * `GET /construction-invoices/{id}/lot-move-preview` — que rubrica do lote de
+ * destino corresponde (mesmo código) a cada despesa da fatura e das NC ligadas.
+ * `canKeep` só quando todas têm par: tudo ou nada.
+ */
+export interface InvoiceLotMovePreview {
+  canKeep: boolean;
+  lines: {
+    creditNote: boolean;
+    fromCode: string | null;
+    fromName: string | null;
+    amount: number | null;
+    toBudgetItemId: string | null;
+    toCode: string | null;
+    toName: string | null;
+  }[];
 }
 
 /**
@@ -557,6 +582,9 @@ export interface InvoiceFilters {
   /** Rubrica; o backend apanha também tudo o que está por baixo dela. `budgetItemLabel` é só para mostrar. */
   budgetItemId: string | null;
   budgetItemLabel: string | null;
+  /** Só em "A pagar" (2026-11-13): o modal mostra-os só lá, e a lista da obra ignora-os. */
+  dueBucket: DueBucket | null;
+  approvedForPayment: boolean | null;
   /** Lote da fatura; só faz sentido numa obra com vários. Apanha também as que ainda não têm rubrica. */
   budgetId: string | null;
 }
@@ -582,6 +610,8 @@ export const ADVANCED_INVOICE_FILTER_KEYS = [
   "minAmount",
   "maxAmount",
   "budgetItemId",
+  "dueBucket",
+  "approvedForPayment",
 ] as const satisfies readonly (keyof InvoiceFilters)[];
 
 /** Nada ligado, primeira página — o ponto de partida de qualquer lista. `size` é a do chamador. */
@@ -605,6 +635,8 @@ export const EMPTY_INVOICE_FILTERS: InvoiceFilters = {
   minAmount: null,
   maxAmount: null,
   budgetItemId: null,
+  dueBucket: null,
+  approvedForPayment: null,
   budgetId: null,
   budgetItemLabel: null,
 };
@@ -742,6 +774,17 @@ export interface OutstandingByUrgencyParams {
   dueBucket?: DueBucket;
   approvedForPayment?: boolean;
   sentToAccountant?: boolean;
+  // A pesquisa avançada (2026-11-13), o mesmo que a lista da obra aceita.
+  q?: string;
+  documentStatus?: InvoiceDocumentStatus;
+  paymentStatus?: PaymentStatus;
+  allocationStatus?: AllocationStatus;
+  from?: string;
+  to?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  /** Só com `enterpriseId` — o backend devolve 400 sem a obra. */
+  budgetItemId?: string;
   page: number;
   size: number;
 }

@@ -410,7 +410,7 @@ de entrada.
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, pela data da fatura, mais recentes primeiro (por omissão; `sort=createdAt,asc`… como na lista de obra) |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, pela data da fatura, mais recentes primeiro (idem) |
 | GET | `/construction-invoices/search?q=&enterpriseId=&scope=&supplierNif=&paymentStatus=&size=` | `ADMIN`, `ACCOUNTANT` — **pesquisa global** (o modal Ctrl+K do header): todas as obras, a empresa e a quarentena, notas de crédito incluídas, sem obras `is_test` nem eliminadas. Ver [[#Pesquisa global de faturas]] |
-| GET | `/construction-invoices/outstanding?enterpriseId=&company=&supplierNif=&dueBucket=&approvedForPayment=&sentToAccountant=&page=&size=` | `ADMIN`, `ACCOUNTANT` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
+| GET | `/construction-invoices/outstanding?enterpriseId=&company=&supplierNif=&dueBucket=&approvedForPayment=&sentToAccountant=&q=&documentStatus=&paymentStatus=&allocationStatus=&from=&to=&minAmount=&maxAmount=&budgetItemId=&page=&size=` | `ADMIN`, `ACCOUNTANT` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada. Por omissão `invoiceDate,desc` (sem data no fim) e depois `createdAt,desc` — ver [[#Ordem das listas de faturas]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/zip?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — os PDFs/fotos num `.zip`, em streaming: `[TESTE - ]Faturas - <Obra>[ - <Lote> \| - Por classificar].zip` |
@@ -738,11 +738,12 @@ associada acompanha os novos valores.
 | `INVOICE_029` | repartição sem nenhuma rubrica |
 | `INVOICE_030` | a mesma rubrica repetida na repartição |
 | `INVOICE_031` | transferência para uma obra de teste (`is_test`) |
-| `INVOICE_032` | transferência cujo destino é o âmbito/obra onde a fatura já está |
+| `INVOICE_032` | transferência cujo destino é o âmbito/obra onde a fatura já está — na mesma obra, só se o lote também não mudar |
 | `INVOICE_033` | `POST /{id}/transfer` sobre uma nota de crédito — a NC segue a fatura de origem, não se transfere sozinha |
 | `INVOICE_050` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — a rubrica é de outro lote do que o da fatura |
 | `INVOICE_051` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — obra de vários lotes e a fatura ainda não tem lote |
 | `INVOICE_052` | `PATCH /{id}/budget` — a fatura já tem despesas e o pedido mudaria o lote |
+| `INVOICE_053` | `POST /{id}/transfer` com `keepRubrics` — alguma despesa não tem rubrica com o mesmo código no lote de destino |
 | `INVOICE_034` | inconsistência não encontrada (`GET/POST /invoice-incidents/{id}`) |
 | `INVOICE_035` | `POST /invoice-incidents` com uma fatura que não existe |
 | `INVOICE_036` | `POST /import-excel` com ficheiro vazio |
@@ -953,10 +954,20 @@ razão obrigatória**, nunca edição direta do `scope`/`enterprise` (o `PUT /{i
 Ver [[faturas-modelo-alvo.md]] §4.
 
 `POST /construction-invoices/{id}/transfer` (`ADMIN`), corpo
-`{ targetScope, targetEnterpriseId?, reason }`:
+`{ targetScope, targetEnterpriseId?, reason, targetBudgetId?, keepRubrics? }`:
 
 - `targetScope` `PROJECT` exige `targetEnterpriseId`; `COMPANY`/`UNIDENTIFIED` **não** o aceitam e
   a obra é limpa (check `ck_invoice_scope_enterprise`).
+- `targetBudgetId` é o lote de destino, só com `PROJECT` (tem de ser um lote vivo da obra de destino,
+  senão `BUDGET_LOT_NOT_FOUND`). Sem ele, numa obra de um só lote esse lote é deduzido.
+- **Mudança de lote** (desde 2026-11-15): com a obra atual e outro `targetBudgetId`, a fatura e as NC
+  ligadas mudam de lote sem sair da obra. A repartição antiga e os nomes dos lotes ficam no log. Com
+  `keepRubrics: true`, cada despesa passa para a rubrica com o **mesmo código** no lote de destino e
+  mantém o valor. É tudo ou nada: basta faltar uma para recusar com `INVOICE_053`. Sem
+  `keepRubrics`, as despesas são apagadas. Aqui `suggestIncident` é sempre `false`.
+  `GET /construction-invoices/{id}/lot-move-preview?targetBudgetId=` (`ADMIN`/`ACCOUNTANT`, só
+  leitura) devolve `{ canKeep, lines[] }`, com a correspondência de cada despesa, para o modal decidir
+  se pergunta.
 - `reason` obrigatória (`@NotBlank` → `VALIDATION_ERROR`).
 - **Apaga as despesas** da fatura — sem obra não há rubrica a que pertençam — depois de guardar a
   repartição antiga (a da fatura **e a de cada nota de crédito ligada**) no `activity_log`
@@ -1139,6 +1150,21 @@ por urgência e **antes** dos totais e da paginação — os totais do topo são
 | `dueBucket` | `OVERDUE` (antes de hoje) · `WEEK` (hoje..hoje+7) · `MONTH` (hoje..hoje+30, **inclui** a semana) · `NONE` (sem vencimento). As faixas não incluem as vencidas. Valor inválido → `400` |
 | `approvedForPayment` | `true` só as aprovadas, `false` só as por aprovar |
 | `sentToAccountant` | `true` só as enviadas, `false` só as por enviar |
+
+**Pesquisa avançada** (2026-11-13 — o modal "Filtros" da lista da obra, `variant="outstanding"`), com a
+semântica dos filtros da caixa de entrada (ver "Filtros da caixa de entrada"), mas em memória
+(`applyAdvancedOutstandingFilter`). Pagamentos, repartições e documentos só se carregam quando o filtro
+que os usa está ligado:
+
+| Parâmetro | Filtra |
+|---|---|
+| `q` | fornecedor, NIF, nº, ATCUD, notas ou nome do ficheiro (contém, sem maiúsculas) |
+| `documentStatus` | `ARCHIVED` · `MISSING` · `TO_PRINT` · `TO_REQUEST` |
+| `paymentStatus` | `UNPAID` (nada pago) · `PARTIAL` (algum pago, com total). `PAID` nunca casa: tudo aqui está por liquidar |
+| `allocationStatus` | `NONE` · `PROVISIONAL` · `PARTIAL` · `COMPLETE`, a mesma regra do `allocationStatus` da resposta |
+| `from`, `to` | data da fatura, inclusive; as sem data saem |
+| `minAmount`, `maxAmount` | total, inclusive; as sem total saem |
+| `budgetItemId` | rubrica **e sub-árvore**. Só com `enterpriseId`: sem a obra → `400` |
 
 O `findOutstandingExcludingScope` não mudou de assinatura: o `InvoiceDueNotifier` usa-o também. Na página,
 os filtros são só estado local (nem URL, nem `localStorage`).

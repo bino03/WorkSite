@@ -12,7 +12,14 @@ import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/i
 
 interface Props {
   open: boolean;
-  enterpriseId: string;
+  /** A obra da rubrica; `null` em "A pagar" sem obra escolhida — aí a rubrica não se pode escolher. */
+  enterpriseId: string | null;
+  /**
+   * `outstanding` = a página "A pagar" (2026-11-13): tudo está por liquidar, por isso o
+   * pagamento só distingue "nada pago" de "parcial", o tipo sai (não há notas de crédito)
+   * e entram o vencimento e a aprovação.
+   */
+  variant?: "enterprise" | "outstanding";
   filters: InvoiceFilters;
   onClose: () => void;
   /** Só as chaves da pesquisa avançada; a página junta-as ao resto e recarrega. */
@@ -28,6 +35,26 @@ const PAYMENT_OPTIONS: { value: PaymentChoice; label: string }[] = [
   { value: "UNPAID", label: "Nada pago" },
   { value: "PARTIAL", label: "Parcialmente pagas" },
   { value: "PAID", label: "Pagas" },
+];
+
+/** Em "A pagar" tudo está por liquidar: "Por liquidar" e "Pagas" não dizem nada. */
+const OUTSTANDING_PAYMENT_OPTIONS = PAYMENT_OPTIONS.filter(
+  (option) => option.value === "ALL" || option.value === "UNPAID" || option.value === "PARTIAL",
+);
+
+/** Cumulativas, como no backend: "30 dias" inclui os 7; nenhuma inclui as vencidas. */
+const DUE_OPTIONS = [
+  { value: "ALL", label: "Todas" },
+  { value: "OVERDUE", label: "Vencidas" },
+  { value: "WEEK", label: "Vence em 7 dias" },
+  { value: "MONTH", label: "Vence em 30 dias" },
+  { value: "NONE", label: "Sem prazo" },
+];
+
+const APPROVAL_OPTIONS = [
+  { value: "ALL", label: "Todas" },
+  { value: "YES", label: "Aprovadas" },
+  { value: "NO", label: "Por aprovar" },
 ];
 
 const ACCOUNTANT_OPTIONS = [
@@ -58,13 +85,22 @@ const ALLOCATION_OPTIONS = [
 ];
 
 const DATE_PRESETS: { label: string; value: [Dayjs, Dayjs] }[] = [
-  { label: "Este mês", value: [dayjs().startOf("month"), dayjs().endOf("month")] },
+  {
+    label: "Este mês",
+    value: [dayjs().startOf("month"), dayjs().endOf("month")],
+  },
   {
     label: "Mês passado",
     value: [dayjs().subtract(1, "month").startOf("month"), dayjs().subtract(1, "month").endOf("month")],
   },
-  { label: "Este ano", value: [dayjs().startOf("year"), dayjs().endOf("year")] },
-  { label: "Ano passado", value: [dayjs().subtract(1, "year").startOf("year"), dayjs().subtract(1, "year").endOf("year")] },
+  {
+    label: "Este ano",
+    value: [dayjs().startOf("year"), dayjs().endOf("year")],
+  },
+  {
+    label: "Ano passado",
+    value: [dayjs().subtract(1, "year").startOf("year"), dayjs().subtract(1, "year").endOf("year")],
+  },
 ];
 
 /** Um NIF português: 9 dígitos. Escrito à mão, serve mesmo que não esteja em lista nenhuma. */
@@ -87,7 +123,15 @@ function paymentChoiceOf(filters: InvoiceFilters): PaymentChoice {
  * Casa do Betão?", "o que falta mandar ao contabilista?", "tudo o que foi para
  * a 4.2?") — os campos fiscais (IVA, base) e os derivados ficaram de fora.
  */
-export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, onClose, onApply }) => {
+export const InvoiceFiltersModal: FC<Props> = ({
+  open,
+  enterpriseId,
+  variant = "enterprise",
+  filters,
+  onClose,
+  onApply,
+}) => {
+  const outstandingOnly = variant === "outstanding";
   const [draft, setDraft] = useState<InvoiceFilters>(filters);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
@@ -128,8 +172,7 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
 
   const clear = () => setDraft((prev) => ({ ...prev, ...clearedInvoiceFilters() }));
 
-  const dateRange: [Dayjs, Dayjs] | null =
-    draft.from && draft.to ? [dayjs(draft.from), dayjs(draft.to)] : null;
+  const dateRange: [Dayjs, Dayjs] | null = draft.from && draft.to ? [dayjs(draft.from), dayjs(draft.to)] : null;
 
   return (
     <Modal
@@ -150,7 +193,12 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
           display: "flex",
           flexDirection: "column",
         },
-        body: { display: "flex", flexDirection: "column", minHeight: 0, flex: 1 },
+        body: {
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          flex: 1,
+        },
         mask: { background: "color-mix(in srgb, #2b2b2d 50%, transparent)" },
       }}
     >
@@ -205,7 +253,12 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
                 })),
                 // Um NIF escrito à mão que não está em lista nenhuma serve na mesma.
                 ...(NIF_RE.test(supplierQuery.trim()) && !suppliers.some((s) => s.nif === supplierQuery.trim())
-                  ? [{ value: supplierQuery.trim(), label: `${supplierQuery.trim()} · usar este NIF` }]
+                  ? [
+                      {
+                        value: supplierQuery.trim(),
+                        label: `${supplierQuery.trim()} · usar este NIF`,
+                      },
+                    ]
                   : []),
               ]}
               onChange={(nif) => {
@@ -219,18 +272,18 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
               style={{ width: "100%" }}
             />
           </Field>
-          <Field label="Tipo">
-            <Radio.Group
-              size="small"
-              optionType="button"
-              buttonStyle="solid"
-              options={DOCUMENT_TYPE_OPTIONS}
-              value={draft.documentType ?? "ALL"}
-              onChange={(e) =>
-                set("documentType", e.target.value === "ALL" ? null : e.target.value)
-              }
-            />
-          </Field>
+          {!outstandingOnly && (
+            <Field label="Tipo">
+              <Radio.Group
+                size="small"
+                optionType="button"
+                buttonStyle="solid"
+                options={DOCUMENT_TYPE_OPTIONS}
+                value={draft.documentType ?? "ALL"}
+                onChange={(e) => set("documentType", e.target.value === "ALL" ? null : e.target.value)}
+              />
+            </Field>
+          )}
           <Field label="Documento">
             <Select
               allowClear
@@ -249,26 +302,45 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
               size="small"
               optionType="button"
               buttonStyle="solid"
-              options={PAYMENT_OPTIONS}
+              options={outstandingOnly ? OUTSTANDING_PAYMENT_OPTIONS : PAYMENT_OPTIONS}
               value={paymentChoiceOf(draft)}
               onChange={(e) => setPayment(e.target.value as PaymentChoice)}
             />
           </Field>
+          {outstandingOnly && (
+            <>
+              <Field label="Vencimento">
+                <Radio.Group
+                  size="small"
+                  optionType="button"
+                  buttonStyle="solid"
+                  options={DUE_OPTIONS}
+                  value={draft.dueBucket ?? "ALL"}
+                  onChange={(e) => set("dueBucket", e.target.value === "ALL" ? null : e.target.value)}
+                />
+              </Field>
+              <Field label="Aprovação para pagamento">
+                <Radio.Group
+                  size="small"
+                  optionType="button"
+                  buttonStyle="solid"
+                  options={APPROVAL_OPTIONS}
+                  value={draft.approvedForPayment === null ? "ALL" : draft.approvedForPayment ? "YES" : "NO"}
+                  onChange={(e) =>
+                    set("approvedForPayment", e.target.value === "ALL" ? null : e.target.value === "YES")
+                  }
+                />
+              </Field>
+            </>
+          )}
           <Field label="Contabilidade">
             <Radio.Group
               size="small"
               optionType="button"
               buttonStyle="solid"
               options={ACCOUNTANT_OPTIONS}
-              value={
-                draft.sentToAccountant === null ? "ALL" : draft.sentToAccountant ? "SENT" : "PENDING"
-              }
-              onChange={(e) =>
-                set(
-                  "sentToAccountant",
-                  e.target.value === "ALL" ? null : e.target.value === "SENT"
-                )
-              }
+              value={draft.sentToAccountant === null ? "ALL" : draft.sentToAccountant ? "SENT" : "PENDING"}
+              onChange={(e) => set("sentToAccountant", e.target.value === "ALL" ? null : e.target.value === "SENT")}
             />
           </Field>
           <Field label="Classificação">
@@ -278,9 +350,7 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
               buttonStyle="solid"
               options={ALLOCATION_OPTIONS}
               value={draft.allocationStatus ?? "ALL"}
-              onChange={(e) =>
-                set("allocationStatus", e.target.value === "ALL" ? null : e.target.value)
-              }
+              onChange={(e) => set("allocationStatus", e.target.value === "ALL" ? null : e.target.value)}
             />
           </Field>
         </Section>
@@ -339,17 +409,36 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
                 borderColor: "var(--ind-color-accent)",
               }}
             >
-              <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, fontSize: 13, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span
+                style={{
+                  fontFamily: "var(--ind-font-heading)",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {draft.budgetItemLabel}
               </span>
               <Button
                 size="small"
                 type="text"
-                onClick={() => setDraft((prev) => ({ ...prev, budgetItemId: null, budgetItemLabel: null }))}
+                onClick={() =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    budgetItemId: null,
+                    budgetItemLabel: null,
+                  }))
+                }
               >
                 Trocar
               </Button>
             </div>
+          ) : !enterpriseId ? (
+            // Em "A pagar" sem obra: uma rubrica é de uma obra, não há árvore onde procurar.
+            <div style={{ fontSize: 12, opacity: 0.6 }}>Escolha uma obra na barra para filtrar por rubrica.</div>
           ) : (
             <RubricSearchField
               enterpriseId={enterpriseId}
@@ -392,7 +481,14 @@ export const InvoiceFiltersModal: FC<Props> = ({ open, enterpriseId, filters, on
 };
 
 const Section: FC<{ title: string; hint?: string; children: ReactNode }> = ({ title, hint, children }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: "10.2px", minWidth: 0 }}>
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: "10.2px",
+      minWidth: 0,
+    }}
+  >
     <div>
       <h6 style={{ color: "var(--ind-accent-700)", margin: 0 }}>{title}</h6>
       {hint && <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>{hint}</div>}

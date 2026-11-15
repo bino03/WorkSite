@@ -32,6 +32,7 @@ import com.management.managementapi.enterprises.dto.invoice.request.InvoiceNotes
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceLotMovePreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceSearchResultDTO;
@@ -360,6 +361,10 @@ public class ConstructionInvoiceController {
                 documentsExportService.plan(enterpriseId, scope, budgetId, invoiceIds, "").toSummary());
     }
 
+    private static String upperOrNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim().toUpperCase();
+    }
+
     /**
      * O {@code SELECTED} leva os ids no query string, por isso tem de ter um teto:
      * um URL com milhares de UUIDs bate no limite do servidor e falha com um erro
@@ -477,13 +482,28 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) OutstandingFilter.DueBucket dueBucket,
             @RequestParam(required = false) Boolean approvedForPayment,
             @RequestParam(required = false) Boolean sentToAccountant,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String documentStatus,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(required = false) String allocationStatus,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) UUID budgetItemId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         if (enterpriseId != null && company) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "enterpriseId e company não se combinam");
         }
+        // Uma rubrica é de uma obra: sem a obra não há sub-árvore para resolver.
+        if (budgetItemId != null && enterpriseId == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "budgetItemId precisa de enterpriseId");
+        }
         OutstandingFilter filter = new OutstandingFilter(
-                enterpriseId, company, supplierNif, dueBucket, approvedForPayment, sentToAccountant);
+                enterpriseId, company, supplierNif, dueBucket, approvedForPayment, sentToAccountant,
+                q, upperOrNull(documentStatus), upperOrNull(paymentStatus), upperOrNull(allocationStatus),
+                from, to, minAmount, maxAmount, budgetItemId);
         // Limites aqui e não por anotação: o controlador não é @Validated, e um
         // @Max num @RequestParam seria ignorado em silêncio.
         return ResponseEntity.ok(service.outstandingByUrgency(
@@ -674,6 +694,19 @@ public class ConstructionInvoiceController {
             @PathVariable UUID id,
             @Valid @RequestBody InvoiceTransferDTO dto) {
         return ResponseEntity.ok(service.transfer(id, dto));
+    }
+
+    /**
+     * Antes de mudar a fatura de lote dentro da mesma obra: que rubrica do lote
+     * de destino tem o mesmo código que cada despesa. Só leitura — o modal
+     * "Transferir" usa-o para perguntar se a rubrica continua a ser a mesma.
+     */
+    @GetMapping("/{id}/lot-move-preview")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    public ResponseEntity<InvoiceLotMovePreviewDTO> lotMovePreview(
+            @PathVariable UUID id,
+            @RequestParam UUID targetBudgetId) {
+        return ResponseEntity.ok(service.lotMovePreview(id, targetBudgetId));
     }
 
     /**

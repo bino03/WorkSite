@@ -220,6 +220,34 @@ class OutstandingByUrgencyTest {
                 .containsExactly(NIF_30_DAYS);
     }
 
+    @Test
+    @DisplayName("a pesquisa avançada (texto, valor, data, documento) estreita sem mudar a ordem, e os totais seguem-na")
+    void advancedFilters() {
+        noDueDateOlder.setSupplierName("Paulo Dinis");
+        overdue.setInvoiceNumber("FT 2026/77");
+        dueSoon.setDocumentStatus(ConstructionInvoice.DocumentStatus.TO_PRINT);
+
+        assertThat(idsFor(advanced(" dinis ", null, null, null, null, null))).containsExactly(noDueDateOlder.getId());
+        assertThat(idsFor(advanced("2026/77", null, null, null, null, null))).containsExactly(overdue.getId());
+        // 200 a 800, inclusive — e pela ordem de urgência, não pelo valor.
+        assertThat(idsFor(advanced(null, new BigDecimal("200"), new BigDecimal("800"), null, null, null)))
+                .containsExactly(dueSoon.getId(), dueLaterByHand.getId(), noDueDateOlder.getId());
+        assertThat(idsFor(advanced(null, null, null, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), null)))
+                .containsExactly(overdue.getId(), dueSoon.getId(), noDueDateNewer.getId());
+        assertThat(idsFor(advanced(null, null, null, null, null, "TO_PRINT"))).containsExactly(dueSoon.getId());
+
+        OutstandingByUrgencyDTO cheap = service.outstandingByUrgency(
+                advanced(null, null, new BigDecimal("200"), null, null, null), 0, 20, TODAY);
+        assertThat(cheap.total()).isEqualByComparingTo("300");
+        assertThat(cheap.overdueTotal()).isEqualByComparingTo("100");
+    }
+
+    private static OutstandingFilter advanced(String q, BigDecimal min, BigDecimal max,
+                                              LocalDate from, LocalDate to, String documentStatus) {
+        return new OutstandingFilter(null, false, null, null, null, null,
+                q, documentStatus, null, null, from, to, min, max, null);
+    }
+
     private static OutstandingFilter dueOnly(OutstandingFilter.DueBucket bucket) {
         return new OutstandingFilter(null, false, null, bucket, null, null);
     }

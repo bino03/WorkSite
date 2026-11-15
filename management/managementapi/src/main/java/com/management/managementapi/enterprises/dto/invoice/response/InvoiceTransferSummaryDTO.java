@@ -17,6 +17,9 @@ public record InvoiceTransferSummaryDTO(
         String toScope,
         UUID toEnterpriseId,
         String toEnterpriseName,
+        /** Nulos nas transferências anteriores a 2026-11-15 e quando a obra não tinha lote. */
+        String fromLotName,
+        String toLotName,
         String reason,
         String byName
 ) {}
