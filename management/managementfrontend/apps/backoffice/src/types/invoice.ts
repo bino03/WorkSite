@@ -146,6 +146,9 @@ export interface InvoiceTransferSummary {
   toScope: InvoiceScope;
   toEnterpriseId: string | null;
   toEnterpriseName: string | null;
+  /** Nulos nas transferências antigas e quando a obra não tinha lote. */
+  fromLotName: string | null;
+  toLotName: string | null;
   reason: string;
   byName: string;
 }
@@ -350,6 +353,28 @@ export interface InvoiceTransferPayload {
   targetScope: InvoiceScope;
   targetEnterpriseId?: string | null;
   reason: string;
+  /** Lote de destino (só `PROJECT`). Na mesma obra é o que torna isto uma mudança de lote. */
+  targetBudgetId?: string | null;
+  /** Mudança de lote: passar as despesas para as rubricas com o mesmo código no destino. */
+  keepRubrics?: boolean;
+}
+
+/**
+ * `GET /construction-invoices/{id}/lot-move-preview` — que rubrica do lote de
+ * destino corresponde (mesmo código) a cada despesa da fatura e das NC ligadas.
+ * `canKeep` só quando todas têm par: tudo ou nada.
+ */
+export interface InvoiceLotMovePreview {
+  canKeep: boolean;
+  lines: {
+    creditNote: boolean;
+    fromCode: string | null;
+    fromName: string | null;
+    amount: number | null;
+    toBudgetItemId: string | null;
+    toCode: string | null;
+    toName: string | null;
+  }[];
 }
 
 /**

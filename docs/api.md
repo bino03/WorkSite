@@ -738,11 +738,12 @@ associada acompanha os novos valores.
 | `INVOICE_029` | repartição sem nenhuma rubrica |
 | `INVOICE_030` | a mesma rubrica repetida na repartição |
 | `INVOICE_031` | transferência para uma obra de teste (`is_test`) |
-| `INVOICE_032` | transferência cujo destino é o âmbito/obra onde a fatura já está |
+| `INVOICE_032` | transferência cujo destino é o âmbito/obra onde a fatura já está — na mesma obra, só se o lote também não mudar |
 | `INVOICE_033` | `POST /{id}/transfer` sobre uma nota de crédito — a NC segue a fatura de origem, não se transfere sozinha |
 | `INVOICE_050` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — a rubrica é de outro lote do que o da fatura |
 | `INVOICE_051` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — obra de vários lotes e a fatura ainda não tem lote |
 | `INVOICE_052` | `PATCH /{id}/budget` — a fatura já tem despesas e o pedido mudaria o lote |
+| `INVOICE_053` | `POST /{id}/transfer` com `keepRubrics` — alguma despesa não tem rubrica com o mesmo código no lote de destino |
 | `INVOICE_034` | inconsistência não encontrada (`GET/POST /invoice-incidents/{id}`) |
 | `INVOICE_035` | `POST /invoice-incidents` com uma fatura que não existe |
 | `INVOICE_036` | `POST /import-excel` com ficheiro vazio |
@@ -953,10 +954,20 @@ razão obrigatória**, nunca edição direta do `scope`/`enterprise` (o `PUT /{i
 Ver [[faturas-modelo-alvo.md]] §4.
 
 `POST /construction-invoices/{id}/transfer` (`ADMIN`), corpo
-`{ targetScope, targetEnterpriseId?, reason }`:
+`{ targetScope, targetEnterpriseId?, reason, targetBudgetId?, keepRubrics? }`:
 
 - `targetScope` `PROJECT` exige `targetEnterpriseId`; `COMPANY`/`UNIDENTIFIED` **não** o aceitam e
   a obra é limpa (check `ck_invoice_scope_enterprise`).
+- `targetBudgetId` é o lote de destino, só com `PROJECT` (tem de ser um lote vivo da obra de destino,
+  senão `BUDGET_LOT_NOT_FOUND`). Sem ele, numa obra de um só lote esse lote é deduzido.
+- **Mudança de lote** (desde 2026-11-15): com a obra atual e outro `targetBudgetId`, a fatura e as NC
+  ligadas mudam de lote sem sair da obra. A repartição antiga e os nomes dos lotes ficam no log. Com
+  `keepRubrics: true`, cada despesa passa para a rubrica com o **mesmo código** no lote de destino e
+  mantém o valor. É tudo ou nada: basta faltar uma para recusar com `INVOICE_053`. Sem
+  `keepRubrics`, as despesas são apagadas. Aqui `suggestIncident` é sempre `false`.
+  `GET /construction-invoices/{id}/lot-move-preview?targetBudgetId=` (`ADMIN`/`ACCOUNTANT`, só
+  leitura) devolve `{ canKeep, lines[] }`, com a correspondência de cada despesa, para o modal decidir
+  se pergunta.
 - `reason` obrigatória (`@NotBlank` → `VALIDATION_ERROR`).
 - **Apaga as despesas** da fatura — sem obra não há rubrica a que pertençam — depois de guardar a
   repartição antiga (a da fatura **e a de cada nota de crédito ligada**) no `activity_log`

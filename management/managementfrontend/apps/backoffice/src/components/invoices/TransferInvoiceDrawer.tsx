@@ -7,11 +7,16 @@ import { useTranslation } from "react-i18next";
 
 import { TransferInvoiceSchema } from "@/components/invoices/transferFormSchema";
 import type { TransferInvoiceForm } from "@/components/invoices/transferFormSchema";
-import { setInvoiceBudget, splitInvoice, transferInvoice } from "@/services/invoiceService";
+import { getLotMovePreview, splitInvoice, transferInvoice } from "@/services/invoiceService";
 import { searchEnterprises, type EnterpriseOption } from "@/services/enterpriseService";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
-import type { ConstructionInvoice, InvoiceScope, InvoiceTransferResult } from "@/types/invoice";
+import type {
+  ConstructionInvoice,
+  InvoiceLotMovePreview,
+  InvoiceScope,
+  InvoiceTransferResult,
+} from "@/types/invoice";
 import type { BudgetItemSearchResult } from "@/types/budget";
 import { RubricSearchField } from "@/components/invoices/RubricSearchField";
 
@@ -89,6 +94,38 @@ export const TransferInvoiceDrawer: FC<Props> = ({ open, invoice, onClose, onTra
   const targetEnterpriseId = watch("targetEnterpriseId");
   const targetLots = options.find((o) => o.id === targetEnterpriseId)?.lots ?? [];
 
+  /**
+   * Destino = a obra onde a fatura já está: só vale como mudança de lote
+   * (2026-11-15 — antes dava sempre `INVOICE_032`). O lote passa a obrigatório
+   * e o atual fica desativado na lista.
+   */
+  const sameProject =
+    targetScope === "PROJECT" && !!targetEnterpriseId && targetEnterpriseId === invoice?.enterpriseId;
+  const lotMove = sameProject && !!targetLotId && targetLotId !== invoice?.budgetId;
+  /** O que acontece às rubricas no lote novo; null enquanto não se escolhe o lote. */
+  const [lotPreview, setLotPreview] = useState<InvoiceLotMovePreview | null>(null);
+  /** "A rubrica continua a ser a mesma?" — só se pergunta quando `canKeep`. */
+  const [keepRubrics, setKeepRubrics] = useState(true);
+  const keeping = lotMove && !!lotPreview?.canKeep && keepRubrics;
+
+  useEffect(() => {
+    setLotPreview(null);
+    if (!lotMove || !invoice || !targetLotId) return;
+    let cancelled = false;
+    getLotMovePreview(invoice.id, targetLotId)
+      .then((preview) => {
+        if (cancelled) return;
+        setLotPreview(preview);
+        setKeepRubrics(preview.canKeep);
+      })
+      .catch((error) => {
+        if (!cancelled) ErrorHandler.handle(error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lotMove, invoice, targetLotId]);
+
   // O lote só faz sentido para o empreendimento escolhido — muda de obra, esquece o lote.
   useEffect(() => {
     setTargetLotId(null);
@@ -148,27 +185,34 @@ export const TransferInvoiceDrawer: FC<Props> = ({ open, invoice, onClose, onTra
   const onSubmit = handleSubmit(async (values) => {
     if (!invoice) return;
     try {
-      const result = await transferInvoice(invoice.id, {
-        targetScope: values.targetScope,
-        targetEnterpriseId:
-          values.targetScope === "PROJECT" ? values.targetEnterpriseId : null,
-        reason: values.reason.trim(),
-      });
       const toProject = values.targetScope === "PROJECT";
       // Numa obra de vários lotes o backend recusa a rubrica sem lote
       // (`INVOICE_BUDGET_REQUIRED`): sem lote escolhido, usa-se o da rubrica.
+      // O lote vai no próprio pedido — era um `setInvoiceBudget` à parte depois.
       const lotId = toProject ? (targetLotId ?? targetRubric?.budgetId ?? null) : null;
-      let allocated = false;
+      const result = await transferInvoice(invoice.id, {
+        targetScope: values.targetScope,
+        targetEnterpriseId: toProject ? values.targetEnterpriseId : null,
+        reason: values.reason.trim(),
+        targetBudgetId: lotId,
+        keepRubrics: lotMove ? keeping : undefined,
+      });
+      let allocated = keeping;
       try {
-        if (lotId) await setInvoiceBudget(result.invoice.id, lotId);
-        if (toProject && targetRubric) {
+        if (toProject && targetRubric && !keeping) {
           await splitInvoice(result.invoice.id, [
             { budgetItemId: targetRubric.id, amount: result.invoice.totalAmount },
           ]);
           allocated = true;
         }
         notificationService.success(
-          t(allocated ? "invoices.transfer.successWithRubric" : "invoices.transfer.success")
+          t(
+            keeping
+              ? "invoices.transfer.lotMoveKeptSuccess"
+              : allocated
+                ? "invoices.transfer.successWithRubric"
+                : "invoices.transfer.success"
+          )
         );
       } catch (error) {
         // A transferência já está feita — só a associação falhou. Avisa e segue,
@@ -209,7 +253,12 @@ export const TransferInvoiceDrawer: FC<Props> = ({ open, invoice, onClose, onTra
               {t("invoices.transfer.submitRubric")}
             </Button>
           ) : (
-            <Button type="primary" onClick={onSubmit} loading={isSubmitting} disabled={!isValid}>
+            <Button
+              type="primary"
+              onClick={onSubmit}
+              loading={isSubmitting}
+              disabled={!isValid || (sameProject && !lotMove) || (lotMove && !lotPreview)}
+            >
               {t("invoices.transfer.submit")}
             </Button>
           )}
@@ -223,7 +272,9 @@ export const TransferInvoiceDrawer: FC<Props> = ({ open, invoice, onClose, onTra
           message={t(
             toRubric
               ? "invoices.transfer.rubricWarning"
-              : sourceScope === "PROJECT"
+              : sameProject
+                ? "invoices.transfer.lotMoveWarning"
+                : sourceScope === "PROJECT"
                 ? "invoices.transfer.warning"
                 : "invoices.transfer.warningOutsideProject"
           )}
@@ -307,19 +358,74 @@ export const TransferInvoiceDrawer: FC<Props> = ({ open, invoice, onClose, onTra
 
         {!toRubric && targetScope === "PROJECT" && targetEnterpriseId && targetLots.length > 0 && (
           <div>
-            <label style={{ fontSize: 12, opacity: 0.7 }}>{t("invoices.transfer.fieldLot")}</label>
+            <label style={{ fontSize: 12, opacity: 0.7 }}>
+              {t(sameProject ? "invoices.transfer.fieldLotRequired" : "invoices.transfer.fieldLot")}
+            </label>
             <Select
               allowClear
               value={targetLotId ?? undefined}
               onChange={(value) => setTargetLotId(value ?? null)}
-              placeholder={t("invoices.transfer.lotPlaceholder")}
+              placeholder={t(
+                sameProject ? "invoices.transfer.lotMovePlaceholder" : "invoices.transfer.lotPlaceholder"
+              )}
               style={{ width: "100%", marginTop: 4 }}
-              options={targetLots.map((lot) => ({ value: lot.id, label: lot.name }))}
+              options={targetLots.map((lot) => ({
+                value: lot.id,
+                label: lot.name,
+                // Na mesma obra, o lote onde a fatura já está daria INVOICE_032.
+                disabled: sameProject && lot.id === invoice?.budgetId,
+              }))}
             />
           </div>
         )}
 
-        {!toRubric && targetScope === "PROJECT" && targetEnterpriseId && (
+        {/* Mesma obra sem outro lote para onde ir — dizê-lo, em vez de um botão morto. */}
+        {!toRubric && sameProject && targetLots.length < 2 && (
+          <Alert type="info" showIcon message={t("invoices.transfer.lotMoveNoOtherLot")} />
+        )}
+
+        {/* "A rubrica continua a ser a mesma?" — só depois de verificar que existe no destino. */}
+        {!toRubric && lotMove && lotPreview && lotPreview.lines.length > 0 && (
+          <div>
+            {lotPreview.canKeep ? (
+              <>
+                <label style={{ fontSize: 12, opacity: 0.7 }}>
+                  {t("invoices.transfer.keepRubricsQuestion")}
+                </label>
+                <ul style={{ margin: "4px 0 6px", paddingLeft: 18, fontSize: 13 }}>
+                  {lotPreview.lines.map((line, i) => (
+                    <li key={i}>
+                      <Text strong>
+                        {line.toCode} · {line.toName}
+                      </Text>
+                      {line.creditNote ? ` (${t("invoices.transfer.creditNoteLine")})` : ""}
+                    </li>
+                  ))}
+                </ul>
+                <Radio.Group
+                  value={keepRubrics}
+                  onChange={(e) => setKeepRubrics(e.target.value as boolean)}
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  <Radio value={true}>{t("invoices.transfer.keepRubricsYes")}</Radio>
+                  <Radio value={false}>{t("invoices.transfer.keepRubricsNo")}</Radio>
+                </Radio.Group>
+              </>
+            ) : (
+              <Alert
+                type="info"
+                showIcon
+                message={t("invoices.transfer.rubricsMissing")}
+                description={lotPreview.lines
+                  .filter((line) => !line.toBudgetItemId)
+                  .map((line) => [line.fromCode, line.fromName].filter(Boolean).join(" · "))
+                  .join("; ")}
+              />
+            )}
+          </div>
+        )}
+
+        {!toRubric && targetScope === "PROJECT" && targetEnterpriseId && !keeping && (
           <div>
             <label style={{ fontSize: 12, opacity: 0.7 }}>
               {t("invoices.transfer.fieldTargetRubric")}

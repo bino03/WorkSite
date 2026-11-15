@@ -32,6 +32,7 @@ import com.management.managementapi.enterprises.dto.invoice.request.InvoiceNotes
 import com.management.managementapi.enterprises.dto.invoice.request.InvoiceRegisterDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.BudgetItemSuggestionDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ConstructionInvoiceResponseDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceLotMovePreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.CreditNoteSplitPreviewDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoicePreviewResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceSearchResultDTO;
@@ -693,6 +694,19 @@ public class ConstructionInvoiceController {
             @PathVariable UUID id,
             @Valid @RequestBody InvoiceTransferDTO dto) {
         return ResponseEntity.ok(service.transfer(id, dto));
+    }
+
+    /**
+     * Antes de mudar a fatura de lote dentro da mesma obra: que rubrica do lote
+     * de destino tem o mesmo código que cada despesa. Só leitura — o modal
+     * "Transferir" usa-o para perguntar se a rubrica continua a ser a mesma.
+     */
+    @GetMapping("/{id}/lot-move-preview")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    public ResponseEntity<InvoiceLotMovePreviewDTO> lotMovePreview(
+            @PathVariable UUID id,
+            @RequestParam UUID targetBudgetId) {
+        return ResponseEntity.ok(service.lotMovePreview(id, targetBudgetId));
     }
 
     /**

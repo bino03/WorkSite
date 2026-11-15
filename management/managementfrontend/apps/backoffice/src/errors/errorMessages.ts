@@ -327,6 +327,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'INVOICE_050': 'A rubrica é de outro lote — a fatura já está noutro lote.',
   'INVOICE_051': 'Escolha primeiro o lote da fatura — a obra tem vários lotes.',
   'INVOICE_052': 'A fatura já tem despesas noutro lote — desfaça a classificação antes de mudar de lote.',
+  'INVOICE_053': 'Nem todas as rubricas da fatura existem no lote de destino — não dá para as manter.',
   // Assiduidade (2026-10-07) — horários, emprego, picagens, feriados, ausências
   'SCHED_001': 'Horário não encontrado.',
   'SCHED_002': 'Já existe um horário com este nome.',

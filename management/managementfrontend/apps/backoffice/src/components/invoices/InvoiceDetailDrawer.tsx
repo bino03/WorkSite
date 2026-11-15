@@ -694,7 +694,8 @@ export const InvoiceDetailDrawer: FC<Props> = ({
  * antiga. Mesmo molde do bloco de pagamentos.
  */
 const InvoiceTransferSection: FC<{ invoice: ConstructionInvoice }> = ({ invoice }) => {
-  const label = (scope: InvoiceScope, name: string | null) => name ?? SCOPE_LABEL[scope];
+  const label = (scope: InvoiceScope, name: string | null, lot: string | null) =>
+    (name ?? SCOPE_LABEL[scope]) + (lot ? ` (${lot})` : "");
   return (
     <div className="ind-card" style={{ padding: "13.6px" }}>
       <div className="ind-card-kicker">Histórico de transferências</div>
@@ -702,7 +703,8 @@ const InvoiceTransferSection: FC<{ invoice: ConstructionInvoice }> = ({ invoice 
         {invoice.transfers.map((tr, i) => (
           <div key={`${tr.transferredAt}-${i}`} style={{ fontSize: 12 }}>
             <div style={{ fontWeight: 600 }}>
-              {label(tr.fromScope, tr.fromEnterpriseName)} → {label(tr.toScope, tr.toEnterpriseName)}
+              {label(tr.fromScope, tr.fromEnterpriseName, tr.fromLotName)} →{" "}
+              {label(tr.toScope, tr.toEnterpriseName, tr.toLotName)}
             </div>
             <div style={{ opacity: 0.7 }}>{tr.reason}</div>
             <div style={{ opacity: 0.55, marginTop: 2 }}>

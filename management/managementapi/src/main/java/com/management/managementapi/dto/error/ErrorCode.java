@@ -334,6 +334,7 @@ public enum ErrorCode {
     INVOICE_BUDGET_OTHER_LOT("INVOICE_050", "A rubrica é de outro lote — a fatura já está no lote escolhido"),
     INVOICE_BUDGET_REQUIRED("INVOICE_051", "Escolha primeiro o lote da fatura — a obra tem vários lotes"),
     INVOICE_BUDGET_HAS_ALLOCATIONS("INVOICE_052", "A fatura já tem despesas noutro lote — desfaça a classificação antes de mudar de lote"),
+    INVOICE_LOT_RUBRICS_MISSING("INVOICE_053", "Nem todas as rubricas da fatura existem no lote de destino — não dá para as manter"),
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================
