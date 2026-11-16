@@ -421,7 +421,7 @@ no pedido (`scope=PROJECT&enterpriseId=`), não do nome do ficheiro.
    observação com data** → **pergunta** `AGGREGATE_PAYMENT` (um movimento / um por fatura).
    Linha negativa = **nota de crédito** (§3.2): origem pela frase acima, ou por nº igual no ficheiro/na
    app; senão **pergunta** `CREDIT_NOTE_ORIGIN` (fatura do ficheiro, fatura já na app, ou não importar).
-   **Uma fatura que uma NC do ficheiro anula por inteiro entra sem pagamento**, mesmo "Liquidada", com
+   **Uma fatura que uma NC do ficheiro anula por inteiro entra sem pagamento, mas `PAID`** (líquido 0 — desde 2026-11-16, antes `UNPAID`), com ou sem "Liquidada"; se estava "Liquidada" há
    aviso — o líquido é zero e a app recusa pagá-la (`INVOICE_019`); no vault ela foi paga no lote e a
    NC abatida no lote (Villa Atrium, `FT FA.A/31025`; Vila Petrus, o Manitou da Civica). Consequência:
    um lote com NC abatida fica na app com o valor **bruto** das faturas (Atrium: 17 241,36 € em vez de

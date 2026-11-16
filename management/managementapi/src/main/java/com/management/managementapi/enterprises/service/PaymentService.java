@@ -102,16 +102,18 @@ public class PaymentService {
     /**
      * O estado de pagamento a partir do líquido e do que já foi pago.
      * {@code null} de líquido (fatura ainda por rever) conta como não pago.
+     *
+     * Paga = pago ≥ líquido, mesmo sem pagamento nenhum: uma fatura anulada por
+     * inteiro por NC (líquido ≤ 0) está liquidada. É a regra do filtro
+     * {@code paymentStatus} em JPQL (pago + NC ≥ total) — até 2026-11-16 esta
+     * dizia UNPAID e a etiqueta "por liquidar" contradizia o filtro "Pagas".
      */
     public static PaymentStatus deriveStatus(BigDecimal net, BigDecimal paid) {
         BigDecimal p = paid == null ? BigDecimal.ZERO : paid;
-        if (p.signum() == 0) {
-            return PaymentStatus.UNPAID;
+        if (net != null && p.compareTo(net) >= 0) {
+            return PaymentStatus.PAID;
         }
-        if (net == null) {
-            return PaymentStatus.PARTIAL;
-        }
-        return p.compareTo(net) >= 0 ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
+        return p.signum() == 0 ? PaymentStatus.UNPAID : PaymentStatus.PARTIAL;
     }
 
     @Transactional(readOnly = true)

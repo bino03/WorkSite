@@ -116,6 +116,11 @@ class PaymentServiceTest {
         assertThat(PaymentService.deriveStatus(new BigDecimal("1000"), new BigDecimal("400"))).isEqualTo(PaymentStatus.PARTIAL);
         assertThat(PaymentService.deriveStatus(new BigDecimal("1000"), new BigDecimal("1000"))).isEqualTo(PaymentStatus.PAID);
         assertThat(PaymentService.deriveStatus(new BigDecimal("1000"), new BigDecimal("1200"))).isEqualTo(PaymentStatus.PAID);
+        // Anulada por inteiro por NC: liquidada sem pagamento — como o filtro "Pagas".
+        assertThat(PaymentService.deriveStatus(BigDecimal.ZERO, BigDecimal.ZERO)).isEqualTo(PaymentStatus.PAID);
+        assertThat(PaymentService.deriveStatus(BigDecimal.ZERO, null)).isEqualTo(PaymentStatus.PAID);
+        // Sem líquido (por rever) continua a não ser paga.
+        assertThat(PaymentService.deriveStatus(null, BigDecimal.ZERO)).isEqualTo(PaymentStatus.UNPAID);
     }
 
     // ── marcar uma fatura ──────────────────────────────────────

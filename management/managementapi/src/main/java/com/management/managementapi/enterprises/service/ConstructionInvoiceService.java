@@ -1621,9 +1621,8 @@ public class ConstructionInvoiceService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal net = invoice.getTotalAmount().subtract(creditNoteTotal);
             total = total.add(net);
-            // Liquidada = líquido − pago ≤ 0 — a definição do filtro `outstanding`,
-            // não a do `deriveStatus`: uma fatura anulada por inteiro por NC tem
-            // líquido 0 e nada pago, e o `deriveStatus` chama-lhe UNPAID.
+            // Liquidada = líquido − pago ≤ 0 — a definição do filtro `outstanding`
+            // e do `deriveStatus` (inclui as anuladas por inteiro por NC).
             BigDecimal remaining = net.subtract(paid);
             if (remaining.signum() > 0) {
                 outstandingCount++;

@@ -131,7 +131,7 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
   serviço (`PaymentService`), não constraints. **O estado de pagamento da fatura — `UNPAID` /
   `PARTIAL` / `PAID` — é derivado, nunca coluna**: `PaymentService.deriveStatus` compara
   `Σ(invoice_payment.amount)` com o líquido (`total_amount` na fase 2; `total_amount − Σ notas
-  de crédito` a partir da fase 3). As listas de faturas aceitam o filtro `outstanding` (por
+  de crédito` a partir da fase 3): `PAID` quando pago ≥ líquido — **mesmo sem pagamento**, por isso uma fatura anulada por inteiro por NC (líquido 0) é `PAID` (desde 2026-11-16; antes dava `UNPAID` e contradizia o filtro "Pagas"); `UNPAID` sem nada pago; `PARTIAL` o resto. Sem total o líquido é `null` e nunca é `PAID`. As listas de faturas aceitam o filtro `outstanding` (por
   liquidar), aplicado por subquery no JPQL de `search`/`searchByScope`. Ver
   [[api.md]] → "Pagamentos".
 
