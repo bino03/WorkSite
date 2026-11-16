@@ -12,7 +12,11 @@ const plural = (n: number) => `${n} fatura${n === 1 ? "" : "s"}`;
  * O "Pago" inclui o já pago das parciais, para as três somas baterem
  * (total = pago + a pagar); a contagem do "Pago" é das pagas por inteiro.
  */
-export const InvoiceTotalsBadge: FC<{ summary: InvoiceTotalsSummary | null }> = ({ summary }) => {
+export const InvoiceTotalsBadge: FC<{
+  summary: InvoiceTotalsSummary | null;
+  /** Lista só de por liquidar: o "Pago" seria sempre 0 (ou só o das parciais) e sai (pedido de 2026-11-16). */
+  hidePaid?: boolean;
+}> = ({ summary, hidePaid = false }) => {
   if (!summary) return null;
 
   const item = (label: string, amount: number, count: number, color?: string) => (
@@ -26,9 +30,11 @@ export const InvoiceTotalsBadge: FC<{ summary: InvoiceTotalsSummary | null }> = 
   return (
     <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "baseline", gap: 14, fontSize: 13 }}>
       {item("Total", summary.total, summary.count)}
-      <Tooltip title="Soma tudo o que já foi pago, incluindo a parte paga das faturas parciais. O número é das faturas liquidadas — pagas por inteiro, ou anuladas por nota de crédito.">
-        <span style={{ cursor: "help" }}>{item("Pago", summary.paid, summary.paidCount)}</span>
-      </Tooltip>
+      {!hidePaid && (
+        <Tooltip title="Soma tudo o que já foi pago, incluindo a parte paga das faturas parciais. O número é das faturas liquidadas — pagas por inteiro, ou anuladas por nota de crédito.">
+          <span style={{ cursor: "help" }}>{item("Pago", summary.paid, summary.paidCount)}</span>
+        </Tooltip>
+      )}
       {item("A pagar", summary.outstanding, summary.outstandingCount, "var(--ind-accent-700)")}
       {summary.withoutTotalCount > 0 && (
         <Tooltip title="Faturas que ainda não têm total — contam como a pagar mas não entram nas somas até serem corrigidas.">

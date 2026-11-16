@@ -603,7 +603,9 @@ const EnterpriseInvoicesPage: FC = () => {
           </Button>
         )}
         {showOutstandingTotal && <OutstandingTotalBadge summary={outstandingSummary} />}
-        {showSupplierTotals && <InvoiceTotalsBadge summary={totalsSummary} />}
+        {showSupplierTotals && (
+          <InvoiceTotalsBadge summary={totalsSummary} hidePaid={wantsOutstandingTotal(filters)} />
+        )}
 
         {allocatableSelected.length > 0 && (
           <Button type="primary" onClick={() => setAllocating(allocatableSelected)}>
