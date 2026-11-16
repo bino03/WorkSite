@@ -39,6 +39,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.InvoiceSear
 import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUploadResultDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTotalsSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.model.ConstructionExpense;
 import com.management.managementapi.enterprises.model.ConstructionInvoice;
@@ -463,6 +464,38 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) UUID budgetId) {
         return ResponseEntity.ok(service.outstandingSummary(enterpriseId, new InvoiceSearchFilter(
                 allocated, needsReview, null, sentToAccountant, atChapter, from, to, q,
+                supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
+                minAmount, maxAmount, budgetItemId, budgetId)));
+    }
+
+    /**
+     * Total, pago e a pagar (número e soma) das faturas desta obra com
+     * exatamente os filtros da lista — o resumo que o Backoffice mostra ao
+     * filtrar por fornecedor.
+     */
+    @GetMapping("/enterprise/{enterpriseId}/totals-summary")
+    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    public ResponseEntity<InvoiceTotalsSummaryDTO> totalsSummary(
+            @PathVariable UUID enterpriseId,
+            @RequestParam(required = false) Boolean allocated,
+            @RequestParam(required = false) Boolean needsReview,
+            @RequestParam(required = false) Boolean outstanding,
+            @RequestParam(required = false) Boolean sentToAccountant,
+            @RequestParam(required = false) Boolean atChapter,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String supplierNif,
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String documentStatus,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(required = false) String allocationStatus,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) UUID budgetItemId,
+            @RequestParam(required = false) UUID budgetId) {
+        return ResponseEntity.ok(service.totalsSummary(enterpriseId, new InvoiceSearchFilter(
+                allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
                 minAmount, maxAmount, budgetItemId, budgetId)));
     }

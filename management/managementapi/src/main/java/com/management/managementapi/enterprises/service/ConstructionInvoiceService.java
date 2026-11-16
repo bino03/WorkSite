@@ -31,6 +31,7 @@ import com.management.managementapi.enterprises.dto.invoice.response.InvoiceUplo
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingByUrgencyDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingSupplierDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.OutstandingInvoicesSummaryDTO;
+import com.management.managementapi.enterprises.dto.invoice.response.InvoiceTotalsSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.PendingInvoicesSummaryDTO;
 import com.management.managementapi.enterprises.dto.invoice.response.ProposedExpenseDTO;
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
@@ -1581,6 +1582,58 @@ public class ConstructionInvoiceService {
             }
         }
         return new OutstandingInvoicesSummaryDTO(invoices.size(), total, withoutTotal);
+    }
+
+    /**
+     * Total, pago e a pagar das faturas da obra com os mesmos filtros da lista
+     * (incluindo {@code outstanding}) — o resumo do filtro por fornecedor. Mesma
+     * conta do {@link #summarizeOutstanding}: líquido = total − NC, e liquidada
+     * quando líquido − pago ≤ 0 (inclui as anuladas por NC).
+     */
+    @Transactional(readOnly = true)
+    public InvoiceTotalsSummaryDTO totalsSummary(UUID enterpriseId, InvoiceSearchFilter filter) {
+        List<ConstructionInvoice> invoices = runSearch(enterpriseId, filter, Pageable.unpaged()).getContent().stream()
+                .filter(i -> i.getDocumentType() != ConstructionInvoice.DocumentType.CREDIT_NOTE)
+                .toList();
+        List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
+        Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
+        Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
+
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal paidTotal = BigDecimal.ZERO;
+        BigDecimal outstanding = BigDecimal.ZERO;
+        long paidCount = 0;
+        long outstandingCount = 0;
+        long withoutTotal = 0;
+        for (ConstructionInvoice invoice : invoices) {
+            BigDecimal paid = payments.getOrDefault(invoice.getId(), List.of()).stream()
+                    .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            paidTotal = paidTotal.add(paid);
+            if (invoice.getTotalAmount() == null) {
+                withoutTotal++;
+                outstandingCount++;
+                continue;
+            }
+            BigDecimal creditNoteTotal = creditNotes.getOrDefault(invoice.getId(), List.of()).stream()
+                    .map(ConstructionInvoice::getTotalAmount)
+                    .filter(java.util.Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal net = invoice.getTotalAmount().subtract(creditNoteTotal);
+            total = total.add(net);
+            // Liquidada = líquido − pago ≤ 0 — a definição do filtro `outstanding`,
+            // não a do `deriveStatus`: uma fatura anulada por inteiro por NC tem
+            // líquido 0 e nada pago, e o `deriveStatus` chama-lhe UNPAID.
+            BigDecimal remaining = net.subtract(paid);
+            if (remaining.signum() > 0) {
+                outstandingCount++;
+                outstanding = outstanding.add(remaining);
+            } else {
+                paidCount++;
+            }
+        }
+        return new InvoiceTotalsSummaryDTO(invoices.size(), total, paidCount, paidTotal,
+                outstandingCount, outstanding, withoutTotal);
     }
 
     /**

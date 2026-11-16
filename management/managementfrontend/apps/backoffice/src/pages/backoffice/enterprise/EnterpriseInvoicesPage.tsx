@@ -9,6 +9,7 @@ import {
   deallocateInvoice,
   deleteInvoice,
   getOutstandingInvoicesSummary,
+  getInvoiceTotalsSummary,
   listInvoices,
   getInvoice,
   setInvoiceBudget,
@@ -37,13 +38,19 @@ import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
 import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
 import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBadge";
+import { InvoiceTotalsBadge } from "@/components/invoices/InvoiceTotalsBadge";
 import { InvoiceFiltersModal } from "@/components/invoices/InvoiceFiltersModal";
 import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/invoices/invoiceFilters";
 import { suggestInvoiceType } from "@/components/invoices/invoiceNumber";
 import { SUPPLIERS_CHANGED_EVENT } from "@/components/suppliers/SuppliersDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import type { BudgetLot } from "@/types/budget";
-import type { ConstructionInvoice, OutstandingInvoicesSummary, InvoiceFilters } from "@/types/invoice";
+import type {
+  ConstructionInvoice,
+  OutstandingInvoicesSummary,
+  InvoiceFilters,
+  InvoiceTotalsSummary,
+} from "@/types/invoice";
 import { EMPTY_INVOICE_FILTERS } from "@/types/invoice";
 import type { IncidentInvoiceRef } from "@/types/incident";
 
@@ -60,6 +67,12 @@ type ViewKey = (typeof VIEWS)[number]["key"];
 /** O "Falta pagar X" faz sentido sempre que a lista é só de faturas por liquidar. */
 const wantsOutstandingTotal = (f: InvoiceFilters) =>
   f.outstanding === true || f.paymentStatus === "UNPAID" || f.paymentStatus === "PARTIAL";
+
+/**
+ * Total, pago e a pagar do fornecedor — só com um fornecedor filtrado. Substitui
+ * o "Falta pagar", que seria o mesmo número que o "A pagar" deste resumo.
+ */
+const wantsSupplierTotals = (f: InvoiceFilters) => !!f.supplierNif;
 
 const initialFilters: InvoiceFilters = {
   ...EMPTY_INVOICE_FILTERS,
@@ -136,6 +149,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [saving, setSaving] = useState(false);
   /** O que falta pagar no filtro "Por liquidar" — só se pede quando o filtro está ligado. */
   const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
+  const [totalsSummary, setTotalsSummary] = useState<InvoiceTotalsSummary | null>(null);
 
   const fetch = useCallback(
     async (
@@ -147,17 +161,22 @@ const EnterpriseInvoicesPage: FC = () => {
       try {
         // A soma é sobre a lista inteira, por isso vem à parte da página; sem
         // o filtro ligado não se pede nem se mostra.
-        const [page, summary] = await Promise.all([
+        const supplierTotals = wantsSupplierTotals(next);
+        const [page, summary, totals] = await Promise.all([
           listInvoices(
             enterpriseId,
             next,
             sort ? { field: sort.field, order: sort.order === "ascend" ? "asc" : "desc" } : undefined
           ),
-          wantsOutstandingTotal(next) ? getOutstandingInvoicesSummary(enterpriseId, next) : Promise.resolve(null),
+          !supplierTotals && wantsOutstandingTotal(next)
+            ? getOutstandingInvoicesSummary(enterpriseId, next)
+            : Promise.resolve(null),
+          supplierTotals ? getInvoiceTotalsSummary(enterpriseId, next) : Promise.resolve(null),
         ]);
         setInvoices(page.content);
         setTotalElements(page.totalElements);
         setOutstandingSummary(summary);
+        setTotalsSummary(totals);
       } catch (error) {
         ErrorHandler.handle(error);
       } finally {
@@ -236,7 +255,8 @@ const EnterpriseInvoicesPage: FC = () => {
   };
 
   const activeFilterCount = countActiveInvoiceFilters(filters);
-  const showOutstandingTotal = wantsOutstandingTotal(filters);
+  const showSupplierTotals = wantsSupplierTotals(filters);
+  const showOutstandingTotal = !showSupplierTotals && wantsOutstandingTotal(filters);
 
   const reload = () => {
     setSelectedIds([]);
@@ -583,6 +603,7 @@ const EnterpriseInvoicesPage: FC = () => {
           </Button>
         )}
         {showOutstandingTotal && <OutstandingTotalBadge summary={outstandingSummary} />}
+        {showSupplierTotals && <InvoiceTotalsBadge summary={totalsSummary} />}
 
         {allocatableSelected.length > 0 && (
           <Button type="primary" onClick={() => setAllocating(allocatableSelected)}>

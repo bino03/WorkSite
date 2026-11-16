@@ -23,6 +23,7 @@ import type {
   InvoiceUploadResult,
   OutstandingByUrgency,
   OutstandingInvoicesSummary,
+  InvoiceTotalsSummary,
   PendingInvoicesSummary,
   RubricSuggestion,
 } from "@/types/invoice";
@@ -299,6 +300,21 @@ export async function getOutstandingInvoicesSummary(
 
   const response = await api.get(
     `/construction-invoices/enterprise/${enterpriseId}/outstanding-summary?${params.toString()}`
+  );
+  return response.data;
+}
+
+/**
+ * Total, pago e a pagar (número e soma) desta obra com exatamente os filtros
+ * da lista — o resumo ao filtrar por fornecedor.
+ */
+export async function getInvoiceTotalsSummary(
+  enterpriseId: string,
+  filters: InvoiceFilters
+): Promise<InvoiceTotalsSummary> {
+  const params = invoiceFilterParams(filters, true);
+  const response = await api.get(
+    `/construction-invoices/enterprise/${enterpriseId}/totals-summary?${params.toString()}`
   );
   return response.data;
 }
