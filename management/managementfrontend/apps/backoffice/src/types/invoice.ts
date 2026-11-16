@@ -795,6 +795,18 @@ export interface OutstandingInvoicesSummary {
   withoutTotalCount: number;
 }
 
+/** `GET …/enterprise/{id}/totals-summary` — total, pago e a pagar do filtro (sem NC). */
+export interface InvoiceTotalsSummary {
+  count: number;
+  total: number;
+  paidCount: number;
+  /** Inclui o pago das parciais: `total = paid + outstanding`. */
+  paid: number;
+  outstandingCount: number;
+  outstanding: number;
+  withoutTotalCount: number;
+}
+
 /**
  * Uma linha de `GET /construction-invoices/search` — a pesquisa global do
  * header (Ctrl+K). Leve: o detalhe vem do `getInvoice` quando se clica.
