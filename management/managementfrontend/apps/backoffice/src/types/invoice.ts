@@ -585,8 +585,8 @@ export interface InvoiceFilters {
   /** Só em "A pagar" (2026-11-13): o modal mostra-os só lá, e a lista da obra ignora-os. */
   dueBucket: DueBucket | null;
   approvedForPayment: boolean | null;
-  /** Lote da fatura; só faz sentido numa obra com vários. Apanha também as que ainda não têm rubrica. */
-  budgetId: string | null;
+  /** Lotes da fatura (um ou vários — 2026-11-17); vazio = todos. Só faz sentido numa obra com vários. Apanha também as que ainda não têm rubrica. */
+  budgetIds: string[];
 }
 
 /**
@@ -637,7 +637,7 @@ export const EMPTY_INVOICE_FILTERS: InvoiceFilters = {
   budgetItemId: null,
   dueBucket: null,
   approvedForPayment: null,
-  budgetId: null,
+  budgetIds: [],
   budgetItemLabel: null,
 };
 

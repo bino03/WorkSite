@@ -217,6 +217,14 @@ export async function searchAllInvoices(params: GlobalInvoiceSearchParams): Prom
   return response.data;
 }
 
+/** Total, pago e a pagar de tudo o que a pesquisa global apanha com estes filtros (sem limite). */
+export async function getGlobalSearchTotals(
+  params: Omit<GlobalInvoiceSearchParams, "size">
+): Promise<InvoiceTotalsSummary> {
+  const response = await api.get(`/construction-invoices/search/totals-summary`, { params });
+  return response.data;
+}
+
 /** Despesas da empresa: faturas sem obra, que não entram em orçamento nenhum. Só `ADMIN`. */
 export async function listCompanyInvoices(
   params: ScopedInvoiceParams
@@ -250,7 +258,8 @@ function invoiceFilterParams(filters: InvoiceFilters, includeOutstanding: boolea
   if (filters.minAmount !== null) params.set("minAmount", String(filters.minAmount));
   if (filters.maxAmount !== null) params.set("maxAmount", String(filters.maxAmount));
   if (filters.budgetItemId) params.set("budgetItemId", filters.budgetItemId);
-  if (filters.budgetId) params.set("budgetId", filters.budgetId);
+  // Repetido (`budgetId=a&budgetId=b`): o Spring junta-os numa `List<UUID>`.
+  filters.budgetIds.forEach((id) => params.append("budgetId", id));
   return params;
 }
 

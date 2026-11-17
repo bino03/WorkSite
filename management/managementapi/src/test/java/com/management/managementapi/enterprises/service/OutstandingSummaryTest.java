@@ -72,7 +72,7 @@ class OutstandingSummaryTest {
         nc.setRelatedInvoiceId(b.getId());
 
         when(repository.search(eq(enterpriseId), any(), any(), eq(true), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any()))
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(a, b, c)));
         when(paymentService.paymentsForInvoices(any(), anyBoolean()))
                 .thenReturn(Map.of(a.getId(), List.of(payment("30"))));
@@ -88,7 +88,7 @@ class OutstandingSummaryTest {
         // Sem paginação e com outstanding=true, sempre — é o que faz o número bater com a lista inteira.
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(repository).search(eq(enterpriseId), any(), any(), eq(true), any(), any(), any(), any(), any(),
-                eq(null), any(), any(), any(), any(), any(), any(), any(), eq(false), any(), eq(false), any(), pageable.capture());
+                eq(null), any(), any(), any(), any(), any(), any(), any(), eq(false), any(), eq(false), any(), any(), pageable.capture());
         assertThat(pageable.getValue().isUnpaged()).isTrue();
     }
 
@@ -96,7 +96,7 @@ class OutstandingSummaryTest {
     @DisplayName("Quarentena/empresa: a mesma conta pela lista por âmbito")
     void byScopeUsesTheScopedList() {
         ConstructionInvoice a = invoice("80");
-        when(repository.searchByScope(eq(ConstructionInvoice.Scope.COMPANY), eq(true), eq("acme"), eq(null), eq(null), any()))
+        when(repository.searchByScope(eq(ConstructionInvoice.Scope.COMPANY), eq(true), eq("acme"), eq(null), eq(null), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(a)));
         when(paymentService.paymentsForInvoices(any(), anyBoolean())).thenReturn(Map.of());
         when(repository.findCreditNotesForAll(any())).thenReturn(List.of());
@@ -112,7 +112,7 @@ class OutstandingSummaryTest {
     @Test
     @DisplayName("Filtro \"carregada em\": dias de Lisboa, intervalo meio-aberto até ao dia seguinte ao fim")
     void uploadedRangeIsLisbonDaysHalfOpen() {
-        when(repository.searchByScope(any(), any(), any(), any(), any(), any()))
+        when(repository.searchByScope(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         service.outstandingSummaryByScope(ConstructionInvoice.Scope.UNIDENTIFIED, null,
@@ -122,7 +122,7 @@ class OutstandingSummaryTest {
         verify(repository).searchByScope(eq(ConstructionInvoice.Scope.UNIDENTIFIED), eq(true), eq(null),
                 eq(OffsetDateTime.parse("2026-07-01T00:00+01:00")),
                 eq(OffsetDateTime.parse("2026-08-01T00:00+01:00")),
-                any());
+                any(), any());
     }
 
     private static ConstructionInvoice invoice(String total) {

@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,7 +80,7 @@ class InvoiceSearchFilterTest {
         when(budgetItemRepository.findTreeByEnterpriseId(enterpriseId))
                 .thenReturn(List.of(c4, c42, c421, c422, c43, deleted));
         when(repository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any()))
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of()));
         when(documentRepository.findByInvoiceIdInOrderByUploadedAtAsc(any())).thenReturn(List.of());
     }
@@ -124,7 +125,23 @@ class InvoiceSearchFilterTest {
         verify(repository).search(eq(enterpriseId), any(), any(), any(), any(), any(), eq(BudgetRowKind.ITEM),
                 any(), any(), eq("ft"), eq("123456789"), eq("CREDIT_NOTE"), eq("MISSING"),
                 eq(new BigDecimal("10")), eq(new BigDecimal("500")), eq("PARTIAL"), eq("COMPLETE"),
-                eq(false), any(), eq(false), any(), eq(pageable));
+                eq(false), any(), eq(false), any(), any(), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("Um valor no texto chega à query como valor exato, como na pesquisa global; texto normal não")
+    void amountInTextIsParsed() {
+        service.search(enterpriseId, InvoiceSearchFilter.basic(null, null, null, null, null, null, null, "1 234,56 €"),
+                pageable);
+        service.search(enterpriseId, InvoiceSearchFilter.basic(null, null, null, null, null, null, null, "betão"),
+                pageable);
+
+        verify(repository).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), eq("1 234,56 €"),
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                eq(new BigDecimal("1234.56")), any());
+        verify(repository).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), eq("betão"),
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                isNull(), any());
     }
 
     // ── auxiliares ────────────────────────────────────────────
@@ -137,7 +154,7 @@ class InvoiceSearchFilterTest {
     private boolean captureBudgetFilter() {
         ArgumentCaptor<Boolean> flag = ArgumentCaptor.forClass(Boolean.class);
         verify(repository).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), flag.capture(), any(), anyBoolean(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), flag.capture(), any(), anyBoolean(), any(), any(), any());
         return flag.getValue();
     }
 
@@ -145,7 +162,7 @@ class InvoiceSearchFilterTest {
     private Collection<UUID> captureBudgetItemIds() {
         ArgumentCaptor<Collection<UUID>> ids = ArgumentCaptor.forClass(Collection.class);
         verify(repository).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), ids.capture(), anyBoolean(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), ids.capture(), anyBoolean(), any(), any(), any());
         return ids.getValue();
     }
 

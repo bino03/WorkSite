@@ -221,6 +221,23 @@ class OutstandingByUrgencyTest {
     }
 
     @Test
+    @DisplayName("um NIF sem nome nem ficha não rebenta a lista: a opção vem só com o NIF, e um nome que apareça depois ganha")
+    void supplierWithoutNameDoesNotBreakTheList() {
+        // Regressão de 2026-11-17: o HashMap.merge com valor null dava NPE e "A pagar" abria em erro.
+        noDueDateOlder.setSupplierNif("509299466");
+        noDueDateNewer.setSupplierNif("509299466");
+        noDueDateNewer.setSupplierName("Paulo Dinis");
+        dueLaterByHand.setSupplierNif("500000000");
+
+        OutstandingByUrgencyDTO all = service.outstandingByUrgency(OutstandingFilter.NONE, 0, 20, TODAY);
+
+        assertThat(all.totalElements()).isEqualTo(5);
+        assertThat(all.suppliers()).contains(
+                new OutstandingSupplierDTO("509299466", "Paulo Dinis"),
+                new OutstandingSupplierDTO("500000000", null));
+    }
+
+    @Test
     @DisplayName("a pesquisa avançada (texto, valor, data, documento) estreita sem mudar a ordem, e os totais seguem-na")
     void advancedFilters() {
         noDueDateOlder.setSupplierName("Paulo Dinis");

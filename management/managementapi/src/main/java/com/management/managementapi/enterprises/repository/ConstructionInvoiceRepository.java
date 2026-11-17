@@ -84,10 +84,17 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                    or lower(i.supplierNif)      like lower(concat('%', :q, '%'))
                    or lower(i.invoiceNumber)    like lower(concat('%', :q, '%'))
                    or lower(i.invoiceAtcud)     like lower(concat('%', :q, '%'))
+                   or lower(i.description)      like lower(concat('%', :q, '%'))
                    or exists (select 1 from ConstructionInvoiceDocument d
                               where d.invoice = i
                                 and lower(d.originalFilename) like lower(concat('%', :q, '%')))
-                   or lower(i.notes)            like lower(concat('%', :q, '%')))
+                   or exists (select 1 from ConstructionExpense x
+                              where x.invoice = i
+                                and (lower(x.name)            like lower(concat('%', :q, '%'))
+                                     or lower(x.description)  like lower(concat('%', :q, '%'))
+                                     or lower(x.observations) like lower(concat('%', :q, '%'))))
+                   or lower(i.notes)            like lower(concat('%', :q, '%'))
+                   or (:amount is not null and i.totalAmount = :amount))
               and (:supplierNif is null or i.supplierNif = :supplierNif)
               and (:documentType   is null or cast(i.documentType   as string) = :documentType)
               and (:documentStatus is null or cast(i.documentStatus as string) = :documentStatus)
@@ -125,7 +132,7 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
               and (:budgetFilter = false
                    or exists (select 1 from ConstructionExpense e
                               where e.invoice = i and e.budgetItem.id in :budgetItemIds))
-              and (:lotFilter = false or i.budget.id = :lotId)
+              and (:lotFilter = false or i.budget.id in :lotIds)
             """)
     Page<ConstructionInvoice> search(@Param("enterpriseId") UUID enterpriseId,
                                      @Param("allocated") Boolean allocated,
@@ -147,7 +154,8 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                      @Param("budgetFilter") boolean budgetFilter,
                                      @Param("budgetItemIds") Collection<UUID> budgetItemIds,
                                      @Param("lotFilter") boolean lotFilter,
-                                     @Param("lotId") UUID lotId,
+                                     @Param("lotIds") Collection<UUID> lotIds,
+                                     @Param("amount") BigDecimal amount,
                                      Pageable pageable);
 
     /**
@@ -179,7 +187,16 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                    or lower(i.invoiceNumber) like lower(concat('%', :q, '%'))
                    or lower(i.invoiceAtcud)  like lower(concat('%', :q, '%'))
                    or lower(i.description)   like lower(concat('%', :q, '%'))
-                   or lower(i.notes)         like lower(concat('%', :q, '%')))
+                   or exists (select 1 from ConstructionInvoiceDocument d
+                              where d.invoice = i
+                                and lower(d.originalFilename) like lower(concat('%', :q, '%')))
+                   or exists (select 1 from ConstructionExpense x
+                              where x.invoice = i
+                                and (lower(x.name)            like lower(concat('%', :q, '%'))
+                                     or lower(x.description)  like lower(concat('%', :q, '%'))
+                                     or lower(x.observations) like lower(concat('%', :q, '%'))))
+                   or lower(i.notes)         like lower(concat('%', :q, '%'))
+                   or (:amount is not null and i.totalAmount = :amount))
               and (:uploadedFrom   is null or i.createdAt >= :uploadedFrom)
               and (:uploadedBefore is null or i.createdAt <  :uploadedBefore)
             """)
@@ -188,6 +205,7 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                                             @Param("q") String q,
                                             @Param("uploadedFrom") OffsetDateTime uploadedFrom,
                                             @Param("uploadedBefore") OffsetDateTime uploadedBefore,
+                                            @Param("amount") BigDecimal amount,
                                             Pageable pageable);
 
     /**
@@ -251,6 +269,11 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
                    or exists (select 1 from ConstructionInvoiceDocument d
                               where d.invoice = i
                                 and lower(d.originalFilename) like lower(concat('%', :q, '%')))
+                   or exists (select 1 from ConstructionExpense x
+                              where x.invoice = i
+                                and (lower(x.name)            like lower(concat('%', :q, '%'))
+                                     or lower(x.description)  like lower(concat('%', :q, '%'))
+                                     or lower(x.observations) like lower(concat('%', :q, '%'))))
                    or (:amount is not null and i.totalAmount = :amount))
               and (:enterpriseFilter = false or e.id = :enterpriseId)
               and (:scope is null or cast(i.scope as string) = :scope)
