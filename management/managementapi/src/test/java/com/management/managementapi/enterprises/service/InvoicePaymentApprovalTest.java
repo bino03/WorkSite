@@ -22,13 +22,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import com.management.managementapi.enterprises.model.Enterprise;
+import com.management.managementapi.model.enums.AccountStatus;
+import com.management.managementapi.model.enums.ProfileRole;
+import com.management.managementapi.notifications.model.Notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -136,6 +146,39 @@ class InvoicePaymentApprovalTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                         .isEqualTo(ErrorCode.INVOICE_IS_CREDIT_NOTE));
+    }
+
+    @Test
+    @DisplayName("aprovar avisa a contabilidade, menos quem aprovou")
+    void approvingNotifiesAccountantsButNotTheApprover() {
+        ConstructionInvoice invoice = unpaidInvoice("100.00");
+        UUID accountant = UUID.randomUUID();
+        when(authContext.currentProfileId()).thenReturn(Optional.of(accountant));
+        UUID otherAccountant = UUID.randomUUID();
+        when(profileRepository.findIdsByRoleInAndAccountStatus(List.of(ProfileRole.ACCOUNTANT), AccountStatus.unlocked))
+                .thenReturn(List.of(accountant, otherAccountant));
+
+        service.setApprovedForPayment(invoice.getId(), true);
+
+        verify(notifications).notifyAll(eq(List.of(otherAccountant)), eq(Notification.TYPE_INVOICE_APPROVED),
+                anyString(), anyString(), eq("/backoffice/invoices/outstanding?approved=true"), eq(invoice.getId()));
+    }
+
+    @Test
+    @DisplayName("aprovar outra vez, ou numa obra de teste, não avisa ninguém")
+    void reapprovingOrTestWorkDoesNotNotify() {
+        ConstructionInvoice already = unpaidInvoice("100.00");
+        already.setApprovedForPayment(true);
+        service.setApprovedForPayment(already.getId(), true);
+
+        ConstructionInvoice onTestWork = unpaidInvoice("100.00");
+        Enterprise test = new Enterprise();
+        test.setIsTest(true);
+        onTestWork.setEnterprise(test);
+        when(authContext.currentProfileId()).thenReturn(Optional.of(ADMIN));
+        service.setApprovedForPayment(onTestWork.getId(), true);
+
+        verify(notifications, never()).notifyAll(any(), any(), any(), any(), any(), any());
     }
 
     private ConstructionInvoice unpaidInvoice(String total) {

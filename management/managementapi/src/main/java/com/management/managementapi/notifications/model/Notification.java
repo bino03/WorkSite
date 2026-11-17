@@ -33,6 +33,9 @@ public class Notification extends BaseEntity {
     /** Fatura por liquidar cujo vencimento está a chegar. */
     public static final String TYPE_INVOICE_DUE = "invoice_due";
 
+    /** Fatura aprovada para pagamento — vai para a contabilidade, que é quem paga. */
+    public static final String TYPE_INVOICE_APPROVED = "invoice_approved";
+
     @Column(name = "recipient_id", nullable = false)
     private UUID recipientId;
 

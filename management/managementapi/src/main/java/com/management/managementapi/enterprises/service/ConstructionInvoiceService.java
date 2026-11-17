@@ -59,8 +59,10 @@ import com.management.managementapi.exeption.StorageException;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.model.Profile;
+import com.management.managementapi.model.enums.AccountStatus;
 import com.management.managementapi.model.enums.ActivityType;
 import com.management.managementapi.model.enums.EntityType;
+import com.management.managementapi.model.enums.ProfileRole;
 import com.management.managementapi.notifications.model.Notification;
 import com.management.managementapi.notifications.service.NotificationService;
 import com.management.managementapi.repository.ActivityLogRepository;
@@ -1864,6 +1866,7 @@ public class ConstructionInvoiceService {
                 invoice.setApprovedForPayment(true);
                 invoice.setApprovedForPaymentAt(OffsetDateTime.now());
                 authContext.currentProfileId().ifPresent(invoice::setApprovedForPaymentBy);
+                notifyAccountantsOfApproval(invoice);
             }
         } else {
             invoice.setApprovedForPayment(false);
@@ -1872,6 +1875,32 @@ public class ConstructionInvoiceService {
         }
 
         return repository.save(invoice);
+    }
+
+    /**
+     * Avisa a contabilidade de que há uma fatura nova para pagar. Só na passagem
+     * de "por aprovar" a "aprovada" (aprovar outra vez não chega aqui), e nunca a
+     * quem acabou de aprovar. As faturas de obras de teste não avisam: não
+     * aparecem em "A pagar", e o aviso apontaria para nada.
+     */
+    private void notifyAccountantsOfApproval(ConstructionInvoice invoice) {
+        if (invoice.getEnterprise() != null && Boolean.TRUE.equals(invoice.getEnterprise().getIsTest())) {
+            return;
+        }
+        UUID approver = invoice.getApprovedForPaymentBy();
+        List<UUID> recipients = profileRepository
+                .findIdsByRoleInAndAccountStatus(List.of(ProfileRole.ACCOUNTANT), AccountStatus.unlocked)
+                .stream()
+                .filter(id -> !id.equals(approver))
+                .toList();
+        String dono = invoice.getEnterprise() == null ? "Empresa" : invoice.getEnterprise().getName();
+        notifications.notifyAll(
+                recipients,
+                Notification.TYPE_INVOICE_APPROVED,
+                "Fatura aprovada para pagamento",
+                descreveFatura(invoice) + " · " + dono,
+                "/backoffice/invoices/outstanding?approved=true",
+                invoice.getId());
     }
 
     /** Marca (ou desmarca) a fatura como enviada para a contabilidade. */

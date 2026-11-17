@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { taskService } from "@/services/taskService";
 import api from "@/api";
 import BlueprintCard from "@/components/common/BlueprintCard";
+import ApprovedToPayCard from "@/components/invoices/ApprovedToPayCard";
 import { normalizeSpringPage } from "@/utils/springPage";
 
 interface Metric {
@@ -19,7 +20,7 @@ interface Metric {
 export const BackofficeHome = () => {
   const { t } = useTranslation();
   const { user } = useAuthContext();
-  const { isAdmin, profileId } = useAuth();
+  const { isAdmin, canManageWorks, profileId } = useAuth();
   const [metrics, setMetrics] = useState<Metric[]>([]);
 
   useEffect(() => {
@@ -99,6 +100,9 @@ export const BackofficeHome = () => {
           </BlueprintCard>
         ))}
       </div>
+
+      {/* Quem paga (e quem aprova) vê logo o que está aprovado e por liquidar. */}
+      {canManageWorks() && <ApprovedToPayCard />}
 
       <h6 style={{ color: "var(--ind-accent-700)" }}>Navegação</h6>
       <div className="keep-cols" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "13.6px" }}>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FC } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge, Button, Input, Tooltip } from "antd";
 import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 
@@ -106,9 +107,18 @@ const OutstandingInvoicesPage: FC = () => {
     [],
   );
 
+  // `?approved=true` abre já nas aprovadas para pagamento — é para onde apontam o
+  // aviso `invoice_approved` e o cartão da página inicial. Depende do parâmetro, não
+  // só da montagem: clicar no aviso estando já nesta página tem de refiltrar.
+  const [searchParams] = useSearchParams();
+  const onlyApproved = searchParams.get("approved") === "true";
   useEffect(() => {
-    void fetch(0, DEFAULT_PAGE_SIZE, NO_FILTERS, ALL_WORKS);
-  }, [fetch]);
+    const initial = onlyApproved ? { ...NO_FILTERS, approvedForPayment: true } : NO_FILTERS;
+    setFilters(initial);
+    setWork(ALL_WORKS);
+    setPage(0);
+    void fetch(0, DEFAULT_PAGE_SIZE, initial, ALL_WORKS);
+  }, [fetch, onlyApproved]);
 
   const reload = useCallback(() => void fetch(page, pageSize, filters, work), [fetch, page, pageSize, filters, work]);
 

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Badge, Dropdown, Empty, Spin } from "antd";
 import {
   BellOutlined,
+  CheckCircleOutlined,
   CheckSquareOutlined,
   ClockCircleOutlined,
   EuroCircleOutlined,
@@ -27,6 +28,7 @@ const iconFor = (type: string) => {
   if (type === "invoice_pending") return <FileTextOutlined />;
   if (type === "budget_item_deadline") return <ClockCircleOutlined />;
   if (type === "invoice_due") return <EuroCircleOutlined />;
+  if (type === "invoice_approved") return <CheckCircleOutlined />;
   return <BellOutlined />;
 };
 
