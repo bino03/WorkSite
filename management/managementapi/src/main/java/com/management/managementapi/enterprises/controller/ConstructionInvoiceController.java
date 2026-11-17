@@ -312,6 +312,22 @@ public class ConstructionInvoiceController {
                 Math.min(Math.max(size, 1), 50));
     }
 
+    /**
+     * Total, pago e a pagar (número e soma) de tudo o que a pesquisa global
+     * apanha com estes filtros — não só as que a lista mostra.
+     */
+    @GetMapping("/search/totals-summary")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    public InvoiceTotalsSummaryDTO searchEverywhereTotals(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID enterpriseId,
+            @RequestParam(required = false) ConstructionInvoice.Scope scope,
+            @RequestParam(required = false) String supplierNif,
+            @RequestParam(required = false) String paymentStatus) {
+        return service.searchEverywhereTotals(
+                new GlobalInvoiceSearchFilter(q, enterpriseId, scope, supplierNif, paymentStatus));
+    }
+
     @GetMapping("/enterprise/{enterpriseId}")
     @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
     public Page<ConstructionInvoiceResponseDTO> listByEnterprise(
@@ -332,7 +348,7 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) BigDecimal maxAmount,
             @RequestParam(required = false) UUID budgetItemId,
-            @RequestParam(required = false) UUID budgetId,
+            @RequestParam(required = false) List<UUID> budgetId,
             @SortDefault.SortDefaults({
                     @SortDefault(sort = "invoiceDate", direction = Sort.Direction.DESC),
                     @SortDefault(sort = "createdAt", direction = Sort.Direction.DESC)})
@@ -461,7 +477,7 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) BigDecimal maxAmount,
             @RequestParam(required = false) UUID budgetItemId,
-            @RequestParam(required = false) UUID budgetId) {
+            @RequestParam(required = false) List<UUID> budgetId) {
         return ResponseEntity.ok(service.outstandingSummary(enterpriseId, new InvoiceSearchFilter(
                 allocated, needsReview, null, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
@@ -493,7 +509,7 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) BigDecimal maxAmount,
             @RequestParam(required = false) UUID budgetItemId,
-            @RequestParam(required = false) UUID budgetId) {
+            @RequestParam(required = false) List<UUID> budgetId) {
         return ResponseEntity.ok(service.totalsSummary(enterpriseId, new InvoiceSearchFilter(
                 allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,

@@ -410,6 +410,7 @@ de entrada.
 | GET | `/construction-invoices/unidentified` | `ADMIN` — a quarentena, paginada, pela data da fatura, mais recentes primeiro (por omissão; `sort=createdAt,asc`… como na lista de obra) |
 | GET | `/construction-invoices/company` | `ADMIN` — despesas da empresa, paginadas, pela data da fatura, mais recentes primeiro (idem) |
 | GET | `/construction-invoices/search?q=&enterpriseId=&scope=&supplierNif=&paymentStatus=&size=` | `ADMIN`, `ACCOUNTANT` — **pesquisa global** (o modal Ctrl+K do header): todas as obras, a empresa e a quarentena, notas de crédito incluídas, sem obras `is_test` nem eliminadas. Ver [[#Pesquisa global de faturas]] |
+| GET | `/construction-invoices/search/totals-summary?q=&enterpriseId=&scope=&supplierNif=&paymentStatus=` | `ADMIN`, `ACCOUNTANT` — o mesmo `{ count, total, paidCount, paid, outstandingCount, outstanding, withoutTotalCount }` do `totals-summary` da obra, com a mesma conta, sobre **tudo** o que a pesquisa global apanha com estes filtros (sem o limite do `size`). Sem filtro e com texto < 2 caracteres devolve zeros. É o resumo por cima da lista no modal Ctrl+K (2026-11-17) |
 | GET | `/construction-invoices/outstanding?enterpriseId=&company=&supplierNif=&dueBucket=&approvedForPayment=&sentToAccountant=&q=&documentStatus=&paymentStatus=&allocationStatus=&from=&to=&minAmount=&maxAmount=&budgetItemId=&page=&size=` | `ADMIN`, `ACCOUNTANT` — "A pagar": as faturas por liquidar de **todas as obras e da empresa**, por ordem de urgência. Ver [[#A pagar: por liquidar em todas as obras]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}` | `ADMIN` ou `EMPLOYEE` — caixa de entrada, paginada. Por omissão `invoiceDate,desc` (sem data no fim) e depois `createdAt,desc` — ver [[#Ordem das listas de faturas]] |
 | GET | `/construction-invoices/enterprise/{enterpriseId}/documents/summary?scope=&budgetId=` | `ADMIN` ou `EMPLOYEE` — quantos documentos tem o âmbito (`DocumentsExportSummaryDTO`), sem tocar no Storage |
@@ -431,7 +432,7 @@ de entrada.
 | DELETE | `/construction-invoices/{id}/allocate` | `ADMIN` — desfaz **todas** as linhas, devolve à caixa de entrada |
 | PATCH | `/construction-invoices/{id}/notes` | `ADMIN` ou `EMPLOYEE` — corpo `{ "notes": "…" }` (máx. 2000; vazio apaga); só mexe na nota, ao contrário do `PUT` |
 | PATCH | `/construction-invoices/{id}/due-date` | `ADMIN` — corpo `{ "dueDate": "2026-11-30" }`; escreve o **vencimento manual**, que prevalece sobre o calculado. `null` apaga-o e a fatura volta ao prazo do fornecedor. Numa nota de crédito → `INVOICE_027`. Ver [[#Vencimento da fatura]] |
-| PATCH | `/construction-invoices/{id}/payment-approval?approved=` | `ADMIN` — aprova a fatura para pagamento (`true`, por omissão) ou retira a aprovação (`false`). Ver [[#Aprovação para pagamento]] |
+| PATCH | `/construction-invoices/{id}/payment-approval?approved=` | `ADMIN` ou `ACCOUNTANT` — aprova a fatura para pagamento (`true`, por omissão) ou retira a aprovação (`false`). Ver [[#Aprovação para pagamento]] |
 | PATCH | `/construction-invoices/{id}/accountant?sent=` | `ADMIN` — marca/desmarca enviada ao contabilista |
 | DELETE | `/construction-invoices/{id}` | `ADMIN` — apaga fatura, ficheiro, miniatura e lançamento |
 | POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
@@ -618,7 +619,7 @@ ordenada por `uploadedAt` descendente:
 | `sentToAccountant` | `false` → o que falta enviar |
 | `atChapter` | `true` → pelo menos uma linha de repartição aponta para uma rubrica que ainda tem filhas `ITEM` (a mesma regra do `chapter` do ecrã "Classificar" — ver `BudgetItemSearchResultDTO`). Só existe aqui: as outras duas listas não têm rubrica. **O Backoffice deixou de o usar** a 2026-09-21 (o botão "Ao capítulo" saiu: com o gasto de uma rubrica-pai repartido pelas filhas, lançar ao capítulo deixou de esconder dinheiro); o parâmetro fica na API, a tag "capítulo" na coluna Rubrica também |
 | `from` / `to` | intervalo de `invoiceDate` (ISO `AAAA-MM-DD`) |
-| `q` | procura no nome e NIF do fornecedor, número, ATCUD, nome do ficheiro e notas |
+| `q` | procura no nome e NIF do fornecedor, número, ATCUD, descrição, nome do ficheiro, notas, nas **linhas da classificação** (nome, descrição e observações da despesa) e, se se lê como valor, no total exato (`parseSearchAmount`). Desde 2026-11-17 é o mesmo conjunto nas três pesquisas (obra, empresa/quarentena, global) |
 | `supplierNif` | NIF exato do fornecedor (a pesquisa avançada escolhe-o do catálogo `/suppliers`) |
 | `documentType` | `INVOICE` / `CREDIT_NOTE` |
 | `documentStatus` | `ARCHIVED` / `MISSING` / `TO_PRINT` / `TO_REQUEST` |
@@ -626,7 +627,7 @@ ordenada por `uploadedAt` descendente:
 | `allocationStatus` | `NONE` / `PROVISIONAL` (com linhas, sem total) / `PARTIAL` (Σ linhas ≠ total) / `COMPLETE` — a regra do `allocationStatus` da resposta, em SQL |
 | `minAmount` / `maxAmount` | intervalo de `totalAmount`, inclusive |
 | `budgetItemId` | rubrica **e toda a sub-árvore dela** (o serviço resolve os ids das descendentes vivas antes da query; uma rubrica de outra obra ou apagada filtra tudo, não devolve a lista inteira) |
-| `budgetId` | lote da fatura (`construction_invoice.budget_id`). Apanha também as faturas **sem rubrica** — é o que deixa ver as "por classificar" de um lote. Vale também no `outstanding-summary` |
+| `budgetId` | lote da fatura (`construction_invoice.budget_id`). **Um ou vários** (desde 2026-11-17): repetido (`budgetId=a&budgetId=b`) ou separado por vírgulas — fatura em qualquer deles. Apanha também as faturas **sem rubrica** — é o que deixa ver as "por classificar" de um lote. Vale também no `outstanding-summary` e no `totals-summary` |
 
 Os últimos oito são a **pesquisa avançada** do Backoffice (2026-09-21, `InvoiceFiltersModal`) e vão
 também no `GET …/outstanding-summary`, que aceita exatamente o mesmo conjunto (menos `outstanding`).
@@ -1117,8 +1118,9 @@ totalAmount, paymentStatus`. `budgetName` é o lote da fatura **só quando a obr
 `400`, não `500` (`GlobalExceptionHandler`, `MethodArgumentTypeMismatchException`).
 
 - **Texto**: `lower() like` (distingue acentos, como as outras listas) sobre fornecedor, NIF, número,
-  ATCUD, descrição, notas e nome do ficheiro. São os campos do `q` por obra e os do `q` da empresa e da
-  quarentena juntos; essas duas listas não mudaram.
+  ATCUD, descrição, notas, nome do ficheiro e as linhas da classificação (nome, descrição e observações
+  de cada `construction_expense`). Desde 2026-11-17 é **o mesmo conjunto** no `q` por obra e no da
+  empresa e da quarentena — antes a obra não tinha a descrição nem o valor, e a empresa/quarentena não tinha o ficheiro.
 - **Valor exato**: se o `q` se lê como valor (`1 234,56 €`, `1.234,56`, `1234,56`, `1234.56`), também
   casa `total_amount =` esse valor (`ConstructionInvoiceService.parseSearchAmount`).
 - **Mínimo de 2 caracteres**, sem filtros: abaixo disso devolve `[]` sem consultar a BD. `size` vai de 1 a 50 (20 por omissão).
@@ -1554,6 +1556,7 @@ confirmaria a existência a quem não devia sequer saber disso.
 | `invoice_pending` | `POST /construction-invoices` (upload) | **Só quem carregou** |
 | `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` e `ACCOUNTANT` desbloqueados** (`ProfileRole.WORKS_MANAGERS`), uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
 | `invoice_due` | Job agendado (`InvoiceDueNotifierConfig`, 07:00 diário **e no arranque**) — faturas por liquidar (as da página "A pagar": obras e empresa, sem quarentena, sem notas de crédito, sem obras `is_test` nem eliminadas) cujo **vencimento** cai em `[hoje, hoje + N]`, `N` = `app.notifications.invoice-due.days-ahead` (7). Para todos os `ADMIN` e `ACCOUNTANT` desbloqueados (`ProfileRole.WORKS_MANAGERS`), **uma vez por fatura e destinatário**. Sem vencimento não avisa; já vencida também não (a lista mostra-as à frente). Avisa de todas, aprovadas ou não — o texto termina em "aprovada para pagamento" ou "por aprovar". Link: `/backoffice/invoices/outstanding`. Mudar o prazo do fornecedor ou o vencimento manual de uma fatura já avisada **não reavisa** |
+| `invoice_approved` | `PATCH /construction-invoices/{id}/payment-approval` com `approved=true`, **só na passagem** de por aprovar a aprovada (reaprovar não avisa). Faturas de obras `is_test` não avisam | **Todos os `ACCOUNTANT` desbloqueados, menos quem aprovou** (não os `ADMIN`: é a contabilidade que paga). Texto: fornecedor · número · obra (ou "Empresa"). Link: `/backoffice/invoices/outstanding?approved=true`, que abre "A pagar" já filtrado nas aprovadas |
 
 > O `budget_item_deadline` corre também no arranque porque a app não está ligada 24h por dia —
 > um cron às 7h numa app que só arranca às 9h nunca dispararia. O link é a página do orçamento da

@@ -104,7 +104,8 @@ const EnterpriseInvoicesPage: FC = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [filters, setFilters] = useState<InvoiceFilters>(() => ({
     ...initialFilters,
-    budgetId: searchParams.get("lote"),
+    // `?lote=` aceita um ou vários, separados por vírgula.
+    budgetIds: (searchParams.get("lote") ?? "").split(",").filter(Boolean),
   }));
   const [view, setView] = useState<ViewKey>("all");
   /** `null` = ordem por omissão do backend (data da fatura, mais recente primeiro; sem data no fim). */
@@ -220,10 +221,12 @@ const EnterpriseInvoicesPage: FC = () => {
   // de um só lote, onde o dropdown não aparece. A regra é não deixar ninguém aterrar
   // numa lista filtrada sem o controlo à vista para a desfiltrar: faltariam faturas
   // sem nada no ecrã a explicar porquê.
+  // Com vários `?lote=`, ficam só os que são lotes vivos.
   useEffect(() => {
-    if (!lots.length || !filters.budgetId) return;
-    if (lots.length > 1 && lots.some((lot) => lot.id === filters.budgetId)) return;
-    applyFilters({ budgetId: null });
+    if (!lots.length || !filters.budgetIds.length) return;
+    const live = lots.length > 1 ? filters.budgetIds.filter((id) => lots.some((lot) => lot.id === id)) : [];
+    if (live.length === filters.budgetIds.length) return;
+    applyFilters({ budgetIds: live });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lots]);
 
@@ -549,7 +552,7 @@ const EnterpriseInvoicesPage: FC = () => {
         </div>
 
         <Input
-          placeholder="Fornecedor, NIF, nº da fatura…"
+          placeholder="Fornecedor, NIF, nº, descrição, artigo ou valor…"
           prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
           value={filters.q}
           onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
@@ -562,29 +565,22 @@ const EnterpriseInvoicesPage: FC = () => {
 
         {/* O lote é o eixo de navegação da obra, não pesquisa avançada: fica à vista na
             barra, fora do modal, fora do badge de contagem e fora do "Limpar filtros"
-            (2026-10-06). Limpa-se aqui mesmo, em "Todos os lotes". Com um lote ou nenhum
-            não há nada a escolher, por isso não aparece. */}
+            (2026-10-06). Limpa-se aqui mesmo (o ✕, ou tirar todos = "Todos os lotes").
+            Com um lote ou nenhum não há nada a escolher, por isso não aparece.
+            Escolha múltipla desde 2026-11-17: ver as faturas de dois ou três lotes juntas. */}
         {lots.length > 1 && (
-          <select
+          <Select
+            mode="multiple"
             aria-label="Lote"
-            value={filters.budgetId ?? ""}
-            onChange={(e) => applyFilters({ budgetId: e.target.value || null })}
-            style={{
-              maxWidth: 200,
-              minHeight: 36,
-              padding: "6px 10px",
-              background: "var(--ind-color-surface)",
-              border: "1px solid var(--ind-color-divider)",
-              color: "var(--ind-color-text)",
-            }}
-          >
-            <option value="">Todos os lotes</option>
-            {lots.map((lot) => (
-              <option key={lot.id} value={lot.id}>
-                {lot.name}
-              </option>
-            ))}
-          </select>
+            allowClear
+            placeholder="Todos os lotes"
+            maxTagCount="responsive"
+            value={filters.budgetIds}
+            onChange={(budgetIds: string[]) => applyFilters({ budgetIds })}
+            options={lots.map((lot) => ({ value: lot.id, label: lot.name }))}
+            optionFilterProp="label"
+            style={{ minWidth: 200, maxWidth: 320 }}
+          />
         )}
 
         {/* Pesquisa avançada: só o ícone com a contagem e o "Limpar" — sem chips (pedido do utilizador). */}

@@ -292,7 +292,7 @@ class DespesasExcelImportServiceTest {
     }
 
     @Test
-    @DisplayName("Uma fatura anulada por inteiro por NC entra sem pagamento, mesmo \"Liquidada\" — a app recusaria pagá-la")
+    @DisplayName("Uma fatura anulada por inteiro por NC entra sem pagamento, mas liquidada — a app recusaria pagá-la")
     void fullyCreditedInvoiceLosesItsPayment() throws Exception {
         ExpensesImportResultDTO result = dryRun(workbook(VAULT_HEADERS, List.<Object[]>of(
                 row("FT 50", "05/01/2026", "Mosaico", "1310,42", "x", "Transferência", null, "Pago no lote de setembro", null),
@@ -302,11 +302,27 @@ class DespesasExcelImportServiceTest {
 
         assertThat(result.errors()).isEmpty();
         assertThat(result.questions()).isEmpty(); // "Pago no lote…" sem data não é marca de agregado
-        assertThat(byNumber(result, "FT 50").paymentStatus()).isEqualTo("UNPAID");
+        // Liquidada pela NC (deriveStatus: líquido 0 ≤ pago 0) — o que o Excel também diz.
+        assertThat(byNumber(result, "FT 50").paymentStatus()).isEqualTo("PAID");
         assertThat(byNumber(result, "FT 51").paymentStatus()).isEqualTo("PAID");
-        assertThat(result.paidCount()).isEqualTo(1);
-        assertThat(result.unpaidCount()).isEqualTo(1);
+        assertThat(result.paidCount()).isEqualTo(2);
+        assertThat(result.unpaidCount()).isEqualTo(0);
         assertThat(result.warnings()).anyMatch(w -> w.contains("FT 50") && w.contains("anulada por inteiro"));
+    }
+
+    @Test
+    @DisplayName("Uma fatura anulada por NC sem \"Liquidada\" no Excel também entra liquidada, sem aviso de pagamento")
+    void fullyCreditedUnpaidInvoiceCountsAsPaid() throws Exception {
+        ExpensesImportResultDTO result = dryRun(workbook(VAULT_HEADERS, List.<Object[]>of(
+                row("FT 60", "05/01/2026", "Mosaico", "500,00", null, null, null, null, null),
+                row("NC 2", "10/01/2026", "Anula a FT 60", "-500,00", null, null, null, "Nota de crédito da fatura FT 60", null)
+        ), true));
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(byNumber(result, "FT 60").paymentStatus()).isEqualTo("PAID");
+        assertThat(result.paidCount()).isEqualTo(1);
+        assertThat(result.unpaidCount()).isEqualTo(0);
+        assertThat(result.warnings()).noneMatch(w -> w.contains("FT 60"));
     }
 
     // ── erros que bloqueiam ─────────────────────────────────────

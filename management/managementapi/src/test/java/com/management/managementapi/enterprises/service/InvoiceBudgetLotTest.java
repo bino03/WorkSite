@@ -181,15 +181,15 @@ class InvoiceBudgetLotTest {
     @DisplayName("filtrar por lote manda o lote à query, e as faturas sem rubrica ficam dentro")
     void searchByLotPassesLotToQuery() {
         when(repository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), anyBoolean(), any(), eq(true), eq(LOT_A), any()))
+                any(), any(), any(), any(), any(), any(), anyBoolean(), any(), eq(true), eq(List.of(LOT_A)), any(), any()))
                 .thenReturn(Page.empty());
         InvoiceSearchFilter filter = new InvoiceSearchFilter(null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, LOT_A);
+                null, null, null, null, null, null, null, null, List.of(LOT_A));
 
         service.search(ENTERPRISE_ID, filter, Pageable.unpaged());
 
         verify(repository).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(), anyBoolean(), any(), eq(true), eq(LOT_A), any());
+                any(), any(), any(), any(), any(), any(), anyBoolean(), any(), eq(true), eq(List.of(LOT_A)), any(), any());
     }
 
     @Test

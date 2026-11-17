@@ -5,7 +5,8 @@ import { SearchOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
-import { searchAllInvoices } from "@/services/invoiceService";
+import { getGlobalSearchTotals, searchAllInvoices } from "@/services/invoiceService";
+import { InvoiceTotalsBadge } from "@/components/invoices/InvoiceTotalsBadge";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
@@ -15,7 +16,7 @@ import {
   WorkFilterSelect,
   type WorkFilter,
 } from "@/components/invoices/InvoiceFilterSelects";
-import type { GlobalInvoiceSearchParams, InvoiceSearchResult } from "@/types/invoice";
+import type { GlobalInvoiceSearchParams, InvoiceSearchResult, InvoiceTotalsSummary } from "@/types/invoice";
 
 /** O mesmo mínimo do backend (`GLOBAL_SEARCH_MIN_LENGTH`): sem filtros, abaixo disto nem se pede. */
 const MIN_LENGTH = 2;
@@ -78,6 +79,7 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [results, setResults] = useState<InvoiceSearchResult[]>([]);
+  const [totals, setTotals] = useState<InvoiceTotalsSummary | null>(null);
   const [limitUsed, setLimitUsed] = useState(TEXT_LIMIT);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -89,20 +91,29 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
     const mine = ++requestId.current;
     if (!hasAnyFilter(current) && text.length < MIN_LENGTH) {
       setResults([]);
+      setTotals(null);
       setLoading(false);
       return;
     }
     const size = text ? TEXT_LIMIT : FILTER_ONLY_LIMIT;
     setLoading(true);
     try {
-      const found = await searchAllInvoices({
+      const params = {
         q: text || undefined,
         enterpriseId: current.work.enterpriseId ?? undefined,
         scope: current.work.scope ?? undefined,
         supplierNif: current.supplierNif ?? undefined,
         paymentStatus: current.paymentStatus ?? undefined,
-        size,
-      });
+      };
+      // O resumo é sobre tudo o que a pesquisa apanha, não só as 20/50 da lista, e pode
+      // demorar mais do que ela: chega à parte, sem a segurar. Se falhar, fica só sem resumo.
+      setTotals(null);
+      void getGlobalSearchTotals(params)
+        .then((summary) => {
+          if (mine === requestId.current) setTotals(summary);
+        })
+        .catch(() => undefined);
+      const found = await searchAllInvoices({ ...params, size });
       if (mine === requestId.current) {
         setResults(found);
         setLimitUsed(size);
@@ -111,6 +122,7 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
     } catch (error) {
       if (mine === requestId.current) {
         setResults([]);
+        setTotals(null);
         ErrorHandler.handle(error);
       }
     } finally {
@@ -129,6 +141,7 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
       setQuery("");
       setFilters(NO_FILTERS);
       setResults([]);
+      setTotals(null);
     }
   }, [open]);
 
@@ -165,7 +178,7 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
           allowClear
           size="large"
           prefix={<SearchOutlined />}
-          placeholder="Fornecedor, NIF, número, ATCUD, ficheiro, notas ou valor exato"
+          placeholder="Fornecedor, NIF, número, descrição, artigo, ficheiro, notas ou valor exato"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -195,6 +208,14 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
             style={{ width: isMobile ? "100%" : 160 }}
           />
         </div>
+
+        {!idle && totals && totals.count > 0 && (
+          <InvoiceTotalsBadge
+            summary={totals}
+            // Lista só de por liquidar: o "Pago" seria 0 (ou só o das parciais) — como na obra.
+            hidePaid={filters.paymentStatus === "OUTSTANDING" || filters.paymentStatus === "UNPAID"}
+          />
+        )}
 
         <Spin spinning={loading}>
           <div style={{ maxHeight: isMobile ? "calc(100dvh - 240px)" : "52vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>

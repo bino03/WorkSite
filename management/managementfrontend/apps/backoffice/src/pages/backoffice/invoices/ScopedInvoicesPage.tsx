@@ -258,7 +258,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         }}
       >
         <Input
-          placeholder="Fornecedor, NIF, nº da fatura…"
+          placeholder="Fornecedor, NIF, nº, descrição, artigo ou valor…"
           prefix={<SearchOutlined style={{ opacity: 0.5 }} />}
           value={query}
           onChange={(e) => setQuery(e.target.value)}

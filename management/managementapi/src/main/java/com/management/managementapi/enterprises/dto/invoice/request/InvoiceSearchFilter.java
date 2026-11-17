@@ -2,6 +2,7 @@ package com.management.managementapi.enterprises.dto.invoice.request;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -28,7 +29,8 @@ import java.util.UUID;
  * @param minAmount        {@code totalAmount} ≥
  * @param maxAmount        {@code totalAmount} ≤
  * @param budgetItemId     rubrica; apanha também tudo o que está nas sub-rubricas dela
- * @param budgetId         lote da fatura — apanha também as que ainda não têm rubrica
+ * @param budgetIds        lotes da fatura (um ou vários — 2026-11-17); vazio ou {@code null} = todos.
+ *                         Apanha também as que ainda não têm rubrica
  */
 public record InvoiceSearchFilter(
         Boolean allocated,
@@ -47,7 +49,7 @@ public record InvoiceSearchFilter(
         BigDecimal minAmount,
         BigDecimal maxAmount,
         UUID budgetItemId,
-        UUID budgetId
+        List<UUID> budgetIds
 ) {
     /** Só o que a lista tinha antes da pesquisa avançada — para os chamadores antigos e os testes. */
     public static InvoiceSearchFilter basic(Boolean allocated, Boolean needsReview, Boolean outstanding,
@@ -61,6 +63,6 @@ public record InvoiceSearchFilter(
     public InvoiceSearchFilter onlyOutstanding() {
         return new InvoiceSearchFilter(allocated, needsReview, true, sentToAccountant, atChapter,
                 from, to, q, supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
-                minAmount, maxAmount, budgetItemId, budgetId);
+                minAmount, maxAmount, budgetItemId, budgetIds);
     }
 }

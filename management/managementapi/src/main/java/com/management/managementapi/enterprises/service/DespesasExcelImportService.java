@@ -1061,7 +1061,10 @@ public class DespesasExcelImportService {
      * Uma fatura que uma NC deste ficheiro anula por inteiro fica com líquido
      * zero — e a app recusa pagá-la ({@code INVOICE_019}). No Excel ela está
      * "Liquidada" na mesma (foi o lote que a pagou, e a NC abateu-se no lote).
-     * O pagamento cai, com aviso; a fatura entra como anulada, não como paga.
+     * O pagamento cai, com aviso; a fatura entra liquidada pela NC, sem
+     * pagamento — o {@code deriveStatus} chama-lhe PAID (líquido ≤ 0), e é isso
+     * que as contagens do {@link #counts} e do teste final têm de dizer, com ou
+     * sem "Liquidada" no Excel.
      * Só depois das respostas: é aí que se sabe a origem de cada NC.
      */
     private static void dropPaymentsOnCreditedInvoices(Model model) {
@@ -1072,9 +1075,11 @@ public class DespesasExcelImportService {
             }
         }
         for (Group group : model.groups) {
-            if (group.payment == null || group.total == null) continue;
+            if (group.creditNote || group.manualExpense || group.total == null) continue;
             BigDecimal credited = creditedByKey.getOrDefault(group.key, BigDecimal.ZERO);
             if (group.total.subtract(credited).signum() > 0) continue;
+            group.annulled = true;
+            if (group.payment == null) continue;
             group.payment = null;
             if (group.aggregateId != null) {
                 Aggregate aggregate = model.aggregates.get(group.aggregateId);
@@ -1085,7 +1090,7 @@ public class DespesasExcelImportService {
                 group.aggregateId = null;
             }
             model.warnings.add("Linha " + group.lines.get(0).excelRow + ": a fatura " + describe(group)
-                    + " está anulada por inteiro por nota de crédito — entra sem pagamento, embora esteja \"Liquidada\".");
+                    + " está anulada por inteiro por nota de crédito — entra liquidada pela NC, sem pagamento próprio.");
         }
     }
 
@@ -1240,7 +1245,11 @@ public class DespesasExcelImportService {
             ConstructionInvoice invoice = invoiceRepository.findById(id).orElseThrow();
             BigDecimal total = invoice.getTotalAmount() == null ? BigDecimal.ZERO : invoice.getTotalAmount();
             sum = sum.add(total);
-            BigDecimal net = total.subtract(invoiceRepository.sumCreditNotesFor(id));
+            // Sem total, o líquido é desconhecido (null), não zero — senão o
+            // deriveStatus, que dá PAID a pago ≥ líquido, chamava paga a uma
+            // fatura por imprimir. O mesmo que o `PaymentService.netAmount`.
+            BigDecimal net = invoice.getTotalAmount() == null ? null
+                    : total.subtract(invoiceRepository.sumCreditNotesFor(id));
             if (PaymentService.deriveStatus(net, paid.get(id)) == PaymentStatus.PAID) {
                 paidInDb++;
             }
@@ -1291,7 +1300,8 @@ public class DespesasExcelImportService {
                 group.creditNote,
                 group.originKey,
                 group.manualExpense,
-                payment == null ? PaymentStatus.UNPAID.name() : payment.status.name(),
+                payment != null ? payment.status.name()
+                        : group.annulled ? PaymentStatus.PAID.name() : PaymentStatus.UNPAID.name(),
                 payment == null || payment.method == null ? null : payment.method.name(),
                 payment == null ? null : payment.paidOn,
                 payment == null ? null : payment.amount,
@@ -1323,7 +1333,9 @@ public class DespesasExcelImportService {
             } else {
                 counts.invoices++;
                 if (group.targetScope != null) counts.transferred++;
-                if (group.payment == null) {
+                if (group.annulled) {
+                    counts.paid++; // liquidada pela NC — o mesmo que o deriveStatus diz na BD
+                } else if (group.payment == null) {
                     counts.unpaid++;
                 } else if (group.payment.status == PaymentStatus.PARTIAL) {
                     counts.partial++;
@@ -1560,6 +1572,8 @@ public class DespesasExcelImportService {
         boolean skipped;
         boolean manualExpense;
         boolean duplicate;
+        /** Anulada por inteiro por uma NC deste ficheiro — liquidada, sem pagamento. */
+        boolean annulled;
         PaymentInfo payment;
         String aggregateId;
     }

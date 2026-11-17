@@ -59,8 +59,10 @@ import com.management.managementapi.exeption.StorageException;
 import com.management.managementapi.integrations.supabase.SignedUrlService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.model.Profile;
+import com.management.managementapi.model.enums.AccountStatus;
 import com.management.managementapi.model.enums.ActivityType;
 import com.management.managementapi.model.enums.EntityType;
+import com.management.managementapi.model.enums.ProfileRole;
 import com.management.managementapi.notifications.model.Notification;
 import com.management.managementapi.notifications.service.NotificationService;
 import com.management.managementapi.repository.ActivityLogRepository;
@@ -865,6 +867,7 @@ public class ConstructionInvoiceService {
                 scope, outstanding, isBlank(q) ? null : q.trim(),
                 uploadedFrom == null ? null : zone.startOfDay(uploadedFrom),
                 uploadedTo == null ? null : zone.startOfNextDay(uploadedTo),
+                isBlank(q) ? null : parseSearchAmount(q.trim()),
                 undatedLast(pageable));
 
         List<UUID> ids = page.getContent().stream().map(ConstructionInvoice::getId).toList();
@@ -897,15 +900,7 @@ public class ConstructionInvoiceService {
         if (!hasFilter && text.length() < GLOBAL_SEARCH_MIN_LENGTH) {
             return List.of();
         }
-        List<ConstructionInvoice> found = repository.searchEverywhere(
-                text.isEmpty() ? null : text,
-                text.isEmpty() ? null : parseSearchAmount(text),
-                filter.enterpriseId() != null,
-                filter.enterpriseId() != null ? filter.enterpriseId() : new UUID(0L, 0L),
-                filter.scope() == null ? null : filter.scope().name(),
-                isBlank(filter.supplierNif()) ? null : filter.supplierNif().trim(),
-                isBlank(filter.paymentStatus()) ? null : filter.paymentStatus().trim().toUpperCase(),
-                PageRequest.of(0, limit));
+        List<ConstructionInvoice> found = findEverywhere(filter, text, PageRequest.of(0, limit));
         List<UUID> ids = found.stream().map(ConstructionInvoice::getId).toList();
         Map<UUID, List<InvoicePaymentSummaryDTO>> payments = ids.isEmpty()
                 ? Map.of()
@@ -943,6 +938,34 @@ public class ConstructionInvoiceService {
                                 creditNotes.getOrDefault(invoice.getId(), List.of()),
                                 payments.getOrDefault(invoice.getId(), List.of()))))
                 .toList();
+    }
+
+    /** A query da pesquisa global — a lista e o resumo de totais usam exatamente a mesma. */
+    private List<ConstructionInvoice> findEverywhere(GlobalInvoiceSearchFilter filter, String text, Pageable pageable) {
+        return repository.searchEverywhere(
+                text.isEmpty() ? null : text,
+                text.isEmpty() ? null : parseSearchAmount(text),
+                filter.enterpriseId() != null,
+                filter.enterpriseId() != null ? filter.enterpriseId() : new UUID(0L, 0L),
+                filter.scope() == null ? null : filter.scope().name(),
+                isBlank(filter.supplierNif()) ? null : filter.supplierNif().trim(),
+                isBlank(filter.paymentStatus()) ? null : filter.paymentStatus().trim().toUpperCase(),
+                pageable);
+    }
+
+    /**
+     * Total, pago e a pagar da pesquisa global com os mesmos filtros — sobre
+     * tudo o que a pesquisa apanha, não só as 20/50 que a lista mostra. Mesma
+     * regra de entrada que {@link #searchEverywhere}: sem filtro e com texto
+     * curto, devolve zeros. Mesma conta que o {@link #totalsSummary} da obra.
+     */
+    @Transactional(readOnly = true)
+    public InvoiceTotalsSummaryDTO searchEverywhereTotals(GlobalInvoiceSearchFilter filter) {
+        String text = isBlank(filter.q()) ? "" : filter.q().trim();
+        if (!filter.hasFilter() && text.length() < GLOBAL_SEARCH_MIN_LENGTH) {
+            return summarizeTotals(List.of());
+        }
+        return summarizeTotals(findEverywhere(filter, text, Pageable.unpaged()));
     }
 
     /** O estado de pagamento como o {@link #toResponseDTO} o calcula: pago vs. total − notas de crédito. */
@@ -1262,8 +1285,10 @@ public class ConstructionInvoiceService {
                 // cair no "sem filtro" e devolver a lista inteira. O UUID de
                 // enchimento é para o `in` nunca ficar vazio.
                 budgetItemIds.isEmpty() ? List.of(new UUID(0L, 0L)) : budgetItemIds,
-                f.budgetId() != null,
-                f.budgetId() != null ? f.budgetId() : new UUID(0L, 0L),
+                f.budgetIds() != null && !f.budgetIds().isEmpty(),
+                f.budgetIds() == null || f.budgetIds().isEmpty() ? List.of(new UUID(0L, 0L)) : f.budgetIds(),
+                // O valor exato, como na pesquisa global: "1 234,56 €" encontra a fatura desse total.
+                isBlank(f.q()) ? null : parseSearchAmount(f.q().trim()),
                 undatedLast(pageable));
     }
 
@@ -1318,6 +1343,7 @@ public class ConstructionInvoiceService {
                 scope, true, isBlank(q) ? null : q.trim(),
                 uploadedFrom == null ? null : zone.startOfDay(uploadedFrom),
                 uploadedTo == null ? null : zone.startOfNextDay(uploadedTo),
+                isBlank(q) ? null : parseSearchAmount(q.trim()),
                 Pageable.unpaged()).getContent();
         return summarizeOutstanding(outstanding);
     }
@@ -1437,7 +1463,11 @@ public class ConstructionInvoiceService {
             String nif = invoice.getSupplierNif().trim();
             Supplier catalog = suppliersByNif.get(nif);
             String name = catalog != null && !isBlank(catalog.getName()) ? catalog.getName() : invoice.getSupplierName();
-            namesByNif.merge(nif, isBlank(name) ? null : name, (kept, next) -> kept != null ? kept : next);
+            // Não `merge`: o HashMap.merge rebenta com valor null, e um NIF sem nome nem ficha
+            // deitava abaixo "A pagar" inteira (NPE, verificado a 2026-11-17). Fica o primeiro nome.
+            if (namesByNif.get(nif) == null) {
+                namesByNif.put(nif, isBlank(name) ? null : name);
+            }
         }
         return namesByNif.entrySet().stream()
                 .map(entry -> new OutstandingSupplierDTO(entry.getKey(), entry.getValue()))
@@ -1592,11 +1622,21 @@ public class ConstructionInvoiceService {
      */
     @Transactional(readOnly = true)
     public InvoiceTotalsSummaryDTO totalsSummary(UUID enterpriseId, InvoiceSearchFilter filter) {
-        List<ConstructionInvoice> invoices = runSearch(enterpriseId, filter, Pageable.unpaged()).getContent().stream()
+        return summarizeTotals(runSearch(enterpriseId, filter, Pageable.unpaged()).getContent());
+    }
+
+    /** A conta do {@link #totalsSummary}, partilhada com a pesquisa global. As NC saem (descontam na origem). */
+    private InvoiceTotalsSummaryDTO summarizeTotals(List<ConstructionInvoice> found) {
+        List<ConstructionInvoice> invoices = found.stream()
                 .filter(i -> i.getDocumentType() != ConstructionInvoice.DocumentType.CREDIT_NOTE)
                 .toList();
+        if (invoices.isEmpty()) {
+            return new InvoiceTotalsSummaryDTO(0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0);
+        }
         List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
-        Map<UUID, List<InvoicePaymentSummaryDTO>> payments = paymentService.paymentsForInvoices(ids, false);
+        // Só a soma por fatura, numa query agrupada: o `paymentsForInvoices` monta o detalhe de cada
+        // pagamento (carregando-os um a um) e com 281 faturas levava 12 s (verificado a 2026-11-17).
+        Map<UUID, BigDecimal> paidByInvoice = paymentService.paidSums(ids);
         Map<UUID, List<ConstructionInvoice>> creditNotes = loadCreditNotes(ids);
 
         BigDecimal total = BigDecimal.ZERO;
@@ -1606,9 +1646,7 @@ public class ConstructionInvoiceService {
         long outstandingCount = 0;
         long withoutTotal = 0;
         for (ConstructionInvoice invoice : invoices) {
-            BigDecimal paid = payments.getOrDefault(invoice.getId(), List.of()).stream()
-                    .map(InvoicePaymentSummaryDTO::amountOnThisInvoice)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal paid = paidByInvoice.getOrDefault(invoice.getId(), BigDecimal.ZERO);
             paidTotal = paidTotal.add(paid);
             if (invoice.getTotalAmount() == null) {
                 withoutTotal++;
@@ -1621,9 +1659,8 @@ public class ConstructionInvoiceService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal net = invoice.getTotalAmount().subtract(creditNoteTotal);
             total = total.add(net);
-            // Liquidada = líquido − pago ≤ 0 — a definição do filtro `outstanding`,
-            // não a do `deriveStatus`: uma fatura anulada por inteiro por NC tem
-            // líquido 0 e nada pago, e o `deriveStatus` chama-lhe UNPAID.
+            // Liquidada = líquido − pago ≤ 0 — a definição do filtro `outstanding`
+            // e do `deriveStatus` (inclui as anuladas por inteiro por NC).
             BigDecimal remaining = net.subtract(paid);
             if (remaining.signum() > 0) {
                 outstandingCount++;
@@ -1865,6 +1902,7 @@ public class ConstructionInvoiceService {
                 invoice.setApprovedForPayment(true);
                 invoice.setApprovedForPaymentAt(OffsetDateTime.now());
                 authContext.currentProfileId().ifPresent(invoice::setApprovedForPaymentBy);
+                notifyAccountantsOfApproval(invoice);
             }
         } else {
             invoice.setApprovedForPayment(false);
@@ -1873,6 +1911,32 @@ public class ConstructionInvoiceService {
         }
 
         return repository.save(invoice);
+    }
+
+    /**
+     * Avisa a contabilidade de que há uma fatura nova para pagar. Só na passagem
+     * de "por aprovar" a "aprovada" (aprovar outra vez não chega aqui), e nunca a
+     * quem acabou de aprovar. As faturas de obras de teste não avisam: não
+     * aparecem em "A pagar", e o aviso apontaria para nada.
+     */
+    private void notifyAccountantsOfApproval(ConstructionInvoice invoice) {
+        if (invoice.getEnterprise() != null && Boolean.TRUE.equals(invoice.getEnterprise().getIsTest())) {
+            return;
+        }
+        UUID approver = invoice.getApprovedForPaymentBy();
+        List<UUID> recipients = profileRepository
+                .findIdsByRoleInAndAccountStatus(List.of(ProfileRole.ACCOUNTANT), AccountStatus.unlocked)
+                .stream()
+                .filter(id -> !id.equals(approver))
+                .toList();
+        String dono = invoice.getEnterprise() == null ? "Empresa" : invoice.getEnterprise().getName();
+        notifications.notifyAll(
+                recipients,
+                Notification.TYPE_INVOICE_APPROVED,
+                "Fatura aprovada para pagamento",
+                descreveFatura(invoice) + " · " + dono,
+                "/backoffice/invoices/outstanding?approved=true",
+                invoice.getId());
     }
 
     /** Marca (ou desmarca) a fatura como enviada para a contabilidade. */

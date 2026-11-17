@@ -48,6 +48,7 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 | [[skill-plan-feature]]      | Feature de várias sessões → entrevista → spec em `notes/roadmap/<slug>.md` + um bullet por fase no ToDo; não implementa | `#process` `#planning` `#spec` | ~30-60m |
 | [[skill-refine-idea]]       | Ideia em linguagem livre → lê o vault → pergunta só o que falta → bullet no ToDo ou entrada em `ideas.md`; não implementa | `#process` `#backlog` `#ideas` | ~5-15m |
 | [[skill-run]]               | Arranca backend + Backoffice localmente em background, com verificação por log e health check `curl` | `#process` `#local` `#health-check` | ~1-2m |
+| [[skill-resumir-fatura]]    | PDF de fatura → descrição por alto (artigo + soma das quantidades, sem fornecedor), confirmada pelo valor; só lê | `#process` `#faturas` `#descrição` | ~1-2m |
 | [[skill-verify-in-browser]] | Ver uma feature a funcionar na app real pela extensão do Chrome — DOM + API, nunca screenshot; escrita só em obra `is_test`; inline, nunca subagente | `#process` `#browser` `#verification` | ~10m + 2-5m/item |
 
 ---
@@ -59,19 +60,19 @@ A **skill** is invocable (`/name`). A **reference** below is not — it's a conv
 **Database**: [[skill-add-database-table]], [[skill-add-backend-feature]]  
 **API Development**: [[skill-add-backend-feature]], [[skill-add-file-upload]], [[skill-permissions-and-auth]]  
 **Frontend**: [[skill-frontend-design-system]], [[skill-frontend-error-handling]], [[skill-frontend-integration-guide]], [[skill-frontend-structure-brief]]  
-**Process**: [[skill-create-new-skill]], [[skill-git-commits]], [[skill-implement-todo]], [[skill-plan-feature]], [[skill-refine-idea]], [[skill-run]], [[skill-verify-in-browser]]
+**Process**: [[skill-create-new-skill]], [[skill-git-commits]], [[skill-implement-todo]], [[skill-plan-feature]], [[skill-refine-idea]], [[skill-resumir-fatura]], [[skill-run]], [[skill-verify-in-browser]]
 
 ---
 
-## Total: 14 Invocable Skills + 3 References
+## Total: 16 Invocable Skills + 3 References
 
 - References: 3 (+ 8 design sub-files)
 - Backend: 4
 - Frontend: 4
-- Process: 6
+- Process: 8
 
 ---
 
-**Last Updated**: 2026-09-27
+**Last Updated**: 2026-11-17
 
 **Note**: When adding a new skill, update this file + [[docs/skills/SKILLS-INDEX.md]] + [[skill-create-new-skill.md]]. References don't get a `.claude/skills/` pointer — only skills do, see [[skill-create-new-skill]]. Files live under `docs/skills/{backend,frontend,process,references}/`.
