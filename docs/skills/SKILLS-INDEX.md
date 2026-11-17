@@ -232,6 +232,16 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - **Use when**: Passo 5.5 do `implement-todo` numa tarefa com UI, ou uma passagem em lote sobre `notes/verificacao-browser-pendente.md`
 - **Nota**: corre **inline**, nunca num subagente — a extensão pertence à sessão principal. Nasceu do procedimento em `notes/learning.md` (2026-09-19)
 
+### [[skill-resumir-fatura]]
+**PDF de uma fatura de fornecedor → descrição por alto (artigo + soma das quantidades, sem fornecedor), confirmada pelo valor**
+
+- **File**: `docs/skills/process/skill-resumir-fatura.md`
+- **Time**: ~1-2 min por fatura
+- **Tags**: `#process` `#faturas` `#betão` `#descrição`
+- **Covers**: Ler todas as páginas → separar o material (betão m³, varão/arame kg) das acessórias (bombagem, deslocação) → somar por tipo, a contar as guias → confirmar qtd. × preço contra o total ilíquido → descrição sem `Fornecedor - `
+- **Use when**: "Dá-me a descrição por alto / a soma do betão desta fatura"
+- **Nota**: só lê, não escreve. Para lançar no Excel → `importar-faturas` do vault Vilatro. Nasceu a 2026-11-17 de três faturas (Brivel FA.20263/1871 e /1880, Fepronor FAC 26/2269)
+
 ---
 
 ## By Topic
@@ -267,6 +277,7 @@ Files live in `docs/skills/process/`. Meta-workflow and commit conventions — n
 - [[skill-implement-todo]] — Levar o backlog (`notes/ToDo.md`) até código, reutilizando as skills acima
 - [[skill-run]] — Arrancar a app localmente (backend + Backoffice), com health check
 - [[skill-verify-in-browser]] — Provar no browser real o que o `implement-todo` implementou
+- [[skill-resumir-fatura]] — Descrição por alto de uma fatura (soma das quantidades), confirmada pelo valor
 
 ---
 
@@ -307,7 +318,7 @@ docs/skills/
 ├── SKILLS-QUICK-REFERENCE.md  ← Fast lookup table
 ├── backend/                   ← 4 skills
 ├── frontend/                  ← 4 skills
-├── process/                   ← 7 skills
+├── process/                   ← 8 skills
 └── references/                ← 3 docs + design/ (8 sub-files), not invocable
 ```
 
@@ -318,15 +329,16 @@ docs/skills/
 | References (not invocable) | 3 (+ 8 design sub-files) |
 | Backend Skills | 4 |
 | Frontend Skills | 4 |
-| Process Skills | 7 |
-| **Total Invocable Skills** | **15** |
+| Process Skills | 8 |
+| **Total Invocable Skills** | **16** |
 
 ---
 
 ## Last Updated
 
-- **Date**: 2026-10-30
-- **Latest**: `skill-plan-feature` (process) — planear uma feature de várias sessões (`/plan-feature`): entrevista → spec em `notes/roadmap/<slug>.md` no molde do `assiduidade.md` → um bullet por fase no ToDo + linha no `backlog.md`. Veio do Workflow, adaptada ao Worksite, ainda por provar. `refine-idea` encaminha para ela as ideias grandes demais; `implement-todo` lê a spec quando um bullet aponta para ela.
+- **Date**: 2026-11-17
+- **Latest**: `skill-resumir-fatura` (process) — descrição por alto de uma fatura de fornecedor (`/resumir-fatura`): soma das quantidades do material (betão em m³ sem bombagem, varão/arame em kg), confirmada pela conta qtd. × preço contra o total ilíquido; descrição sem `Fornecedor - `. Só lê.
+- **Anterior (2026-10-30)**: `skill-plan-feature` (process) — planear uma feature de várias sessões (`/plan-feature`): entrevista → spec em `notes/roadmap/<slug>.md` no molde do `assiduidade.md` → um bullet por fase no ToDo + linha no `backlog.md`. Veio do Workflow, adaptada ao Worksite, ainda por provar. `refine-idea` encaminha para ela as ideias grandes demais; `implement-todo` lê a spec quando um bullet aponta para ela.
 - **Anterior (2026-09-27)**: `skill-refine-idea` (process) — a entrada do ciclo: ideia em linguagem livre → lê o vault → pergunta só o que falta → bullet no ToDo (com `> Decidido`) ou entrada com contexto em `ideas.md` (`/refine-idea`). Veio do Workflow, ainda por provar. `implement-todo` passa a ler o bloco `> Decidido` e as ideias de qualquer `> Contexto (via …)`.
 - **Anterior (2026-09-25)**: `skill-run` (process) — arranca backend + Backoffice localmente (`/run`), com verificação por log e health check por `curl` em vez de assumir sucesso.
 - **Anterior (2026-09-19)**: `skill-verify-in-browser` (process) — o procedimento da extensão do Chrome que vivia em `notes/learning.md` passa a ser invocável (`/verify-in-browser`) e chamado pelo `implement-todo` na Fase 5.5; a secção frontend de `code-best-practices` fundida no `skill-frontend-design-system` ("Regras de base"); regra "o integration guide apaga-se ao fechar a feature".
