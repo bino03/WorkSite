@@ -27,7 +27,7 @@ import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
 import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
 import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
-import { useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
+import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
@@ -88,7 +88,8 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [payInvoice, setPayInvoice] = useState<ConstructionInvoice | null>(null);
+  const [payInvoices, setPayInvoices] = useState<ConstructionInvoice[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [noteInvoice, setNoteInvoice] = useState<ConstructionInvoice | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
   const [incidentInvoices, setIncidentInvoices] = useState<IncidentInvoiceRef[] | null>(null);
@@ -114,6 +115,9 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         setInvoices(list.content);
         setTotalElements(list.totalElements);
         setOutstandingSummary(summary);
+        // Uma página nova (ou pagar/enviar) muda as linhas: uma seleção antiga
+        // apontaria para faturas que já cá não estão.
+        setSelectedIds([]);
       } catch (error) {
         ErrorHandler.handle(error);
       } finally {
@@ -219,6 +223,43 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
     });
   };
 
+  // O checkbox está solto (ver `InvoicesList`): cada botão filtra o que lhe serve
+  // e mostra a contagem — quem não serve para uma ação não conta para ela.
+  const selectedInvoices = invoices.filter((i) => selectedIds.includes(i.id));
+  const approvableSelected = selectedInvoices.filter(canApproveForPayment);
+  const payableSelected = selectedInvoices.filter(
+    (i) => i.documentType !== "CREDIT_NOTE" && i.netAmount != null && i.paidAmount < i.netAmount
+  );
+  const sendableSelected = selectedInvoices.filter((i) => !i.sentToAccountant);
+
+  /** Marca todas as selecionadas de uma vez — só marca, nunca desmarca em bloco. */
+  const handleBulkSendToAccountant = () => {
+    const targets = sendableSelected;
+    confirm({
+      title: "Contabilidade",
+      message: `Marcar ${targets.length} fatura${targets.length > 1 ? "s" : ""} como enviada${
+        targets.length > 1 ? "s" : ""
+      } para a contabilidade?`,
+      actionLabel: "Marcar como enviadas",
+      onConfirm: async () => {
+        try {
+          // Sequencial: um erro a meio deixa as anteriores marcadas.
+          for (const invoice of targets) {
+            await setInvoiceSentToAccountant(invoice.id, true);
+          }
+          notificationService.success(
+            "Contabilidade",
+            targets.length === 1 ? "Fatura marcada como enviada." : `${targets.length} faturas marcadas como enviadas.`
+          );
+          reload();
+        } catch (error) {
+          ErrorHandler.handle(error);
+          reload();
+        }
+      },
+    });
+  };
+
   return (
     <div>
       <div
@@ -294,6 +335,26 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         {outstanding && <OutstandingTotalBadge summary={outstandingSummary} />}
       </div>
 
+      {canManageWorks() && selectedInvoices.length > 0 && (
+        <div style={{ display: "flex", gap: "10.2px", flexWrap: "wrap", marginBottom: "13.6px" }}>
+          {approvableSelected.length > 0 && (
+            <Button onClick={() => paymentApproval.approveMany(approvableSelected)}>
+              Aprovar {approvableSelected.length} para pagamento
+            </Button>
+          )}
+          {payableSelected.length > 0 && (
+            <Button onClick={() => setPayInvoices(payableSelected)}>
+              Registar pagamento de {payableSelected.length}
+            </Button>
+          )}
+          {sendableSelected.length > 0 && (
+            <Button onClick={handleBulkSendToAccountant}>
+              Marcar {sendableSelected.length} como enviada{sendableSelected.length > 1 ? "s" : ""} à contabilidade
+            </Button>
+          )}
+        </div>
+      )}
+
       {!loading && invoices.length === 0 && (
         <p style={{ fontSize: 12, opacity: 0.6 }}>{emptyHint}</p>
       )}
@@ -303,11 +364,11 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         loading={loading}
         scope={scope}
         pagination={{ currentPage: page, totalElements, pageSize }}
-        selectedIds={[]}
+        selectedIds={selectedIds}
         sortField={sort?.field ?? null}
         sortOrder={sort?.order ?? null}
         onSortChange={handleSortChange}
-        onSelectionChange={() => undefined}
+        onSelectionChange={setSelectedIds}
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);
           setPageSize(nextSize);
@@ -321,7 +382,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         onSendToAccountant={handleSendToAccountant}
         onDelete={handleDelete}
         onTransfer={setTransferInvoice}
-        onRegisterPayment={setPayInvoice}
+        onRegisterPayment={(invoice) => setPayInvoices([invoice])}
         onTogglePaymentApproval={paymentApproval.toggle}
         onMarkPaid={markPaid}
         onAddNote={setNoteInvoice}
@@ -350,9 +411,9 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
       />
 
       <AggregatePaymentDrawer
-        open={payInvoice !== null}
-        invoices={payInvoice ? [payInvoice] : []}
-        onClose={() => setPayInvoice(null)}
+        open={payInvoices !== null}
+        invoices={payInvoices ?? []}
+        onClose={() => setPayInvoices(null)}
         onDone={reload}
       />
 
