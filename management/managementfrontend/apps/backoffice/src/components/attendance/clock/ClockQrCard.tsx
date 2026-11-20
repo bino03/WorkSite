@@ -7,7 +7,7 @@ import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { generateClockCode, getClockCode, getClockQrPng } from "@/services/clockService";
 import type { ClockCode } from "@/services/clockService";
-import { formatDateTime } from "@/utils/formatters";
+import { formatDate, formatDateTime } from "@/utils/formatters";
 
 const { Text } = Typography;
 
@@ -104,7 +104,7 @@ export function ClockQrCard({ enterpriseId }: Props) {
     image.style.cssText = "width:120mm;height:120mm";
     image.onload = () => win.print();
     const generated = doc.createElement("p");
-    generated.textContent = `QR gerado a ${formatDateTime(code.generatedAt)}`;
+    generated.textContent = `QR gerado a ${formatDate(code.generatedAt)}`;
     generated.style.cssText = "font-size:14px;color:#666;margin:16px 0 0";
     doc.body.append(title, subtitle, image, generated);
   };
@@ -131,7 +131,7 @@ export function ClockQrCard({ enterpriseId }: Props) {
             <img src={imageUrl} alt={`QR de picagem da obra ${code.enterpriseName}`} style={{ width: 240, height: 240 }} />
           )}
           <Text type="secondary">
-            Gerado a <strong>{formatDateTime(code.generatedAt)}</strong> — a mesma data sai na folha impressa, para
+            Gerado a <strong>{formatDateTime(code.generatedAt)}</strong> — a data (sem a hora) sai na folha impressa, para
             se saber se o QR colado na obra é o atual.
           </Text>
           <Space wrap style={{ justifyContent: "center" }}>
