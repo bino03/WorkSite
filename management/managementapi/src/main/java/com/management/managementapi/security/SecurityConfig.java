@@ -185,7 +185,7 @@ public class SecurityConfig {
                 .requestMatchers("/settings/**").hasRole("ADMIN")
                 // Backups: um download em massa de todas as faturas.
                 .requestMatchers("/backups/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/employees/**").hasAnyRole("ADMIN", "EMPLOYEE", "ACCOUNTANT")
+                .requestMatchers(HttpMethod.GET, "/employees/**").hasAnyRole("ADMIN", "ACCOUNTANT")
                 .requestMatchers("/auth/me").authenticated()
                 .anyRequest().authenticated()
             )

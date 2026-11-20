@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
-import { BuildOutlined, CheckSquareOutlined, QrcodeOutlined, TeamOutlined } from "@ant-design/icons";
+import { BuildOutlined, CalendarOutlined, CheckSquareOutlined, QrcodeOutlined, TeamOutlined } from "@ant-design/icons";
 import { Button } from "antd";
 import { useAuthContext } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,10 +34,14 @@ export const BackofficeHome = () => {
       const weekFromNow = today.add(7, "day");
 
       try {
+        // As obras só para quem as gere: um EMPLOYEE leva 403 em /enterprises desde 2026-11-20.
+        const worksManager = canManageWorks();
         const [pendingRes, inProgressRes, enterprisesRes] = await Promise.all([
           taskService.list({ q: "", status: "PENDING", enterpriseId: null, assigneeId, page: 0, size: 100 }),
           taskService.list({ q: "", status: "IN_PROGRESS", enterpriseId: null, assigneeId, page: 0, size: 100 }),
-          api.get<{ content: { status: string }[] }>("/enterprises", { params: { page: 0, size: 200 } }),
+          worksManager
+            ? api.get<{ content: { status: string }[] }>("/enterprises", { params: { page: 0, size: 200 } })
+            : Promise.resolve(null),
         ]);
 
         const dueSoonCount = pendingRes.content.filter(
@@ -47,17 +51,19 @@ export const BackofficeHome = () => {
           dayjs(task.dueDate).isBefore(today)
         ).length;
 
-        const enterpriseStatuses = enterprisesRes.data.content ?? [];
-        const activeCount = enterpriseStatuses.filter(
-          (e) => e.status === "planning" || e.status === "under_construction"
-        ).length;
-        const planningCount = enterpriseStatuses.filter((e) => e.status === "planning").length;
-
         const nextMetrics: Metric[] = [
           { label: "Tarefas pendentes", value: String(pendingRes.page.totalElements), meta: `${dueSoonCount} vencem esta semana` },
           { label: "Tarefas atrasadas", value: String(overdueCount), meta: "requer atenção" },
-          { label: "Projetos ativos", value: String(activeCount), meta: `${planningCount} em planeamento` },
         ];
+
+        if (enterprisesRes) {
+          const enterpriseStatuses = enterprisesRes.data.content ?? [];
+          const activeCount = enterpriseStatuses.filter(
+            (e) => e.status === "planning" || e.status === "under_construction"
+          ).length;
+          const planningCount = enterpriseStatuses.filter((e) => e.status === "planning").length;
+          nextMetrics.push({ label: "Projetos ativos", value: String(activeCount), meta: `${planningCount} em planeamento` });
+        }
 
         if (admin) {
           const [teamRes, adminRes] = await Promise.all([
@@ -117,13 +123,24 @@ export const BackofficeHome = () => {
 
       <h6 style={{ color: "var(--ind-accent-700)" }}>Navegação</h6>
       <div className="keep-cols" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "13.6px" }}>
-        <Link to="/backoffice/empreendimentos" style={{ color: "inherit" }}>
-          <BlueprintCard style={{ padding: "13.6px" }}>
-            <BuildOutlined style={{ fontSize: 22, color: "var(--ind-color-accent)" }} />
-            <span className="ind-card-title">Empreendimentos</span>
-            <p className="ind-card-body">Consultar e gerir projetos em curso.</p>
-          </BlueprintCard>
-        </Link>
+        {canManageWorks() && (
+          <Link to="/backoffice/empreendimentos" style={{ color: "inherit" }}>
+            <BlueprintCard style={{ padding: "13.6px" }}>
+              <BuildOutlined style={{ fontSize: 22, color: "var(--ind-color-accent)" }} />
+              <span className="ind-card-title">Empreendimentos</span>
+              <p className="ind-card-body">Consultar e gerir projetos em curso.</p>
+            </BlueprintCard>
+          </Link>
+        )}
+        {isEmployee() && (
+          <Link to="/backoffice/ferias" style={{ color: "inherit" }}>
+            <BlueprintCard style={{ padding: "13.6px" }}>
+              <CalendarOutlined style={{ fontSize: 22, color: "var(--ind-color-accent)" }} />
+              <span className="ind-card-title">As minhas férias</span>
+              <p className="ind-card-body">Dias de férias, ausências e o calendário com os feriados.</p>
+            </BlueprintCard>
+          </Link>
+        )}
         <Link to="/backoffice/tasks" style={{ color: "inherit" }}>
           <BlueprintCard style={{ padding: "13.6px" }}>
             <CheckSquareOutlined style={{ fontSize: 22, color: "var(--ind-color-accent)" }} />

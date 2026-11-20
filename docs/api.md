@@ -1393,6 +1393,20 @@ Não existe endpoint de apagar a sério. A resposta traz `localDate` — o dia a
 A sequência é avaliada **dentro do dia local**: um dia de trabalho não atravessa a meia-noite (decisão
 de 2026-10-06), por isso cada dia começa a zero e um dia mal preenchido não contamina o seguinte.
 
+## As minhas férias (`MyAttendanceController`, `/attendance/me`)
+
+Fase 5b (2026-11-20): o funcionário vê as **suas** férias, só em leitura. `ADMIN` ou `EMPLOYEE` (na
+classe); o perfil vem sempre da sessão. Página `/backoffice/ferias` ("As minhas férias"), com o saldo,
+um calendário do mês (feriados + ausências) e a lista do ano.
+
+| Método | Rota | O quê |
+|---|---|---|
+| GET | `/attendance/me/absences?from=&to=` | As minhas ausências no intervalo (resumo, sem documentos); `ABS_011` se `to < from` ou mais de 400 dias |
+| GET | `/attendance/me/vacation-balance?year=` | O meu saldo de férias (o mesmo `VacationBalanceDTO` do admin) |
+| GET | `/attendance/me/holidays?from=&to=` | Os feriados do intervalo, nacionais e municipais |
+
+Marcar e aprovar férias continua a ser do admin (`/attendance/absences`).
+
 ## Picar pelo QR da obra (`ClockController`, `/attendance/clock`)
 
 A fase 5 da assiduidade (`V49`, 2026-11-20): o funcionário lê com a câmara do telemóvel o QR colado

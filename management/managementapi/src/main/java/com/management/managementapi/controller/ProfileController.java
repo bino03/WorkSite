@@ -15,6 +15,7 @@ import com.management.managementapi.service.ProfileService;
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
@@ -42,6 +43,8 @@ public class ProfileController {
      * GET /api/profiles/agents
      * Retorna todos os profiles exceto o do utilizador autenticado
      */
+    // A lista de todas as contas: não é para um EMPLOYEE (2026-11-20). Nenhum ecrã a usa hoje.
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @GetMapping("/agents")
     public ResponseEntity<List<ProfileListResponseDTO>> getAllAgents(Authentication authentication) {
         // Obter o auth_user_id do utilizador autenticado (vem do JWT sub)

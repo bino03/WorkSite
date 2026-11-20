@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import { useTranslation } from "react-i18next";
@@ -14,6 +14,8 @@ import {
   DownOutlined,
   FileTextOutlined,
   SearchOutlined,
+  CalendarOutlined,
+  QrcodeOutlined,
 } from "@ant-design/icons";
 import { GlobalInvoiceSearchModal } from "@/components/invoices/GlobalInvoiceSearchModal";
 import { ShellHeader } from "./shell/ShellHeader";
@@ -22,13 +24,16 @@ import { rememberSpace } from "./shell/spaces";
 
 const ACCENT = "var(--ind-color-accent)";
 
+/** As páginas do espaço Obras que só ADMIN e contabilidade abrem (desde 2026-11-20). */
+const WORKS_ONLY = ["/backoffice/empreendimentos", "/backoffice/invoices"];
+
 /**
  * A shell do espaço **Obras**: empreendimentos, tarefas e faturas. A gestão de
  * contas saiu daqui a 2026-10-07 para o espaço Equipa (`TeamLayout`).
  */
 export default function AppLayout() {
   // Gates de permissão passam sempre por aqui — ver backoffice-app-shell-and-auth.md §3.
-  const { isAdmin, canManageWorks } = useAuth();
+  const { isAdmin, isEmployee, canManageWorks } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -96,9 +101,23 @@ export default function AppLayout() {
   return (
     <div style={{ minHeight: "100vh" }}>
       <ShellHeader spaceName="Obras" homePath={base}>
-        <NavLink to={`${base}/empreendimentos`} style={navLinkStyle(ACCENT)}>
-          <BuildOutlined />{t("nav.enterprises")}
-        </NavLink>
+        {/* Obras e faturas são de quem gere obras. O EMPLOYEE (a malta da obra) pica o
+            ponto, vê as suas tarefas e as suas férias — desde 2026-11-20. */}
+        {managesWorks && (
+          <NavLink to={`${base}/empreendimentos`} style={navLinkStyle(ACCENT)}>
+            <BuildOutlined />{t("nav.enterprises")}
+          </NavLink>
+        )}
+        {isEmployee() && (
+          <NavLink to="/picar?ler=1" style={navLinkStyle(ACCENT)}>
+            <QrcodeOutlined />Picar ponto
+          </NavLink>
+        )}
+        {isEmployee() && (
+          <NavLink to={`${base}/ferias`} style={navLinkStyle(ACCENT)}>
+            <CalendarOutlined />As minhas férias
+          </NavLink>
+        )}
         <NavLink to={`${base}/tasks`} style={navLinkStyle(ACCENT)}>
           <CheckSquareOutlined />{isAdmin() ? "Tarefas" : "Minhas Tarefas"}
         </NavLink>
@@ -127,7 +146,11 @@ export default function AppLayout() {
       </ShellHeader>
 
       <main className="container-page shell-main" style={{ padding: "27.2px 20.4px" }}>
-        <Outlet />
+        {/* Um link antigo ou escrito à mão não abre as páginas de obras a um EMPLOYEE —
+            o backend já recusa (403), isto só evita a página partida. */}
+        {!managesWorks && WORKS_ONLY.some((path) => pathname.startsWith(path))
+          ? <Navigate to={base} replace />
+          : <Outlet />}
       </main>
 
       {managesWorks && <GlobalInvoiceSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />}

@@ -106,7 +106,7 @@ public class ConstructionInvoiceController {
      * de ele decidir "Guardar" (que é o {@code POST /} abaixo).
      */
     @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasAnyRole('ADMIN','ACCOUNTANT'))")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoicePreviewResultDTO> preview(
             @RequestParam(required = false) UUID enterpriseId,
             @RequestParam(required = false) String scope,
@@ -124,7 +124,7 @@ public class ConstructionInvoiceController {
      * {@link ConstructionInvoiceService}.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT') and (#scope == null or #scope.equalsIgnoreCase('PROJECT') or hasAnyRole('ADMIN','ACCOUNTANT'))")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceUploadResultDTO> upload(
             @RequestParam(required = false) UUID enterpriseId,
             @RequestParam(required = false) String scope,
@@ -210,7 +210,7 @@ public class ConstructionInvoiceController {
      * obra e o PDF do fornecedor são o mesmo documento fiscal.
      */
     @PostMapping(value = "/{id}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceUploadResultDTO> addDocument(
             @PathVariable UUID id,
             @RequestPart("file") MultipartFile file,
@@ -329,7 +329,7 @@ public class ConstructionInvoiceController {
     }
 
     @GetMapping("/enterprise/{enterpriseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public Page<ConstructionInvoiceResponseDTO> listByEnterprise(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) Boolean allocated,
@@ -367,7 +367,7 @@ public class ConstructionInvoiceController {
      * plano, que só lê a base de dados.
      */
     @GetMapping("/enterprise/{enterpriseId}/documents/summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<DocumentsExportSummaryDTO> documentsSummary(
             @PathVariable UUID enterpriseId,
             @RequestParam(defaultValue = "ALL") InvoiceDocumentsScope scope,
@@ -420,7 +420,7 @@ public class ConstructionInvoiceController {
      * descarrega-se um ficheiro de cada vez já fora da transação.
      */
     @GetMapping("/enterprise/{enterpriseId}/documents/zip")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<StreamingResponseBody> documentsZip(
             @PathVariable UUID enterpriseId,
             @RequestParam(defaultValue = "ALL") InvoiceDocumentsScope scope,
@@ -459,7 +459,7 @@ public class ConstructionInvoiceController {
      * número que o filtro "Por liquidar" mostra ao lado dos resultados.
      */
     @GetMapping("/enterprise/{enterpriseId}/outstanding-summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<OutstandingInvoicesSummaryDTO> outstandingSummary(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) Boolean allocated,
@@ -490,7 +490,7 @@ public class ConstructionInvoiceController {
      * filtrar por fornecedor.
      */
     @GetMapping("/enterprise/{enterpriseId}/totals-summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceTotalsSummaryDTO> totalsSummary(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) Boolean allocated,
@@ -583,7 +583,7 @@ public class ConstructionInvoiceController {
      * {@code pending-count} (só o número) até 2026-09-18.
      */
     @GetMapping("/enterprise/{enterpriseId}/pending-summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<PendingInvoicesSummaryDTO> pendingSummary(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) UUID budgetId) {
@@ -595,7 +595,7 @@ public class ConstructionInvoiceController {
      * lançado neste projeto. Devolve 204 quando ainda não há histórico.
      */
     @GetMapping("/enterprise/{enterpriseId}/suggestion")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<BudgetItemSuggestionDTO> suggestion(
             @PathVariable UUID enterpriseId,
             @RequestParam String supplierNif) {
@@ -607,14 +607,14 @@ public class ConstructionInvoiceController {
 
     /** Detalhe. É a única resposta que traz o link assinado do documento completo. */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(service.getDetail(id));
     }
 
     /** Corrige à mão o que o QR não trouxe ou trouxe errado. */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> update(
             @PathVariable UUID id,
             @Valid @RequestBody ConstructionInvoiceUpsertDTO dto,
@@ -630,7 +630,7 @@ public class ConstructionInvoiceController {
 
     /** Substitui o ficheiro — relê o QR e regenera a miniatura. */
     @PostMapping(value = "/{id}/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceUploadResultDTO> replaceFile(
             @PathVariable UUID id,
             @RequestPart("file") MultipartFile file,
@@ -653,7 +653,7 @@ public class ConstructionInvoiceController {
      * não são tocados, porque não vêm do QR.
      */
     @PostMapping("/{id}/rescan")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<InvoiceUploadResultDTO> rescan(
             @PathVariable UUID id,
             HttpServletRequest request) {
@@ -700,7 +700,7 @@ public class ConstructionInvoiceController {
      * fatura não é de obra. Nunca grava nada — quem decide é quem classifica.
      */
     @GetMapping("/{id}/rubric-suggestion")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<RubricSuggestionDTO> rubricSuggestion(@PathVariable UUID id) {
         return service.suggestRubric(id)
                 .map(ResponseEntity::ok)
@@ -797,7 +797,7 @@ public class ConstructionInvoiceController {
 
     /** Escreve (ou apaga, se vier vazia) a nota da fatura, sem tocar no resto. */
     @PatchMapping("/{id}/notes")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionInvoiceResponseDTO> setNotes(
             @PathVariable UUID id,
             @Valid @RequestBody InvoiceNotesDTO dto,

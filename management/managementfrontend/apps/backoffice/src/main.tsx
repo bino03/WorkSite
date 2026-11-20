@@ -35,6 +35,7 @@ import InvoiceIncidentsPage from "./pages/backoffice/invoices/InvoiceIncidentsPa
 import TasksPage from "./pages/backoffice/TasksPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import ClockPage from "./pages/clock/ClockPage";
+import MyVacationsPage from "./pages/me/MyVacationsPage";
 import "antd/dist/reset.css";
 import "./index.css";
 import "./colors.css";
@@ -75,6 +76,7 @@ const App = () => (
               <Route path="invoices/company" element={<CompanyInvoicesPage />} />
               <Route path="invoices/incidents" element={<InvoiceIncidentsPage />} />
               <Route path="tasks" element={<TasksPage />} />
+              <Route path="ferias" element={<MyVacationsPage />} />
             </Route>
 
             {/* Espaço Equipa — só ADMIN (o TeamLayout devolve um EMPLOYEE a Obras) */}

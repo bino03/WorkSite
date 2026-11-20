@@ -47,7 +47,7 @@ public class EnterpriseController {
     private final EnterpriseService enterpriseService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<Page<EnterpriseListDTO>> getAllEnterprises(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -59,14 +59,14 @@ public class EnterpriseController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<List<EnterpriseResponseDTO>> getActiveEnterprises() {
         List<EnterpriseResponseDTO> enterprises = enterpriseService.findAllActive();
         return ResponseEntity.ok(enterprises);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<EnterpriseFullResponseDTO> getEnterpriseById(@PathVariable @NonNull UUID id) {
         EnterpriseFullResponseDTO enterprise = enterpriseService.findById(id);
         return ResponseEntity.ok(enterprise);
@@ -77,7 +77,7 @@ public class EnterpriseController {
      * Útil para dropdowns e seleção de projeto
      */
     @GetMapping("/{id}/basic")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<EnterpriseBasicDTO> getEnterpriseBasicById(@PathVariable @NonNull UUID id) {
         EnterpriseBasicDTO enterprise = enterpriseService.findBasicById(id);
         return ResponseEntity.ok(enterprise);
@@ -88,7 +88,7 @@ public class EnterpriseController {
      * Útil para dropdowns e seleção de projeto
      */
     @GetMapping("/basic")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<List<EnterpriseBasicDTO>> getAllBasicEnterprises() {
         List<EnterpriseBasicDTO> enterprises = enterpriseService.findAllBasic();
         return ResponseEntity.ok(enterprises);
@@ -144,7 +144,7 @@ public class EnterpriseController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<List<EnterpriseDTO>> searchEnterprisesByName(@RequestParam @NonNull String name) {
         List<EnterpriseDTO> enterprises = enterpriseService.findByName(name);
         return ResponseEntity.ok(enterprises);
