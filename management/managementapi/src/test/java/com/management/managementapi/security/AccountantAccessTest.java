@@ -43,7 +43,8 @@ class AccountantAccessTest {
         Method upload = endpoint(ConstructionInvoiceController.class, "upload");
 
         assertThat(allows("EMPLOYEE", upload, Map.of("scope", "COMPANY"))).isFalse();
-        assertThat(allows("EMPLOYEE", upload, Map.of("scope", "PROJECT"))).isTrue();
+        // Desde 2026-11-20 o EMPLOYEE (a malta da obra) também não carrega faturas de obra — ver EmployeeAccessTest.
+        assertThat(allows("EMPLOYEE", upload, Map.of("scope", "PROJECT"))).isFalse();
         assertThat(allows("EMPLOYEE", endpoint(PaymentController.class, "markAsPaid"))).isFalse();
     }
 

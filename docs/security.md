@@ -26,6 +26,22 @@ identificar quem tem a caixa e para uma interface própria futura — nessa altu
 que já existe em vez de criar outro. As folhas de caixa são só `ADMIN` (package `cashsheet`, fora de
 `enterprises.controller`, por isso fora do `WorksEndpointsRoleGuardTest`).
 
+### O `EMPLOYEE` é a malta da obra (desde 2026-11-20)
+
+Decisão do utilizador: "employee sempre foi o role dedicado para a malta da obra". **Pode**: picar o
+ponto pelo QR (`/attendance/clock/**` sem `/codes`), ver as suas férias, ausências e feriados
+(`/attendance/me/**`, só leitura), as suas tarefas (`/tasks`, mudar o estado), as notificações e o
+próprio perfil (`/profile/myprofile` e `update*`). **Não pode**: nada do espaço Obras (obras,
+orçamentos, despesas, faturas — incluindo as de obra, que até aqui carregava —, fornecedores), a
+lista de funcionários (`/employees/**`), o histórico (`/activities/**`), as localizações
+(`/locations/**`, que até esta data **não tinham controlo de role nenhum**) e a lista de todas as
+contas (`/profile/agents`). Todas as rotas do próprio tiram o perfil da sessão, nunca do pedido.
+
+`EmployeeAccessTest` guarda isto como o `AccountantAccessTest` guarda a contabilidade: nenhum endpoint
+de `enterprises.controller` aceita um `EMPLOYEE`, e os que ele usa continuam abertos. No Backoffice, o
+`AppLayout` esconde Obras/Faturas e manda para `/backoffice` quem não gere obras e abre um link
+antigo; o `EMPLOYEE` vê "Picar ponto" e "As minhas férias".
+
 ### Role `ACCOUNTANT` — desde 2026-10-30 (`V47`)
 
 Uma terceira role para a contabilidade. **No espaço Obras faz tudo o que o ADMIN faz** (obras,
@@ -42,7 +58,7 @@ eliminado; no Backoffice o botão "Eliminadas" só aparece ao ADMIN.
 
 Como se aplica: `hasAnyRole('ADMIN','ACCOUNTANT')` explícito em cada `@PreAuthorize` de Obras (não
 uma `RoleHierarchy`, que não consegue dizer "ADMIN só em Obras"), e `ACCOUNTANT` acrescentado a todo
-o `hasAnyRole('ADMIN','EMPLOYEE')`. Dois testes guardam isto sem contexto Spring nem BD — avaliam as
+o `hasAnyRole('ADMIN','EMPLOYEE')` (o `EMPLOYEE` saiu de Obras a 2026-11-20 — ver acima). Dois testes guardam isto sem contexto Spring nem BD — avaliam as
 expressões `@PreAuthorize` com o `DefaultMethodSecurityExpressionHandler` (`security/PreAuthorizeEvaluator`
 nos testes):
 
@@ -68,8 +84,8 @@ continua a guardar o resto. Desenho e fases em `notes/roadmap/role-accountant.md
 | `POST /auth/admin/**` | `ADMIN` |
 | `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
 | `/backups/**` | `ADMIN` — download em massa de todas as faturas; reforçado com `@PreAuthorize` em cada método, `BackupAccessTest` |
-| `GET /employees/**` | `ADMIN`, `EMPLOYEE` ou `ACCOUNTANT` |
-| `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. O self-service do funcionário é a fase 5 de [[../notes/roadmap/assiduidade]] |
+| `GET /employees/**` | `ADMIN` ou `ACCOUNTANT` (o `EMPLOYEE` deixou de ter acesso a 2026-11-20) |
+| `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. Exceções do próprio funcionário (`ADMIN` ou `EMPLOYEE`): `/attendance/clock` (picar, menos `/codes`) e `/attendance/me/**` (as suas férias) |
 | `/auth/me` | qualquer utilizador autenticado |
 | Tudo o resto | autenticado (role específica validada por `@PreAuthorize` no controller) |
 

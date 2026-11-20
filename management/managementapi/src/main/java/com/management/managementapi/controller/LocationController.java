@@ -17,9 +17,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
+/**
+ * Localizações das obras. Só quem gere obras (ADMIN, contabilidade): até 2026-11-20 não tinha
+ * controlo de role nenhum, e um EMPLOYEE (a malta da obra) podia ler e alterar localizações.
+ */
 @RestController
 @RequestMapping("/locations")
+@PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
 public class LocationController {
 
   private final LocationRepository locationRepo;

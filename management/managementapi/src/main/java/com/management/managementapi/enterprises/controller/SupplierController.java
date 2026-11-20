@@ -49,7 +49,7 @@ public class SupplierController {
 
     /** O catálogo, por ordem alfabética. {@code q} filtra por nome ou NIF. */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public List<SupplierResponseDTO> list(@RequestParam(required = false) String q) {
         return service.list(q);
     }
@@ -59,7 +59,7 @@ public class SupplierController {
      * mais frequente para o menos — a lista de trabalho do ecrã.
      */
     @GetMapping("/unknown-nifs")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public List<UnknownSupplierNifDTO> unknownNifs() {
         return service.listUnknownNifs();
     }

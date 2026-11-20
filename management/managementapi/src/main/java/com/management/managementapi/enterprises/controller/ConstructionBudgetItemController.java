@@ -68,7 +68,7 @@ public class ConstructionBudgetItemController {
     // ── lotes (V39) ───────────────────────────────────────────
 
     @GetMapping("/enterprise/{enterpriseId}/budgets")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<List<BudgetLotDTO>> listLots(@PathVariable UUID enterpriseId) {
         return ResponseEntity.ok(service.listLots(enterpriseId));
     }
@@ -126,14 +126,14 @@ public class ConstructionBudgetItemController {
 
     /** O orçamento da vila inteira — todos os lotes lado a lado. */
     @GetMapping("/enterprise/{enterpriseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<BudgetTreeDTO> getTree(@PathVariable UUID enterpriseId) {
         return ResponseEntity.ok(service.getTree(enterpriseId));
     }
 
     /** A árvore de um lote — a página do orçamento. */
     @GetMapping("/budgets/{budgetId}/tree")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<BudgetTreeDTO> getBudgetTree(@PathVariable UUID budgetId) {
         return ResponseEntity.ok(service.getBudgetTree(budgetId));
     }
@@ -142,7 +142,7 @@ public class ConstructionBudgetItemController {
 
     /** O que a exportação vai escrever (contagens e avisos) — o passo 2 do modal, antes do download. */
     @GetMapping("/enterprise/{enterpriseId}/export/summary")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<BudgetExportSummaryDTO> exportSummary(@PathVariable UUID enterpriseId) {
         return ResponseEntity.ok(exportService.summary(enterpriseId));
     }
@@ -156,7 +156,7 @@ public class ConstructionBudgetItemController {
      * e espaços, e o {@code filename="…"} cru só aguenta ISO-8859-1.
      */
     @GetMapping("/enterprise/{enterpriseId}/export")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<byte[]> export(@PathVariable UUID enterpriseId,
                                          @RequestParam Set<BudgetExportSheet> sheets) {
         BudgetExcelExportService.ExportFile file = exportService.export(enterpriseId, sheets);
@@ -184,7 +184,7 @@ public class ConstructionBudgetItemController {
      * outros dois: é leitura.
      */
     @GetMapping("/budgets/{budgetId}/export")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<byte[]> exportLot(@PathVariable UUID budgetId,
                                             @RequestParam Set<BudgetExportSheet> sheets) {
         BudgetExcelExportService.ExportFile file = exportService.exportLot(budgetId, sheets);
@@ -209,7 +209,7 @@ public class ConstructionBudgetItemController {
      * é leitura.
      */
     @GetMapping("/enterprise/{enterpriseId}/export/zip")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<StreamingResponseBody> exportZip(
             @PathVariable UUID enterpriseId,
             @RequestParam Set<BudgetExportSheet> sheets,
@@ -249,7 +249,7 @@ public class ConstructionBudgetItemController {
      * rubrica sem sair dele. Rubricas que não aceitam despesas não aparecem.
      */
     @GetMapping("/enterprise/{enterpriseId}/search")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<List<BudgetItemSearchResultDTO>> search(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false, defaultValue = "") String q,
@@ -258,7 +258,7 @@ public class ConstructionBudgetItemController {
     }
 
     @GetMapping("/items/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<BudgetItemNodeDTO> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(service.getNode(id));
     }

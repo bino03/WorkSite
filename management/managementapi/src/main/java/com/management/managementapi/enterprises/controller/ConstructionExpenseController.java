@@ -53,7 +53,7 @@ public class ConstructionExpenseController {
     private final AuthContext authContext;
 
     @GetMapping("/budget-item/{budgetItemId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<List<ConstructionExpenseResponseDTO>> listByBudgetItem(@PathVariable UUID budgetItemId) {
         return ResponseEntity.ok(service.listByBudgetItem(budgetItemId));
     }
@@ -66,7 +66,7 @@ public class ConstructionExpenseController {
      * filtros são opcionais.
      */
     @GetMapping("/enterprise/{enterpriseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public Page<ConstructionExpenseResponseDTO> listByEnterprise(
             @PathVariable UUID enterpriseId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -79,7 +79,7 @@ public class ConstructionExpenseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','EMPLOYEE','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ConstructionExpenseResponseDTO> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(service.toResponseDTO(service.getById(id)));
     }

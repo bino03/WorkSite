@@ -1393,6 +1393,20 @@ Não existe endpoint de apagar a sério. A resposta traz `localDate` — o dia a
 A sequência é avaliada **dentro do dia local**: um dia de trabalho não atravessa a meia-noite (decisão
 de 2026-10-06), por isso cada dia começa a zero e um dia mal preenchido não contamina o seguinte.
 
+## As minhas férias (`MyAttendanceController`, `/attendance/me`)
+
+Fase 5b (2026-11-20): o funcionário vê as **suas** férias, só em leitura. `ADMIN` ou `EMPLOYEE` (na
+classe); o perfil vem sempre da sessão. Página `/backoffice/ferias` ("As minhas férias"), com o saldo,
+um calendário do mês (feriados + ausências) e a lista do ano.
+
+| Método | Rota | O quê |
+|---|---|---|
+| GET | `/attendance/me/absences?from=&to=` | As minhas ausências no intervalo (resumo, sem documentos); `ABS_011` se `to < from` ou mais de 400 dias |
+| GET | `/attendance/me/vacation-balance?year=` | O meu saldo de férias (o mesmo `VacationBalanceDTO` do admin) |
+| GET | `/attendance/me/holidays?from=&to=` | Os feriados do intervalo, nacionais e municipais |
+
+Marcar e aprovar férias continua a ser do admin (`/attendance/absences`).
+
 ## Picar pelo QR da obra (`ClockController`, `/attendance/clock`)
 
 A fase 5 da assiduidade (`V49`, 2026-11-20): o funcionário lê com a câmara do telemóvel o QR colado
@@ -1428,6 +1442,8 @@ na obra, entra com a **sua** conta (`EMPLOYEE`) e confirma com um toque. O QR le
 | `ATT_023` | A direção enviada já não é a próxima |
 | `ATT_024` | Menos de 1 minuto desde a última picagem (`ClockService.MIN_GAP`) |
 | `ATT_025` | Pedir o PNG de uma obra que ainda não tem QR |
+
+Há **duas formas de chegar à picagem**, que dão no mesmo: (1) ler o QR com a app da câmara do telemóvel, que abre `/picar?c=…` sem abrir a app primeiro; (2) o botão **"Picar ponto"** no ecrã inicial de um `EMPLOYEE`, que abre `/picar?ler=1` e lê o QR com a câmara dentro da app (`QrScanner`, `jsqr` — o `BarcodeDetector` não existe no Safari do iPhone; a câmara só abre em HTTPS). Depois de picar, "Ler o QR de outra obra" serve a troca de obra ao almoço.
 
 No Backoffice: a página **`/picar`** (fora do `AppLayout`, feita para telemóvel) — está no `SpaController` e no `SecurityConfig.SPA_PATHS`, sem o que dava 404 online e, para o admin, o
 passo **"QR de picagem"** no drawer da obra (último passo, só `ADMIN`): "Criar QR" numa obra sem QR; com QR, imprimir, copiar link e "Gerar novo QR". Fora da lista de obras de propósito — define-se uma vez e raramente se mexe (decisão do utilizador, 2026-11-20).

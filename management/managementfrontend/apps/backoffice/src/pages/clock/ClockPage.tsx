@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert, Button, Result, Spin } from "antd";
-import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
+import { HomeOutlined, LoginOutlined, LogoutOutlined, QrcodeOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useAuthContext } from "@/context/AuthContext";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { clockIn, myTodayEntries, previewClock } from "@/services/clockService";
 import type { ClockPreview } from "@/services/clockService";
 import type { TimeDirection, TimeEntry } from "@/types/attendance";
+import { QrScanner } from "@/components/attendance/clock/QrScanner";
 import { AFTER_LOGIN_KEY } from "./afterLogin";
 
 /**
@@ -31,6 +32,8 @@ export default function ClockPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const code = params.get("c");
+  // `?ler=1` vem do botão "Picar ponto" do ecrã inicial: abre logo a câmara.
+  const [scanning, setScanning] = useState(!code && params.get("ler") === "1");
 
   const [phase, setPhase] = useState<Phase>(user ? "loading" : "auth");
   const [preview, setPreview] = useState<ClockPreview | null>(null);
@@ -43,7 +46,7 @@ export default function ClockPage() {
   useEffect(() => {
     if (user) return;
     let cancelled = false;
-    sessionStorage.setItem(AFTER_LOGIN_KEY, `/picar${code ? `?c=${encodeURIComponent(code)}` : ""}`);
+    sessionStorage.setItem(AFTER_LOGIN_KEY, `/picar${window.location.search}`);
     restoreSession().then((restored) => {
       if (cancelled) return;
       if (restored) {
@@ -80,6 +83,32 @@ export default function ClockPage() {
   useEffect(() => {
     if (phase === "loading") void load();
   }, [phase, load]);
+
+  // Um QR lido dentro da app muda o `?c=` sem recarregar a página: voltar a carregar.
+  useEffect(() => {
+    if (user) setPhase("loading");
+  }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** O QR traz `<app>/picar?c=<código>`; tudo o que não seja isso não é um QR de picagem. */
+  const onScanned = useCallback(
+    (text: string) => {
+      setScanning(false);
+      let scannedCode: string | null = null;
+      try {
+        const url = new URL(text);
+        if (url.pathname.endsWith("/picar")) scannedCode = url.searchParams.get("c");
+      } catch {
+        scannedCode = null;
+      }
+      if (!scannedCode) {
+        setProblem("Este QR não é um QR de picagem da obra.");
+        setPhase("error");
+        return;
+      }
+      navigate(`/picar?c=${encodeURIComponent(scannedCode)}`, { replace: true });
+    },
+    [navigate]
+  );
 
   const confirm = async () => {
     if (!code || !preview) return;
@@ -127,9 +156,14 @@ export default function ClockPage() {
             </h1>
           </div>
           {user && (
-            <Button type="text" icon={<LogoutOutlined />} onClick={() => void logout()} aria-label="Sair">
-              Sair
-            </Button>
+            <div style={{ display: "flex", gap: 4 }}>
+              <Button type="text" icon={<HomeOutlined />} onClick={() => navigate("/backoffice")} aria-label="Início">
+                Início
+              </Button>
+              <Button type="text" icon={<LogoutOutlined />} onClick={() => void logout()} aria-label="Sair">
+                Sair
+              </Button>
+            </div>
           )}
         </header>
 
@@ -201,12 +235,24 @@ export default function ClockPage() {
           </section>
         )}
 
-        {phase === "ready" && !code && (
-          <Alert
-            type="info"
-            showIcon
-            message="Para picar, leia o QR da obra com a câmara do telemóvel."
-          />
+        {scanning && <QrScanner onDetected={onScanned} onCancel={() => setScanning(false)} />}
+
+        {/* Sem QR lido: o botão que abre a câmara. Também depois de picar, para a obra
+            seguinte (manhã numa, tarde noutra). */}
+        {!scanning && user && isEmployeeOrAdmin && (phase === "ready" || phase === "done" || phase === "error") && (
+          <Button
+            type={code ? "default" : "primary"}
+            size="large"
+            block
+            icon={<QrcodeOutlined />}
+            onClick={() => {
+              setProblem(null);
+              setScanning(true);
+            }}
+            style={code ? undefined : { height: 64, fontSize: 20 }}
+          >
+            {code ? "Ler o QR de outra obra" : "Ler QR da obra"}
+          </Button>
         )}
 
         {(phase === "ready" || phase === "done") && (
