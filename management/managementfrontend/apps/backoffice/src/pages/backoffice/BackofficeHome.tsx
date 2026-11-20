@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
-import { BuildOutlined, CheckSquareOutlined, TeamOutlined } from "@ant-design/icons";
+import { BuildOutlined, CheckSquareOutlined, QrcodeOutlined, TeamOutlined } from "@ant-design/icons";
+import { Button } from "antd";
 import { useAuthContext } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
 import { taskService } from "@/services/taskService";
@@ -20,7 +21,7 @@ interface Metric {
 export const BackofficeHome = () => {
   const { t } = useTranslation();
   const { user } = useAuthContext();
-  const { isAdmin, canManageWorks, profileId } = useAuth();
+  const { isAdmin, isEmployee, canManageWorks, profileId } = useAuth();
   const [metrics, setMetrics] = useState<Metric[]>([]);
 
   useEffect(() => {
@@ -90,6 +91,16 @@ export const BackofficeHome = () => {
       <h1 style={{ margin: "0 0 20.4px" }}>
         {t("common.welcome", { defaultValue: "Bem-vindo" })}{user?.name ? `, ${user.name}` : ""}
       </h1>
+
+      {/* O funcionário pica a partir daqui: o botão abre a câmara dentro da app e lê o
+          QR da obra — é a primeira coisa do ecrã, porque é o que ele faz todos os dias. */}
+      {isEmployee() && (
+        <Link to="/picar?ler=1" style={{ display: "block", marginBottom: "27.2px" }}>
+          <Button type="primary" size="large" block icon={<QrcodeOutlined />} style={{ height: 72, fontSize: 22 }}>
+            Picar ponto
+          </Button>
+        </Link>
+      )}
 
       <div className="keep-cols" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "13.6px", marginBottom: "27.2px" }}>
         {metrics.map((m) => (
