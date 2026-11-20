@@ -471,6 +471,7 @@ public enum ErrorCode {
     SCHEDULE_BREAK_TOO_LONG("SCHED_006", "A pausa não pode ser igual ou maior que o período de trabalho do dia"),
     SCHEDULE_IN_USE("SCHED_007", "Este horário já esteve atribuído a um funcionário e por isso não pode ser alterado — crie um horário novo e atribua-o a partir da data que quiser"),
     SCHEDULE_NOT_DELETED("SCHED_008", "Este horário não está apagado"),
+    SCHEDULE_INVALID_LUNCH("SCHED_009", "O almoço tem de ter início e fim, e ficar dentro do dia de trabalho"),
 
     // ========================================================================
     // ASSIDUIDADE — emprego e picagens (ATT_xxx)
@@ -485,6 +486,12 @@ public enum ErrorCode {
     TIME_ENTRY_DUPLICATE_INSTANT("ATT_012", "Já existe uma picagem deste funcionário neste instante"),
     TIME_ENTRY_NOT_DELETED("ATT_013", "Esta picagem não está apagada"),
     TIME_ENTRY_BEFORE_HIRE("ATT_014", "Não se pode registar uma picagem antes da data de admissão do funcionário"),
+    CLOCK_CODE_INVALID("ATT_020", "Este QR não é válido — pode ter sido substituído. Peça o QR atual ao encarregado"),
+    CLOCK_ENTERPRISE_CLOSED("ATT_021", "Esta obra já não aceita picagens"),
+    CLOCK_NOT_EMPLOYED("ATT_022", "Não tem ficha de emprego ativa — fale com o escritório"),
+    CLOCK_STALE_DIRECTION("ATT_023", "Esta picagem já tinha sido feita — a página estava desatualizada"),
+    CLOCK_TOO_SOON("ATT_024", "Acabou de picar há menos de um minuto"),
+    CLOCK_CODE_NOT_CREATED("ATT_025", "Esta obra ainda não tem QR de picagem"),
 
     // ========================================================================
     // ASSIDUIDADE — feriados e ausências (ABS_xxx)

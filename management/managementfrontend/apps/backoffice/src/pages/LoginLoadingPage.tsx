@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthContext } from "@/context/AuthContext";
 import { useTranslation } from "react-i18next";
 import { landingPath } from "@/layouts/shell/spaces";
+import { AFTER_LOGIN_KEY } from "@/pages/clock/afterLogin";
 
 export const LoginLoadingPage = () => {
   const navigate = useNavigate();
@@ -27,7 +28,15 @@ export const LoginLoadingPage = () => {
         const userInfo = await login(email, password);
         sessionStorage.setItem("welcome_name", userInfo.name);
 
-        if (userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE" || userInfo.role === "ACCOUNTANT") {
+        // A página de picar guarda para onde voltar antes de mandar para o login: quem
+        // leu o QR tem de acabar na picagem, não na página inicial. Só caminhos /picar,
+        // para isto não virar um redirect aberto.
+        const afterLogin = sessionStorage.getItem(AFTER_LOGIN_KEY);
+        sessionStorage.removeItem(AFTER_LOGIN_KEY);
+
+        if (afterLogin?.startsWith("/picar") && (userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE")) {
+          navigate(afterLogin, { replace: true });
+        } else if (userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE" || userInfo.role === "ACCOUNTANT") {
           navigate(landingPath(userInfo.role === "ADMIN"), { replace: true });
         } else {
           navigate("/login", {

@@ -3660,6 +3660,7 @@
       "endBeforeStart": "End time must be after the start time.",
       "breakTooLong": "The break cannot be equal to or longer than the day's working period.",
       "breakNegative": "The break cannot be negative.",
+      "lunchInvalid": "Lunch needs a start and an end, inside the working day (after arrival, before leaving).",
       "atLeastOneDay": "Pick at least one working day.",
       "dateRequired": "Date is required.",
       "municipalityRequired": "A municipal holiday must name the municipality.",

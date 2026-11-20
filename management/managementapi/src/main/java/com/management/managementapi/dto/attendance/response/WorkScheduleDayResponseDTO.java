@@ -11,6 +11,10 @@ public record WorkScheduleDayResponseDTO(
         DayOfWeek weekday,
         @JsonFormat(pattern = "HH:mm") LocalTime startTime,
         @JsonFormat(pattern = "HH:mm") LocalTime endTime,
+        /** null num dia de um só período. */
+        @JsonFormat(pattern = "HH:mm") LocalTime lunchStart,
+        @JsonFormat(pattern = "HH:mm") LocalTime lunchEnd,
+        /** Derivado do almoço; 0 sem almoço. */
         int breakMinutes,
         /** Minutos de trabalho previstos neste dia, já sem a pausa. */
         long expectedMinutes

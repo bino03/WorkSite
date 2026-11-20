@@ -34,6 +34,7 @@ import OutstandingInvoicesPage from "./pages/backoffice/invoices/OutstandingInvo
 import InvoiceIncidentsPage from "./pages/backoffice/invoices/InvoiceIncidentsPage";
 import TasksPage from "./pages/backoffice/TasksPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
+import ClockPage from "./pages/clock/ClockPage";
 import "antd/dist/reset.css";
 import "./index.css";
 import "./colors.css";
@@ -53,6 +54,10 @@ const App = () => (
 
             {/* Rota pública de aceitação de convite */}
             <Route path="/accept-invite" element={<AcceptInvitePage />} />
+
+            {/* Picar ponto pelo QR da obra — fora do AppLayout, para o telemóvel. A própria
+                página trata da sessão (recupera-a dos cookies ou vai ao login e volta). */}
+            <Route path="/picar" element={<ClockPage />} />
 
             {/* Rotas protegidas do backoffice */}
             <Route path="/backoffice/*" element={<PrivateRoute><AppLayout /></PrivateRoute>}>

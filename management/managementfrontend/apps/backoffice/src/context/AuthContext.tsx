@@ -8,6 +8,12 @@ interface AuthContextType {
   user: UserInfo | null;
   login: (email: string, password: string) => Promise<UserInfo>;
   logout: () => Promise<void>;
+  /**
+   * Recupera a sessão a partir dos cookies quando o `sessionStorage` vem vazio — é o
+   * caso de um separador novo aberto pela câmara ao ler o QR da obra. Sem isto o
+   * funcionário fazia login a cada picagem, com os cookies ainda válidos.
+   */
+  restoreSession: () => Promise<UserInfo | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,8 +41,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     navigate('/login');
   }, [navigate]);
 
+  const restoreSession = useCallback(async (): Promise<UserInfo | null> => {
+    try {
+      const userInfo = await authService.fetchMe();
+      setUser(userInfo);
+      return userInfo;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, restoreSession }}>
       {children}
     </AuthContext.Provider>
   );

@@ -71,7 +71,7 @@ class VacationBalanceServiceTest {
             day.setDayOfWeek(weekday);
             day.setStartTime(LocalTime.of(8, 0));
             day.setEndTime(LocalTime.of(17, 0));
-            day.setBreakMinutes(60);
+            day.setLunch(LocalTime.NOON, LocalTime.of(13, 0));
             days.add(day);
         }
         schedule.setDays(days);

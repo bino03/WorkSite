@@ -6,9 +6,11 @@ import { WEEKDAYS } from "@/types/attendance";
  * se é dia de trabalho — um dia desligado não vai para o backend (é assim que
  * fins de semana e horários parciais se exprimem, sem flag nenhuma).
  *
- * As regras espelham as do backend: saída depois da entrada (`SCHED_005` — um dia
- * não atravessa a meia-noite), pausa menor que o período (`SCHED_006`), pelo
- * menos um dia (`@NotEmpty`). Mensagens são chaves i18n (`attendance.formErrors.*`).
+ * Desde 2026-11-20 o almoço pica-se, e o horário diz **quando** é (`lunchStart`/
+ * `lunchEnd`, as duas ou nenhuma — vazio = dia de um só período). As regras espelham
+ * as do backend: saída depois da entrada (`SCHED_005` — um dia não atravessa a
+ * meia-noite), almoço dentro do dia (`SCHED_009`), pelo menos um dia (`@NotEmpty`).
+ * Mensagens são chaves i18n (`attendance.formErrors.*`).
  */
 
 /** Nome de horário: letras, números e a pontuação de "08–17 c/ 1h (verão)". */
@@ -22,13 +24,25 @@ export const toMinutes = (time: string): number => {
   return hours * 60 + minutes;
 };
 
+/** Minutos previstos de um dia: o período menos o almoço, se houver. */
+export const expectedDayMinutes = (day: { startTime: string; endTime: string; lunchStart: string; lunchEnd: string }) => {
+  if (!TIME.test(day.startTime) || !TIME.test(day.endTime)) return 0;
+  const span = toMinutes(day.endTime) - toMinutes(day.startTime);
+  if (span <= 0) return 0;
+  const lunch =
+    TIME.test(day.lunchStart) && TIME.test(day.lunchEnd) ? Math.max(0, toMinutes(day.lunchEnd) - toMinutes(day.lunchStart)) : 0;
+  return Math.max(0, span - lunch);
+};
+
 const DaySchema = z
   .object({
     weekday: z.enum(WEEKDAYS as [string, ...string[]]),
     enabled: z.boolean(),
     startTime: z.string(),
     endTime: z.string(),
-    breakMinutes: z.number().int().min(0, "attendance.formErrors.breakNegative").max(600),
+    /** "" = sem almoço. */
+    lunchStart: z.string(),
+    lunchEnd: z.string(),
   })
   .superRefine((day, ctx) => {
     if (!day.enabled) return;
@@ -36,11 +50,23 @@ const DaySchema = z
       ctx.addIssue({ code: "custom", message: "attendance.formErrors.timeInvalid", path: ["startTime"] });
       return;
     }
-    const span = toMinutes(day.endTime) - toMinutes(day.startTime);
-    if (span <= 0) {
+    const start = toMinutes(day.startTime);
+    const end = toMinutes(day.endTime);
+    if (end <= start) {
       ctx.addIssue({ code: "custom", message: "attendance.formErrors.endBeforeStart", path: ["endTime"] });
-    } else if (day.breakMinutes >= span) {
-      ctx.addIssue({ code: "custom", message: "attendance.formErrors.breakTooLong", path: ["breakMinutes"] });
+      return;
+    }
+    const hasLunchStart = day.lunchStart !== "";
+    const hasLunchEnd = day.lunchEnd !== "";
+    if (!hasLunchStart && !hasLunchEnd) return;
+    if (hasLunchStart !== hasLunchEnd || !TIME.test(day.lunchStart) || !TIME.test(day.lunchEnd)) {
+      ctx.addIssue({ code: "custom", message: "attendance.formErrors.lunchInvalid", path: ["lunchStart"] });
+      return;
+    }
+    const lunchStart = toMinutes(day.lunchStart);
+    const lunchEnd = toMinutes(day.lunchEnd);
+    if (!(start < lunchStart && lunchStart < lunchEnd && lunchEnd < end)) {
+      ctx.addIssue({ code: "custom", message: "attendance.formErrors.lunchInvalid", path: ["lunchStart"] });
     }
   });
 

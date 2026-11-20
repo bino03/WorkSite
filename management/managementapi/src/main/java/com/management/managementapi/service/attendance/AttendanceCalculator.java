@@ -63,13 +63,19 @@ public final class AttendanceCalculator {
         long expectedMinutes = expected(scheduled, holiday, absence);
         LocalTime firstIn = firstLocalTime(entries, TimeDirection.IN, zone);
         LocalTime lastOut = lastLocalTime(entries, TimeDirection.OUT, zone);
-        boolean incomplete = entries.size() % 2 != 0;
+        boolean lunchNotClocked = lunchNotClocked(entries, scheduled, zone);
+        // Um almoço por picar é um dia por fechar, como uma saída esquecida: entra nos
+        // mesmos avisos ("dias por fechar") sem o frontend ter de saber de um caso novo.
+        boolean incomplete = entries.size() % 2 != 0 || lunchNotClocked;
 
         Map<UUID, WorkedAtEnterprise> grossByEnterprise = pairedMinutesByEnterprise(entries);
         long grossMinutes = grossByEnterprise.values().stream().mapToLong(WorkedAtEnterprise::workedMinutes).sum();
-        // A pausa desconta-se do bruto, e só se houve trabalho: descontar uma hora
-        // de almoço a quem não apareceu daria um total negativo.
-        long breakMinutes = (scheduled == null || grossMinutes == 0) ? 0 : scheduled.getBreakMinutes();
+        // Desde 2026-11-20 o almoço pica-se: as horas são a soma dos pares, e o intervalo
+        // entre a saída da manhã e a entrada da tarde já não conta. Só quando o almoço
+        // não foi picado (um par atravessa a janela inteira) se desconta a pausa do
+        // horário — para um esquecimento não pagar uma hora a mais. O admin corrige
+        // acrescentando as duas picagens, e o dia passa a contar o que foi picado.
+        long breakMinutes = lunchNotClocked ? scheduled.getBreakMinutes() : 0;
         long workedMinutes = Math.max(0, grossMinutes - breakMinutes);
 
         return new DayAttendance(
@@ -77,11 +83,13 @@ public final class AttendanceCalculator {
                 workedMinutes,
                 expectedMinutes,
                 Math.max(0, workedMinutes - expectedMinutes),
-                lateness(firstIn, scheduled, holiday, absence),
+                lateness(firstIn, scheduled, holiday, absence)
+                        + afternoonLateness(entries, scheduled, holiday, absence, zone),
                 status(day, today, entries, scheduled, hasSchedule, holiday, absence),
                 firstIn,
                 lastOut,
                 incomplete,
+                lunchNotClocked,
                 holiday == null ? null : holiday.getName(),
                 absence == null ? null : absence.getType(),
                 shareOut(grossByEnterprise, grossMinutes, workedMinutes));
@@ -182,6 +190,60 @@ public final class AttendanceCalculator {
             return 0;
         }
         return Duration.between(scheduled.getStartTime(), firstIn).toMinutes();
+    }
+
+    /**
+     * O almoço não foi picado quando um único par entrada→saída cobre a janela de almoço
+     * inteira do horário. Um almoço picado mais tarde ou mais curto (saída às 12:30,
+     * entrada às 13:15) não é isto — conta o que foi picado.
+     */
+    private static boolean lunchNotClocked(List<TimeEntry> entries, WorkScheduleDay scheduled, ZoneId zone) {
+        if (scheduled == null || !scheduled.hasLunch()) {
+            return false;
+        }
+        TimeEntry openIn = null;
+        for (TimeEntry entry : entries) {
+            if (entry.getDirection() == TimeDirection.IN) {
+                openIn = entry;
+            } else if (openIn != null) {
+                LocalTime in = local(openIn, zone);
+                LocalTime out = local(entry, zone);
+                if (!in.isAfter(scheduled.getLunchStart()) && !out.isBefore(scheduled.getLunchEnd())) {
+                    return true;
+                }
+                openIn = null;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Atraso no regresso do almoço: a primeira entrada depois do início do almoço que
+     * não é a primeira do dia (essa já conta no atraso da manhã). Uma troca de obra a
+     * meio da manhã (saída 10:00, entrada 10:05) não conta, porque é antes do almoço.
+     */
+    private static long afternoonLateness(List<TimeEntry> entries, WorkScheduleDay scheduled,
+                                          Holiday holiday, Absence absence, ZoneId zone) {
+        if (holiday != null || absence != null || scheduled == null || !scheduled.hasLunch()) {
+            return 0;
+        }
+        for (int i = 1; i < entries.size(); i++) {
+            TimeEntry entry = entries.get(i);
+            if (entry.getDirection() != TimeDirection.IN) {
+                continue;
+            }
+            LocalTime in = local(entry, zone);
+            if (in.isAfter(scheduled.getLunchStart())) {
+                return in.isAfter(scheduled.getLunchEnd())
+                        ? Duration.between(scheduled.getLunchEnd(), in).toMinutes()
+                        : 0;
+            }
+        }
+        return 0;
+    }
+
+    private static LocalTime local(TimeEntry entry, ZoneId zone) {
+        return entry.getHappenedAt().atZoneSameInstant(zone).toLocalTime();
     }
 
     /**

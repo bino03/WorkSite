@@ -3691,6 +3691,7 @@
       "endBeforeStart": "A saída tem de ser depois da entrada.",
       "breakTooLong": "A pausa não pode ser igual ou maior que o período de trabalho do dia.",
       "breakNegative": "A pausa não pode ser negativa.",
+      "lunchInvalid": "O almoço precisa de início e fim, e tem de ficar dentro do dia (depois da entrada, antes da saída).",
       "atLeastOneDay": "Escolha pelo menos um dia de trabalho.",
       "dateRequired": "A data é obrigatória.",
       "municipalityRequired": "Um feriado municipal tem de indicar o concelho.",

@@ -18,6 +18,8 @@ import EditEnterpriseLocationCard from "@/components/enterprise/edit/EditEnterpr
 import EditEnterpriseGalleryCard from "@/components/enterprise/edit/EditEnterpriseGalleryCard";
 import AuthenticatedImage from "@/components/image/AuthenticatedImage";
 import BlueprintCard from "@/components/common/BlueprintCard";
+import { ClockQrCard } from "@/components/attendance/clock/ClockQrCard";
+import { useAuth } from "@/hooks/useAuth";
 
 /* ========= CONSTANTES ========= */
 
@@ -53,6 +55,13 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 const VIEW_STEPS = ["Visão Geral", "Datas e Áreas", "Financeiro", "Localização", "Multimédia", "Auditoria"];
+/**
+ * Só ADMIN (`/attendance/clock/codes` é ADMIN). No fim de propósito: o QR define-se uma
+ * vez e raramente se mexe, não precisa de estar à mão. Não usa o "Editar" do cabeçalho —
+ * o cartão tem as suas próprias ações.
+ */
+const CLOCK_QR_STEP = "QR de picagem";
+const CLOCK_QR_INDEX = VIEW_STEPS.length;
 
 /* ========= HELPERS ========= */
 
@@ -322,6 +331,8 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
   onUpdated,
 }) => {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  const steps = isAdmin() ? [...VIEW_STEPS, CLOCK_QR_STEP] : VIEW_STEPS;
   const [data, setData] = useState<EnterpriseFullResponseDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -394,7 +405,7 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
 
           <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
             <div style={{ width: 190, flexShrink: 0, borderRight: "1px solid var(--ind-color-divider)", padding: "13.6px 0" }}>
-              {VIEW_STEPS.map((label, i) => {
+              {steps.map((label, i) => {
                 const active = i === current;
                 return (
                   <div
@@ -433,6 +444,7 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
                   {current === 3 && <LocationCard location={data.location} />}
                   {current === 4 && <MediaCard data={data} />}
                   {current === 5 && <AuditCard data={data} />}
+                  {current === CLOCK_QR_INDEX && enterpriseId && <ClockQrCard enterpriseId={enterpriseId} />}
                 </>
               )}
             </div>
@@ -457,7 +469,7 @@ const EnterpriseViewDrawer: React.FC<EnterpriseViewDrawerProps> = ({
             </div>
             <div style={{ display: "flex", gap: "6.8px" }}>
               <Button disabled={current === 0} onClick={() => { setEditing(false); setCurrent((c) => Math.max(0, c - 1)); }}>Anterior</Button>
-              <Button disabled={current === VIEW_STEPS.length - 1} onClick={() => { setEditing(false); setCurrent((c) => Math.min(VIEW_STEPS.length - 1, c + 1)); }}>Seguinte</Button>
+              <Button disabled={current === steps.length - 1} onClick={() => { setEditing(false); setCurrent((c) => Math.min(steps.length - 1, c + 1)); }}>Seguinte</Button>
             </div>
           </div>
         </div>

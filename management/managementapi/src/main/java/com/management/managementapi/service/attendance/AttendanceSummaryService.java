@@ -187,6 +187,7 @@ public class AttendanceSummaryService {
                 day.firstIn(),
                 day.lastOut(),
                 day.incomplete(),
+                day.lunchNotClocked(),
                 day.needsAttention(),
                 day.holidayName(),
                 day.absenceType(),

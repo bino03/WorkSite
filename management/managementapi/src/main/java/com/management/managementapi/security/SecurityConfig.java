@@ -120,7 +120,7 @@ public class SecurityConfig {
     static final String[] SPA_PATHS = {
         "/", "/index.html", "/assets/**", "/*.svg", "/*.ico",
         "/login", "/loading", "/forgot-password", "/reset-password", "/accept-invite",
-        "/backoffice", "/backoffice/**", "/team", "/team/**"
+        "/backoffice", "/backoffice/**", "/team", "/team/**", "/picar"
     };
 
     // A página corre com uma CSP própria — a da API (`default-src 'none'`) não deixava o

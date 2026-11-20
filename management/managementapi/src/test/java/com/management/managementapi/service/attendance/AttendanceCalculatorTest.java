@@ -25,6 +25,7 @@ import com.management.managementapi.model.enums.TimeDirection;
 import com.management.managementapi.service.attendance.DayAttendance.DayStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * Esta é a camada onde um erro é silencioso: não lança exceção, devolve o número
@@ -59,7 +60,9 @@ class AttendanceCalculatorTest {
         day.setDayOfWeek(DayOfWeek.WEDNESDAY);
         day.setStartTime(LocalTime.parse(start));
         day.setEndTime(LocalTime.parse(end));
-        day.setBreakMinutes(pausa);
+        if (pausa > 0) {
+            day.setLunch(LocalTime.NOON, LocalTime.NOON.plusMinutes(pausa));
+        }
         return day;
     }
 
@@ -83,35 +86,110 @@ class AttendanceCalculatorTest {
         // teste é que o apanhou. Corrigido lá a 2026-10-06.
         assertThat(day.overtimeMinutes()).isEqualTo(40);
         assertThat(day.status()).isEqualTo(DayStatus.WORKED);
-        assertThat(day.incomplete()).isFalse();
+        // Desde 2026-11-20 o almoço pica-se: um só par a atravessar o almoço é um dia por fechar.
+        assertThat(day.lunchNotClocked()).isTrue();
+        assertThat(day.incomplete()).isTrue();
     }
 
     @Test
-    @DisplayName("a pausa do horário desconta-se mesmo que ninguém a pique")
-    void pausaDescontaSemSerPicada() {
+    @DisplayName("almoço esquecido: desconta a pausa do horário e o dia fica por fechar")
+    void almocoNaoPicadoDescontaEFicaPorFechar() {
         DayAttendance day = calcular(
                 List.of(entry(TimeDirection.IN, 8, 0), entry(TimeDirection.OUT, 17, 0)),
                 horario("08:00", "17:00", 60));
 
-        // 9 horas entre picagens, menos a hora de almoço que o horário declara.
+        // 9 horas entre picagens, menos a hora de almoço que o horário declara —
+        // um esquecimento não paga uma hora a mais, e o admin é chamado a corrigir.
         assertThat(day.workedMinutes()).isEqualTo(480);
         assertThat(day.overtimeMinutes()).isZero();
         assertThat(day.latenessMinutes()).isZero();
+        assertThat(day.lunchNotClocked()).isTrue();
+        assertThat(day.needsAttention()).isTrue();
     }
 
     @Test
-    @DisplayName("quem pica a saída ao almoço e volta não leva a pausa descontada duas vezes")
-    void pausaNaoDescontaDuasVezes() {
+    @DisplayName("almoço picado: as horas são a soma dos pares, sem desconto nenhum")
+    void almocoPicadoNaoDesconta() {
         DayAttendance day = calcular(
                 List.of(entry(TimeDirection.IN, 8, 0), entry(TimeDirection.OUT, 12, 0),
                         entry(TimeDirection.IN, 13, 0), entry(TimeDirection.OUT, 17, 0)),
                 horario("08:00", "17:00", 60));
 
-        // 4h + 4h = 8h de pares, menos a pausa declarada = 7h.
-        // É intencional: o horário diz que há uma hora de pausa, e quem a picou
-        // também a tem a descontar — senão duas pessoas com o mesmo horário e as
-        // mesmas horas no local teriam totais diferentes só por uma ter picado.
-        assertThat(day.workedMinutes()).isEqualTo(420);
+        // 4h + 4h. Até 2026-11-20 isto dava 7h (a pausa descontava-se por cima da picada).
+        assertThat(day.workedMinutes()).isEqualTo(480);
+        assertThat(day.overtimeMinutes()).isZero();
+        assertThat(day.lunchNotClocked()).isFalse();
+        assertThat(day.incomplete()).isFalse();
+        assertThat(day.needsAttention()).isFalse();
+    }
+
+    @Test
+    @DisplayName("almoço picado mais curto conta o que foi picado")
+    void almocoCurtoContaOPicado() {
+        DayAttendance day = calcular(
+                List.of(entry(TimeDirection.IN, 8, 0), entry(TimeDirection.OUT, 12, 15),
+                        entry(TimeDirection.IN, 12, 45), entry(TimeDirection.OUT, 17, 0)),
+                horario("08:00", "17:00", 60));
+
+        // 4h15 + 4h15 = 8h30, e voltou antes da hora: sem atraso.
+        assertThat(day.workedMinutes()).isEqualTo(510);
+        assertThat(day.overtimeMinutes()).isEqualTo(30);
+        assertThat(day.latenessMinutes()).isZero();
+        assertThat(day.lunchNotClocked()).isFalse();
+    }
+
+    @Test
+    @DisplayName("regresso do almoço atrasado soma ao atraso da manhã")
+    void atrasoNoRegressoDoAlmoco() {
+        DayAttendance day = calcular(
+                List.of(entry(TimeDirection.IN, 8, 10), entry(TimeDirection.OUT, 12, 0),
+                        entry(TimeDirection.IN, 13, 20), entry(TimeDirection.OUT, 17, 0)),
+                horario("08:00", "17:00", 60));
+
+        assertThat(day.latenessMinutes()).isEqualTo(30);
+        assertThat(day.workedMinutes()).isEqualTo(450);
+    }
+
+    @Test
+    @DisplayName("manhã numa obra e tarde noutra: as horas vão para cada obra, sem pausa a repartir")
+    void manhaNumaObraTardeNoutra() {
+        Enterprise petrus = new Enterprise();
+        petrus.setId(UUID.randomUUID());
+        petrus.setName("Villa Petrus");
+        Enterprise alleu = new Enterprise();
+        alleu.setId(UUID.randomUUID());
+        alleu.setName("Villa Alleu");
+
+        TimeEntry manhaIn = entry(TimeDirection.IN, 8, 0);
+        manhaIn.setEnterprise(petrus);
+        TimeEntry manhaOut = entry(TimeDirection.OUT, 12, 0);
+        manhaOut.setEnterprise(petrus);
+        TimeEntry tardeIn = entry(TimeDirection.IN, 13, 0);
+        tardeIn.setEnterprise(alleu);
+        TimeEntry tardeOut = entry(TimeDirection.OUT, 17, 0);
+        tardeOut.setEnterprise(alleu);
+
+        DayAttendance day = calcular(List.of(manhaIn, manhaOut, tardeIn, tardeOut), horario("08:00", "17:00", 60));
+
+        assertThat(day.workedMinutes()).isEqualTo(480);
+        assertThat(day.enterprises())
+                .extracting(WorkedAtEnterprise::enterpriseName, WorkedAtEnterprise::workedMinutes)
+                .containsExactly(tuple("Villa Petrus", 240L), tuple("Villa Alleu", 240L));
+        assertThat(day.needsAttention()).isFalse();
+    }
+
+    @Test
+    @DisplayName("trocar de obra a meio da manhã não é atraso nem almoço")
+    void trocaDeObraAMeioDaManha() {
+        DayAttendance day = calcular(
+                List.of(entry(TimeDirection.IN, 8, 0), entry(TimeDirection.OUT, 10, 0),
+                        entry(TimeDirection.IN, 10, 15), entry(TimeDirection.OUT, 12, 0),
+                        entry(TimeDirection.IN, 13, 0), entry(TimeDirection.OUT, 17, 0)),
+                horario("08:00", "17:00", 60));
+
+        assertThat(day.latenessMinutes()).isZero();
+        assertThat(day.workedMinutes()).isEqualTo(465);
+        assertThat(day.lunchNotClocked()).isFalse();
     }
 
     @Test
@@ -200,7 +278,9 @@ class AttendanceCalculatorTest {
         assertThat(day.incomplete()).isTrue();
         assertThat(day.needsAttention()).isTrue();
         // O par fechado (08–12) continua a contar; a entrada sem saída é ignorada.
-        assertThat(day.workedMinutes()).isEqualTo(180);
+        // Inteiro desde 2026-11-20: o almoço foi picado, logo não há pausa a descontar.
+        assertThat(day.workedMinutes()).isEqualTo(240);
+        assertThat(day.lunchNotClocked()).isFalse();
         assertThat(day.lastOut()).isEqualTo(LocalTime.parse("12:00"));
     }
 

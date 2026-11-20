@@ -52,6 +52,10 @@ export interface WorkScheduleDay {
   weekday: Weekday;
   startTime: string;
   endTime: string;
+  /** null = dia de um só período. Desde 2026-11-20 o almoço pica-se. */
+  lunchStart: string | null;
+  lunchEnd: string | null;
+  /** Derivado do almoço; 0 sem almoço. */
   breakMinutes: number;
   /** Já sem a pausa. */
   expectedMinutes: number;
@@ -73,7 +77,8 @@ export interface WorkScheduleDayUpsert {
   weekday: Weekday;
   startTime: string;
   endTime: string;
-  breakMinutes: number;
+  lunchStart: string | null;
+  lunchEnd: string | null;
 }
 
 export interface WorkScheduleUpsert {
@@ -153,7 +158,8 @@ export interface TimeEntry {
   /** O dia em Lisboa — não o dia do `happenedAt` em UTC. */
   localDate: string;
   direction: TimeDirection;
-  source: "MANUAL";
+  /** `QR` = o próprio leu o QR da obra (desde a V49). */
+  source: "MANUAL" | "QR";
   registeredByName: string | null;
   note: string | null;
   deletedAt: string | null;
@@ -299,7 +305,10 @@ export interface DayAttendance {
   status: DayStatus;
   firstIn: string | null;
   lastOut: string | null;
+  /** Ímpar de picagens, ou almoço por picar. */
   incomplete: boolean;
+  /** Um par atravessa o almoço inteiro: a pausa do horário foi descontada até se acrescentarem as picagens. */
+  lunchNotClocked: boolean;
   needsAttention: boolean;
   holidayName: string | null;
   absenceType: AbsenceType | null;

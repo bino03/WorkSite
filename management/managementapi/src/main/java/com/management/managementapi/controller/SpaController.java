@@ -18,7 +18,7 @@ public class SpaController {
 
     @GetMapping({
         "/login", "/loading", "/forgot-password", "/reset-password", "/accept-invite",
-        "/backoffice", "/backoffice/**", "/team", "/team/**"
+        "/backoffice", "/backoffice/**", "/team", "/team/**", "/picar"
     })
     public String forwardToIndex() {
         return "forward:/index.html";

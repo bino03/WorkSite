@@ -20,6 +20,8 @@ public record DayAttendanceDTO(
         @JsonFormat(pattern = "HH:mm") LocalTime firstIn,
         @JsonFormat(pattern = "HH:mm") LocalTime lastOut,
         boolean incomplete,
+        /** Almoço por picar: a pausa do horário foi descontada até o admin acrescentar as picagens. */
+        boolean lunchNotClocked,
         /** True quando o dia é falta por justificar ou está mal preenchido. */
         boolean needsAttention,
         /** O nome do feriado, quando o dia é feriado. */
