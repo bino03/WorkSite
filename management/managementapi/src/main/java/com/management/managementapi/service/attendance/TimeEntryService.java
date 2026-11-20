@@ -133,6 +133,30 @@ public class TimeEntryService {
         return saved;
     }
 
+    /**
+     * A picagem feita pelo próprio, a ler o QR da obra (fase 5). As mesmas regras que
+     * a do admin — admissão e sequência — mas {@code registered_by} fica null, que é
+     * como o modelo diz "foi o próprio", e {@code source = QR}.
+     */
+    public TimeEntry registerByClock(Profile profile, Enterprise enterprise, TimeDirection direction,
+                                     OffsetDateTime happenedAt) {
+        validateNotBeforeHire(profile.getId(), happenedAt);
+        validateSequence(profile.getId(), happenedAt, direction, null);
+
+        TimeEntry entry = new TimeEntry();
+        entry.setProfile(profile);
+        entry.setEnterprise(enterprise);
+        entry.setHappenedAt(happenedAt);
+        entry.setDirection(direction);
+        entry.setSource(TimeEntrySource.QR);
+        entry.setRegisteredBy(null);
+
+        TimeEntry saved = repository.save(entry);
+        revisionRepository.save(TimeEntryRevision.before(
+                saved, TimeEntryChange.CREATE, profile.getId(), profile.getName(), "QR da obra"));
+        return saved;
+    }
+
     public TimeEntry correct(UUID id, TimeEntryUpsertDTO dto, UUID actorId, String actorName) {
         TimeEntry entry = getById(id);
 

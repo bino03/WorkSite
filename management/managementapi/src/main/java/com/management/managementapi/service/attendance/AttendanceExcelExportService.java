@@ -172,7 +172,7 @@ public class AttendanceExcelExportService {
                 duration(row, 6, styles, day.expectedMinutes());
                 duration(row, 7, styles, day.overtimeMinutes());
                 duration(row, 8, styles, day.latenessMinutes());
-                text(row, 9, day.incomplete() ? "Sim" : null);
+                text(row, 9, day.lunchNotClocked() ? "Almoço por picar" : day.incomplete() ? "Sim" : null);
                 text(row, 10, day.holidayName());
                 text(row, 11, absenceLabel(day.absenceType()));
                 text(row, 12, enterprisesOfDay(day));
@@ -348,6 +348,7 @@ public class AttendanceExcelExportService {
     private static String sourceLabel(TimeEntrySource source) {
         return switch (source) {
             case MANUAL -> "Manual";
+            case QR -> "QR da obra";
         };
     }
 

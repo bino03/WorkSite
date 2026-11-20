@@ -157,9 +157,15 @@ public class WorkScheduleService {
             if (!day.endTime().isAfter(day.startTime())) {
                 throw new BusinessException(ErrorCode.SCHEDULE_INVALID_HOURS);
             }
-            Duration span = Duration.between(day.startTime(), day.endTime());
-            if (day.breakMinutes() >= span.toMinutes()) {
-                throw new BusinessException(ErrorCode.SCHEDULE_BREAK_TOO_LONG);
+            // As duas ou nenhuma, e estritamente dentro do dia: almoço às 08:00 num dia
+            // que começa às 08:00 não deixava manhã nenhuma. Igual ao CHECK da V48.
+            boolean hasStart = day.lunchStart() != null;
+            boolean hasEnd = day.lunchEnd() != null;
+            if (hasStart != hasEnd || (hasStart
+                    && !(day.startTime().isBefore(day.lunchStart())
+                         && day.lunchStart().isBefore(day.lunchEnd())
+                         && day.lunchEnd().isBefore(day.endTime())))) {
+                throw new BusinessException(ErrorCode.SCHEDULE_INVALID_LUNCH);
             }
         }
     }
@@ -173,7 +179,7 @@ public class WorkScheduleService {
             day.setDayOfWeek(dto.weekday());
             day.setStartTime(dto.startTime());
             day.setEndTime(dto.endTime());
-            day.setBreakMinutes(dto.breakMinutes());
+            day.setLunch(dto.lunchStart(), dto.lunchEnd());
             schedule.getDays().add(day);
         }
     }

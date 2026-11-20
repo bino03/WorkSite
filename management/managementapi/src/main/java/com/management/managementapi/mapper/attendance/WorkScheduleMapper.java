@@ -34,6 +34,8 @@ public interface WorkScheduleMapper {
                 day.getDayOfWeek(),
                 day.getStartTime(),
                 day.getEndTime(),
+                day.getLunchStart(),
+                day.getLunchEnd(),
                 day.getBreakMinutes(),
                 day.expectedWork().toMinutes());
     }

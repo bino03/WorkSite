@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Button, Drawer, Input, InputNumber, Space, Switch, Typography } from "antd";
+import { Alert, Button, Drawer, Input, Space, Switch, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
@@ -10,7 +10,7 @@ import { WEEKDAYS, WEEKDAY_LABEL } from "@/types/attendance";
 import type { Weekday, WorkSchedule } from "@/types/attendance";
 import { formatMinutes } from "@/utils/formatters";
 import Label from "@/components/common/Label";
-import { WorkScheduleFormSchema, toMinutes } from "./workScheduleFormSchema";
+import { WorkScheduleFormSchema, expectedDayMinutes } from "./workScheduleFormSchema";
 import type { WorkScheduleForm } from "./workScheduleFormSchema";
 
 const { Text } = Typography;
@@ -32,15 +32,23 @@ function defaultsFor(schedule: WorkSchedule | null): WorkScheduleForm {
     days: WEEKDAYS.map((weekday) => {
       const day = schedule?.days.find((candidate) => candidate.weekday === weekday);
       if (day) {
-        return { weekday, enabled: true, startTime: day.startTime, endTime: day.endTime, breakMinutes: day.breakMinutes };
+        return {
+          weekday,
+          enabled: true,
+          startTime: day.startTime,
+          endTime: day.endTime,
+          lunchStart: day.lunchStart ?? "",
+          lunchEnd: day.lunchEnd ?? "",
+        };
       }
-      // Um horário novo começa como 08–17 c/ 1h, de segunda a sexta: é o caso comum.
+      // Um horário novo começa como 08–17 c/ almoço 12–13, de segunda a sexta: é o caso comum.
       return {
         weekday,
         enabled: !schedule && WORKING_WEEK.includes(weekday),
         startTime: "08:00",
         endTime: "17:00",
-        breakMinutes: 60,
+        lunchStart: "12:00",
+        lunchEnd: "13:00",
       };
     }),
   };
@@ -75,10 +83,7 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
   const days = watch("days");
   const weeklyMinutes = days
     .filter((day) => day.enabled)
-    .reduce((total, day) => {
-      const span = toMinutes(day.endTime) - toMinutes(day.startTime);
-      return span > 0 ? total + Math.max(0, span - day.breakMinutes) : total;
-    }, 0);
+    .reduce((total, day) => total + expectedDayMinutes(day), 0);
 
   /** Copia o horário de segunda para os outros dias ligados — poupa 4 vezes a mesma hora. */
   const copyMondayToEnabled = () => {
@@ -87,7 +92,8 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
       if (index === 0 || !day.enabled) return;
       setValue(`days.${index}.startTime`, monday.startTime, { shouldValidate: true });
       setValue(`days.${index}.endTime`, monday.endTime, { shouldValidate: true });
-      setValue(`days.${index}.breakMinutes`, monday.breakMinutes, { shouldValidate: true });
+      setValue(`days.${index}.lunchStart`, monday.lunchStart, { shouldValidate: true });
+      setValue(`days.${index}.lunchEnd`, monday.lunchEnd, { shouldValidate: true });
     });
   };
 
@@ -101,7 +107,8 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
           weekday: day.weekday as Weekday,
           startTime: day.startTime,
           endTime: day.endTime,
-          breakMinutes: day.breakMinutes,
+          lunchStart: day.lunchStart || null,
+          lunchEnd: day.lunchEnd || null,
         })),
     };
     try {
@@ -158,7 +165,7 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
           <Controller
             name="name"
             control={control}
-            render={({ field }) => <Input {...field} placeholder="ex.: 08–17 c/ 1h de almoço" maxLength={120} />}
+            render={({ field }) => <Input {...field} placeholder="ex.: 08–17 c/ almoço 12–13" maxLength={120} />}
           />
           {fieldError(errors.name?.message)}
         </div>
@@ -182,6 +189,17 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div
+              className="ind-card-meta"
+              style={{ display: "grid", gridTemplateColumns: "44px 60px 1fr 1fr 1fr 1fr", gap: 8 }}
+            >
+              <span />
+              <span />
+              <span>Entrada</span>
+              <span>Almoço</span>
+              <span>Regresso</span>
+              <span>Saída</span>
+            </div>
             {WEEKDAYS.map((weekday, index) => {
               const enabled = days[index]?.enabled;
               const dayErrors = errors.days?.[index];
@@ -190,7 +208,7 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "44px 80px 1fr 1fr 110px",
+                      gridTemplateColumns: "44px 60px 1fr 1fr 1fr 1fr",
                       gap: 8,
                       alignItems: "center",
                       opacity: enabled ? 1 : 0.55,
@@ -216,6 +234,21 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
                         <Input {...field} type="time" disabled={!enabled} aria-label={`Entrada à ${WEEKDAY_LABEL[weekday]}`} />
                       )}
                     />
+                    {/* Almoço vazio = dia de um só período (p.ex. sábado de manhã). */}
+                    <Controller
+                      name={`days.${index}.lunchStart`}
+                      control={control}
+                      render={({ field }) => (
+                        <Input {...field} type="time" disabled={!enabled} aria-label={`Início do almoço à ${WEEKDAY_LABEL[weekday]}`} />
+                      )}
+                    />
+                    <Controller
+                      name={`days.${index}.lunchEnd`}
+                      control={control}
+                      render={({ field }) => (
+                        <Input {...field} type="time" disabled={!enabled} aria-label={`Fim do almoço à ${WEEKDAY_LABEL[weekday]}`} />
+                      )}
+                    />
                     <Controller
                       name={`days.${index}.endTime`}
                       control={control}
@@ -223,27 +256,10 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
                         <Input {...field} type="time" disabled={!enabled} aria-label={`Saída à ${WEEKDAY_LABEL[weekday]}`} />
                       )}
                     />
-                    <Controller
-                      name={`days.${index}.breakMinutes`}
-                      control={control}
-                      render={({ field }) => (
-                        <InputNumber
-                          value={field.value}
-                          onChange={(value) => field.onChange(value ?? 0)}
-                          min={0}
-                          max={600}
-                          step={15}
-                          disabled={!enabled}
-                          addonAfter="min"
-                          aria-label={`Pausa à ${WEEKDAY_LABEL[weekday]}`}
-                          style={{ width: "100%" }}
-                        />
-                      )}
-                    />
                   </div>
                   {enabled &&
                     fieldError(
-                      dayErrors?.startTime?.message ?? dayErrors?.endTime?.message ?? dayErrors?.breakMinutes?.message
+                      dayErrors?.startTime?.message ?? dayErrors?.endTime?.message ?? dayErrors?.lunchStart?.message
                     )}
                 </div>
               );
@@ -251,7 +267,7 @@ export function WorkScheduleUpsertDrawer({ open, schedule, onClose, onSaved }: P
           </div>
           {fieldError(errors.days?.root?.message ?? errors.days?.message)}
           <p className="ind-card-meta" style={{ marginTop: 10 }}>
-            Total semanal, já sem as pausas: <strong>{formatMinutes(weeklyMinutes)}</strong>
+            Total semanal, já sem os almoços: <strong>{formatMinutes(weeklyMinutes)}</strong>
           </p>
         </div>
       </div>

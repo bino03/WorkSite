@@ -14,14 +14,15 @@ import com.management.managementapi.model.enums.AbsenceType;
  * <p>Um total gravado mentiria na primeira correção, e as correções são uma
  * funcionalidade escolhida de propósito. Ver notes/roadmap/assiduidade.md.
  *
- * @param workedMinutes   minutos efetivamente trabalhados, já sem a pausa do horário
+ * @param workedMinutes   a soma dos pares; a pausa do horário só se desconta se o almoço não foi picado
  * @param expectedMinutes minutos que o horário previa; 0 se não era dia de trabalho
  * @param overtimeMinutes o que passou do previsto; 0 se não passou
- * @param latenessMinutes atraso da primeira entrada face à hora prevista; 0 se não houve
+ * @param latenessMinutes atraso da primeira entrada mais o do regresso do almoço; 0 se não houve
  * @param status          como é que o dia se classifica
  * @param firstIn         primeira entrada local do dia, ou null se não houve nenhuma
  * @param lastOut         última saída local do dia, ou null
- * @param incomplete      número ímpar de picagens — falta uma saída (ou uma entrada)
+ * @param incomplete      número ímpar de picagens, ou almoço por picar — o dia tem de ser fechado
+ * @param lunchNotClocked um par atravessa a janela de almoço inteira: a pausa do horário foi descontada
  * @param holidayName     o nome do feriado, quando é feriado; null nos outros dias
  * @param absenceType     o tipo da ausência aprovada que cobre o dia, ou null
  * @param enterprises     os minutos trabalhados repartidos por obra; somam {@code workedMinutes}
@@ -36,6 +37,7 @@ public record DayAttendance(
         LocalTime firstIn,
         LocalTime lastOut,
         boolean incomplete,
+        boolean lunchNotClocked,
         String holidayName,
         AbsenceType absenceType,
         List<WorkedAtEnterprise> enterprises

@@ -15,7 +15,8 @@ import jakarta.persistence.Table;
 
 /**
  * um dia da semana de um {@link WorkSchedule}: a que horas começa, a que horas acaba,
- * e quantos minutos de pausa se descontam. A pausa vive aqui porque ninguém a pica.
+ * e quando é o almoço. Desde a V48 o almoço pica-se — o horário diz quando devia ser,
+ * para medir o regresso e reconhecer um almoço esquecido.
  *
  * <p>As horas são locais ({@code time} na base de dados, sem fuso): a entrada é às 08:00
  * em janeiro e em julho, mesmo que o instante UTC não seja o mesmo. O fuso aplica-se no
@@ -39,8 +40,19 @@ public class WorkScheduleDay extends BaseEntity {
     @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
 
+    /**
+     * Derivado de {@link #lunchStart}/{@link #lunchEnd} desde a V48 — só existe para o
+     * código anterior (a app online até ao deploy) continuar a ler a pausa. Não tem setter.
+     */
     @Column(name = "break_minutes", nullable = false)
     private int breakMinutes;
+
+    /** Início do almoço, ou null se o dia é de um só período. Desde a V48 o almoço pica-se. */
+    @Column(name = "lunch_start")
+    private LocalTime lunchStart;
+
+    @Column(name = "lunch_end")
+    private LocalTime lunchEnd;
 
     public WorkSchedule getSchedule() { return schedule; }
     public void setSchedule(WorkSchedule schedule) { this.schedule = schedule; }
@@ -58,7 +70,20 @@ public class WorkScheduleDay extends BaseEntity {
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
 
     public int getBreakMinutes() { return breakMinutes; }
-    public void setBreakMinutes(int breakMinutes) { this.breakMinutes = breakMinutes; }
+
+    public LocalTime getLunchStart() { return lunchStart; }
+    public LocalTime getLunchEnd() { return lunchEnd; }
+
+    /** As duas ou nenhuma; a pausa acompanha-as. */
+    public void setLunch(LocalTime lunchStart, LocalTime lunchEnd) {
+        this.lunchStart = lunchStart;
+        this.lunchEnd = lunchEnd;
+        this.breakMinutes = hasLunch() ? (int) Duration.between(lunchStart, lunchEnd).toMinutes() : 0;
+    }
+
+    public boolean hasLunch() {
+        return lunchStart != null && lunchEnd != null;
+    }
 
     /** Horas de trabalho previstas neste dia, já sem a pausa. */
     public Duration expectedWork() {

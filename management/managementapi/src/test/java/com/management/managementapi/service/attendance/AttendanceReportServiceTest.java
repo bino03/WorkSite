@@ -53,7 +53,7 @@ class AttendanceReportServiceTest {
             total += obra.workedMinutes();
         }
         return new DayAttendanceDTO(LocalDate.of(2026, 7, diaDoMes), total, 480, 0, 0,
-                DayStatus.WORKED, null, null, false, false, null, null, List.of(obras));
+                DayStatus.WORKED, null, null, false, false, false, null, null, List.of(obras));
     }
 
     private static AttendanceSummaryDTO resumo(UUID profileId, String nome, DayAttendanceDTO... dias) {

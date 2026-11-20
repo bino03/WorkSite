@@ -110,7 +110,7 @@ class AttendanceSummaryServiceTest {
             day.setDayOfWeek(weekday);
             day.setStartTime(LocalTime.parse(start));
             day.setEndTime(LocalTime.parse(end));
-            day.setBreakMinutes(60);
+            day.setLunch(LocalTime.NOON, LocalTime.of(13, 0));
             days.add(day);
         }
         schedule.setDays(days);

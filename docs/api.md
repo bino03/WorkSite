@@ -1304,16 +1304,19 @@ acumula: "deixar de trabalhar à sexta" é apagar o dia, não editá-lo. `weekda
 
 ```json
 {
-  "name": "08–17 c/ 1h almoço",
+  "name": "08–17 c/ almoço 12–13",
   "notes": null,
   "days": [
-    { "weekday": "MONDAY", "startTime": "08:00", "endTime": "17:00", "breakMinutes": 60 }
+    { "weekday": "MONDAY", "startTime": "08:00", "lunchStart": "12:00", "lunchEnd": "13:00", "endTime": "17:00" }
   ]
 }
 ```
 
-A resposta acrescenta `expectedMinutes` por dia e `weeklyMinutes` no horário, ambos já com a pausa
-descontada — são derivados, não colunas.
+`lunchStart`/`lunchEnd` (desde a `V48`, 2026-11-20): as duas ou nenhuma — sem almoço é um dia de um só
+período (sábado de manhã). Substituíram o `breakMinutes` no pedido: o almoço pica-se, e o horário diz
+**quando** devia ser. A resposta acrescenta `breakMinutes` (derivado do almoço; a coluna fica na BD só
+para o código anterior à `V48`), `expectedMinutes` por dia e `weeklyMinutes` no horário, já sem o
+almoço — são derivados.
 
 ### Códigos de erro
 
@@ -1323,7 +1326,8 @@ descontada — são derivados, não colunas.
 | `SCHED_002` | Já existe um horário com este nome entre os vivos |
 | `SCHED_004` | O mesmo dia da semana aparece duas vezes |
 | `SCHED_005` | Hora de saída não é depois da entrada — **um dia de trabalho não atravessa a meia-noite** |
-| `SCHED_006` | A pausa é igual ou maior que o período de trabalho do dia |
+| `SCHED_006` | Já não é lançado desde a `V48` (era "pausa maior que o dia"); fica reservado |
+| `SCHED_009` | Almoço só com início ou só com fim, ou fora do dia (`start < lunchStart < lunchEnd < end`) |
 | `SCHED_008` | Restaurar um horário que não está apagado |
 
 `SCHED_003` não existe: "horário sem dias" é apanhado pelo `@NotEmpty` do DTO e volta como erro de
@@ -1389,6 +1393,47 @@ Não existe endpoint de apagar a sério. A resposta traz `localDate` — o dia a
 A sequência é avaliada **dentro do dia local**: um dia de trabalho não atravessa a meia-noite (decisão
 de 2026-10-06), por isso cada dia começa a zero e um dia mal preenchido não contamina o seguinte.
 
+## Picar pelo QR da obra (`ClockController`, `/attendance/clock`)
+
+A fase 5 da assiduidade (`V49`, 2026-11-20): o funcionário lê com a câmara do telemóvel o QR colado
+na obra, entra com a **sua** conta (`EMPLOYEE`) e confirma com um toque. O QR leva
+`<APP_FRONTEND_URL>/picar?c=<código>`, onde o código é **opaco** (32 caracteres aleatórios,
+`attendance.enterprise_clock_code`) e não o id da obra, para que um QR partilhado se possa invalidar.
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/attendance/clock/preview?code=` | `ADMIN`, `EMPLOYEE` — `{ enterpriseId, enterpriseName, nextDirection, today[] }` |
+| POST | `/attendance/clock` | `ADMIN`, `EMPLOYEE` — `{ code, direction }` → `201` com a picagem (`source = QR`, `registeredByName` null = o próprio) |
+| GET | `/attendance/clock/me/today` | `ADMIN`, `EMPLOYEE` — as minhas picagens de hoje |
+| GET | `/attendance/clock/codes/{enterpriseId}` | `ADMIN` — `{ enterpriseId, enterpriseName, url, generatedAt }`, ou **`204`** se a obra ainda não tem QR. **Ler não cria**. `generatedAt` é a data do QR atual, que muda a cada "Gerar novo QR" (`V50`) |
+| GET | `/attendance/clock/codes/{enterpriseId}/qr.png` | `ADMIN` — PNG 800×800, correção H, `Cache-Control: no-store`; `ATT_025` se não há QR |
+| POST | `/attendance/clock/codes/{enterpriseId}` | `ADMIN` — **cria** o QR da obra ou **substitui** o atual (o antigo deixa de picar logo) |
+
+- **Sempre sobre o próprio**: o perfil vem da sessão, nenhuma rota recebe um id de perfil. Não há
+  IDOR possível.
+- **A direção não se escolhe**: é o contrário da última picagem de hoje (o dia começa por `IN`). O
+  cliente envia a que mostrou ("Picar ENTRADA"), e o backend volta a conferi-la: se já não bater
+  (duplo toque, página antiga) → `ATT_023`, e nada é gravado.
+- **O instante é o do servidor**, truncado ao segundo, e nunca o do telemóvel.
+- As regras do registo pelo admin aplicam-se igual: admissão (`ATT_014`) e sequência (`ATT_011`).
+  A revisão `CREATE` fica com o próprio como autor e razão "QR da obra".
+- **`url` depende de `APP_FRONTEND_URL`**: um QR gerado pelo backend local aponta para
+  `localhost`, e o modal avisa. Os QR imprimem-se a partir da app online.
+
+| Código | Quando |
+|---|---|
+| `ATT_020` | Código desconhecido, ou substituído por um "Gerar novo QR" |
+| `ATT_021` | Obra `archived` ou `deleted` |
+| `ATT_022` | Sem ficha de emprego, ou com `ended_at` antes de hoje / `hired_at` depois de hoje. **Ao contrário** do registo pelo admin, aqui a ficha é obrigatória |
+| `ATT_023` | A direção enviada já não é a próxima |
+| `ATT_024` | Menos de 1 minuto desde a última picagem (`ClockService.MIN_GAP`) |
+| `ATT_025` | Pedir o PNG de uma obra que ainda não tem QR |
+
+No Backoffice: a página **`/picar`** (fora do `AppLayout`, feita para telemóvel) — está no `SpaController` e no `SecurityConfig.SPA_PATHS`, sem o que dava 404 online e, para o admin, o
+passo **"QR de picagem"** no drawer da obra (último passo, só `ADMIN`): "Criar QR" numa obra sem QR; com QR, imprimir, copiar link e "Gerar novo QR". Fora da lista de obras de propósito — define-se uma vez e raramente se mexe (decisão do utilizador, 2026-11-20).
+A página recupera a sessão pelos cookies quando o separador vem sem `sessionStorage`; sem sessão,
+guarda `after_login` e vai ao login, que volta à picagem.
+
 ## Resumos de assiduidade (`AttendanceSummaryController`, `/attendance/summary`)
 
 Horas, extras, atrasos e faltas. **Só leitura, porque nada disto está guardado**: é tudo derivado das
@@ -1403,7 +1448,7 @@ correção a uma picagem, e corrigir picagens é uma funcionalidade.
 | GET | `/attendance/summary/range?profileId=&from=&to=` | `ADMIN` |
 
 Cada dia traz `workedMinutes`, `expectedMinutes`, `overtimeMinutes`, `latenessMinutes`, `firstIn`,
-`lastOut`, `incomplete`, `needsAttention`, `enterprises` (os minutos do dia por obra, com a pausa já
+`lastOut`, `incomplete`, `lunchNotClocked`, `needsAttention`, `enterprises` (os minutos do dia por obra, com a pausa já
 repartida — somam `workedMinutes`; ver "Relatórios de assiduidade") e um `status`:
 
 | `status` | Significado |
@@ -1415,11 +1460,18 @@ repartida — somam `workedMinutes`; ver "Relatórios de assiduidade") e um `sta
 | `NO_SCHEDULE` | Não há horário atribuído a cobrir o dia (antes da admissão, ou sem ficha de emprego). Nem falta nem previsão |
 
 Como os números saem:
-- **horas trabalhadas** = soma dos pares entrada→saída, menos a pausa que o *horário* declara (ninguém
-  pica o almoço). A pausa não se desconta a quem não trabalhou, para o total nunca ser negativo.
-- **atraso** = primeira entrada depois da `start_time` do horário. Chegar adiantado dá 0, não negativo.
+- **horas trabalhadas** = soma dos pares entrada→saída. **Desde 2026-11-20 o almoço pica-se** (entrada e
+  saída de manhã e de tarde, e a obra pode mudar entre as duas), por isso o intervalo já não conta e não
+  há desconto. Só quando o almoço **não foi picado** — um par cobre a janela `lunchStart`–`lunchEnd`
+  inteira — se desconta a pausa do horário, e o dia sai `lunchNotClocked` + `incomplete` para o admin
+  acrescentar as duas picagens; feito isso, conta o que foi picado. Um almoço picado mais curto ou mais
+  tarde conta como foi picado.
+- **atraso** = primeira entrada depois da `start_time` do horário, **mais** o regresso do almoço: a
+  primeira entrada depois de `lunchStart` (que não seja a primeira do dia) depois de `lunchEnd`. Uma
+  troca de obra a meio da manhã não conta. Chegar adiantado dá 0, não negativo.
 - **extra** = o que passa das horas previstas. Trabalhar num dia não previsto conta tudo como extra.
-- **`incomplete`** = número ímpar de picagens (alguém esqueceu-se de picar a saída). O par fechado
+- **`incomplete`** = número ímpar de picagens (alguém esqueceu-se de picar a saída), **ou** almoço por
+  picar (`lunchNotClocked`). No `.xlsx`, a coluna "Incompleto" diz "Almoço por picar" neste caso. O par fechado
   continua a contar; a picagem sem par é ignorada em vez de o dia ser descartado.
 - **`scheduleChanges`** no resumo = quantas mudanças de horário o período atravessou. Mais de zero quer
   dizer que os totais somam dias calculados com horários diferentes — e isso diz-se, não se esconde.
@@ -1442,8 +1494,8 @@ vistas batem sempre certo.
   vínculo em **algum** dia do mês — quem entrou ou saiu a meio também fecha o mês.
 - **`enterprises`** = por obra: `workedMinutes` e, por pessoa, minutos e dias lá trabalhados. Ordenadas
   por nome; `enterpriseId`/`enterpriseName` null é **"sem obra"** (picagens sem obra) e vem no fim.
-- **A obra de um par entrada→saída é a da entrada.** A pausa do horário desconta-se ao dia, não a um
-  par, por isso **reparte-se pelas obras do dia na proporção do tempo em cada uma** (decisão de
+- **A obra de um par entrada→saída é a da entrada.** Com o almoço picado não há pausa a repartir. Quando
+  há (almoço por picar), desconta-se ao dia, não a um par, por isso **reparte-se pelas obras do dia na proporção do tempo em cada uma** (decisão de
   2026-10-07); o resto da divisão inteira vai para a obra com mais tempo. A soma por obra = o total
   do funcionário, sempre.
 

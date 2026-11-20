@@ -126,7 +126,9 @@ export default function TeamTodayPage() {
             profileId: employee.profileId,
             profileName: name,
             day: day.date,
-            what: `Dia incompleto — entrada ${day.firstIn ?? "?"}, sem saída`,
+            what: day.lunchNotClocked
+              ? `Almoço por picar — ${day.firstIn ?? "?"}–${day.lastOut ?? "?"}, a pausa do horário foi descontada`
+              : `Dia incompleto — entrada ${day.firstIn ?? "?"}, sem saída`,
             action: "correct",
           });
         } else if (day.status === "NO_SCHEDULE" && day.date === today) {
@@ -203,7 +205,7 @@ export default function TeamTodayPage() {
           >
             <Stat value={working} label="A trabalhar agora" hint="com entrada picada e sem saída" />
             <Stat value={missing} label="Faltas por justificar" hint="este mês" />
-            <Stat value={incomplete} label="Dias incompletos" hint="falta uma saída" />
+            <Stat value={incomplete} label="Dias incompletos" hint="falta uma saída ou o almoço" />
             <Stat value={pending.length} label="Pedidos de férias" hint="à espera de aprovação" />
           </div>
 

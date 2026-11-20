@@ -53,7 +53,11 @@ class WorkScheduleServiceTest {
     }
 
     private static WorkScheduleDayDTO day(DayOfWeek weekday, String start, String end, int breakMinutes) {
-        return new WorkScheduleDayDTO(weekday, LocalTime.parse(start), LocalTime.parse(end), breakMinutes);
+        // Uma pausa > 0 vira almoço a partir do meio-dia: é como o horário se diz desde a V48.
+        return breakMinutes == 0
+                ? new WorkScheduleDayDTO(weekday, LocalTime.parse(start), LocalTime.parse(end), null, null)
+                : new WorkScheduleDayDTO(weekday, LocalTime.parse(start), LocalTime.parse(end),
+                        LocalTime.NOON, LocalTime.NOON.plusMinutes(breakMinutes));
     }
 
     private static WorkScheduleUpsertDTO dto(WorkScheduleDayDTO... days) {
@@ -123,12 +127,12 @@ class WorkScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("uma pausa que engole o dia todo é recusada")
+    @DisplayName("um almoço que não cabe dentro do dia é recusado")
     void recusaPausaMaiorQueODia() {
         assertThatThrownBy(() -> service().create(dto(day(DayOfWeek.MONDAY, "08:00", "12:00", 240)), null))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.SCHEDULE_BREAK_TOO_LONG);
+                .isEqualTo(ErrorCode.SCHEDULE_INVALID_LUNCH);
 
         verify(repository, never()).save(any());
     }

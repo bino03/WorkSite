@@ -81,7 +81,7 @@ class AttendanceExcelExportServiceTest {
         Enterprise aleu = obra(UUID.randomUUID(), "Vila Aleu");
 
         DayAttendanceDTO dia = new DayAttendanceDTO(LocalDate.of(2026, 7, 15), 480, 480, 0, 0,
-                DayStatus.WORKED, null, null, false, false, null, null,
+                DayStatus.WORKED, null, null, false, false, false, null, null,
                 List.of(new WorkedAtEnterprise(petrus.getId(), "Vila Petrus", 480)));
         AttendanceSummaryDTO resumo = new AttendanceSummaryDTO(ana, "Ana", JULHO.atDay(1), JULHO.atEndOfMonth(),
                 480, 480, 0, 0, 1, 0, 0, 0, 0, 0, List.of(dia));
