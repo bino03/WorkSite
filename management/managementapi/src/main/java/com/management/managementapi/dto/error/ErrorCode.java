@@ -486,12 +486,13 @@ public enum ErrorCode {
     TIME_ENTRY_DUPLICATE_INSTANT("ATT_012", "Já existe uma picagem deste funcionário neste instante"),
     TIME_ENTRY_NOT_DELETED("ATT_013", "Esta picagem não está apagada"),
     TIME_ENTRY_BEFORE_HIRE("ATT_014", "Não se pode registar uma picagem antes da data de admissão do funcionário"),
-    CLOCK_CODE_INVALID("ATT_020", "Este QR não é válido — pode ter sido substituído. Peça o QR atual ao encarregado"),
+    CLOCK_CODE_INVALID("ATT_020", "Este QR não é reconhecido. Peça o QR da obra ao encarregado"),
     CLOCK_ENTERPRISE_CLOSED("ATT_021", "Esta obra já não aceita picagens"),
     CLOCK_NOT_EMPLOYED("ATT_022", "Não tem ficha de emprego ativa — fale com o escritório"),
     CLOCK_STALE_DIRECTION("ATT_023", "Esta picagem já tinha sido feita — a página estava desatualizada"),
     CLOCK_TOO_SOON("ATT_024", "Acabou de picar há menos de um minuto"),
     CLOCK_CODE_NOT_CREATED("ATT_025", "Esta obra ainda não tem QR de picagem"),
+    CLOCK_CODE_RETIRED("ATT_026", "Este QR foi substituído — use o que está afixado na obra"),
 
     // ========================================================================
     // ASSIDUIDADE — feriados e ausências (ABS_xxx)

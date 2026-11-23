@@ -1371,6 +1371,7 @@ endpoint do QR que o define.
 |---|---|---|
 | GET | `/attendance/time-entries?profileId=` | `ADMIN` (paginado) |
 | GET | `/attendance/time-entries/day?profileId=&day=` | `ADMIN` — o dia local, 00:00 a 00:00 em `Europe/Lisbon` |
+| GET | `/attendance/time-entries/team-day?day=` | `ADMIN`: `[{ profileId, profileName, scheduledStart, entries[] }]`, uma linha por pessoa com ficha nesse dia (`TeamDayService`, duas consultas para a equipa toda). `scheduledStart` é a hora de entrada que o horário prevê (null = folga ou sem horário). Serve o cartão "Quem está" do painel Hoje: a obra de quem está a trabalhar é a da **última entrada**, que o relatório do mês não tem (só guarda pares fechados) |
 | GET | `/attendance/time-entries/deleted?profileId=` | `ADMIN` — zona de recuperação |
 | GET | `/attendance/time-entries/{id}` | `ADMIN` |
 | GET | `/attendance/time-entries/{id}/revisions` | `ADMIN` — **o rasto de auditoria** |
@@ -1395,19 +1396,25 @@ Não existe endpoint de apagar a sério. A resposta traz `localDate` — o dia a
 A sequência é avaliada **dentro do dia local**: um dia de trabalho não atravessa a meia-noite (decisão
 de 2026-10-06), por isso cada dia começa a zero e um dia mal preenchido não contamina o seguinte.
 
-## As minhas férias (`MyAttendanceController`, `/attendance/me`)
+## As minhas férias e horas (`MyAttendanceController`, `/attendance/me`)
 
-Fase 5b (2026-11-20): o funcionário vê as **suas** férias, só em leitura. `ADMIN` ou `EMPLOYEE` (na
-classe); o perfil vem sempre da sessão. Página `/backoffice/ferias` ("As minhas férias"), com o saldo,
-um calendário do mês (feriados + ausências) e a lista do ano.
+Fase 5b (2026-11-20 e 2026-11-23): o funcionário vê as **suas** férias e horas, e **pede férias**.
+`ADMIN` ou `EMPLOYEE` (na classe); o perfil vem sempre da sessão, nenhuma rota recebe um id de
+perfil. Página `/backoffice/ferias` ("Férias e horas"): separador Férias (saldo, calendário do mês,
+lista do ano, "Pedir férias", "Anular" num pedido pendente) e separador Horas (o mês dia a dia).
 
 | Método | Rota | O quê |
 |---|---|---|
 | GET | `/attendance/me/absences?from=&to=` | As minhas ausências no intervalo (resumo, sem documentos); `ABS_011` se `to < from` ou mais de 400 dias |
 | GET | `/attendance/me/vacation-balance?year=` | O meu saldo de férias (o mesmo `VacationBalanceDTO` do admin) |
 | GET | `/attendance/me/holidays?from=&to=` | Os feriados do intervalo, nacionais e municipais |
+| GET | `/attendance/me/summary/month?month=aaaa-mm` | As minhas horas do mês: o mesmo `AttendanceSummaryDTO` de `/attendance/summary/month` |
+| GET | `/attendance/me/vacation-requests/preview?startsOn=&endsOn=&halfDay=` | `{ year, days, available }`: os dias úteis que o pedido gastaria no ano em que começa, e o disponível antes dele. É o **aviso** de saldo do formulário. Um pedido acima do saldo **não é recusado** (o `ABS_017` continua reservado) |
+| POST | `/attendance/me/vacation-requests` | `{ startsOn, endsOn, halfDay, note }` → `201` com a ausência: sempre `VACATION`, sempre `PENDING`, `requestedBy` = o próprio. Mesmas regras do registo pelo admin (`ABS_011`/`012`/`013`/`016`). Avisa os `ADMIN` (`absence_requested`) |
+| DELETE | `/attendance/me/vacation-requests/{id}` | Anula (soft delete) um pedido **meu** ainda `PENDING` → `204`. De outra pessoa → `ABS_010` (não 403, para não confirmar que existe); já decidido → `ABS_014` |
 
-Marcar e aprovar férias continua a ser do admin (`/attendance/absences`).
+Outras ausências (baixa, faltas) e aprovar continuam a ser do admin (`/attendance/absences`). Aprovar ou
+recusar avisa o funcionário (`absence_decided`), a não ser que tenha sido ele a decidir.
 
 ## Picar pelo QR da obra (`ClockController`, `/attendance/clock`)
 
@@ -1438,7 +1445,8 @@ na obra, entra com a **sua** conta (`EMPLOYEE`) e confirma com um toque. O QR le
 
 | Código | Quando |
 |---|---|
-| `ATT_020` | Código desconhecido, ou substituído por um "Gerar novo QR" |
+| `ATT_020` | Código desconhecido (nunca foi de nenhuma obra, ou substituído antes da `V52`) |
+| `ATT_026` | Código **substituído** por um "Gerar novo QR" (`attendance.retired_clock_code`, `V52`). No `preview` regista a tentativa e avisa os `ADMIN` (`clock_retired_qr`); no `POST` só recusa. Vem **antes** do `ATT_022`: avisa mesmo sem ficha de emprego |
 | `ATT_021` | Obra `archived` ou `deleted` |
 | `ATT_022` | Sem ficha de emprego, ou com `ended_at` antes de hoje / `hired_at` depois de hoje. **Ao contrário** do registo pelo admin, aqui a ficha é obrigatória |
 | `ATT_023` | A direção enviada já não é a próxima |
@@ -1625,6 +1633,9 @@ confirmaria a existência a quem não devia sequer saber disso.
 | `task_assigned` | `POST /tasks` e `PUT /tasks/{id}` | Os atribuídos, **menos** os que já estavam atribuídos antes e **menos** quem fez a atribuição |
 | `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` e `ACCOUNTANT` desbloqueados** (`ProfileRole.WORKS_MANAGERS`), uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
 | `invoice_approved` | `PATCH /construction-invoices/{id}/payment-approval` com `approved=true`, **só na passagem** de por aprovar a aprovada (reaprovar não avisa). Faturas de obras `is_test` não avisam | **Todos os `ACCOUNTANT` desbloqueados, menos quem aprovou** (não os `ADMIN`: é a contabilidade que paga). Texto: fornecedor · número · obra (ou "Empresa"). Link: `/backoffice/invoices/outstanding?approved=true`, que abre "A pagar" já filtrado nas aprovadas |
+| `absence_requested` | `POST /attendance/me/vacation-requests` (o funcionário pede férias) | **Todos os `ADMIN` desbloqueados**, menos o próprio. Texto: "<funcionário> pediu férias de <dd/mm/aaaa> a <dd/mm/aaaa>." (ou "a <dia> (manhã)"). Link: `/team/absences` |
+| `absence_decided` | `POST /attendance/absences/{id}/approve` e `/reject` (qualquer ausência, não só as pedidas pelo próprio) | **O funcionário da ausência**, a não ser que tenha sido ele a decidir. Texto: "O seu pedido de férias/ausência … foi aprovado/recusado." Link: `/backoffice/ferias` |
+| `clock_retired_qr` | `GET /attendance/clock/preview` com um código já substituído (`ATT_026`) — **uma vez por funcionário, código e dia** (dedupe pela unique de `attendance.retired_clock_code_attempt`). Um código inventado (`ATT_020`) não avisa | **Todos os `ADMIN` desbloqueados**. Texto: "<funcionário> tentou picar na obra <X> com um QR antigo (substituído a <data>)". Link: `/team/time-entries?profile=<id>&day=<aaaa-mm-dd>`, que abre o dia desse funcionário para picar à mão. **Exceção à regra da mesma transação**: grava-se em `REQUIRES_NEW` (`RetiredClockCodeAlertService`), porque o que a origina é um erro que desfaz a transação do pedido |
 
 > O `budget_item_deadline` corre também no arranque porque a app não está ligada 24h por dia —
 > um cron às 7h numa app que só arranca às 9h nunca dispararia. O link é a página do orçamento da

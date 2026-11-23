@@ -115,7 +115,7 @@ export default function AppLayout() {
         )}
         {isEmployee() && (
           <NavLink to={`${base}/ferias`} style={navLinkStyle(ACCENT)}>
-            <CalendarOutlined />As minhas férias
+            <CalendarOutlined />Férias e horas
           </NavLink>
         )}
         <NavLink to={`${base}/tasks`} style={navLinkStyle(ACCENT)}>

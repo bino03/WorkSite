@@ -5,11 +5,13 @@ import { useTranslation } from "react-i18next";
 import { Badge, Dropdown, Empty, Spin } from "antd";
 import {
   BellOutlined,
+  CalendarOutlined,
   CheckCircleOutlined,
   CheckSquareOutlined,
   ClockCircleOutlined,
   EuroCircleOutlined,
   FileTextOutlined,
+  QrcodeOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -29,6 +31,8 @@ const iconFor = (type: string) => {
   if (type === "budget_item_deadline") return <ClockCircleOutlined />;
   if (type === "invoice_due") return <EuroCircleOutlined />;
   if (type === "invoice_approved") return <CheckCircleOutlined />;
+  if (type === "clock_retired_qr") return <QrcodeOutlined />;
+  if (type === "absence_requested" || type === "absence_decided") return <CalendarOutlined />;
   return <BellOutlined />;
 };
 

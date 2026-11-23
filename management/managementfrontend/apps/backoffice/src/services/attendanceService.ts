@@ -15,6 +15,7 @@ import type {
   EmploymentTermCreate,
   Holiday,
   HolidayUpsert,
+  TeamDayPerson,
   TimeEntry,
   TimeEntryRevision,
   TimeEntryUpsert,
@@ -131,6 +132,12 @@ export async function listTimeEntries(
 
 export async function listTimeEntriesForDay(profileId: string, day: string): Promise<TimeEntry[]> {
   const response = await api.get(`/attendance/time-entries/day`, { params: { profileId, day } });
+  return response.data;
+}
+
+/** O dia da equipa toda (painel Hoje): quem tem ficha, a hora de entrada prevista e as picagens. */
+export async function listTeamDay(day: string): Promise<TeamDayPerson[]> {
+  const response = await api.get(`/attendance/time-entries/team-day`, { params: { day } });
   return response.data;
 }
 
