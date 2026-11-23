@@ -49,11 +49,11 @@ const EditFinancialCard: FC<Props> = ({ data, onSave, onCancel }) => {
   const onSubmit = async (values: FinanceFormValues) => {
     try {
       const response = await updateEnterpriseFinance(data.id, {
-        totalInvestment: values.total_investment ?? null,
+        totalInvestment: data.budgetTotal != null ? undefined : (values.total_investment ?? null),
         currentValue: values.current_value ?? null,
         currency: values.currency,
       });
-      onSave({ ...data, ...response });
+      onSave({ ...data, ...response, ...(data.budgetTotal != null ? { totalInvestment: data.totalInvestment } : {}) });
       notificationService.success(t('enterpriseEdit.financialUpdated'));
     } catch (error) {
       ErrorHandler.handle(error);
@@ -63,7 +63,7 @@ const EditFinancialCard: FC<Props> = ({ data, onSave, onCancel }) => {
   return (
     <FormProvider {...methods}>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <FinancialSection />
+        <FinancialSection investmentFromBudget={data.budgetTotal != null} />
 
         <Space style={{ display: "flex", justifyContent: "flex-end", marginTop: "13.6px" }}>
           <Button onClick={onCancel} disabled={isSubmitting}>

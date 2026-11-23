@@ -169,6 +169,8 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 > divergia do orçamento importado; fica só no cartão Financeiro da edição. `null` numa obra sem
 > rubricas.
 >
+> Desde 2026-11-23, `GET /enterprises/{id}` (`EnterpriseFullResponseDTO`) traz também `budgetTotal` (a mesma soma, `null` sem orçamento) e, **com orçamento, `totalInvestment` vem já igual a ele**. Sem folha de orçamento o investimento escreve-se à mão (`PATCH /enterprise-relations/{id}/finance`); com folha, esse PATCH **ignora** o `totalInvestment` e o campo fica só de leitura no cartão Financeiro.
+>
 > Desde 2026-09-24, o mesmo DTO traz também `lots` (`BudgetLotOptionDTO[]`, só `id`+`name`, sem os
 > números do orçamento) — vazio (nunca `null`) numa obra sem lotes. É o que alimenta o seletor de
 > lote no `TransferInvoiceDrawer`: depois de escolher a obra de destino, se ela tiver lotes, escolhe-se

@@ -57,7 +57,7 @@ class EnterpriseOverviewSlugTest {
         when(enterpriseRepository.save(any(Enterprise.class))).thenAnswer(c -> c.getArgument(0));
         return new EnterpriseRelationsService(
                 enterpriseRepository, enterpriseLocationRepository, locationRepository,
-                enterprisesMediaRepository, storageService);
+                enterprisesMediaRepository, storageService, org.mockito.Mockito.mock(ConstructionBudgetItemService.class));
     }
 
     private Enterprise existing(String slug, boolean isTest) {

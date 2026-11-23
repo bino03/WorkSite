@@ -216,6 +216,13 @@ public class EnterpriseService {
         enterpriseDTO.setMedia(mediaDTOs);
         enterpriseDTO.setCreatedbyName(createdByName);
 
+        // Com folha de orçamento, o investimento é a soma dos lotes; sem ela, o valor escrito à mão.
+        BigDecimal budgetTotal = constructionBudgetItemService.budgetTotalsByEnterprise(List.of(id)).get(id);
+        enterpriseDTO.setBudgetTotal(budgetTotal);
+        if (budgetTotal != null) {
+            enterpriseDTO.setTotalInvestment(budgetTotal);
+        }
+
         String bannerSignedUrl = enterpriseMediaRepository
                 .findByEnterpriseId(id)
                 .stream()

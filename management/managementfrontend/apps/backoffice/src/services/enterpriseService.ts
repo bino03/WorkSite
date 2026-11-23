@@ -63,6 +63,8 @@ export interface EnterpriseFullResponseDTO {
   landArea?: number | null;
   totalUnits?: number | null;
   totalInvestment?: number | null;
+  /** Soma das folhas de orçamento dos lotes; null sem orçamento (aí o investimento escreve-se à mão). */
+  budgetTotal?: number | null;
   currentValue?: number | null;
   currency?: string | null;
   constructionCompany?: string | null;
