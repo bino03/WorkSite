@@ -139,9 +139,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 const OverviewCard: React.FC<{ data: EnterpriseFullResponseDTO }> = ({ data }) => (
   <BlueprintCard kicker="Visão geral" style={{ padding: "13.6px", gap: "10.2px" }}>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" }}>
-      <Fact label="Construtora">{data.constructionCompany || "—"}</Fact>
       <Fact label="Arquiteto">{data.architect || "—"}</Fact>
-      <Fact label="Cidade">{data.location?.city || "—"}</Fact>
       <Fact label="Estado">{STATUS_LABELS[data.status] || data.status}</Fact>
     </div>
     {data.description && (
