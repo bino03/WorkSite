@@ -46,8 +46,7 @@ antigo; o `EMPLOYEE` vê "Picar ponto" e "As minhas férias".
 
 Uma terceira role para a contabilidade. **No espaço Obras faz tudo o que o ADMIN faz** (obras,
 orçamentos, despesas, faturas — incluindo despesas da empresa e quarentena —, pagamentos,
-aprovação para pagamento, fornecedores, incidentes) e recebe os avisos de Obras (`invoice_due`,
-prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das Definições
+aprovação para pagamento, fornecedores, incidentes) e recebe os avisos de Obras (prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das Definições
 (`/settings/**`), das contas e convites (`/auth/admin/**`, escritas em `/employees`) e da gestão de
 tarefas — em Tarefas comporta-se como EMPLOYEE. Não é trabalhador para a assiduidade.
 

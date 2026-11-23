@@ -37,6 +37,7 @@ Faz também, a baixo custo (leituras/greps rápidos, sem subagentes — isto ali
 2. **Planos por retomar**: lista `notes/roadmap/plans/` (pode não existir ainda — nesse caso não há nada a retomar). Qualquer ficheiro com `**Estado**: em curso` é candidato a retoma.
 3. **Ideias com contexto já recolhido**: grep rápido a `notes/ideas.md` por `> Contexto (via ` (deixadas por esta skill ou pelo [[skill-refine-idea]]). Guarda quantas encontraste (não precisas de as ler todas agora, só confirmar que existem e quantas).
 4. **Últimas entradas do work log**: as 1-3 entradas mais recentes de `notes/whatIveDone.md` (só os títulos `## AAAA-MM-DD — ...`, não o conteúdo todo).
+5. **Restos de concluídos**: o ToDo só guarda o que falta fazer, mas o que se fecha fora desta skill (numa sessão direta, ou quando "falta só o browser") tende a ficar como `- [x]`, `~~riscado~~`, um bloco "✅ concluído" ou um `> Decidido` sem bullet por cima. Se houver, propõe **uma vez**, antes do menu, tirá-los. Cada um só sai se tiver entrada no `whatIveDone.md` (se não tiver, escreve-se primeiro) e, se falta só o browser, se a pendência estiver em `notes/verificacao-browser-pendente.md`. **Nunca toques num `- [ ]`**: a descrição, as decisões e os ⚠️ dos itens por fazer ficam intactos; um item feito em parte só se reescreve para dizer o que falta, com a confirmação do utilizador. Uma secção sem `- [ ]` apaga-se inteira (o estado da frente fica no `roadmap/backlog.md`). Recusado → segue sem limpar.
 
 ---
 
@@ -230,7 +231,7 @@ Por tarefa, na ordem confirmada:
 
 ## Fase 6: Bookkeeping por tarefa concluída
 
-**`notes/ToDo.md`** — remove a linha exata do bullet implementado (e o bloco `> Decidido` indentado por baixo dela, se existir) com uma edição pontual (nunca reescrevas o ficheiro todo). Para bullets que fazem parte de um grupo temático maior, remove só o bullet implementado, deixa os irmãos por implementar intactos.
+**`notes/ToDo.md`** — remove a linha exata do bullet implementado (e o bloco `> Decidido` indentado por baixo dela, se existir) com uma edição pontual (nunca reescrevas o ficheiro todo). Para bullets que fazem parte de um grupo temático maior, remove só o bullet implementado, deixa os irmãos por implementar intactos. **Remover, nunca marcar**: nada de `[x]`, riscado ou resumo "✅ concluído" no lugar — o histórico é do `whatIveDone.md`, e cada linha que fica no ToDo paga-se em tokens em todas as invocações. Se falta só o browser, a pendência vai para `notes/verificacao-browser-pendente.md`, não fica no ToDo. Feito em parte → reescreve o bullet com só o que falta. A secção ficou sem `- [ ]` → apaga-a inteira.
 
 **`notes/whatIveDone.md`** — acrescenta (nunca sobrescrever) uma entrada no formato:
 
@@ -302,7 +303,7 @@ secção é a única cópia dos critérios no projeto; as outras skills linkam p
 - [ ] Implementação sempre sequencial, uma tarefa de cada vez, com checkpoint no plano antes/depois de cada tarefa
 - [ ] Cada tarefa testada (testes de backend a passar / UI verificada no browser) antes do bookkeeping — nunca saltado, mesmo com pouco orçamento
 - [ ] `Final Checklist` da(s) skill(s) invocada(s) fechado por completo em cada tarefa, incluindo os itens de documentação (`docs/api.md`, `docs/database.md`, `docs/security.md`, etc.) — atualizados proativamente, não deixados para o aviso do hook de pre-commit
-- [ ] `notes/ToDo.md` atualizado por tarefa concluída (remoção pontual, não reescrita)
+- [ ] `notes/ToDo.md` atualizado por tarefa concluída (remoção pontual, não reescrita; o feito sai, sem `[x]` nem ✅)
 - [ ] `notes/whatIveDone.md` com entrada nova por tarefa concluída; integration guide da feature apagado (`git rm`) se a tarefa fechou o frontend
 - [ ] `notes/roadmap/backlog.md` com a linha da iniciativa atualizada; `notes/learning.md` se houve lição de ferramenta; `notes/workflow-feedback.md` se uma skill/doc atrapalhou
 - [ ] Resumo final + proposta de commit na branch `dev` (nunca no `master`), sem `git push` sem confirmação

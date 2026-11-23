@@ -157,8 +157,8 @@ Desenho das 5 fases, com as decisões e o porquê, em [[../notes/roadmap/assidui
 |---|---|
 | **Entrada** | o sino do cabeçalho — `components/notifications/NotificationBell.tsx` (`iconFor` escolhe o ícone por `type`; sem polling) |
 | **Frontend** | `services/notificationInboxService.ts` · `types/notification.ts` |
-| **Backend** | `notifications/controller/NotificationController` · `service/NotificationService` (escrita chamada pelos serviços de domínio, na mesma transação) · `service/BudgetItemDeadlineNotifier` e `service/InvoiceDueNotifier` (o gatilho por job) · `repository/NotificationRepository` · `model/Notification` (constantes `TYPE_*`) |
-| **Jobs agendados** | `enterprises/config/BudgetItemDeadlineNotifierConfig` e `InvoiceDueNotifierConfig` (07:00 + arranque) — os outros dois jobs do projeto são `security/RevokedTokenCleanupConfig` (limpeza de tokens) e `enterprises/config/ConstructionBudgetItemPurgeConfig` (purga às 3h) |
+| **Backend** | `notifications/controller/NotificationController` · `service/NotificationService` (escrita chamada pelos serviços de domínio, na mesma transação) · `service/BudgetItemDeadlineNotifier` (o gatilho por job) · `repository/NotificationRepository` · `model/Notification` (constantes `TYPE_*`) |
+| **Jobs agendados** | `enterprises/config/BudgetItemDeadlineNotifierConfig` (07:00 + arranque) — os outros dois jobs do projeto são `security/RevokedTokenCleanupConfig` (limpeza de tokens) e `enterprises/config/ConstructionBudgetItemPurgeConfig` (purga às 3h) |
 | **Base de dados** | `worksite.notification` — `V20` |
 | **Detalhe** | [[api.md]] → "Quem gera notificações" |
 
@@ -206,7 +206,6 @@ começar a olhar.
 | o link do email aponta para `localhost` | `APP_FRONTEND_URL` não está definido no ambiente — ver [[environment.md]] |
 | aceitar um convite dá erro | `InviteService#accept` — `USER_013` (desconhecido/usado/cancelado) ou `USER_012` (fora do prazo) |
 | o aviso de prazo de rubrica não aparece / aparece a dobrar | `BudgetItemDeadlineNotifier` — só `ITEM` vivas de obras não `completed/archived/deleted`, `end_date` em [hoje, hoje+N]; dedupe por `(recipient, type, entity)`, por isso adiar a data **não** reavisa |
-| o aviso de vencimento de fatura não aparece | `InvoiceDueNotifier` — só faturas por liquidar de `findOutstandingExcludingScope` (sem quarentena, sem obras `is_test`) **com vencimento** em [hoje, hoje+N]; sem prazo no fornecedor nem vencimento manual não há aviso; dedupe por `(recipient, type, entity)`, logo uma fatura já avisada não volta a avisar mesmo que o vencimento mude |
 | recuperar a password não faz nada | `PasswordResetService` — o `204` do `forgot-password` é sempre igual, exista ou não a conta; confirmar no log se saiu email |
 | preciso de acrescentar um campo à fatura | migração → `ConstructionInvoice` → DTOs de `dto/invoice/` → `ConstructionInvoiceService` → `types/invoice.ts` → `InvoiceDetailDrawer` |
 | a fatura está `PARTIAL` e devia estar `PAID` (ou o contrário) | `paymentStatus` é derivado da soma de `invoice_payment.amount` vs. o líquido — `PaymentService` (registo/anulação) e `InvoicePaymentSummaryDTO`; uma NC ligada baixa o líquido |

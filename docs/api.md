@@ -1169,7 +1169,7 @@ que os usa está ligado:
 | `minAmount`, `maxAmount` | total, inclusive; as sem total saem |
 | `budgetItemId` | rubrica **e sub-árvore**. Só com `enterpriseId`: sem a obra → `400` |
 
-O `findOutstandingExcludingScope` não mudou de assinatura: o `InvoiceDueNotifier` usa-o também. Na página,
+O `findOutstandingExcludingScope` não mudou de assinatura. Na página,
 os filtros são só estado local (nem URL, nem `localStorage`).
 
 - **O que entra**: a mesma definição de "por liquidar" do filtro `outstanding=true` (pago + notas de
@@ -1621,20 +1621,13 @@ confirmaria a existência a quem não devia sequer saber disso.
 | Tipo | Quando | Para quem |
 |---|---|---|
 | `task_assigned` | `POST /tasks` e `PUT /tasks/{id}` | Os atribuídos, **menos** os que já estavam atribuídos antes e **menos** quem fez a atribuição |
-| `invoice_pending` | `POST /construction-invoices` (upload) | **Só quem carregou** |
 | `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` e `ACCOUNTANT` desbloqueados** (`ProfileRole.WORKS_MANAGERS`), uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
-| `invoice_due` | Job agendado (`InvoiceDueNotifierConfig`, 07:00 diário **e no arranque**) — faturas por liquidar (as da página "A pagar": obras e empresa, sem quarentena, sem notas de crédito, sem obras `is_test` nem eliminadas) cujo **vencimento** cai em `[hoje, hoje + N]`, `N` = `app.notifications.invoice-due.days-ahead` (7). Para todos os `ADMIN` e `ACCOUNTANT` desbloqueados (`ProfileRole.WORKS_MANAGERS`), **uma vez por fatura e destinatário**. Sem vencimento não avisa; já vencida também não (a lista mostra-as à frente). Avisa de todas, aprovadas ou não — o texto termina em "aprovada para pagamento" ou "por aprovar". Link: `/backoffice/invoices/outstanding`. Mudar o prazo do fornecedor ou o vencimento manual de uma fatura já avisada **não reavisa** |
 | `invoice_approved` | `PATCH /construction-invoices/{id}/payment-approval` com `approved=true`, **só na passagem** de por aprovar a aprovada (reaprovar não avisa). Faturas de obras `is_test` não avisam | **Todos os `ACCOUNTANT` desbloqueados, menos quem aprovou** (não os `ADMIN`: é a contabilidade que paga). Texto: fornecedor · número · obra (ou "Empresa"). Link: `/backoffice/invoices/outstanding?approved=true`, que abre "A pagar" já filtrado nas aprovadas |
 
 > O `budget_item_deadline` corre também no arranque porque a app não está ligada 24h por dia —
 > um cron às 7h numa app que só arranca às 9h nunca dispararia. O link é a página do orçamento da
 > obra (`/backoffice/empreendimentos/{id}/budget`), sem realçar a rubrica. Decisões de 2026-09-16.
 
-> ⚠️ Consequência conhecida do `invoice_pending`: alocar uma fatura a uma rubrica é
-> `hasRole('ADMIN')`, mas carregar é `ADMIN` **ou** `EMPLOYEE`. Quando um empregado carrega uma
-> fatura, o aviso vai para ele e **nenhum admin fica a saber** que há trabalho por fazer — o
-> contador de pendentes na página do orçamento continua a ser o único sinal. Foi decisão
-> explícita a 2026-08-18; mudar é trocar o destinatário para os ADMIN.
 
 A escrita acontece **na mesma transação** da operação que a originou: se a tarefa não for
 gravada, a notificação também não existe.
