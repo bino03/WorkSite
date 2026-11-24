@@ -35,6 +35,7 @@ import { useConfirm } from "@/context/ConfirmDialogContext";
 import { parseApiError } from "@/utils/apiError";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { roleToLabel } from "@/utils/profile";
+import { SupplierIbanLine } from "@/components/invoices/SupplierIbanLine";
 import type { ConstructionInvoice, InvoiceScope } from "@/types/invoice";
 
 const SCOPE_LABEL: Record<InvoiceScope, string> = {
@@ -938,6 +939,15 @@ const InvoiceFields: FC<{
         />
         <CompanyNifWarning nif={values.supplierNif} />
       </Field>
+      {/* O IBAN é o da ficha do NIF gravado: com o NIF a meio de ser mudado,
+          mostrar o do antigo era convidar a pagar à empresa errada. */}
+      {invoice.documentType !== "CREDIT_NOTE" &&
+        invoice.supplierNif &&
+        values.supplierNif === invoice.supplierNif && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <SupplierIbanLine iban={invoice.supplierIban} />
+          </div>
+        )}
     </div>
   );
 

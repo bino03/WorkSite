@@ -12,6 +12,7 @@ import com.management.managementapi.enterprises.repository.SupplierRepository;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.exeption.ResourceNotFoundException;
 import com.management.managementapi.security.AuthContext;
+import com.management.managementapi.util.Iban;
 
 import lombok.RequiredArgsConstructor;
 
@@ -95,6 +96,7 @@ public class SupplierService {
         supplier.setName(dto.name().trim());
         supplier.setNotes(trimToNull(dto.notes()));
         supplier.setPaymentTermDays(dto.paymentTermDays());
+        supplier.setIban(validIban(dto.iban()));
         authContext.currentProfileId().ifPresent(supplier::setCreatedBy);
 
         return saveAndApplyName(supplier);
@@ -117,6 +119,7 @@ public class SupplierService {
         supplier.setName(dto.name().trim());
         supplier.setNotes(trimToNull(dto.notes()));
         supplier.setPaymentTermDays(dto.paymentTermDays());
+        supplier.setIban(validIban(dto.iban()));
 
         return saveAndApplyName(supplier);
     }
@@ -165,6 +168,18 @@ public class SupplierService {
                         ConstructionInvoiceRepository.SupplierNifCount::getInvoiceCount,
                         (first, second) -> first,
                         LinkedHashMap::new));
+    }
+
+    /**
+     * Normaliza e valida: um IBAN com um dígito trocado é recusado em vez de
+     * gravado, porque é dele que se copia para a transferência.
+     */
+    static String validIban(String raw) {
+        String iban = Iban.normalize(raw);
+        if (iban != null && !Iban.isValid(iban)) {
+            throw new BusinessException(ErrorCode.SUPPLIER_IBAN_INVALID);
+        }
+        return iban;
     }
 
     private static boolean isBlank(String value) {

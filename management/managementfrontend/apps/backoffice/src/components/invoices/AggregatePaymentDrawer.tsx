@@ -14,6 +14,7 @@ import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { formatCurrency } from "@/utils/formatters";
 import { isUnapprovedPayment } from "@/hooks/useInvoicePaymentApproval";
+import { SupplierIbanLine } from "@/components/invoices/SupplierIbanLine";
 import type { ConstructionInvoice, LeftOutInvoice, PaymentMethod } from "@/types/invoice";
 
 const { Text } = Typography;
@@ -173,6 +174,11 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
 
         {differentSuppliers && (
           <Alert type="info" showIcon message={t("invoices.payment.differentSupplierWarning")} />
+        )}
+
+        {/* Com vários fornecedores não há um IBAN para onde transferir. */}
+        {!differentSuppliers && invoices.length > 0 && watch("method") === "TRANSFERENCIA" && (
+          <SupplierIbanLine iban={invoices[0].supplierIban} />
         )}
 
         {leftOut.length > 0 && (

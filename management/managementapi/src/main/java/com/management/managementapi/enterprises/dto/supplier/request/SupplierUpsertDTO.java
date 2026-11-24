@@ -35,5 +35,12 @@ public record SupplierUpsertDTO(
          */
         @Min(value = 0, message = "O prazo de pagamento não pode ser negativo")
         @Max(value = 365, message = "O prazo de pagamento não pode passar de 365 dias")
-        Integer paymentTermDays
+        Integer paymentTermDays,
+
+        /**
+         * Aceita espaços e hífenes (é como vem impresso nas faturas); o service
+         * normaliza e valida o mod-97. Null ou vazio apaga-o.
+         */
+        @Size(max = 50, message = "IBAN demasiado longo")
+        String iban
 ) {}

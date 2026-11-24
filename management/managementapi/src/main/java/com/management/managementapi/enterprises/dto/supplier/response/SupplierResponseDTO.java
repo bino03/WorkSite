@@ -20,5 +20,7 @@ public record SupplierResponseDTO(
         String notes,
         /** Dias a contar da data da fatura; null é "sem prazo", 0 é pronto pagamento. */
         Integer paymentTermDays,
+        /** Sem espaços, maiúsculas; null se a ficha não o tem. */
+        String iban,
         long invoiceCount
 ) {}

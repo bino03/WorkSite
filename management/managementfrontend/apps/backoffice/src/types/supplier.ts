@@ -13,6 +13,8 @@ export interface Supplier {
   notes: string | null;
   /** Prazo de pagamento em dias a contar da data da fatura. Null é "sem prazo"; 0 é pronto pagamento. */
   paymentTermDays: number | null;
+  /** Sem espaços, maiúsculas; null se a ficha não o tem. */
+  iban: string | null;
   /** Faturas com este NIF, em todos os projetos. */
   invoiceCount: number;
 }
@@ -32,6 +34,8 @@ export interface SupplierUpsert {
   notes?: string | null;
   /** O backend grava o que vier: omitir num `PUT` apaga o prazo. */
   paymentTermDays?: number | null;
+  /** Com ou sem espaços; o backend normaliza e valida (`SUPPLIER_003`). Omitir num `PUT` apaga-o. */
+  iban?: string | null;
 }
 
 /** `invoicesUpdated` = faturas que estavam sem nome e ficaram com ele. */

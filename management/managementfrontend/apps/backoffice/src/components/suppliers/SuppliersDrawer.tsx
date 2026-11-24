@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties, FC } from "react";
-import { Button, Drawer, Empty, Input, InputNumber, Space, Spin, Tabs } from "antd";
+import { Button, Drawer, Empty, Input, InputNumber, Space, Spin, Tabs, Typography } from "antd";
 import { DeleteOutlined, SearchOutlined } from "@ant-design/icons";
 
 import {
@@ -15,6 +15,7 @@ import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { formatDate } from "@/utils/formatters";
+import { formatIban, isValidIban, normalizeIban } from "@/utils/iban";
 import type { Supplier, UnknownSupplierNif } from "@/types/supplier";
 
 /**
@@ -56,6 +57,8 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
   const [editedNames, setEditedNames] = useState<Record<string, string>>({});
   /** Prazo de pagamento em edição de cada fornecedor; null é "sem prazo". */
   const [editedTerms, setEditedTerms] = useState<Record<string, number | null>>({});
+  /** IBAN em edição, tal como se escreve (com espaços); comparado já normalizado. */
+  const [editedIbans, setEditedIbans] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<TabKey>("pending");
 
@@ -76,6 +79,11 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
       setEditedNames(Object.fromEntries(known.map((supplier) => [supplier.id, supplier.name])));
       setEditedTerms(
         Object.fromEntries(known.map((supplier) => [supplier.id, supplier.paymentTermDays]))
+      );
+      setEditedIbans(
+        Object.fromEntries(
+          known.map((supplier) => [supplier.id, supplier.iban ? formatIban(supplier.iban) : ""])
+        )
       );
       return pending;
     } catch (error) {
@@ -127,17 +135,19 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
   const handleSave = async (supplier: Supplier) => {
     const name = (editedNames[supplier.id] ?? "").trim();
     const paymentTermDays = termOf(supplier);
-    if (!name || (name === supplier.name && paymentTermDays === supplier.paymentTermDays)) return;
+    const iban = ibanOf(supplier);
+    if (!name || !ibanOk(iban) || !isDirty(supplier)) return;
 
     setSavingKey(supplier.id);
     try {
-      // O PUT substitui tudo: as notas e o prazo vão sempre, senão gravar o
-      // nome apagava-os.
+      // O PUT substitui tudo: as notas, o prazo e o IBAN vão sempre, senão
+      // gravar o nome apagava-os.
       const result = await updateSupplier(supplier.id, {
         nif: supplier.nif,
         name,
         notes: supplier.notes,
         paymentTermDays,
+        iban: iban || null,
       });
       await afterSave(result.invoicesUpdated);
     } catch (error) {
@@ -167,6 +177,22 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
   /** O prazo em edição; `undefined` no estado é "ainda não mexido", não "sem prazo". */
   const termOf = (supplier: Supplier): number | null =>
     supplier.id in editedTerms ? editedTerms[supplier.id] : supplier.paymentTermDays;
+
+  /** O IBAN em edição, normalizado; "" é "sem IBAN". */
+  const ibanOf = (supplier: Supplier): string =>
+    normalizeIban(supplier.id in editedIbans ? editedIbans[supplier.id] : supplier.iban);
+
+  const ibanOk = (iban: string): boolean => iban === "" || isValidIban(iban);
+
+  const isDirty = (supplier: Supplier): boolean => {
+    const name = (editedNames[supplier.id] ?? supplier.name).trim();
+    return (
+      name.length > 0 &&
+      (name !== supplier.name ||
+        termOf(supplier) !== supplier.paymentTermDays ||
+        ibanOf(supplier) !== (supplier.iban ?? ""))
+    );
+  };
 
   const term = query.trim().toLowerCase();
   const visibleSuppliers = term
@@ -263,9 +289,8 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
           {visibleSuppliers.map((supplier, index) => {
             const edited = editedNames[supplier.id] ?? supplier.name;
             const editedTerm = termOf(supplier);
-            const dirty =
-              edited.trim().length > 0 &&
-              (edited.trim() !== supplier.name || editedTerm !== supplier.paymentTermDays);
+            const ibanValid = ibanOk(ibanOf(supplier));
+            const dirty = isDirty(supplier);
 
             return (
               <li key={supplier.id} style={rowStyle(index)}>
@@ -305,6 +330,7 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
                         <Button
                           type="primary"
                           loading={savingKey === supplier.id}
+                          disabled={!ibanValid}
                           onClick={() => handleSave(supplier)}
                         >
                           Guardar
@@ -320,6 +346,22 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
                     </>
                   )}
                 </div>
+                <Input
+                  aria-label={`IBAN de ${supplier.name}`}
+                  placeholder="IBAN (para transferências)"
+                  disabled={!editable}
+                  status={ibanValid ? undefined : "error"}
+                  value={editedIbans[supplier.id] ?? ""}
+                  onChange={(e) =>
+                    setEditedIbans((prev) => ({ ...prev, [supplier.id]: e.target.value }))
+                  }
+                  onPressEnter={() => handleSave(supplier)}
+                />
+                {!ibanValid && (
+                  <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                    IBAN inválido — confirme os dígitos.
+                  </Typography.Text>
+                )}
                 <div style={{ fontSize: 12, opacity: 0.7 }}>
                   NIF {supplier.nif} · {supplier.invoiceCount} fatura
                   {supplier.invoiceCount === 1 ? "" : "s"}

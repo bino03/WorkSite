@@ -340,6 +340,7 @@ public enum ErrorCode {
     // ========================================================================
     SUPPLIER_NOT_FOUND("SUPPLIER_001", "Fornecedor não encontrado"),
     SUPPLIER_NIF_ALREADY_EXISTS("SUPPLIER_002", "Já existe um fornecedor com este NIF"),
+    SUPPLIER_IBAN_INVALID("SUPPLIER_003", "IBAN inválido — confirme os dígitos"),
 
     // ========================================================================
     // NOTIFICAÇÕES (NOTIF_xxx)
