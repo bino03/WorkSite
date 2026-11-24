@@ -748,6 +748,7 @@ associada acompanha os novos valores.
 | `INVOICE_051` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — obra de vários lotes e a fatura ainda não tem lote |
 | `INVOICE_052` | `PATCH /{id}/budget` — a fatura já tem despesas e o pedido mudaria o lote |
 | `INVOICE_053` | `POST /{id}/transfer` com `keepRubrics` — alguma despesa não tem rubrica com o mesmo código no lote de destino |
+| `INVOICE_054` | `GET /outstanding/payment-list` — nenhuma fatura aprovada por pagar com estes filtros |
 | `INVOICE_034` | inconsistência não encontrada (`GET/POST /invoice-incidents/{id}`) |
 | `INVOICE_035` | `POST /invoice-incidents` com uma fatura que não existe |
 | `INVOICE_036` | `POST /import-excel` com ficheiro vazio |
@@ -1187,6 +1188,17 @@ os filtros são só estado local (nem URL, nem `localStorage`).
   poucas centenas de faturas — se um dia forem milhares, é aqui que se sente.
 - **Pagar várias a partir daqui** continua a obedecer a `INVOICE_PAYMENT_CROSS_ENTERPRISE`: um
   pagamento agregado é de uma obra só. O cliente desativa o botão quando a seleção mistura obras.
+
+**Lista de pagamentos** (2026-11-24): `GET /construction-invoices/outstanding/payment-list?format=XLSX|PDF`
+(`ADMIN`, `ACCOUNTANT`), com os mesmos filtros de `/outstanding` menos `page`/`size` — e o
+`approvedForPayment` **forçado a `true`**: só entram as aprovadas para pagamento e ainda por liquidar.
+Devolve o ficheiro (`Pagamentos aprovados - AAAA-MM-DD.xlsx|.pdf`), **agrupado por fornecedor**: nome, NIF,
+os IBAN da ficha com o banco de cada um (`Iban.bankOf`, o mesmo mapa de códigos PT do Backoffice), e por baixo
+as faturas (nº, data, vencimento, obra, **a pagar** = líquido − pago) com o total do fornecedor e o total geral.
+Fornecedores por ordem alfabética, "por identificar" no fim; faturas pela ordem de urgência. Sem nenhuma →
+`400`/`INVOICE_054`, para não descarregar um ficheiro vazio. O PDF usa as fontes base (WinAnsi): um carácter
+fora dele sai como `?`. `PaymentListExportService`; botão "Exportar" em "A pagar" (com os filtros do ecrã) e no
+cartão "Aprovadas para pagamento" da página inicial (sem filtros).
 
 ### Vencimento da fatura
 

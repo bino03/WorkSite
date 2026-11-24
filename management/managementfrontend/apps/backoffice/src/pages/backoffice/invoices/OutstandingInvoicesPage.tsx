@@ -28,8 +28,43 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { ALL_WORKS, WorkFilterSelect, type WorkFilter } from "@/components/invoices/InvoiceFilterSelects";
 import { InvoiceFiltersModal } from "@/components/invoices/InvoiceFiltersModal";
 import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/invoices/invoiceFilters";
+import { PaymentListExportButton } from "@/components/invoices/PaymentListExportButton";
 import { EMPTY_INVOICE_FILTERS } from "@/types/invoice";
-import type { ConstructionInvoice, InvoiceFilters, OutstandingByUrgency } from "@/types/invoice";
+import type {
+  ConstructionInvoice,
+  InvoiceFilters,
+  OutstandingByUrgency,
+  OutstandingByUrgencyParams,
+} from "@/types/invoice";
+
+/**
+ * Os filtros da página como parâmetros de "A pagar" — a lista e a exportação usam
+ * os mesmos, para o ficheiro ter o que está no ecrã. Sem `approvedForPayment`:
+ * a lista junta-o, a exportação força-o a true.
+ */
+const outstandingParams = (
+  current: InvoiceFilters,
+  currentWork: WorkFilter
+): Omit<OutstandingByUrgencyParams, "page" | "size" | "approvedForPayment"> => {
+  const q = current.q.trim();
+  return {
+    enterpriseId: currentWork.enterpriseId ?? undefined,
+    company: currentWork.scope === "COMPANY" ? true : undefined,
+    supplierNif: current.supplierNif ?? undefined,
+    dueBucket: current.dueBucket ?? undefined,
+    sentToAccountant: current.sentToAccountant ?? undefined,
+    q: q || undefined,
+    documentStatus: current.documentStatus ?? undefined,
+    paymentStatus: current.paymentStatus ?? undefined,
+    allocationStatus: current.allocationStatus ?? undefined,
+    from: current.from ?? undefined,
+    to: current.to ?? undefined,
+    minAmount: current.minAmount ?? undefined,
+    maxAmount: current.maxAmount ?? undefined,
+    // A rubrica é de uma obra; sem obra o backend recusa-a.
+    budgetItemId: currentWork.enterpriseId ? (current.budgetItemId ?? undefined) : undefined,
+  };
+};
 
 /**
  * "A pagar": as faturas por liquidar de todas as obras e da empresa, pela
@@ -72,25 +107,10 @@ const OutstandingInvoicesPage: FC = () => {
     async (nextPage: number, nextSize: number, current: InvoiceFilters, currentWork: WorkFilter) => {
       setLoading(true);
       try {
-        const q = current.q.trim();
         setData(
           await listOutstandingByUrgency({
-            enterpriseId: currentWork.enterpriseId ?? undefined,
-            company: currentWork.scope === "COMPANY" ? true : undefined,
-            supplierNif: current.supplierNif ?? undefined,
-            dueBucket: current.dueBucket ?? undefined,
+            ...outstandingParams(current, currentWork),
             approvedForPayment: current.approvedForPayment ?? undefined,
-            sentToAccountant: current.sentToAccountant ?? undefined,
-            q: q || undefined,
-            documentStatus: current.documentStatus ?? undefined,
-            paymentStatus: current.paymentStatus ?? undefined,
-            allocationStatus: current.allocationStatus ?? undefined,
-            from: current.from ?? undefined,
-            to: current.to ?? undefined,
-            minAmount: current.minAmount ?? undefined,
-            maxAmount: current.maxAmount ?? undefined,
-            // A rubrica é de uma obra; sem obra o backend recusa-a.
-            budgetItemId: currentWork.enterpriseId ? (current.budgetItemId ?? undefined) : undefined,
             page: nextPage,
             size: nextSize,
           }),
@@ -265,6 +285,12 @@ const OutstandingInvoicesPage: FC = () => {
             Limpar filtros
           </Button>
         )}
+
+        {/* Só as aprovadas para pagamento, com os filtros que estão no ecrã (o
+            "aprovadas" é forçado no backend, seja qual for o filtro). */}
+        <div style={{ marginLeft: isMobile ? undefined : "auto" }}>
+          <PaymentListExportButton params={outstandingParams(filters, work)} />
+        </div>
       </div>
 
       <InvoiceFiltersModal

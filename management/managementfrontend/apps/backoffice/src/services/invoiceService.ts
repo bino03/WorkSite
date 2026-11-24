@@ -206,6 +206,31 @@ export async function listOutstandingByUrgency(
   return response.data;
 }
 
+export type PaymentListFormat = "XLSX" | "PDF";
+
+/**
+ * A lista de pagamentos: as faturas de "A pagar" com estes filtros, **só as aprovadas
+ * para pagamento** (o backend força-o), agrupadas por fornecedor com os IBAN de cada
+ * um — para quem faz as transferências. Sem nenhuma → `INVOICE_054`.
+ */
+export async function exportPaymentList(
+  params: Omit<OutstandingByUrgencyParams, "page" | "size" | "approvedForPayment">,
+  format: PaymentListFormat
+): Promise<DownloadedFile> {
+  const response = await api.get(`/construction-invoices/outstanding/payment-list`, {
+    params: { ...params, format },
+    responseType: "blob",
+  });
+  const extension = format === "PDF" ? "pdf" : "xlsx";
+  return {
+    blob: response.data,
+    fileName: fileNameFromDisposition(
+      response.headers["content-disposition"],
+      `Pagamentos aprovados.${extension}`
+    ),
+  };
+}
+
 /**
  * A pesquisa global (Ctrl+K): todas as obras, a empresa e a quarentena, as mais
  * recentes primeiro. Um texto que se lê como valor ("1 234,56") também casa o

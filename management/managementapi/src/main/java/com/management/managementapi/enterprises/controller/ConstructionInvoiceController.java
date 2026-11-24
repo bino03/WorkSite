@@ -7,6 +7,8 @@ import com.management.managementapi.enterprises.model.Enterprise;
 import com.management.managementapi.enterprises.repository.EnterpriseRepository;
 import com.management.managementapi.enterprises.service.ConstructionBudgetItemService;
 import com.management.managementapi.enterprises.service.InvoiceDocumentsExportService;
+import com.management.managementapi.enterprises.service.BudgetExcelExportService;
+import com.management.managementapi.enterprises.service.PaymentListExportService;
 import com.management.managementapi.exeption.BusinessException;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -95,6 +97,7 @@ public class ConstructionInvoiceController {
     private final ConstructionInvoiceService service;
     private final DespesasExcelImportService importService;
     private final InvoiceDocumentsExportService documentsExportService;
+    private final PaymentListExportService paymentListExportService;
     private final EnterpriseRepository enterpriseRepository;
     private final ConstructionBudgetItemService budgetService;
     private final ActivityLogger activityLogger;
@@ -557,6 +560,53 @@ public class ConstructionInvoiceController {
         // @Max num @RequestParam seria ignorado em silêncio.
         return ResponseEntity.ok(service.outstandingByUrgency(
                 filter, Math.max(page, 0), Math.min(Math.max(size, 1), 100), LocalDate.now()));
+    }
+
+    /**
+     * A lista de pagamentos: as faturas de "A pagar" com estes filtros, <b>só as
+     * aprovadas para pagamento</b> (o {@code approvedForPayment} é forçado),
+     * agrupadas por fornecedor com os IBAN de cada um — {@code format=XLSX} ou
+     * {@code PDF}. Vazia → {@code INVOICE_054}, para o browser não descarregar
+     * um ficheiro sem nada. Ver {@link PaymentListExportService}.
+     */
+    @GetMapping("/outstanding/payment-list")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    public ResponseEntity<byte[]> paymentList(
+            @RequestParam(defaultValue = "XLSX") PaymentListExportService.Format format,
+            @RequestParam(required = false) UUID enterpriseId,
+            @RequestParam(defaultValue = "false") boolean company,
+            @RequestParam(required = false) String supplierNif,
+            @RequestParam(required = false) OutstandingFilter.DueBucket dueBucket,
+            @RequestParam(required = false) Boolean sentToAccountant,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String documentStatus,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(required = false) String allocationStatus,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) UUID budgetItemId) {
+        if (enterpriseId != null && company) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "enterpriseId e company não se combinam");
+        }
+        if (budgetItemId != null && enterpriseId == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "budgetItemId precisa de enterpriseId");
+        }
+        OutstandingFilter filter = new OutstandingFilter(
+                enterpriseId, company, supplierNif, dueBucket, Boolean.TRUE, sentToAccountant,
+                q, upperOrNull(documentStatus), upperOrNull(paymentStatus), upperOrNull(allocationStatus),
+                from, to, minAmount, maxAmount, budgetItemId);
+
+        BudgetExcelExportService.ExportFile file = paymentListExportService.export(filter, format, LocalDate.now());
+        MediaType type = format == PaymentListExportService.Format.PDF
+                ? MediaType.APPLICATION_PDF
+                : MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(file.fileName(), StandardCharsets.UTF_8).build().toString())
+                .contentType(type)
+                .body(file.content());
     }
 
     @GetMapping("/unidentified/outstanding-summary")

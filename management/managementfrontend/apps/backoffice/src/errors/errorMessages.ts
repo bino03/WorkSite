@@ -372,6 +372,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'SUPPLIER_001': 'Fornecedor não encontrado.',
   'SUPPLIER_002': 'Já existe um fornecedor com este NIF.',
   'SUPPLIER_003': 'IBAN inválido — confirme os dígitos.',
+  'INVOICE_054': 'Não há faturas aprovadas por pagar com estes filtros.',
 
   // ── Tarefas ────────────────────────────────────────────────────────────────
   'TASK_001': 'Tarefa não encontrada. Pode ter sido removida.',

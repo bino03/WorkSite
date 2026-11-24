@@ -335,6 +335,7 @@ public enum ErrorCode {
     INVOICE_BUDGET_REQUIRED("INVOICE_051", "Escolha primeiro o lote da fatura — a obra tem vários lotes"),
     INVOICE_BUDGET_HAS_ALLOCATIONS("INVOICE_052", "A fatura já tem despesas noutro lote — desfaça a classificação antes de mudar de lote"),
     INVOICE_LOT_RUBRICS_MISSING("INVOICE_053", "Nem todas as rubricas da fatura existem no lote de destino — não dá para as manter"),
+    INVOICE_PAYMENT_LIST_EMPTY("INVOICE_054", "Não há faturas aprovadas por pagar com estes filtros"),
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================
