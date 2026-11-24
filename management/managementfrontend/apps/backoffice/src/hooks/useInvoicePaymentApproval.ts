@@ -1,4 +1,5 @@
 import { setInvoicePaymentApproval } from "@/services/invoiceService";
+import { useConfirm } from "@/context/ConfirmDialogContext";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import type { ConstructionInvoice } from "@/types/invoice";
@@ -25,6 +26,8 @@ export function isUnapprovedPayment(invoice: ConstructionInvoice): boolean {
  * não mexe em dinheiro e desfaz-se com um clique.
  */
 export function useInvoicePaymentApproval(onDone: () => void) {
+  const confirm = useConfirm();
+
   /** Aprova se não estiver aprovada; retira se estiver. */
   const toggle = async (invoice: ConstructionInvoice) => {
     try {
@@ -44,7 +47,17 @@ export function useInvoicePaymentApproval(onDone: () => void) {
    * cautela de "marcar como enviadas". Para à primeira falha e diz quantas
    * ficaram feitas.
    */
-  const approveMany = async (invoices: ConstructionInvoice[]) => {
+  const approveMany = (invoices: ConstructionInvoice[]) => {
+    const plural = invoices.length > 1;
+    confirm({
+      title: "Aprovar para pagamento",
+      message: `Aprovar ${invoices.length} fatura${plural ? "s" : ""} para pagamento?`,
+      actionLabel: "Aprovar",
+      onConfirm: () => runApproveMany(invoices),
+    });
+  };
+
+  const runApproveMany = async (invoices: ConstructionInvoice[]) => {
     let approved = 0;
     try {
       for (const invoice of invoices) {
