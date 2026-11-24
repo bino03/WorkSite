@@ -159,7 +159,7 @@ export const MarkPaidDrawer: FC<Props> = ({ open, invoice, onClose, onPaid }) =>
         )}
 
         {invoice && watch("method") === "TRANSFERENCIA" && (
-          <SupplierIbanLine iban={invoice.supplierIban} />
+          <SupplierIbanLine ibans={invoice.supplierIbans} />
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" }}>

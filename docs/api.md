@@ -1247,7 +1247,7 @@ carregar.
 | GET | `/suppliers?q=` | `ADMIN` ou `EMPLOYEE` — catálogo por ordem alfabética, com `invoiceCount` |
 | GET | `/suppliers/unknown-nifs` | `ADMIN` ou `EMPLOYEE` — NIFs vistos nas faturas ainda sem empresa, do mais frequente para o menos |
 | POST | `/suppliers` | `ADMIN` — dá nome a um NIF (e, se vier, o prazo); devolve `201` |
-| PUT | `/suppliers/{id}` | `ADMIN` — renomeia e/ou muda o prazo e o IBAN. **Substitui tudo**: `notes`, `paymentTermDays` e `iban` omitidos ficam a `null` |
+| PUT | `/suppliers/{id}` | `ADMIN` — renomeia e/ou muda o prazo e os IBAN. **Substitui tudo**: `notes` e `paymentTermDays` omitidos ficam a `null`, `ibans` a `[]` |
 | DELETE | `/suppliers/{id}` | `ADMIN` — tira do catálogo; devolve `204` |
 
 **Gravar propaga-se às faturas.** `POST` e `PUT` escrevem o nome nas faturas desse NIF que
@@ -1269,12 +1269,15 @@ fornecedor, ou mudar-lhe o NIF, deixa essas faturas sem vencimento.
 `unknown-nifs` traz `suggestedName` — um nome que alguém já escreveu à mão nalguma fatura desse
 NIF, se existir — para o ecrã o mostrar pré-preenchido em vez de o pedir outra vez.
 
-**IBAN** (`iban`, desde a `V53`): um por fornecedor, para pagar por transferência — a app só o
-mostra e copia, a transferência faz-se no homebanking. O `POST`/`PUT` aceitam-no com espaços ou
-hífenes (como vem impresso); o service normaliza (sem espaços, maiúsculas) e valida formato + mod-97
-(`util/Iban.java`, espelhado em `utils/iban.ts` no Backoffice), e recusa com `SUPPLIER_003`. Vazio ou
-omitido apaga-o (o `PUT` substitui tudo). A resposta de cada fatura traz `supplierIban` — o da ficha com
-o mesmo NIF, resolvido na leitura como o vencimento; `null` sem ficha ou sem IBAN.
+**IBAN** (`ibans`, lista, desde a `V54`; a `V53` tinha um só): **um por banco**, para pagar por
+transferência — a app só os mostra e copia, a transferência faz-se no homebanking. O `POST`/`PUT`
+aceitam cada um com espaços ou hífenes (como vem impresso); o service normaliza (sem espaços,
+maiúsculas), valida formato + mod-97 (`util/Iban.java`, espelhado em `utils/iban.ts` no Backoffice),
+tira vazios e repetidos e mantém a ordem; um inválido recusa a gravação toda com `SUPPLIER_003`. Máx. 10.
+Lista vazia ou omitida apaga-os (o `PUT` substitui tudo). A resposta de cada fatura traz `supplierIbans` —
+os da ficha com o mesmo NIF, resolvidos na leitura como o vencimento; `[]` sem ficha ou sem IBAN. O nome
+do banco **não** vem da API: o Backoffice lê-o dos dígitos 5-8 de um IBAN PT (`bankOfIban`, só códigos
+conhecidos; os outros mostram "IBAN").
 
 Códigos de erro: `SUPPLIER_001` (não encontrado), `SUPPLIER_002` (NIF já no catálogo), `SUPPLIER_003` (IBAN inválido).
 

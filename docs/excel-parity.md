@@ -110,7 +110,7 @@ não tenha equivalente regista-se aqui, para a revisão que o §11 pede ter onde
 | Campo | Desde | O que é | Porque não vai para o Excel |
 |---|---|---|---|
 | `supplier.payment_term_days` | `V45` | prazo de pagamento do fornecedor, em dias | o Excel não tem catálogo de fornecedores com atributos (as colunas `Fornecedor`/`NIF` são texto por linha) |
-| `supplier.iban` | `V53` | IBAN do fornecedor, para copiar para a transferência | idem — e nem o import nem o export o tocam. Na futura conciliação (Fase 7) o `TRANSF.<iban>` do extrato liga-se a ele |
+| `supplier.ibans` | `V54` (a `V53` tinha um só) | IBAN do fornecedor, um por banco, para copiar para a transferência | idem — e nem o import nem o export o tocam. Na futura conciliação (Fase 7) o `TRANSF.<iban>` do extrato liga-se a ele |
 | `construction_invoice.due_date_override` | `V45` | vencimento escrito à mão numa fatura | o Excel não tem coluna de vencimento; decidido a 2026-10-13 que não ganha |
 | `construction_invoice.approved_for_payment` (+ `_by`, `_at`) | `V46` | a fatura foi aprovada para pagamento, por quem e quando | é um passo de trabalho da app; no Excel paga-se sem ele. Uma fatura que venha do Excel entra por aprovar, e isso não a impede de ser paga |
 

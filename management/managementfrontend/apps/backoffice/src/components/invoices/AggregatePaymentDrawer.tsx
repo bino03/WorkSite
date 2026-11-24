@@ -178,7 +178,7 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
 
         {/* Com vários fornecedores não há um IBAN para onde transferir. */}
         {!differentSuppliers && invoices.length > 0 && watch("method") === "TRANSFERENCIA" && (
-          <SupplierIbanLine iban={invoices[0].supplierIban} />
+          <SupplierIbanLine ibans={invoices[0].supplierIbans} />
         )}
 
         {leftOut.length > 0 && (

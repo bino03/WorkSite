@@ -2332,7 +2332,7 @@ public class ConstructionInvoiceService {
 
                 displaySupplierName(invoice, catalogSupplier),
                 invoice.getSupplierNif(),
-                catalogSupplier == null ? null : catalogSupplier.getIban(),
+                catalogSupplier == null ? List.of() : List.copyOf(catalogSupplier.getIbans()),
                 invoice.getInvoiceNumber(),
                 invoice.getInvoiceAtcud(),
                 invoice.getInvoiceDate(),

@@ -1,6 +1,11 @@
 package com.management.managementapi.enterprises.model;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import com.management.managementapi.model.BaseEntity;
 
@@ -39,15 +44,19 @@ public class Supplier extends BaseEntity {
     @Column(name = "payment_term_days")
     private Integer paymentTermDays;
 
-    /** Normalizado (sem espaços, maiúsculas) e validado pelo mod-97. Null é "sem IBAN". */
-    @Column(name = "iban")
-    private String iban;
+    /**
+     * Um por banco, pela ordem em que foram escritos. Normalizados (sem
+     * espaços, maiúsculas) e validados pelo mod-97. Vazio é "sem IBAN".
+     */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "ibans", nullable = false)
+    private List<String> ibans = new ArrayList<>();
 
     @Column(name = "created_by")
     private UUID createdBy;
 
-    public String getIban() { return iban; }
-    public void setIban(String iban) { this.iban = iban; }
+    public List<String> getIbans() { return ibans; }
+    public void setIbans(List<String> ibans) { this.ibans = ibans == null ? new ArrayList<>() : new ArrayList<>(ibans); }
 
     public String getNif() { return nif; }
     public void setNif(String nif) { this.nif = nif; }

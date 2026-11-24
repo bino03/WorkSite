@@ -1,5 +1,7 @@
 package com.management.managementapi.enterprises.dto.supplier.request;
 
+import java.util.List;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -38,9 +40,10 @@ public record SupplierUpsertDTO(
         Integer paymentTermDays,
 
         /**
-         * Aceita espaços e hífenes (é como vem impresso nas faturas); o service
-         * normaliza e valida o mod-97. Null ou vazio apaga-o.
+         * Um por banco. Cada um aceita espaços e hífenes (é como vem impresso
+         * nas faturas); o service normaliza, valida o mod-97, tira os vazios e
+         * os repetidos. Null ou lista vazia apaga-os todos.
          */
-        @Size(max = 50, message = "IBAN demasiado longo")
-        String iban
+        @Size(max = 10, message = "Demasiados IBAN")
+        List<@Size(max = 50, message = "IBAN demasiado longo") String> ibans
 ) {}

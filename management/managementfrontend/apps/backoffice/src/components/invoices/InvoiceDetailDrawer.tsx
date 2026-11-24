@@ -945,7 +945,7 @@ const InvoiceFields: FC<{
         invoice.supplierNif &&
         values.supplierNif === invoice.supplierNif && (
           <div style={{ gridColumn: "1 / -1" }}>
-            <SupplierIbanLine iban={invoice.supplierIban} />
+            <SupplierIbanLine ibans={invoice.supplierIbans} />
           </div>
         )}
     </div>
