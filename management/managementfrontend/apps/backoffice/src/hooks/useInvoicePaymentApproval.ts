@@ -22,8 +22,9 @@ export function isUnapprovedPayment(invoice: ConstructionInvoice): boolean {
 }
 
 /**
- * Aprovar para pagamento e retirar a aprovação. Sem diálogo de confirmação:
- * não mexe em dinheiro e desfaz-se com um clique.
+ * Aprovar para pagamento e retirar a aprovação. Uma fatura de cada vez
+ * (`toggle`) não pede confirmação: não mexe em dinheiro e desfaz-se com um
+ * clique. Em bloco (`approveMany`) pede, porque são várias de uma vez.
  */
 export function useInvoicePaymentApproval(onDone: () => void) {
   const confirm = useConfirm();
