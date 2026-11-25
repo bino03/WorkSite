@@ -9,8 +9,6 @@ import {
   CheckCircleOutlined,
   CheckSquareOutlined,
   ClockCircleOutlined,
-  EuroCircleOutlined,
-  FileTextOutlined,
   QrcodeOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -27,9 +25,7 @@ import type { AppNotification } from "@/types/notification";
 /** O `type` da notificação só existe para isto. Qualquer tipo novo cai no sino. */
 const iconFor = (type: string) => {
   if (type === "task_assigned") return <CheckSquareOutlined />;
-  if (type === "invoice_pending") return <FileTextOutlined />;
   if (type === "budget_item_deadline") return <ClockCircleOutlined />;
-  if (type === "invoice_due") return <EuroCircleOutlined />;
   if (type === "invoice_approved") return <CheckCircleOutlined />;
   if (type === "clock_retired_qr") return <QrcodeOutlined />;
   if (type === "absence_requested" || type === "absence_decided") return <CalendarOutlined />;

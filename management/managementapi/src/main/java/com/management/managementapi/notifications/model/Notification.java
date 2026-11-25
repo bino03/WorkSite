@@ -24,14 +24,8 @@ public class Notification extends BaseEntity {
     /** Tarefa atribuída ao destinatário. */
     public static final String TYPE_TASK_ASSIGNED = "task_assigned";
 
-    /** Fatura carregada e ainda por classificar numa rubrica. */
-    public static final String TYPE_INVOICE_PENDING = "invoice_pending";
-
     /** Rubrica de orçamento cujo prazo (`end_date`) está a chegar ao fim. */
     public static final String TYPE_BUDGET_ITEM_DEADLINE = "budget_item_deadline";
-
-    /** Fatura por liquidar cujo vencimento está a chegar. */
-    public static final String TYPE_INVOICE_DUE = "invoice_due";
 
     /** Fatura aprovada para pagamento — vai para a contabilidade, que é quem paga. */
     public static final String TYPE_INVOICE_APPROVED = "invoice_approved";
