@@ -7,7 +7,11 @@ import BlueprintCard from "@/components/common/BlueprintCard";
 
 const FIELD_SIZE = "large" as const;
 
-export default function FinancialSection() {
+/**
+ * `investmentFromBudget`: a obra tem folha de orçamento, por isso o investimento é a soma dos lotes
+ * e não se edita à mão. Sem folha, escreve-se aqui.
+ */
+export default function FinancialSection({ investmentFromBudget = false }: { investmentFromBudget?: boolean }) {
   const { control } = useFormContext();
   const { t } = useTranslation();
 
@@ -36,11 +40,17 @@ export default function FinancialSection() {
                   min={0}
                   step={1000}
                   placeholder="0"
+                  disabled={investmentFromBudget}
                   formatter={value => `€ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                   parser={value => value?.replace(/€\s?|(,*)/g, '') as unknown as number}
                 />
               )}
             />
+            {investmentFromBudget && (
+              <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
+                Soma das folhas de orçamento de todos os lotes.
+              </div>
+            )}
           </div>
 
           <div className="field">

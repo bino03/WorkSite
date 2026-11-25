@@ -4,9 +4,17 @@ import { Button, Empty, Spin } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { ErrorHandler } from "@/errors/errorHandler";
-import { getMonthReport, listPendingAbsences, listTeamAbsences } from "@/services/attendanceService";
+import {
+  getMonthReport,
+  listHolidays,
+  listPendingAbsences,
+  listTeamAbsences,
+  listTeamDay,
+} from "@/services/attendanceService";
 import { ABSENCE_TYPE_LABEL } from "@/types/attendance";
-import type { Absence, AttendanceMonthReport, DayAttendance } from "@/types/attendance";
+import type { Absence, AttendanceMonthReport, DayAttendance, Holiday, TeamDayPerson } from "@/types/attendance";
+import { WhoIsInCard, whoIsIn } from "@/components/attendance/today/WhoIsInCard";
+import { UpcomingHolidaysCard } from "@/components/attendance/today/UpcomingHolidaysCard";
 import { formatLongDate } from "@/utils/formatters";
 import { TeamAbsenceMap } from "@/components/attendance/absences/TeamAbsenceMap";
 import { AbsenceUpsertDrawer } from "@/components/attendance/absences/AbsenceUpsertDrawer";
@@ -47,10 +55,11 @@ function Stat({ value, label, hint }: { value: number; label: string; hint: stri
  * O painel de entrada do espaço Equipa: o dia de hoje, o que está por resolver, e
  * o mapa de férias do mês.
  *
- * **Não tem endpoint próprio** — monta-se de três pedidos que já serviam outros
- * ecrãs (`reports/month`, `absences/pending`, `absences/team`). Os números são
- * derivados dos mesmos `days[]` que a página de Picagens usa, para não haver duas
- * contas diferentes do mesmo facto.
+ * Monta-se de três pedidos que já serviam outros ecrãs (`reports/month`,
+ * `absences/pending`, `absences/team`) e de um próprio, `time-entries/team-day`, para o
+ * "Quem está": o relatório do mês só tem as obras de pares fechados, e quem só picou
+ * entrada não tinha obra. Faltas e dias incompletos continuam a sair dos mesmos `days[]`
+ * que a página de Picagens usa, para não haver duas contas diferentes do mesmo facto.
  */
 export default function TeamTodayPage() {
   const navigate = useNavigate();
@@ -60,6 +69,9 @@ export default function TeamTodayPage() {
   const [report, setReport] = useState<AttendanceMonthReport | null>(null);
   const [pending, setPending] = useState<Absence[]>([]);
   const [monthAbsences, setMonthAbsences] = useState<Absence[]>([]);
+  const [teamDay, setTeamDay] = useState<TeamDayPerson[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [now, setNow] = useState(() => dayjs().format("HH:mm"));
   const [loading, setLoading] = useState(true);
 
   const [registerEntry, setRegisterEntry] = useState(false);
@@ -73,36 +85,48 @@ export default function TeamTodayPage() {
     const from = `${month}-01`;
     const to = dayjs(from).endOf("month").format("YYYY-MM-DD");
     try {
-      const [monthReport, pendingAbsences, teamAbsences] = await Promise.all([
+      const [monthReport, pendingAbsences, teamAbsences, teamToday, nextHolidays] = await Promise.all([
         getMonthReport(month),
         listPendingAbsences(),
         listTeamAbsences(from, to),
+        listTeamDay(today),
+        // Um ano à frente numa chamada só: em dezembro apanha os de janeiro.
+        listHolidays(today, dayjs(today).add(1, "year").format("YYYY-MM-DD")),
       ]);
+      setHolidays(nextHolidays);
       setReport(monthReport);
       setPending(pendingAbsences);
       setMonthAbsences(teamAbsences);
+      setTeamDay(teamToday);
+      setNow(dayjs().format("HH:mm"));
     } catch (error) {
       ErrorHandler.handle(error);
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  }, [month, today]);
 
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
 
-  const { working, missing, incomplete, attention } = useMemo(() => {
+  // "A trabalhar agora" sai daqui e não do relatório do mês: desde que o almoço se pica, quem
+  // voltou do almoço tem uma saída no dia, e o "entrada sem saída" antigo deixava-o de fora.
+  const who = useMemo(() => {
+    const holidayToday = !!report?.employees.some((employee) =>
+      employee.days.some((day) => day.date === today && day.status === "HOLIDAY")
+    );
+    return whoIsIn(teamDay, monthAbsences, today, now, holidayToday);
+  }, [teamDay, monthAbsences, today, now, report]);
+
+  const { missing, incomplete, attention } = useMemo(() => {
     const rows: Attention[] = [];
-    let workingNow = 0;
     let missingDays = 0;
     let incompleteDays = 0;
 
     report?.employees.forEach((employee) => {
       const name = employee.profileName ?? "—";
       employee.days.forEach((day: DayAttendance) => {
-        // "A trabalhar agora" é hoje com entrada picada e ainda sem saída.
-        if (day.date === today && day.firstIn && !day.lastOut) workingNow += 1;
 
         // Os dias futuros já vêm do backend como "UPCOMING", mas hoje conta lá como dia começado:
         // sem picagens é "MISSING", e quem está a trabalhar agora vem como "incompleto". Aqui só se
@@ -160,7 +184,6 @@ export default function TeamTodayPage() {
     });
 
     return {
-      working: workingNow,
       missing: missingDays,
       incomplete: incompleteDays,
       attention: rows.sort((a, b) => b.day.localeCompare(a.day)),
@@ -203,10 +226,22 @@ export default function TeamTodayPage() {
               marginBottom: "20.4px",
             }}
           >
-            <Stat value={working} label="A trabalhar agora" hint="com entrada picada e sem saída" />
+            <Stat value={who.workingCount} label="A trabalhar agora" hint="a última picagem é uma entrada" />
             <Stat value={missing} label="Faltas por justificar" hint="este mês" />
             <Stat value={incomplete} label="Dias incompletos" hint="falta uma saída ou o almoço" />
             <Stat value={pending.length} label="Pedidos de férias" hint="à espera de aprovação" />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: "13.6px",
+              marginBottom: "20.4px",
+            }}
+          >
+            <WhoIsInCard state={who} />
+            <UpcomingHolidaysCard holidays={holidays} today={today} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 2fr) 3fr", gap: "13.6px" }}>

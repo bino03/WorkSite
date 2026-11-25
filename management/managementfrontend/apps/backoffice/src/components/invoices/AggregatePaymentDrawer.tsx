@@ -10,10 +10,12 @@ import { useTranslation } from "react-i18next";
 import { AggregatePaymentSchema } from "@/components/invoices/paymentFormSchema";
 import type { AggregatePaymentForm } from "@/components/invoices/paymentFormSchema";
 import { registerAggregatePayment } from "@/services/paymentService";
+import { useConfirm } from "@/context/ConfirmDialogContext";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { formatCurrency } from "@/utils/formatters";
 import { isUnapprovedPayment } from "@/hooks/useInvoicePaymentApproval";
+import { SupplierIbanLine } from "@/components/invoices/SupplierIbanLine";
 import type { ConstructionInvoice, LeftOutInvoice, PaymentMethod } from "@/types/invoice";
 
 const { Text } = Typography;
@@ -41,6 +43,7 @@ function remainingOf(invoice: ConstructionInvoice): number {
  */
 export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onDone }) => {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const proofRef = useRef<HTMLInputElement>(null);
   const [proof, setProof] = useState<File | null>(null);
   const [leftOut, setLeftOut] = useState<LeftOutInvoice[]>([]);
@@ -90,7 +93,18 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
   const amount = watch("amount");
   const diff = Math.round(((amount ?? 0) - selectedTotal) * 100) / 100;
 
-  const onSubmit = handleSubmit(async (values) => {
+  const onSubmit = handleSubmit((values) => {
+    confirm({
+      title: "Marcar como pagas",
+      message: `Marcar ${invoices.length} fatura${invoices.length > 1 ? "s" : ""} como paga${
+        invoices.length > 1 ? "s" : ""
+      }, num pagamento de ${formatCurrency(values.amount ?? 0)}?`,
+      actionLabel: "Marcar como pagas",
+      onConfirm: () => submitPayment(values),
+    });
+  });
+
+  const submitPayment = async (values: AggregatePaymentForm) => {
     // A lista das que ficam de fora é a resposta a **este** envio. Sem a
     // limpar, um envio seguinte que falhe por outro motivo deixava no ecrã o
     // aviso do envio anterior a contradizer o erro novo.
@@ -117,7 +131,7 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
     } catch (error) {
       ErrorHandler.handle(error);
     }
-  });
+  };
 
   const fieldError = (message?: string) =>
     message ? (
@@ -173,6 +187,11 @@ export const AggregatePaymentDrawer: FC<Props> = ({ open, invoices, onClose, onD
 
         {differentSuppliers && (
           <Alert type="info" showIcon message={t("invoices.payment.differentSupplierWarning")} />
+        )}
+
+        {/* Com vários fornecedores não há um IBAN para onde transferir. */}
+        {!differentSuppliers && invoices.length > 0 && watch("method") === "TRANSFERENCIA" && (
+          <SupplierIbanLine ibans={invoices[0].supplierIbans} />
         )}
 
         {leftOut.length > 0 && (

@@ -169,6 +169,8 @@ pasta tornariam ambígua qualquer importação ou exportação. Ver [[excel-pari
 > divergia do orçamento importado; fica só no cartão Financeiro da edição. `null` numa obra sem
 > rubricas.
 >
+> Desde 2026-11-23, `GET /enterprises/{id}` (`EnterpriseFullResponseDTO`) traz também `budgetTotal` (a mesma soma, `null` sem orçamento) e, **com orçamento, `totalInvestment` vem já igual a ele**. Sem folha de orçamento o investimento escreve-se à mão (`PATCH /enterprise-relations/{id}/finance`); com folha, esse PATCH **ignora** o `totalInvestment` e o campo fica só de leitura no cartão Financeiro.
+>
 > Desde 2026-09-24, o mesmo DTO traz também `lots` (`BudgetLotOptionDTO[]`, só `id`+`name`, sem os
 > números do orçamento) — vazio (nunca `null`) numa obra sem lotes. É o que alimenta o seletor de
 > lote no `TransferInvoiceDrawer`: depois de escolher a obra de destino, se ela tiver lotes, escolhe-se
@@ -746,6 +748,7 @@ associada acompanha os novos valores.
 | `INVOICE_051` | `PATCH /{id}/allocate` / `expenses/split` / `batch-allocate` — obra de vários lotes e a fatura ainda não tem lote |
 | `INVOICE_052` | `PATCH /{id}/budget` — a fatura já tem despesas e o pedido mudaria o lote |
 | `INVOICE_053` | `POST /{id}/transfer` com `keepRubrics` — alguma despesa não tem rubrica com o mesmo código no lote de destino |
+| `INVOICE_054` | `GET /outstanding/payment-list` — nenhuma fatura aprovada por pagar com estes filtros |
 | `INVOICE_034` | inconsistência não encontrada (`GET/POST /invoice-incidents/{id}`) |
 | `INVOICE_035` | `POST /invoice-incidents` com uma fatura que não existe |
 | `INVOICE_036` | `POST /import-excel` com ficheiro vazio |
@@ -1169,7 +1172,7 @@ que os usa está ligado:
 | `minAmount`, `maxAmount` | total, inclusive; as sem total saem |
 | `budgetItemId` | rubrica **e sub-árvore**. Só com `enterpriseId`: sem a obra → `400` |
 
-O `findOutstandingExcludingScope` não mudou de assinatura: o `InvoiceDueNotifier` usa-o também. Na página,
+O `findOutstandingExcludingScope` não mudou de assinatura. Na página,
 os filtros são só estado local (nem URL, nem `localStorage`).
 
 - **O que entra**: a mesma definição de "por liquidar" do filtro `outstanding=true` (pago + notas de
@@ -1185,6 +1188,17 @@ os filtros são só estado local (nem URL, nem `localStorage`).
   poucas centenas de faturas — se um dia forem milhares, é aqui que se sente.
 - **Pagar várias a partir daqui** continua a obedecer a `INVOICE_PAYMENT_CROSS_ENTERPRISE`: um
   pagamento agregado é de uma obra só. O cliente desativa o botão quando a seleção mistura obras.
+
+**Lista de pagamentos** (2026-11-24): `GET /construction-invoices/outstanding/payment-list?format=XLSX|PDF`
+(`ADMIN`, `ACCOUNTANT`), com os mesmos filtros de `/outstanding` menos `page`/`size` — e o
+`approvedForPayment` **forçado a `true`**: só entram as aprovadas para pagamento e ainda por liquidar.
+Devolve o ficheiro (`Pagamentos aprovados - AAAA-MM-DD.xlsx|.pdf`), **agrupado por fornecedor**: nome, NIF,
+os IBAN da ficha com o banco de cada um (`Iban.bankOf`, o mesmo mapa de códigos PT do Backoffice), e por baixo
+as faturas (nº, data, vencimento, obra, **a pagar** = líquido − pago) com o total do fornecedor e o total geral.
+Fornecedores por ordem alfabética, "por identificar" no fim; faturas pela ordem de urgência. Sem nenhuma →
+`400`/`INVOICE_054`, para não descarregar um ficheiro vazio. O PDF usa as fontes base (WinAnsi): um carácter
+fora dele sai como `?`. `PaymentListExportService`; botão "Exportar" em "A pagar" (com os filtros do ecrã) e no
+cartão "Aprovadas para pagamento" da página inicial (sem filtros).
 
 ### Vencimento da fatura
 
@@ -1245,7 +1259,7 @@ carregar.
 | GET | `/suppliers?q=` | `ADMIN` ou `EMPLOYEE` — catálogo por ordem alfabética, com `invoiceCount` |
 | GET | `/suppliers/unknown-nifs` | `ADMIN` ou `EMPLOYEE` — NIFs vistos nas faturas ainda sem empresa, do mais frequente para o menos |
 | POST | `/suppliers` | `ADMIN` — dá nome a um NIF (e, se vier, o prazo); devolve `201` |
-| PUT | `/suppliers/{id}` | `ADMIN` — renomeia e/ou muda o prazo. **Substitui tudo**: `notes` e `paymentTermDays` omitidos ficam a `null` |
+| PUT | `/suppliers/{id}` | `ADMIN` — renomeia e/ou muda o prazo e os IBAN. **Substitui tudo**: `notes` e `paymentTermDays` omitidos ficam a `null`, `ibans` a `[]` |
 | DELETE | `/suppliers/{id}` | `ADMIN` — tira do catálogo; devolve `204` |
 
 **Gravar propaga-se às faturas.** `POST` e `PUT` escrevem o nome nas faturas desse NIF que
@@ -1267,7 +1281,17 @@ fornecedor, ou mudar-lhe o NIF, deixa essas faturas sem vencimento.
 `unknown-nifs` traz `suggestedName` — um nome que alguém já escreveu à mão nalguma fatura desse
 NIF, se existir — para o ecrã o mostrar pré-preenchido em vez de o pedir outra vez.
 
-Códigos de erro: `SUPPLIER_001` (não encontrado), `SUPPLIER_002` (NIF já no catálogo).
+**IBAN** (`ibans`, lista, desde a `V54`; a `V53` tinha um só): **um por banco**, para pagar por
+transferência — a app só os mostra e copia, a transferência faz-se no homebanking. O `POST`/`PUT`
+aceitam cada um com espaços ou hífenes (como vem impresso); o service normaliza (sem espaços,
+maiúsculas), valida formato + mod-97 (`util/Iban.java`, espelhado em `utils/iban.ts` no Backoffice),
+tira vazios e repetidos e mantém a ordem; um inválido recusa a gravação toda com `SUPPLIER_003`. Máx. 10.
+Lista vazia ou omitida apaga-os (o `PUT` substitui tudo). A resposta de cada fatura traz `supplierIbans` —
+os da ficha com o mesmo NIF, resolvidos na leitura como o vencimento; `[]` sem ficha ou sem IBAN. O nome
+do banco **não** vem da API: o Backoffice lê-o dos dígitos 5-8 de um IBAN PT (`bankOfIban`, só códigos
+conhecidos; os outros mostram "IBAN").
+
+Códigos de erro: `SUPPLIER_001` (não encontrado), `SUPPLIER_002` (NIF já no catálogo), `SUPPLIER_003` (IBAN inválido).
 
 ## Tarefas (`TaskController`, `/tasks`)
 
@@ -1369,6 +1393,7 @@ endpoint do QR que o define.
 |---|---|---|
 | GET | `/attendance/time-entries?profileId=` | `ADMIN` (paginado) |
 | GET | `/attendance/time-entries/day?profileId=&day=` | `ADMIN` — o dia local, 00:00 a 00:00 em `Europe/Lisbon` |
+| GET | `/attendance/time-entries/team-day?day=` | `ADMIN`: `[{ profileId, profileName, scheduledStart, entries[] }]`, uma linha por pessoa com ficha nesse dia (`TeamDayService`, duas consultas para a equipa toda). `scheduledStart` é a hora de entrada que o horário prevê (null = folga ou sem horário). Serve o cartão "Quem está" do painel Hoje: a obra de quem está a trabalhar é a da **última entrada**, que o relatório do mês não tem (só guarda pares fechados) |
 | GET | `/attendance/time-entries/deleted?profileId=` | `ADMIN` — zona de recuperação |
 | GET | `/attendance/time-entries/{id}` | `ADMIN` |
 | GET | `/attendance/time-entries/{id}/revisions` | `ADMIN` — **o rasto de auditoria** |
@@ -1393,19 +1418,25 @@ Não existe endpoint de apagar a sério. A resposta traz `localDate` — o dia a
 A sequência é avaliada **dentro do dia local**: um dia de trabalho não atravessa a meia-noite (decisão
 de 2026-10-06), por isso cada dia começa a zero e um dia mal preenchido não contamina o seguinte.
 
-## As minhas férias (`MyAttendanceController`, `/attendance/me`)
+## As minhas férias e horas (`MyAttendanceController`, `/attendance/me`)
 
-Fase 5b (2026-11-20): o funcionário vê as **suas** férias, só em leitura. `ADMIN` ou `EMPLOYEE` (na
-classe); o perfil vem sempre da sessão. Página `/backoffice/ferias` ("As minhas férias"), com o saldo,
-um calendário do mês (feriados + ausências) e a lista do ano.
+Fase 5b (2026-11-20 e 2026-11-23): o funcionário vê as **suas** férias e horas, e **pede férias**.
+`ADMIN` ou `EMPLOYEE` (na classe); o perfil vem sempre da sessão, nenhuma rota recebe um id de
+perfil. Página `/backoffice/ferias` ("Férias e horas"): separador Férias (saldo, calendário do mês,
+lista do ano, "Pedir férias", "Anular" num pedido pendente) e separador Horas (o mês dia a dia).
 
 | Método | Rota | O quê |
 |---|---|---|
 | GET | `/attendance/me/absences?from=&to=` | As minhas ausências no intervalo (resumo, sem documentos); `ABS_011` se `to < from` ou mais de 400 dias |
 | GET | `/attendance/me/vacation-balance?year=` | O meu saldo de férias (o mesmo `VacationBalanceDTO` do admin) |
 | GET | `/attendance/me/holidays?from=&to=` | Os feriados do intervalo, nacionais e municipais |
+| GET | `/attendance/me/summary/month?month=aaaa-mm` | As minhas horas do mês: o mesmo `AttendanceSummaryDTO` de `/attendance/summary/month` |
+| GET | `/attendance/me/vacation-requests/preview?startsOn=&endsOn=&halfDay=` | `{ year, days, available }`: os dias úteis que o pedido gastaria no ano em que começa, e o disponível antes dele. É o **aviso** de saldo do formulário. Um pedido acima do saldo **não é recusado** (o `ABS_017` continua reservado) |
+| POST | `/attendance/me/vacation-requests` | `{ startsOn, endsOn, halfDay, note }` → `201` com a ausência: sempre `VACATION`, sempre `PENDING`, `requestedBy` = o próprio. Mesmas regras do registo pelo admin (`ABS_011`/`012`/`013`/`016`). Avisa os `ADMIN` (`absence_requested`) |
+| DELETE | `/attendance/me/vacation-requests/{id}` | Anula (soft delete) um pedido **meu** ainda `PENDING` → `204`. De outra pessoa → `ABS_010` (não 403, para não confirmar que existe); já decidido → `ABS_014` |
 
-Marcar e aprovar férias continua a ser do admin (`/attendance/absences`).
+Outras ausências (baixa, faltas) e aprovar continuam a ser do admin (`/attendance/absences`). Aprovar ou
+recusar avisa o funcionário (`absence_decided`), a não ser que tenha sido ele a decidir.
 
 ## Picar pelo QR da obra (`ClockController`, `/attendance/clock`)
 
@@ -1436,7 +1467,8 @@ na obra, entra com a **sua** conta (`EMPLOYEE`) e confirma com um toque. O QR le
 
 | Código | Quando |
 |---|---|
-| `ATT_020` | Código desconhecido, ou substituído por um "Gerar novo QR" |
+| `ATT_020` | Código desconhecido (nunca foi de nenhuma obra, ou substituído antes da `V52`) |
+| `ATT_026` | Código **substituído** por um "Gerar novo QR" (`attendance.retired_clock_code`, `V52`). No `preview` regista a tentativa e avisa os `ADMIN` (`clock_retired_qr`); no `POST` só recusa. Vem **antes** do `ATT_022`: avisa mesmo sem ficha de emprego |
 | `ATT_021` | Obra `archived` ou `deleted` |
 | `ATT_022` | Sem ficha de emprego, ou com `ended_at` antes de hoje / `hired_at` depois de hoje. **Ao contrário** do registo pelo admin, aqui a ficha é obrigatória |
 | `ATT_023` | A direção enviada já não é a próxima |
@@ -1621,20 +1653,16 @@ confirmaria a existência a quem não devia sequer saber disso.
 | Tipo | Quando | Para quem |
 |---|---|---|
 | `task_assigned` | `POST /tasks` e `PUT /tasks/{id}` | Os atribuídos, **menos** os que já estavam atribuídos antes e **menos** quem fez a atribuição |
-| `invoice_pending` | `POST /construction-invoices` (upload) | **Só quem carregou** |
 | `budget_item_deadline` | Job agendado (`BudgetItemDeadlineNotifierConfig`, 07:00 diário **e no arranque**) — rubricas `ITEM` vivas, de obras que não estejam `completed`/`archived`/`deleted`, com `end_date` entre hoje e hoje+N (`APP_BUDGET_DEADLINE_DAYS_AHEAD`, 7 por omissão) | **Todos os `ADMIN` e `ACCOUNTANT` desbloqueados** (`ProfileRole.WORKS_MANAGERS`), uma vez por rubrica e destinatário (dedupe `existsByRecipientIdAndTypeAndEntityId`); adiar a data de uma rubrica já avisada **não** gera aviso novo |
-| `invoice_due` | Job agendado (`InvoiceDueNotifierConfig`, 07:00 diário **e no arranque**) — faturas por liquidar (as da página "A pagar": obras e empresa, sem quarentena, sem notas de crédito, sem obras `is_test` nem eliminadas) cujo **vencimento** cai em `[hoje, hoje + N]`, `N` = `app.notifications.invoice-due.days-ahead` (7). Para todos os `ADMIN` e `ACCOUNTANT` desbloqueados (`ProfileRole.WORKS_MANAGERS`), **uma vez por fatura e destinatário**. Sem vencimento não avisa; já vencida também não (a lista mostra-as à frente). Avisa de todas, aprovadas ou não — o texto termina em "aprovada para pagamento" ou "por aprovar". Link: `/backoffice/invoices/outstanding`. Mudar o prazo do fornecedor ou o vencimento manual de uma fatura já avisada **não reavisa** |
 | `invoice_approved` | `PATCH /construction-invoices/{id}/payment-approval` com `approved=true`, **só na passagem** de por aprovar a aprovada (reaprovar não avisa). Faturas de obras `is_test` não avisam | **Todos os `ACCOUNTANT` desbloqueados, menos quem aprovou** (não os `ADMIN`: é a contabilidade que paga). Texto: fornecedor · número · obra (ou "Empresa"). Link: `/backoffice/invoices/outstanding?approved=true`, que abre "A pagar" já filtrado nas aprovadas |
+| `absence_requested` | `POST /attendance/me/vacation-requests` (o funcionário pede férias) | **Todos os `ADMIN` desbloqueados**, menos o próprio. Texto: "<funcionário> pediu férias de <dd/mm/aaaa> a <dd/mm/aaaa>." (ou "a <dia> (manhã)"). Link: `/team/absences` |
+| `absence_decided` | `POST /attendance/absences/{id}/approve` e `/reject` (qualquer ausência, não só as pedidas pelo próprio) | **O funcionário da ausência**, a não ser que tenha sido ele a decidir. Texto: "O seu pedido de férias/ausência … foi aprovado/recusado." Link: `/backoffice/ferias` |
+| `clock_retired_qr` | `GET /attendance/clock/preview` com um código já substituído (`ATT_026`) — **uma vez por funcionário, código e dia** (dedupe pela unique de `attendance.retired_clock_code_attempt`). Um código inventado (`ATT_020`) não avisa | **Todos os `ADMIN` desbloqueados**. Texto: "<funcionário> tentou picar na obra <X> com um QR antigo (substituído a <data>)". Link: `/team/time-entries?profile=<id>&day=<aaaa-mm-dd>`, que abre o dia desse funcionário para picar à mão. **Exceção à regra da mesma transação**: grava-se em `REQUIRES_NEW` (`RetiredClockCodeAlertService`), porque o que a origina é um erro que desfaz a transação do pedido |
 
 > O `budget_item_deadline` corre também no arranque porque a app não está ligada 24h por dia —
 > um cron às 7h numa app que só arranca às 9h nunca dispararia. O link é a página do orçamento da
 > obra (`/backoffice/empreendimentos/{id}/budget`), sem realçar a rubrica. Decisões de 2026-09-16.
 
-> ⚠️ Consequência conhecida do `invoice_pending`: alocar uma fatura a uma rubrica é
-> `hasRole('ADMIN')`, mas carregar é `ADMIN` **ou** `EMPLOYEE`. Quando um empregado carrega uma
-> fatura, o aviso vai para ele e **nenhum admin fica a saber** que há trabalho por fazer — o
-> contador de pendentes na página do orçamento continua a ser o único sinal. Foi decisão
-> explícita a 2026-08-18; mudar é trocar o destinatário para os ADMIN.
 
 A escrita acontece **na mesma transação** da operação que a originou: se a tarefa não for
 gravada, a notificação também não existe.

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.management.managementapi.dto.attendance.response.VacationBalanceDTO;
+import com.management.managementapi.dto.attendance.response.VacationRequestPreviewDTO;
 import com.management.managementapi.model.attendance.Absence;
 import com.management.managementapi.model.attendance.Employment;
 import com.management.managementapi.model.attendance.EmploymentTerm;
@@ -100,6 +101,28 @@ public class VacationBalanceService {
                 .stream().map(holiday -> holiday.getDate()).collect(HashSet::new, Set::add, Set::addAll);
 
         return workingDays(absence, employment, holidays, year);
+    }
+
+    /**
+     * Quantos dias de férias um pedido ainda por gravar gastaria no ano em que começa,
+     * e o que sobra desse ano. É o aviso de saldo do pedido pelo próprio — avisa, não
+     * bloqueia (decidido a 2026-11-23; o {@code ABS_017} continua reservado).
+     */
+    @Transactional(readOnly = true)
+    public VacationRequestPreviewDTO previewRequest(UUID profileId, LocalDate startsOn, LocalDate endsOn,
+                                                    AbsenceHalfDay halfDay) {
+        int year = startsOn.getYear();
+        Employment employment = employmentRepository.findByProfileId(profileId).orElse(null);
+        Set<LocalDate> holidays = holidayRepository.findByDateBetweenOrderByDateAsc(startsOn, endsOn)
+                .stream().map(holiday -> holiday.getDate()).collect(HashSet::new, Set::add, Set::addAll);
+
+        Absence draft = new Absence();
+        draft.setStartsOn(startsOn);
+        draft.setEndsOn(endsOn);
+        draft.setHalfDay(halfDay == null ? AbsenceHalfDay.NONE : halfDay);
+
+        double days = workingDays(draft, employment, holidays, year);
+        return new VacationRequestPreviewDTO(year, days, forYear(profileId, year).available());
     }
 
     /**

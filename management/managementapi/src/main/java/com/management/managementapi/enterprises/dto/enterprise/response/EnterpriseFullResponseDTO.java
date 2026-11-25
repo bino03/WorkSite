@@ -33,6 +33,8 @@ public class EnterpriseFullResponseDTO {
     private BigDecimal landArea;
     private Integer totalUnits;
     private BigDecimal totalInvestment;
+    /** Soma das folhas do orçamento de todos os lotes; {@code null} numa obra sem orçamento (aí o investimento escreve-se à mão). */
+    private BigDecimal budgetTotal;
     private BigDecimal currentValue;
     private String currency;
     private String constructionCompany;

@@ -1,5 +1,6 @@
 package com.management.managementapi.enterprises.dto.supplier.response;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -20,5 +21,7 @@ public record SupplierResponseDTO(
         String notes,
         /** Dias a contar da data da fatura; null é "sem prazo", 0 é pronto pagamento. */
         Integer paymentTermDays,
+        /** Um por banco, sem espaços, maiúsculas; vazio se a ficha não tem nenhum. */
+        List<String> ibans,
         long invoiceCount
 ) {}

@@ -47,6 +47,12 @@ Drawer é o padrão dominante (24 ficheiros usam `<Drawer>` contra 12 com `<Moda
   — faz-se um `Modal` pequeno do domínio (`TimeEntryReasonModal`), com o título, o texto e o rótulo
   do botão a mudar conforme a ação. **Restaurar não pode ler "Confirmar eliminação"**: é a mesma
   armadilha dos valores por omissão do `confirm()`, aqui resolvida por o modal ser próprio.
+- **`useConfirm()` aberto de dentro de um Drawer (2026-11-24)**: o modal do diálogo partilhado tem
+  `zIndex={1100}`, acima dos drawers (1000). Com o valor por omissão (1000) o drawer, montado depois,
+  ficava por cima: o diálogo aparecia escurecido e o botão de confirmar ficava tapado pela máscara do
+  drawer — não se conseguia clicar. Apanhado a verificar o "Marcar como pagas" do
+  `AggregatePaymentDrawer`; prova-se com `document.elementFromPoint` no centro do botão (tem de ser o
+  próprio botão, não `ant-drawer-mask`). Qualquer Modal novo aberto de um drawer precisa do mesmo cuidado.
 - Confirmações de ações destrutivas usam o diálogo partilhado `useConfirm()` (`context/ConfirmDialogContext`) — ver [[backoffice-buttons-and-icons]]. `Popconfirm` só sobrevive em três ficheiros por migrar; não o uses em código novo. `Modal.confirm` só quando a confirmação precisa de mais contexto do que o diálogo partilhado permite.
 
 ## Skills relacionadas

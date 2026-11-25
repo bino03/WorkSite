@@ -1,10 +1,43 @@
 import api from "@/api";
-import type { Absence, Holiday, VacationBalance } from "@/types/attendance";
+import type {
+  Absence,
+  AttendanceSummary,
+  Holiday,
+  MyVacationRequest,
+  VacationBalance,
+  VacationRequestPreview,
+} from "@/types/attendance";
 
 /*
- * "As minhas férias" (`/attendance/me`, ADMIN ou EMPLOYEE). Só leitura, e sempre de
- * quem tem a sessão — nenhuma destas chamadas leva um id de perfil.
+ * "As minhas férias e horas" (`/attendance/me`, ADMIN ou EMPLOYEE), sempre de quem tem
+ * a sessão — nenhuma destas chamadas leva um id de perfil. A única escrita é pedir
+ * férias (fica pendente) e anular um pedido ainda por decidir.
  */
+
+export async function myMonthSummary(month: string): Promise<AttendanceSummary> {
+  const response = await api.get<AttendanceSummary>("/attendance/me/summary/month", { params: { month } });
+  return response.data;
+}
+
+export async function previewVacationRequest(
+  startsOn: string,
+  endsOn: string,
+  halfDay: MyVacationRequest["halfDay"]
+): Promise<VacationRequestPreview> {
+  const response = await api.get<VacationRequestPreview>("/attendance/me/vacation-requests/preview", {
+    params: { startsOn, endsOn, halfDay },
+  });
+  return response.data;
+}
+
+export async function requestVacation(request: MyVacationRequest): Promise<Absence> {
+  const response = await api.post<Absence>("/attendance/me/vacation-requests", request);
+  return response.data;
+}
+
+export async function cancelVacationRequest(id: string): Promise<void> {
+  await api.delete(`/attendance/me/vacation-requests/${id}`);
+}
 
 export async function myAbsences(from: string, to: string): Promise<Absence[]> {
   const response = await api.get<Absence[]>("/attendance/me/absences", { params: { from, to } });

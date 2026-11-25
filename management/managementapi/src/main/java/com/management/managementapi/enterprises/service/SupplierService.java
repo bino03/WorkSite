@@ -12,6 +12,7 @@ import com.management.managementapi.enterprises.repository.SupplierRepository;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.exeption.ResourceNotFoundException;
 import com.management.managementapi.security.AuthContext;
+import com.management.managementapi.util.Iban;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -95,6 +97,7 @@ public class SupplierService {
         supplier.setName(dto.name().trim());
         supplier.setNotes(trimToNull(dto.notes()));
         supplier.setPaymentTermDays(dto.paymentTermDays());
+        supplier.setIbans(validIbans(dto.ibans()));
         authContext.currentProfileId().ifPresent(supplier::setCreatedBy);
 
         return saveAndApplyName(supplier);
@@ -117,6 +120,7 @@ public class SupplierService {
         supplier.setName(dto.name().trim());
         supplier.setNotes(trimToNull(dto.notes()));
         supplier.setPaymentTermDays(dto.paymentTermDays());
+        supplier.setIbans(validIbans(dto.ibans()));
 
         return saveAndApplyName(supplier);
     }
@@ -165,6 +169,27 @@ public class SupplierService {
                         ConstructionInvoiceRepository.SupplierNifCount::getInvoiceCount,
                         (first, second) -> first,
                         LinkedHashMap::new));
+    }
+
+    /**
+     * Normaliza e valida cada um: um IBAN com um dígito trocado é recusado em
+     * vez de gravado, porque é dele que se copia para a transferência. Os
+     * vazios caem e os repetidos ficam uma vez, pela ordem em que vieram.
+     */
+    static List<String> validIbans(List<String> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        LinkedHashSet<String> ibans = new LinkedHashSet<>();
+        for (String value : raw) {
+            String iban = Iban.normalize(value);
+            if (iban == null) continue;
+            if (!Iban.isValid(iban)) {
+                throw new BusinessException(ErrorCode.SUPPLIER_IBAN_INVALID);
+            }
+            ibans.add(iban);
+        }
+        return List.copyOf(ibans);
     }
 
     private static boolean isBlank(String value) {

@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.management.managementapi.dto.attendance.request.AbsenceUpsertDTO;
+import com.management.managementapi.dto.attendance.request.MyVacationRequestDTO;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.exeption.FileUploadException;
@@ -27,6 +29,10 @@ import com.management.managementapi.model.attendance.Employment;
 import com.management.managementapi.model.enums.AbsenceHalfDay;
 import com.management.managementapi.model.enums.AbsenceStatus;
 import com.management.managementapi.model.enums.AbsenceType;
+import com.management.managementapi.model.enums.AccountStatus;
+import com.management.managementapi.model.enums.ProfileRole;
+import com.management.managementapi.notifications.model.Notification;
+import com.management.managementapi.notifications.service.NotificationService;
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.repository.attendance.AbsenceDocumentRepository;
 import com.management.managementapi.repository.attendance.AbsenceRepository;
@@ -48,6 +54,7 @@ public class AbsenceService {
 
     private static final Logger log = LoggerFactory.getLogger(AbsenceService.class);
 
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final String BUCKET = "documents";
     private static final Set<String> ALLOWED_MIME = Set.of(
             "application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic");
@@ -59,17 +66,20 @@ public class AbsenceService {
     private final EmploymentRepository employmentRepository;
     private final ProfileRepository profileRepository;
     private final SupabaseStorageService storageService;
+    private final NotificationService notifications;
 
     public AbsenceService(AbsenceRepository repository,
                           AbsenceDocumentRepository documentRepository,
                           EmploymentRepository employmentRepository,
                           ProfileRepository profileRepository,
-                          SupabaseStorageService storageService) {
+                          SupabaseStorageService storageService,
+                          NotificationService notifications) {
         this.repository = repository;
         this.documentRepository = documentRepository;
         this.employmentRepository = employmentRepository;
         this.profileRepository = profileRepository;
         this.storageService = storageService;
+        this.notifications = notifications;
     }
 
     // ── Leitura ───────────────────────────────────────────────
@@ -150,7 +160,78 @@ public class AbsenceService {
         absence.setStatus(approve ? AbsenceStatus.APPROVED : AbsenceStatus.REJECTED);
         absence.setApprovedBy(resolveProfileOrNull(decidedBy));
         absence.setApprovedAt(OffsetDateTime.now());
-        return repository.save(absence);
+        Absence saved = repository.save(absence);
+        notifyDecision(saved, decidedBy);
+        return saved;
+    }
+
+    // ── Pelo próprio (fase 5b) ────────────────────────────────
+
+    /**
+     * O funcionário pede férias para si. Passa pelas mesmas regras do registo pelo
+     * admin (datas, admissão, sobreposição) e nasce {@code PENDING}; os ADMIN são
+     * avisados no sino. O saldo não bloqueia — o aviso é do formulário.
+     */
+    public Absence requestVacation(UUID profileId, MyVacationRequestDTO dto) {
+        Absence absence = create(new AbsenceUpsertDTO(profileId, AbsenceType.VACATION,
+                dto.startsOn(), dto.endsOn(), dto.halfDay(), dto.note()), profileId);
+
+        List<UUID> admins = profileRepository.findIdsByRoleInAndAccountStatus(
+                        List.of(ProfileRole.ADMIN), AccountStatus.unlocked)
+                .stream()
+                .filter(id -> !id.equals(profileId))
+                .toList();
+        notifications.notifyAll(admins, Notification.TYPE_ABSENCE_REQUESTED,
+                "Pedido de férias",
+                absence.getProfile().getName() + " pediu férias " + describePeriod(absence) + ".",
+                "/team/absences",
+                absence.getId());
+        return absence;
+    }
+
+    /**
+     * Anular um pedido próprio ainda por decidir. Uma ausência de outra pessoa dá
+     * {@code ABS_010} e não 403: distinguir "não é tua" de "não existe" confirmaria
+     * que existe.
+     */
+    public void cancelOwnRequest(UUID absenceId, UUID profileId) {
+        Absence absence = getById(absenceId);
+        if (!absence.getProfile().getId().equals(profileId)) {
+            throw new ResourceNotFoundException(ErrorCode.ABSENCE_NOT_FOUND, "Ausência " + absenceId + " não encontrada");
+        }
+        if (absence.getStatus() != AbsenceStatus.PENDING) {
+            throw new BusinessException(ErrorCode.ABSENCE_ALREADY_DECIDED);
+        }
+        absence.setDeletedAt(OffsetDateTime.now());
+        repository.save(absence);
+    }
+
+    /** Ao próprio, quando o escritório decide — menos se foi ele que decidiu. */
+    private void notifyDecision(Absence absence, UUID decidedBy) {
+        UUID owner = absence.getProfile().getId();
+        if (owner.equals(decidedBy)) {
+            return;
+        }
+        boolean approved = absence.getStatus() == AbsenceStatus.APPROVED;
+        String what = absence.getType() == AbsenceType.VACATION ? "férias" : "ausência";
+        notifications.notify(owner, Notification.TYPE_ABSENCE_DECIDED,
+                approved ? "Pedido aprovado" : "Pedido recusado",
+                "O seu pedido de " + what + " " + describePeriod(absence)
+                        + (approved ? " foi aprovado." : " foi recusado."),
+                "/backoffice/ferias",
+                absence.getId());
+    }
+
+    private static String describePeriod(Absence absence) {
+        if (absence.getStartsOn().isEqual(absence.getEndsOn())) {
+            String half = switch (absence.getHalfDay()) {
+                case MORNING -> " (manhã)";
+                case AFTERNOON -> " (tarde)";
+                default -> "";
+            };
+            return "a " + absence.getStartsOn().format(DATE) + half;
+        }
+        return "de " + absence.getStartsOn().format(DATE) + " a " + absence.getEndsOn().format(DATE);
     }
 
     /**

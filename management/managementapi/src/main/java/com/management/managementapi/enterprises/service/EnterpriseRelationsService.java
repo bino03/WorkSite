@@ -42,17 +42,20 @@ public class EnterpriseRelationsService {
     private LocationRepository locationRepository;
     private final EnterpriseMediaRepository enterprisesMediaRepository;
     private final SupabaseStorageService storageService;
+    private final ConstructionBudgetItemService budgetService;
 
     public EnterpriseRelationsService(EnterpriseRepository enterpriseRepository,
             EnterpriseLocationRepository enterpriseLocationRepository,
             LocationRepository locationRepository,
             EnterpriseMediaRepository enterprisesMediaRepository,
-            SupabaseStorageService storageService) {
+            SupabaseStorageService storageService,
+            ConstructionBudgetItemService budgetService) {
         this.enterpriseLocationRepository = enterpriseLocationRepository;
         this.enterpriseRepository = enterpriseRepository;
         this.locationRepository = locationRepository;
         this.enterprisesMediaRepository = enterprisesMediaRepository;
         this.storageService = storageService;
+        this.budgetService = budgetService;
 
     }
 
@@ -315,7 +318,9 @@ public FinanceCardDTO updateFinance(@NonNull UUID id, FinanceCardDTO dto) {
             .orElseThrow(() -> new EntityNotFoundException("Enterprise not found with id: " + id));
 
     // Aplicar as alterações parciais (PATCH)
-    if (dto.getTotalInvestment() != null) {
+    // Com folha de orçamento o investimento é a soma dos lotes (calculada ao ler), não se escreve à mão.
+    boolean hasBudget = budgetService.budgetTotalsByEnterprise(java.util.List.of(id)).containsKey(id);
+    if (dto.getTotalInvestment() != null && !hasBudget) {
         enterprise.setTotalInvestment(dto.getTotalInvestment());
     }
     if (dto.getCurrentValue() != null) {

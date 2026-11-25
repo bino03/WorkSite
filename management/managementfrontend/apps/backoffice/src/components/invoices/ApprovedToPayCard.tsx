@@ -6,6 +6,7 @@ import { CheckCircleOutlined } from "@ant-design/icons";
 
 import BlueprintCard from "@/components/common/BlueprintCard";
 import { InvoiceDueDateCell } from "@/components/invoices/InvoiceDueDate";
+import { PaymentListExportButton } from "@/components/invoices/PaymentListExportButton";
 import { listOutstandingByUrgency } from "@/services/invoiceService";
 import { formatCurrency } from "@/utils/formatters";
 import type { OutstandingByUrgency } from "@/types/invoice";
@@ -42,9 +43,13 @@ export const ApprovedToPayCard: FC = () => {
           Aprovadas para pagamento
         </span>
         {data && data.totalElements > 0 && (
-          <span className="ind-card-meta">
-            {data.totalElements} {data.totalElements === 1 ? "fatura" : "faturas"} · {formatCurrency(data.total)}
-            {data.overdueCount > 0 && ` · ${data.overdueCount} vencida${data.overdueCount === 1 ? "" : "s"}`}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span className="ind-card-meta">
+              {data.totalElements} {data.totalElements === 1 ? "fatura" : "faturas"} · {formatCurrency(data.total)}
+              {data.overdueCount > 0 && ` · ${data.overdueCount} vencida${data.overdueCount === 1 ? "" : "s"}`}
+            </span>
+            {/* Todas as aprovadas, sem filtros — as mesmas que os números ao lado contam. */}
+            <PaymentListExportButton size="small" />
           </span>
         )}
       </div>

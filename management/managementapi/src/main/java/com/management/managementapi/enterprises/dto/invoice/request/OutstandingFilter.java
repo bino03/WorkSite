@@ -56,6 +56,12 @@ public record OutstandingFilter(
                 null, null, null, null, null, null, null, null, null);
     }
 
+    /** O mesmo filtro, só com as aprovadas para pagamento — a lista de pagamentos exportada. */
+    public OutstandingFilter onlyApproved() {
+        return new OutstandingFilter(enterpriseId, company, supplierNif, dueBucket, Boolean.TRUE, sentToAccountant,
+                q, documentStatus, paymentStatus, allocationStatus, from, to, minAmount, maxAmount, budgetItemId);
+    }
+
     /** Algum filtro que obriga a carregar pagamentos, repartições ou documentos. */
     public boolean hasAdvanced() {
         return (q != null && !q.isBlank()) || documentStatus != null || paymentStatus != null

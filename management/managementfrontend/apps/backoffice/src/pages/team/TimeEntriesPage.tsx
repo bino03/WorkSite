@@ -3,6 +3,7 @@ import { Button, DatePicker, Empty, Input, Segmented, Spin, Table, Tooltip } fro
 import { LeftOutlined, RightOutlined, SearchOutlined, WarningOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
+import { useSearchParams } from "react-router-dom";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { getMonthReport } from "@/services/attendanceService";
 import { DAY_STATUS_LABEL } from "@/types/attendance";
@@ -46,9 +47,17 @@ type Scope = "day" | "month";
  * dia, pelo `DayTimeEntriesDrawer`.
  */
 export default function TimeEntriesPage() {
-  const [month, setMonth] = useState(() => dayjs().format("YYYY-MM"));
+  // `?profile=<id>&day=<aaaa-mm-dd>` abre logo o dia desse funcionário — é o link do
+  // aviso de QR antigo, para o admin picar à mão por quem não conseguiu.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedProfile = searchParams.get("profile");
+  const linkedDayParam = searchParams.get("day") ?? "";
+  const linkedDay = /^\d{4}-\d{2}-\d{2}$/.test(linkedDayParam) ? dayjs(linkedDayParam) : null;
+  const initialDay = linkedDay?.isValid() ? linkedDay : dayjs();
+
+  const [month, setMonth] = useState(() => initialDay.format("YYYY-MM"));
   const [scope, setScope] = useState<Scope>("day");
-  const [day, setDay] = useState(() => dayjs().format("YYYY-MM-DD"));
+  const [day, setDay] = useState(() => initialDay.format("YYYY-MM-DD"));
   const [query, setQuery] = useState("");
   const [report, setReport] = useState<AttendanceMonthReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +77,28 @@ export default function TimeEntriesPage() {
   useEffect(() => {
     void fetchReport();
   }, [fetchReport]);
+
+  // Só uma vez: depois de abrir, os parâmetros saem do URL para fechar o drawer não o reabrir.
+  useEffect(() => {
+    if (!report || !linkedProfile) return;
+    const employee = report.employees.find((candidate) => candidate.profileId === linkedProfile);
+    const entry = employee?.days.find((candidate) => candidate.date === day);
+    if (employee && entry) {
+      setOpenDay({
+        key: `${employee.profileId}-${entry.date}`,
+        profileId: employee.profileId,
+        profileName: employee.profileName ?? "—",
+        date: entry.date,
+        status: entry.status,
+        firstIn: entry.firstIn,
+        lastOut: entry.lastOut,
+        workedMinutes: entry.workedMinutes,
+        needsAttention: entry.needsAttention,
+        enterprises: "",
+      });
+    }
+    setSearchParams({}, { replace: true });
+  }, [report, linkedProfile, day, setSearchParams]);
 
   // Mudar de mês arrasta o dia escolhido para dentro dele, senão a vista "dia"
   // ficaria a apontar para fora do relatório carregado e apareceria vazia.

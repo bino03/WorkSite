@@ -15,9 +15,14 @@ import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockMultipartFile;
 
 import com.management.managementapi.dto.attendance.request.AbsenceUpsertDTO;
+import com.management.managementapi.dto.attendance.request.MyVacationRequestDTO;
 import com.management.managementapi.dto.error.ErrorCode;
 import com.management.managementapi.exeption.BusinessException;
 import com.management.managementapi.exeption.FileUploadException;
+import com.management.managementapi.exeption.ResourceNotFoundException;
+import com.management.managementapi.model.enums.AccountStatus;
+import com.management.managementapi.notifications.model.Notification;
+import com.management.managementapi.notifications.service.NotificationService;
 import com.management.managementapi.integrations.supabase.SupabaseStorageService;
 import com.management.managementapi.model.Profile;
 import com.management.managementapi.model.attendance.Absence;
@@ -33,6 +38,7 @@ import com.management.managementapi.repository.attendance.EmploymentRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -57,6 +63,7 @@ class AbsenceServiceTest {
     @Mock private EmploymentRepository employmentRepository;
     @Mock private ProfileRepository profileRepository;
     @Mock private SupabaseStorageService storageService;
+    @Mock private NotificationService notifications;
 
     private static final UUID PERFIL = UUID.randomUUID();
     private static final UUID ADMIN = UUID.randomUUID();
@@ -74,7 +81,73 @@ class AbsenceServiceTest {
             return absence;
         });
         return new AbsenceService(repository, documentRepository, employmentRepository,
-                profileRepository, storageService);
+                profileRepository, storageService, notifications);
+    }
+
+    // ── Pedido pelo próprio (fase 5b) ─────────────────────────
+
+    @Test
+    @DisplayName("o funcionário pede férias para si: nasce pendente, é VACATION, e os ADMIN são avisados")
+    void pedidoProprioAvisaAdmins() {
+        semSobreposicao();
+        when(profileRepository.findIdsByRoleInAndAccountStatus(any(), eq(AccountStatus.unlocked)))
+                .thenReturn(List.of(ADMIN, PERFIL));
+
+        Absence absence = service().requestVacation(PERFIL,
+                new MyVacationRequestDTO(LocalDate.of(2026, 7, 13), LocalDate.of(2026, 7, 17), null, null));
+
+        assertThat(absence.getStatus()).isEqualTo(AbsenceStatus.PENDING);
+        assertThat(absence.getType()).isEqualTo(AbsenceType.VACATION);
+        assertThat(absence.getProfile().getId()).isEqualTo(PERFIL);
+        // Um ADMIN que pede para si próprio não se avisa a si mesmo.
+        verify(notifications).notifyAll(eq(List.of(ADMIN)), eq(Notification.TYPE_ABSENCE_REQUESTED), any(),
+                eq("Funcionário pediu férias de 13/07/2026 a 17/07/2026."), eq("/team/absences"), eq(absence.getId()));
+    }
+
+    private Absence existente(UUID dono, AbsenceStatus status) {
+        Profile profile = new Profile();
+        profile.setId(dono);
+        profile.setName("Dono");
+        Absence absence = new Absence();
+        absence.setId(UUID.randomUUID());
+        absence.setProfile(profile);
+        absence.setType(AbsenceType.VACATION);
+        absence.setStartsOn(LocalDate.of(2026, 8, 3));
+        absence.setEndsOn(LocalDate.of(2026, 8, 3));
+        absence.setHalfDay(AbsenceHalfDay.MORNING);
+        absence.setStatus(status);
+        when(repository.findByIdAndDeletedAtIsNull(absence.getId())).thenReturn(Optional.of(absence));
+        return absence;
+    }
+
+    @Test
+    @DisplayName("anula-se o próprio pedido pendente; o de outro dá 'não encontrada'; um decidido não")
+    void anularProprioPedido() {
+        Absence meu = existente(PERFIL, AbsenceStatus.PENDING);
+        service().cancelOwnRequest(meu.getId(), PERFIL);
+        assertThat(meu.getDeletedAt()).isNotNull();
+
+        Absence alheio = existente(UUID.randomUUID(), AbsenceStatus.PENDING);
+        assertThatThrownBy(() -> service().cancelOwnRequest(alheio.getId(), PERFIL))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThat(alheio.getDeletedAt()).isNull();
+
+        Absence decidido = existente(PERFIL, AbsenceStatus.APPROVED);
+        assertThatThrownBy(() -> service().cancelOwnRequest(decidido.getId(), PERFIL))
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ABSENCE_ALREADY_DECIDED);
+    }
+
+    @Test
+    @DisplayName("decidir avisa o funcionário, com o dia e o meio dia")
+    void decidirAvisaOFuncionario() {
+        Absence pedido = existente(PERFIL, AbsenceStatus.PENDING);
+
+        service().decide(pedido.getId(), false, ADMIN);
+
+        verify(notifications).notify(eq(PERFIL), eq(Notification.TYPE_ABSENCE_DECIDED), eq("Pedido recusado"),
+                eq("O seu pedido de férias a 03/08/2026 (manhã) foi recusado."), eq("/backoffice/ferias"),
+                eq(pedido.getId()));
     }
 
     private static AbsenceUpsertDTO dto(LocalDate from, LocalDate to, AbsenceHalfDay halfDay) {
@@ -169,10 +242,7 @@ class AbsenceServiceTest {
     @Test
     @DisplayName("aprovar grava quem aprovou e quando")
     void aprovarGravaQuemEQuando() {
-        Absence pendente = new Absence();
-        pendente.setId(UUID.randomUUID());
-        pendente.setStatus(AbsenceStatus.PENDING);
-        when(repository.findByIdAndDeletedAtIsNull(pendente.getId())).thenReturn(Optional.of(pendente));
+        Absence pendente = existente(PERFIL, AbsenceStatus.PENDING);
 
         Absence aprovada = service().decide(pendente.getId(), true, ADMIN);
 

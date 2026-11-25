@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties, FC } from "react";
-import { Button, Drawer, Empty, Input, InputNumber, Space, Spin, Tabs } from "antd";
-import { DeleteOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Drawer, Empty, Input, InputNumber, Space, Spin, Tabs, Typography } from "antd";
+import { CloseOutlined, DeleteOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 
 import {
   createSupplier,
@@ -15,6 +15,7 @@ import { notificationService } from "@/services/general/notificationService";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialogContext";
 import { formatDate } from "@/utils/formatters";
+import { bankOfIban, formatIban, isValidIban, normalizeIban } from "@/utils/iban";
 import type { Supplier, UnknownSupplierNif } from "@/types/supplier";
 
 /**
@@ -56,6 +57,8 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
   const [editedNames, setEditedNames] = useState<Record<string, string>>({});
   /** Prazo de pagamento em edição de cada fornecedor; null é "sem prazo". */
   const [editedTerms, setEditedTerms] = useState<Record<string, number | null>>({});
+  /** IBAN em edição (um por banco), tal como se escrevem (com espaços); comparados já normalizados. */
+  const [editedIbans, setEditedIbans] = useState<Record<string, string[]>>({});
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<TabKey>("pending");
 
@@ -76,6 +79,11 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
       setEditedNames(Object.fromEntries(known.map((supplier) => [supplier.id, supplier.name])));
       setEditedTerms(
         Object.fromEntries(known.map((supplier) => [supplier.id, supplier.paymentTermDays]))
+      );
+      setEditedIbans(
+        Object.fromEntries(
+          known.map((supplier) => [supplier.id, supplier.ibans.map(formatIban)])
+        )
       );
       return pending;
     } catch (error) {
@@ -127,17 +135,19 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
   const handleSave = async (supplier: Supplier) => {
     const name = (editedNames[supplier.id] ?? "").trim();
     const paymentTermDays = termOf(supplier);
-    if (!name || (name === supplier.name && paymentTermDays === supplier.paymentTermDays)) return;
+    const ibans = ibansOf(supplier);
+    if (!name || !ibans.every(isValidIban) || !isDirty(supplier)) return;
 
     setSavingKey(supplier.id);
     try {
-      // O PUT substitui tudo: as notas e o prazo vão sempre, senão gravar o
-      // nome apagava-os.
+      // O PUT substitui tudo: as notas, o prazo e o IBAN vão sempre, senão
+      // gravar o nome apagava-os.
       const result = await updateSupplier(supplier.id, {
         nif: supplier.nif,
         name,
         notes: supplier.notes,
         paymentTermDays,
+        ibans,
       });
       await afterSave(result.invoicesUpdated);
     } catch (error) {
@@ -167,6 +177,26 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
   /** O prazo em edição; `undefined` no estado é "ainda não mexido", não "sem prazo". */
   const termOf = (supplier: Supplier): number | null =>
     supplier.id in editedTerms ? editedTerms[supplier.id] : supplier.paymentTermDays;
+
+  /** As linhas de IBAN em edição, tal como escritas (pode haver vazias). */
+  const ibanRowsOf = (supplier: Supplier): string[] => editedIbans[supplier.id] ?? supplier.ibans;
+
+  /** Os IBAN a gravar: normalizados, sem as linhas vazias. */
+  const ibansOf = (supplier: Supplier): string[] =>
+    ibanRowsOf(supplier).map(normalizeIban).filter((iban) => iban !== "");
+
+  const setIbanRows = (supplier: Supplier, rows: string[]) =>
+    setEditedIbans((prev) => ({ ...prev, [supplier.id]: rows }));
+
+  const isDirty = (supplier: Supplier): boolean => {
+    const name = (editedNames[supplier.id] ?? supplier.name).trim();
+    return (
+      name.length > 0 &&
+      (name !== supplier.name ||
+        termOf(supplier) !== supplier.paymentTermDays ||
+        ibansOf(supplier).join(",") !== supplier.ibans.join(","))
+    );
+  };
 
   const term = query.trim().toLowerCase();
   const visibleSuppliers = term
@@ -263,9 +293,9 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
           {visibleSuppliers.map((supplier, index) => {
             const edited = editedNames[supplier.id] ?? supplier.name;
             const editedTerm = termOf(supplier);
-            const dirty =
-              edited.trim().length > 0 &&
-              (edited.trim() !== supplier.name || editedTerm !== supplier.paymentTermDays);
+            const ibanRows = ibanRowsOf(supplier);
+            const ibanValid = ibansOf(supplier).every(isValidIban);
+            const dirty = isDirty(supplier);
 
             return (
               <li key={supplier.id} style={rowStyle(index)}>
@@ -305,6 +335,7 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
                         <Button
                           type="primary"
                           loading={savingKey === supplier.id}
+                          disabled={!ibanValid}
                           onClick={() => handleSave(supplier)}
                         >
                           Guardar
@@ -320,6 +351,58 @@ export const SuppliersDrawer: FC<Props> = ({ open, onClose }) => {
                     </>
                   )}
                 </div>
+                {/* Um por banco: ao pagar escolhe-se o do banco de onde sai o dinheiro. */}
+                {ibanRows.map((row, rowIndex) => {
+                  const normalized = normalizeIban(row);
+                  const rowInvalid = normalized !== "" && !isValidIban(normalized);
+                  const bank = rowInvalid || normalized === "" ? null : bankOfIban(normalized);
+                  return (
+                    <div key={rowIndex} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <Input
+                        aria-label={`IBAN ${rowIndex + 1} de ${supplier.name}`}
+                        placeholder="IBAN (para transferências)"
+                        disabled={!editable}
+                        status={rowInvalid ? "error" : undefined}
+                        suffix={bank ? <span style={{ fontSize: 12, opacity: 0.7 }}>{bank}</span> : undefined}
+                        value={row}
+                        onChange={(e) =>
+                          setIbanRows(
+                            supplier,
+                            ibanRows.map((value, i) => (i === rowIndex ? e.target.value : value))
+                          )
+                        }
+                        onPressEnter={() => handleSave(supplier)}
+                      />
+                      {editable && (
+                        <Button
+                          type="text"
+                          icon={<CloseOutlined />}
+                          aria-label={`Tirar o IBAN ${rowIndex + 1} de ${supplier.name}`}
+                          onClick={() =>
+                            setIbanRows(supplier, ibanRows.filter((_, i) => i !== rowIndex))
+                          }
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                {editable && ibanRows.length < 10 && (
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<PlusOutlined />}
+                    style={{ alignSelf: "flex-start", paddingInline: 0 }}
+                    aria-label={`Acrescentar IBAN a ${supplier.name}`}
+                    onClick={() => setIbanRows(supplier, [...ibanRows, ""])}
+                  >
+                    {ibanRows.length === 0 ? "IBAN" : "Outro IBAN"}
+                  </Button>
+                )}
+                {!ibanValid && (
+                  <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                    IBAN inválido — confirme os dígitos.
+                  </Typography.Text>
+                )}
                 <div style={{ fontSize: 12, opacity: 0.7 }}>
                   NIF {supplier.nif} · {supplier.invoiceCount} fatura
                   {supplier.invoiceCount === 1 ? "" : "s"}

@@ -40,14 +40,13 @@ contas (`/profile/agents`). Todas as rotas do próprio tiram o perfil da sessão
 `EmployeeAccessTest` guarda isto como o `AccountantAccessTest` guarda a contabilidade: nenhum endpoint
 de `enterprises.controller` aceita um `EMPLOYEE`, e os que ele usa continuam abertos. No Backoffice, o
 `AppLayout` esconde Obras/Faturas e manda para `/backoffice` quem não gere obras e abre um link
-antigo; o `EMPLOYEE` vê "Picar ponto" e "As minhas férias".
+antigo; o `EMPLOYEE` vê "Picar ponto" e "Férias e horas".
 
 ### Role `ACCOUNTANT` — desde 2026-10-30 (`V47`)
 
 Uma terceira role para a contabilidade. **No espaço Obras faz tudo o que o ADMIN faz** (obras,
 orçamentos, despesas, faturas — incluindo despesas da empresa e quarentena —, pagamentos,
-aprovação para pagamento, fornecedores, incidentes) e recebe os avisos de Obras (`invoice_due`,
-prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das Definições
+aprovação para pagamento, fornecedores, incidentes) e recebe os avisos de Obras (prazo de rubrica). **Fica de fora** do espaço Equipa (`/attendance/**`), das Definições
 (`/settings/**`), das contas e convites (`/auth/admin/**`, escritas em `/employees`) e da gestão de
 tarefas — em Tarefas comporta-se como EMPLOYEE. Não é trabalhador para a assiduidade.
 
@@ -85,7 +84,7 @@ continua a guardar o resto. Desenho e fases em `notes/roadmap/role-accountant.md
 | `/settings/**` | `ADMIN` — credenciais SMTP; reforçado com `@PreAuthorize` na classe |
 | `/backups/**` | `ADMIN` — download em massa de todas as faturas; reforçado com `@PreAuthorize` em cada método, `BackupAccessTest` |
 | `GET /employees/**` | `ADMIN` ou `ACCOUNTANT` (o `EMPLOYEE` deixou de ter acesso a 2026-11-20) |
-| `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. Exceções do próprio funcionário (`ADMIN` ou `EMPLOYEE`): `/attendance/clock` (picar, menos `/codes`) e `/attendance/me/**` (as suas férias) |
+| `/attendance/**` | `ADMIN` — só por `@PreAuthorize` em cada método, sem matcher no `SecurityConfig`. Exceções do próprio funcionário (`ADMIN` ou `EMPLOYEE`): `/attendance/clock` (picar, menos `/codes`) e `/attendance/me/**` (as suas férias e horas). É lá a **única escrita** do `EMPLOYEE` na assiduidade (2026-11-23): pedir férias (`POST /attendance/me/vacation-requests`, sempre `VACATION`/`PENDING`, perfil da sessão — o DTO nem tem `profileId`) e anular um pedido seu pendente (`DELETE …/{id}`, alheio → `ABS_010`, sem 403) |
 | `/auth/me` | qualquer utilizador autenticado |
 | Tudo o resto | autenticado (role específica validada por `@PreAuthorize` no controller) |
 

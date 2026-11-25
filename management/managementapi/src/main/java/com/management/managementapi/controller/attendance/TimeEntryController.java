@@ -21,12 +21,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.management.managementapi.dto.attendance.request.TimeEntryUpsertDTO;
+import com.management.managementapi.dto.attendance.response.TeamDayPersonDTO;
 import com.management.managementapi.dto.attendance.response.TimeEntryResponseDTO;
 import com.management.managementapi.dto.attendance.response.TimeEntryRevisionResponseDTO;
 import com.management.managementapi.model.attendance.TimeEntry;
 import com.management.managementapi.model.enums.EntityType;
 import com.management.managementapi.security.AuthContext;
 import com.management.managementapi.service.ActivityLogger;
+import com.management.managementapi.service.attendance.TeamDayService;
 import com.management.managementapi.service.attendance.TimeEntryService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,6 +47,7 @@ import lombok.RequiredArgsConstructor;
 public class TimeEntryController {
 
     private final TimeEntryService service;
+    private final TeamDayService teamDayService;
     private final ActivityLogger activityLogger;
     private final AuthContext authContext;
 
@@ -65,6 +68,13 @@ public class TimeEntryController {
             @RequestParam UUID profileId,
             @RequestParam LocalDate day) {
         return service.listForDay(profileId, day);
+    }
+
+    /** O dia da equipa toda: quem tem ficha, a hora de entrada prevista e as picagens (painel Hoje). */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/team-day")
+    public List<TeamDayPersonDTO> teamDay(@RequestParam LocalDate day) {
+        return teamDayService.forDay(day);
     }
 
     @PreAuthorize("hasRole('ADMIN')")

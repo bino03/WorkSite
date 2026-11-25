@@ -148,6 +148,15 @@ export interface EmploymentTermCreate {
 export type TimeDirection = "IN" | "OUT";
 export type TimeEntryChange = "CREATE" | "UPDATE" | "DELETE" | "RESTORE";
 
+/** Uma pessoa da equipa num dia (`/attendance/time-entries/team-day`). */
+export interface TeamDayPerson {
+  profileId: string;
+  profileName: string;
+  /** "08:00:00"; null = o horário não prevê trabalho nesse dia, ou não tem horário. */
+  scheduledStart: string | null;
+  entries: TimeEntry[];
+}
+
 export interface TimeEntry {
   id: string;
   profileId: string;
@@ -263,6 +272,21 @@ export interface AbsenceUpsert {
   endsOn: string;
   halfDay: AbsenceHalfDay;
   note: string | null;
+}
+
+/** Pedido de férias pelo próprio: sem funcionário nem tipo (é sempre VACATION, de quem tem a sessão). */
+export interface MyVacationRequest {
+  startsOn: string;
+  endsOn: string;
+  halfDay: AbsenceHalfDay;
+  note: string | null;
+}
+
+/** O que o pedido gastaria no ano em que começa, e o disponível desse ano antes dele. */
+export interface VacationRequestPreview {
+  year: number;
+  days: number;
+  available: number;
 }
 
 export interface VacationBalance {

@@ -249,18 +249,7 @@ public class ConstructionInvoiceService {
         ConstructionInvoice saved = repository.save(invoice);
         addDocument(saved, enterpriseId, stored, checksum, (long) original.length);
 
-        // Uma fatura acabada de carregar está sempre por classificar — registar e
-        // classificar são momentos diferentes, é o princípio desta classe. Avisa-se
-        // quem carregou, para não ficar esquecida na caixa de entrada.
-        authContext.currentProfileId().ifPresent(uploader -> notifications.notify(
-                uploader,
-                Notification.TYPE_INVOICE_PENDING,
-                "Fatura por classificar",
-                descreveFatura(saved),
-                scope == ConstructionInvoice.Scope.PROJECT
-                        ? "/backoffice/empreendimentos/" + enterpriseId + "/invoices"
-                        : "/backoffice/invoices/" + scope.name().toLowerCase(),
-                saved.getId()));
+        // Sem aviso de "por classificar": era spam. A lista de faturas por classificar chega.
 
         return new InvoiceUploadResultDTO(
                 toResponseDTO(saved, false),
@@ -2343,6 +2332,7 @@ public class ConstructionInvoiceService {
 
                 displaySupplierName(invoice, catalogSupplier),
                 invoice.getSupplierNif(),
+                catalogSupplier == null ? List.of() : List.copyOf(catalogSupplier.getIbans()),
                 invoice.getInvoiceNumber(),
                 invoice.getInvoiceAtcud(),
                 invoice.getInvoiceDate(),

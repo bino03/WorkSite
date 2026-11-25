@@ -44,6 +44,8 @@ public record ConstructionInvoiceResponseDTO(
         // ── identificação (QR da AT, corrigível à mão) ──
         String supplierName,
         String supplierNif,
+        /** Os IBAN da ficha do fornecedor com este NIF (um por banco), para pagar; vazio sem ficha ou sem IBAN. */
+        List<String> supplierIbans,
         String invoiceNumber,
         String invoiceAtcud,
         LocalDate invoiceDate,

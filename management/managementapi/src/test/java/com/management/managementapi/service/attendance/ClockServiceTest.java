@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -34,11 +35,13 @@ import com.management.managementapi.mapper.attendance.TimeEntryMapper;
 import com.management.managementapi.model.Profile;
 import com.management.managementapi.model.attendance.Employment;
 import com.management.managementapi.model.attendance.EnterpriseClockCode;
+import com.management.managementapi.model.attendance.RetiredClockCode;
 import com.management.managementapi.model.attendance.TimeEntry;
 import com.management.managementapi.model.enums.TimeDirection;
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.repository.attendance.EmploymentRepository;
 import com.management.managementapi.repository.attendance.EnterpriseClockCodeRepository;
+import com.management.managementapi.repository.attendance.RetiredClockCodeRepository;
 import com.management.managementapi.repository.attendance.TimeEntryRepository;
 
 /**
@@ -51,6 +54,8 @@ import com.management.managementapi.repository.attendance.TimeEntryRepository;
 class ClockServiceTest {
 
     @Mock private EnterpriseClockCodeRepository codeRepository;
+    @Mock private RetiredClockCodeRepository retiredRepository;
+    @Mock private RetiredClockCodeAlertService alertService;
     @Mock private EnterpriseRepository enterpriseRepository;
     @Mock private EmploymentRepository employmentRepository;
     @Mock private ProfileRepository profileRepository;
@@ -66,8 +71,9 @@ class ClockServiceTest {
     private final List<TimeEntry> hoje = new ArrayList<>();
 
     private ClockService service() {
-        return new ClockService(codeRepository, enterpriseRepository, employmentRepository, profileRepository,
-                entryRepository, timeEntryService, mapper, ZONE, "https://worksite.example/");
+        return new ClockService(codeRepository, retiredRepository, alertService, enterpriseRepository,
+                employmentRepository, profileRepository, entryRepository, timeEntryService, mapper, ZONE,
+                "https://worksite.example/");
     }
 
     @BeforeEach
@@ -147,12 +153,57 @@ class ClockServiceTest {
     }
 
     @Test
-    @DisplayName("um código desconhecido (ou substituído) não pica")
+    @DisplayName("um código inventado não pica, e não avisa ninguém")
     void codigoInvalido() {
-        assertThatThrownBy(() -> service().clock("codigo-antigo-que-ja-nao-existe-x", TimeDirection.IN, ANA))
+        assertThatThrownBy(() -> service().preview("codigo-inventado-que-nunca-existiu", ANA))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CLOCK_CODE_INVALID);
+        verify(alertService, never()).recordAttempt(any(), any());
+    }
+
+    private RetiredClockCode retiredCode(String value) {
+        EnterpriseClockCode old = new EnterpriseClockCode();
+        old.setEnterprise(obra);
+        old.regenerate(value, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
+        RetiredClockCode retired = RetiredClockCode.of(old, OffsetDateTime.now(ZoneOffset.UTC).minusDays(3));
+        when(retiredRepository.findByCode(value)).thenReturn(Optional.of(retired));
+        return retired;
+    }
+
+    @Test
+    @DisplayName("ler um QR substituído dá ATT_026 e avisa os ADMIN — mesmo sem ficha de emprego")
+    void qrAntigoNoPreviewAvisa() {
+        RetiredClockCode retired = retiredCode("codigo-antigo-que-foi-substituido");
+        UUID semFicha = UUID.randomUUID();
+        when(employmentRepository.findByProfileId(semFicha)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().preview("codigo-antigo-que-foi-substituido", semFicha))
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CLOCK_CODE_RETIRED);
+        verify(alertService).recordAttempt(retired, semFicha);
+    }
+
+    @Test
+    @DisplayName("confirmar com um QR substituído dá ATT_026 sem novo aviso (o aviso é do preview)")
+    void qrAntigoNoPostNaoAvisa() {
+        retiredCode("codigo-antigo-que-foi-substituido");
+
+        assertThatThrownBy(() -> service().clock("codigo-antigo-que-foi-substituido", TimeDirection.IN, ANA))
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CLOCK_CODE_RETIRED);
+        verify(alertService, never()).recordAttempt(any(), any());
+    }
+
+    @Test
+    @DisplayName("se o aviso falhar a gravar, o funcionário vê na mesma o ATT_026")
+    void avisoQueFalhaNaoTrocaOErro() {
+        RetiredClockCode retired = retiredCode("codigo-antigo-que-foi-substituido");
+        when(alertService.recordAttempt(retired, ANA)).thenThrow(new IllegalStateException("unique"));
+
+        assertThatThrownBy(() -> service().preview("codigo-antigo-que-foi-substituido", ANA))
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CLOCK_CODE_RETIRED);
     }
 
     @Test
@@ -229,6 +280,11 @@ class ClockServiceTest {
         assertThat(primeiro).startsWith("https://worksite.example/picar?c=");
         assertThat(segundo).isNotEqualTo("https://worksite.example/picar?c=" + CODE).isNotEqualTo(primeiro);
         assertThat(existente.getCode()).hasSize(32);
+        // O código substituído fica guardado (e só o da segunda vez: na primeira não havia).
+        ArgumentCaptor<RetiredClockCode> retired = ArgumentCaptor.forClass(RetiredClockCode.class);
+        verify(retiredRepository).save(retired.capture());
+        assertThat(retired.getValue().getCode()).isEqualTo(CODE);
+        assertThat(retired.getValue().getEnterprise()).isEqualTo(obra);
         // A data muda com o código: é a do QR que está colado na obra.
         assertThat(existente.getGeneratedAt()).isAfter(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
     }

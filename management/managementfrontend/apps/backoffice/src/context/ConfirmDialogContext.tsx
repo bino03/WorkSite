@@ -63,6 +63,9 @@ export const ConfirmDialogProvider = ({ children }: { children: ReactNode }) => 
         footer={null}
         centered
         width={440}
+        // Acima dos drawers (1000): sem isto, um confirm aberto a partir de um
+        // drawer ficava por baixo da máscara dele e o botão não se conseguia clicar.
+        zIndex={1100}
         styles={{
           content: {
             background: "var(--ind-color-bg)",

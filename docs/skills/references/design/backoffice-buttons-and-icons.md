@@ -37,6 +37,14 @@ Já é usado em `TasksList`, `EnterprisesList`, `EmployeesList`, `AppLayout` (lo
 
 **Regra sem exceções**: qualquer ação destrutiva passa por confirmação. Nenhuma apaga direto.
 
+**Ações em bloco sobre faturas selecionadas também confirmam, mesmo sem apagar (2026-11-24)**: aprovar
+para pagamento (`useInvoicePaymentApproval.approveMany`), marcar como pagas (submit do
+`AggregatePaymentDrawer`) e marcar como enviadas à contabilidade. Mexem em várias faturas de uma vez e
+um clique enganado custa a desfazer uma a uma. Numa ação que não elimina passar sempre `title` e
+`actionLabel` (ver o aviso em `apps/backoffice/CLAUDE.md`). O pagamento de **uma** fatura
+(`MarkPaidDrawer`) e o aprovar/retirar aprovação de uma linha continuam sem confirmação: não são em
+bloco e desfazem-se com um clique.
+
 > ⚠️ **Os valores por omissão são de eliminação** — `title` é "Confirmar eliminação" e
 > `actionLabel` é "Eliminar" (`ConfirmDialogContext.tsx:24-27`). Numa ação **não destrutiva**
 > tens de passar os dois, senão o utilizador lê "Confirmar eliminação" ao marcar uma fatura

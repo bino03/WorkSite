@@ -203,6 +203,8 @@ export interface ConstructionInvoice {
 
   supplierName: string | null;
   supplierNif: string | null;
+  /** IBAN da ficha do fornecedor com este NIF (um por banco, sem espaços); vazio sem ficha ou sem IBAN. */
+  supplierIbans: string[];
   invoiceNumber: string | null;
   invoiceAtcud: string | null;
   /** Null quando o QR não foi lido — ver `needsReview`. */

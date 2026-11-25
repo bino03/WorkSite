@@ -37,9 +37,12 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, UUID> {
                                           @Param("from") OffsetDateTime from,
                                           @Param("to") OffsetDateTime to);
 
+    /** As picagens vivas de toda a equipa num intervalo (o painel Hoje), opcionalmente de uma obra. */
     @Query("""
             select e from TimeEntry e
+            join fetch e.profile
             left join fetch e.enterprise
+            left join fetch e.registeredBy
             where e.deletedAt is null
               and e.happenedAt >= :from
               and e.happenedAt < :to

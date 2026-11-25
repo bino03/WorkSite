@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,11 +41,13 @@ import com.management.managementapi.mapper.attendance.TimeEntryMapper;
 import com.management.managementapi.model.Profile;
 import com.management.managementapi.model.attendance.Employment;
 import com.management.managementapi.model.attendance.EnterpriseClockCode;
+import com.management.managementapi.model.attendance.RetiredClockCode;
 import com.management.managementapi.model.attendance.TimeEntry;
 import com.management.managementapi.model.enums.TimeDirection;
 import com.management.managementapi.repository.ProfileRepository;
 import com.management.managementapi.repository.attendance.EmploymentRepository;
 import com.management.managementapi.repository.attendance.EnterpriseClockCodeRepository;
+import com.management.managementapi.repository.attendance.RetiredClockCodeRepository;
 import com.management.managementapi.repository.attendance.TimeEntryRepository;
 
 /**
@@ -66,7 +70,11 @@ public class ClockService {
             EnumSet.of(EnterPriseStatus.deleted, EnterPriseStatus.archived);
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private static final Logger log = LoggerFactory.getLogger(ClockService.class);
+
     private final EnterpriseClockCodeRepository codeRepository;
+    private final RetiredClockCodeRepository retiredRepository;
+    private final RetiredClockCodeAlertService alertService;
     private final EnterpriseRepository enterpriseRepository;
     private final EmploymentRepository employmentRepository;
     private final ProfileRepository profileRepository;
@@ -77,6 +85,8 @@ public class ClockService {
     private final String frontendUrl;
 
     public ClockService(EnterpriseClockCodeRepository codeRepository,
+                        RetiredClockCodeRepository retiredRepository,
+                        RetiredClockCodeAlertService alertService,
                         EnterpriseRepository enterpriseRepository,
                         EmploymentRepository employmentRepository,
                         ProfileRepository profileRepository,
@@ -86,6 +96,8 @@ public class ClockService {
                         AttendanceZone zone,
                         @Value("${app.frontend.url:http://localhost:5173}") String frontendUrl) {
         this.codeRepository = codeRepository;
+        this.retiredRepository = retiredRepository;
+        this.alertService = alertService;
         this.enterpriseRepository = enterpriseRepository;
         this.employmentRepository = employmentRepository;
         this.profileRepository = profileRepository;
@@ -114,12 +126,17 @@ public class ClockService {
      * imprimir o novo. É a mesma operação — "definir um QR novo" — tenha ou não havido um.
      */
     public ClockCodeResponseDTO generate(UUID enterpriseId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         EnterpriseClockCode code = codeRepository.findByEnterpriseId(enterpriseId).orElseGet(() -> {
             EnterpriseClockCode created = new EnterpriseClockCode();
             created.setEnterprise(resolveEnterprise(enterpriseId));
             return created;
         });
-        code.regenerate(newCode(), OffsetDateTime.now(ZoneOffset.UTC));
+        if (code.getCode() != null) {
+            // Guardado antes de sobrepor: é o que distingue, mais tarde, um QR antigo de um inventado.
+            retiredRepository.save(RetiredClockCode.of(code, now));
+        }
+        code.regenerate(newCode(), now);
         return toResponse(codeRepository.save(code));
     }
 
@@ -144,7 +161,9 @@ public class ClockService {
 
     @Transactional(readOnly = true)
     public ClockPreviewDTO preview(String code, UUID profileId) {
-        Enterprise enterprise = resolveOpenEnterprise(code);
+        // O aviso de QR antigo dispara aqui, não no POST: o /picar chama o preview logo
+        // ao ler o QR, e um QR antigo nunca chega a confirmar (decidido a 2026-11-23).
+        Enterprise enterprise = resolveOpenEnterprise(code, profileId);
         requireEmployed(profileId);
         List<TimeEntry> today = todayEntries(profileId);
         return new ClockPreviewDTO(enterprise.getId(), enterprise.getName(), nextDirection(today),
@@ -152,7 +171,7 @@ public class ClockService {
     }
 
     public TimeEntry clock(String code, TimeDirection expected, UUID profileId) {
-        Enterprise enterprise = resolveOpenEnterprise(code);
+        Enterprise enterprise = resolveOpenEnterprise(code, null);
         requireEmployed(profileId);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS);
@@ -194,14 +213,40 @@ public class ClockService {
         return entryRepository.findForProfileBetween(profileId, zone.startOfDay(today), zone.startOfNextDay(today));
     }
 
-    private Enterprise resolveOpenEnterprise(String code) {
-        Enterprise enterprise = codeRepository.findByCode(code)
-                .map(EnterpriseClockCode::getEnterprise)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CLOCK_CODE_INVALID));
+    /**
+     * A obra do código, se está aberta. Um código que já foi de uma obra e foi substituído
+     * dá {@code ATT_026}; com {@code alertFor}, a tentativa fica registada e os ADMIN são
+     * avisados. Vem antes da ficha de emprego de propósito: quem tenta picar com um QR
+     * antigo é sinal para o escritório, tenha ou não ficha.
+     */
+    private Enterprise resolveOpenEnterprise(String code, UUID alertFor) {
+        Optional<EnterpriseClockCode> current = codeRepository.findByCode(code);
+        if (current.isEmpty()) {
+            RetiredClockCode retired = retiredRepository.findByCode(code)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.CLOCK_CODE_INVALID));
+            if (alertFor != null) {
+                alertRetired(retired, alertFor);
+            }
+            throw new BusinessException(ErrorCode.CLOCK_CODE_RETIRED);
+        }
+        Enterprise enterprise = current.get().getEnterprise();
         if (enterprise.getStatus() != null && CLOSED.contains(enterprise.getStatus())) {
             throw new BusinessException(ErrorCode.CLOCK_ENTERPRISE_CLOSED);
         }
         return enterprise;
+    }
+
+    /**
+     * O aviso nunca pode trocar o erro que o funcionário vê: se a escrita falhar (ex.: duas
+     * leituras em simultâneo a bater na unique do dedupe), regista-se e segue o ATT_026.
+     */
+    private void alertRetired(RetiredClockCode retired, UUID profileId) {
+        try {
+            alertService.recordAttempt(retired, profileId);
+        } catch (RuntimeException e) {
+            log.warn("[picagem] aviso de QR antigo não gravado (código {}, perfil {}): {}",
+                    retired.getId(), profileId, e.getMessage());
+        }
     }
 
     /**

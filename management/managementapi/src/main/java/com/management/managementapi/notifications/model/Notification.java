@@ -36,6 +36,15 @@ public class Notification extends BaseEntity {
     /** Fatura aprovada para pagamento — vai para a contabilidade, que é quem paga. */
     public static final String TYPE_INVOICE_APPROVED = "invoice_approved";
 
+    /** Um funcionário tentou picar com um QR de obra já substituído — vai para os ADMIN. */
+    public static final String TYPE_CLOCK_RETIRED_QR = "clock_retired_qr";
+
+    /** Um funcionário pediu férias pelo Backoffice — vai para os ADMIN, que decidem. */
+    public static final String TYPE_ABSENCE_REQUESTED = "absence_requested";
+
+    /** O escritório aprovou ou recusou um pedido — vai para o funcionário. */
+    public static final String TYPE_ABSENCE_DECIDED = "absence_decided";
+
     @Column(name = "recipient_id", nullable = false)
     private UUID recipientId;
 

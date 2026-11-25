@@ -1,19 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, Empty, Skeleton, Tag } from "antd";
+import { Button, Calendar, Empty, Segmented, Skeleton, Tag } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import BlueprintCard from "@/components/common/BlueprintCard";
+import { MyHoursPanel } from "@/components/attendance/me/MyHoursPanel";
+import { MyVacationRequestDrawer } from "@/components/attendance/me/MyVacationRequestDrawer";
+import { useConfirm } from "@/context/ConfirmDialogContext";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { holidaysBetween, myAbsences, myVacationBalance } from "@/services/myAttendanceService";
+import { notificationService } from "@/services/general/notificationService";
+import {
+  cancelVacationRequest,
+  holidaysBetween,
+  myAbsences,
+  myVacationBalance,
+} from "@/services/myAttendanceService";
 import { ABSENCE_STATUS_LABEL, ABSENCE_TYPE_LABEL } from "@/types/attendance";
 import type { Absence, AbsenceStatus, Holiday, VacationBalance } from "@/types/attendance";
 
 /**
- * "As minhas férias" — o funcionário (EMPLOYEE) vê o seu saldo de férias do ano, as suas
- * ausências e o calendário com os feriados (fase 5b da assiduidade, 2026-11-20). Só
- * leitura: marcar férias continua a ser pedido ao escritório, que as regista no espaço
- * Equipa.
+ * "As minhas férias e horas" (fase 5b da assiduidade, 2026-11-20 e 2026-11-23). No
+ * separador Férias, o funcionário vê o saldo do ano, as suas ausências e o calendário com
+ * os feriados, e **pede férias** (ficam pendentes até o escritório decidir; um pedido
+ * pendente pode anular-se). No separador Horas vê o seu mês dia a dia. Outras ausências
+ * (baixa, faltas) continuam a ser lançadas pelo escritório.
  */
 const STATUS_COLOR: Record<AbsenceStatus, string> = {
   APPROVED: "green",
@@ -34,8 +45,13 @@ const formatRange = (absence: Absence) => {
     : `${start.format("DD/MM/YYYY")} a ${end.format("DD/MM/YYYY")}`;
 };
 
+type Tab = "vacations" | "hours";
+
 export default function MyVacationsPage() {
   const isMobile = useIsMobile();
+  const confirm = useConfirm();
+  const [tab, setTab] = useState<Tab>("vacations");
+  const [requesting, setRequesting] = useState(false);
   const [month, setMonth] = useState<Dayjs>(dayjs().startOf("month"));
   const year = month.year();
 
@@ -126,17 +142,48 @@ export default function MyVacationsPage() {
     );
   };
 
+  const askToCancel = (absence: Absence) =>
+    confirm({
+      title: "Anular este pedido?",
+      message: `O pedido de férias ${formatRange(absence)} deixa de estar pendente. Pode voltar a pedir depois.`,
+      actionLabel: "Anular pedido",
+      onConfirm: async () => {
+        try {
+          await cancelVacationRequest(absence.id);
+          notificationService.success("Pedido anulado");
+          await load(year);
+        } catch (error) {
+          ErrorHandler.handle(error);
+        }
+      },
+    });
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20.4px" }}>
-      <div>
-        <h6 style={{ color: "var(--ind-accent-700)" }}>Assiduidade</h6>
-        <h1 style={{ margin: 0 }}>As minhas férias</h1>
-        <p className="ind-card-meta" style={{ margin: "4px 0 0" }}>
-          Para marcar férias, fale com o escritório — o pedido aparece aqui como pendente.
-        </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h6 style={{ color: "var(--ind-accent-700)" }}>Assiduidade</h6>
+          <h1 style={{ margin: 0 }}>As minhas férias e horas</h1>
+        </div>
+        {tab === "vacations" && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setRequesting(true)}>
+            Pedir férias
+          </Button>
+        )}
       </div>
 
-      {loading && !balance ? (
+      <Segmented
+        value={tab}
+        onChange={(value) => setTab(value as Tab)}
+        options={[
+          { label: "Férias", value: "vacations" },
+          { label: "Horas", value: "hours" },
+        ]}
+      />
+
+      {tab === "hours" ? (
+        <MyHoursPanel />
+      ) : loading && !balance ? (
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : (
         <>
@@ -216,9 +263,16 @@ export default function MyVacationsPage() {
                         {formatRange(absence)} · {formatDays(absence.workingDays)} dia(s) útil(eis)
                       </div>
                     </div>
-                    <Tag color={STATUS_COLOR[absence.status]} style={{ margin: 0 }}>
-                      {ABSENCE_STATUS_LABEL[absence.status]}
-                    </Tag>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      {absence.status === "PENDING" && absence.type === "VACATION" && (
+                        <Button size="small" onClick={() => askToCancel(absence)}>
+                          Anular
+                        </Button>
+                      )}
+                      <Tag color={STATUS_COLOR[absence.status]} style={{ margin: 0 }}>
+                        {ABSENCE_STATUS_LABEL[absence.status]}
+                      </Tag>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -226,6 +280,8 @@ export default function MyVacationsPage() {
           </BlueprintCard>
         </>
       )}
+
+      <MyVacationRequestDrawer open={requesting} onClose={() => setRequesting(false)} onSaved={() => void load(year)} />
     </div>
   );
 }

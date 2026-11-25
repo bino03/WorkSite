@@ -1,4 +1,5 @@
 import { setInvoicePaymentApproval } from "@/services/invoiceService";
+import { useConfirm } from "@/context/ConfirmDialogContext";
 import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import type { ConstructionInvoice } from "@/types/invoice";
@@ -21,10 +22,13 @@ export function isUnapprovedPayment(invoice: ConstructionInvoice): boolean {
 }
 
 /**
- * Aprovar para pagamento e retirar a aprovação. Sem diálogo de confirmação:
- * não mexe em dinheiro e desfaz-se com um clique.
+ * Aprovar para pagamento e retirar a aprovação. Uma fatura de cada vez
+ * (`toggle`) não pede confirmação: não mexe em dinheiro e desfaz-se com um
+ * clique. Em bloco (`approveMany`) pede, porque são várias de uma vez.
  */
 export function useInvoicePaymentApproval(onDone: () => void) {
+  const confirm = useConfirm();
+
   /** Aprova se não estiver aprovada; retira se estiver. */
   const toggle = async (invoice: ConstructionInvoice) => {
     try {
@@ -44,7 +48,17 @@ export function useInvoicePaymentApproval(onDone: () => void) {
    * cautela de "marcar como enviadas". Para à primeira falha e diz quantas
    * ficaram feitas.
    */
-  const approveMany = async (invoices: ConstructionInvoice[]) => {
+  const approveMany = (invoices: ConstructionInvoice[]) => {
+    const plural = invoices.length > 1;
+    confirm({
+      title: "Aprovar para pagamento",
+      message: `Aprovar ${invoices.length} fatura${plural ? "s" : ""} para pagamento?`,
+      actionLabel: "Aprovar",
+      onConfirm: () => runApproveMany(invoices),
+    });
+  };
+
+  const runApproveMany = async (invoices: ConstructionInvoice[]) => {
     let approved = 0;
     try {
       for (const invoice of invoices) {

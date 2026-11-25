@@ -111,6 +111,21 @@ class VacationBalanceServiceTest {
         return absence;
     }
 
+    @Test
+    @DisplayName("o aviso de saldo de um pedido conta só dias úteis e mostra o disponível antes dele")
+    void previewDoPedido() {
+        emprego(22);
+        // 10 dias já aprovados; o pedido de segunda a sexta (13–17/07) com um feriado na quarta.
+        ausencias(ferias(LocalDate.of(ANO, 6, 1), LocalDate.of(ANO, 6, 12), AbsenceStatus.APPROVED));
+        feriados(LocalDate.of(ANO, 7, 15));
+
+        var preview = service().previewRequest(PERFIL, LocalDate.of(ANO, 7, 13), LocalDate.of(ANO, 7, 17), null);
+
+        assertThat(preview.year()).isEqualTo(ANO);
+        assertThat(preview.days()).isEqualTo(4.0);
+        assertThat(preview.available()).isEqualTo(12.0);
+    }
+
     private void ausencias(Absence... absences) {
         when(absenceRepository.findForProfileOverlapping(any(), any(), any(), any()))
                 .thenReturn(List.of(absences));

@@ -14,6 +14,7 @@ import { ErrorHandler } from "@/errors/errorHandler";
 import { notificationService } from "@/services/general/notificationService";
 import { formatCurrency } from "@/utils/formatters";
 import { isUnapprovedPayment } from "@/hooks/useInvoicePaymentApproval";
+import { SupplierIbanLine } from "@/components/invoices/SupplierIbanLine";
 import type { ConstructionInvoice, PaymentMethod } from "@/types/invoice";
 
 const { Text } = Typography;
@@ -48,6 +49,7 @@ export const MarkPaidDrawer: FC<Props> = ({ open, invoice, onClose, onPaid }) =>
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isValid, isSubmitting },
   } = useForm<MarkPaidForm>({
     resolver: zodResolver(MarkPaidSchema),
@@ -154,6 +156,10 @@ export const MarkPaidDrawer: FC<Props> = ({ open, invoice, onClose, onPaid }) =>
               <> · {t("invoices.payment.status.PARTIAL")}: {formatCurrency(invoice.paidAmount)}</>
             )}
           </div>
+        )}
+
+        {invoice && watch("method") === "TRANSFERENCIA" && (
+          <SupplierIbanLine ibans={invoice.supplierIbans} />
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10.2px" }}>

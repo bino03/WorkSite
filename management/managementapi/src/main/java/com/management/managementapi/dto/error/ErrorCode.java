@@ -335,11 +335,13 @@ public enum ErrorCode {
     INVOICE_BUDGET_REQUIRED("INVOICE_051", "Escolha primeiro o lote da fatura — a obra tem vários lotes"),
     INVOICE_BUDGET_HAS_ALLOCATIONS("INVOICE_052", "A fatura já tem despesas noutro lote — desfaça a classificação antes de mudar de lote"),
     INVOICE_LOT_RUBRICS_MISSING("INVOICE_053", "Nem todas as rubricas da fatura existem no lote de destino — não dá para as manter"),
+    INVOICE_PAYMENT_LIST_EMPTY("INVOICE_054", "Não há faturas aprovadas por pagar com estes filtros"),
     // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================
     SUPPLIER_NOT_FOUND("SUPPLIER_001", "Fornecedor não encontrado"),
     SUPPLIER_NIF_ALREADY_EXISTS("SUPPLIER_002", "Já existe um fornecedor com este NIF"),
+    SUPPLIER_IBAN_INVALID("SUPPLIER_003", "IBAN inválido — confirme os dígitos"),
 
     // ========================================================================
     // NOTIFICAÇÕES (NOTIF_xxx)
@@ -486,12 +488,13 @@ public enum ErrorCode {
     TIME_ENTRY_DUPLICATE_INSTANT("ATT_012", "Já existe uma picagem deste funcionário neste instante"),
     TIME_ENTRY_NOT_DELETED("ATT_013", "Esta picagem não está apagada"),
     TIME_ENTRY_BEFORE_HIRE("ATT_014", "Não se pode registar uma picagem antes da data de admissão do funcionário"),
-    CLOCK_CODE_INVALID("ATT_020", "Este QR não é válido — pode ter sido substituído. Peça o QR atual ao encarregado"),
+    CLOCK_CODE_INVALID("ATT_020", "Este QR não é reconhecido. Peça o QR da obra ao encarregado"),
     CLOCK_ENTERPRISE_CLOSED("ATT_021", "Esta obra já não aceita picagens"),
     CLOCK_NOT_EMPLOYED("ATT_022", "Não tem ficha de emprego ativa — fale com o escritório"),
     CLOCK_STALE_DIRECTION("ATT_023", "Esta picagem já tinha sido feita — a página estava desatualizada"),
     CLOCK_TOO_SOON("ATT_024", "Acabou de picar há menos de um minuto"),
     CLOCK_CODE_NOT_CREATED("ATT_025", "Esta obra ainda não tem QR de picagem"),
+    CLOCK_CODE_RETIRED("ATT_026", "Este QR foi substituído — use o que está afixado na obra"),
 
     // ========================================================================
     // ASSIDUIDADE — feriados e ausências (ABS_xxx)
