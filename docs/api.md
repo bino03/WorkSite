@@ -437,11 +437,11 @@ de entrada.
 | PATCH | `/construction-invoices/{id}/payment-approval?approved=` | `ADMIN` ou `ACCOUNTANT` — aprova a fatura para pagamento (`true`, por omissão) ou retira a aprovação (`false`). Ver [[#Aprovação para pagamento]] |
 | PATCH | `/construction-invoices/{id}/accountant?sent=` | `ADMIN` — marca/desmarca enviada ao contabilista |
 | DELETE | `/construction-invoices/{id}` | `ADMIN` — apaga fatura, ficheiro, miniatura e lançamento |
-| POST | `/construction-invoices/{id}/payments` | `ADMIN` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
-| POST | `/construction-invoices/payments` | `ADMIN` — pagamento **agregado** de N faturas (multipart: `payment` JSON com `invoiceIds[]` + `proof` opcional); `201` se bater, `200` (nada gravado) se o valor não bater |
-| DELETE | `/construction-invoices/payments/{paymentId}` | `ADMIN` — anula um pagamento, repõe as faturas; `204` |
-| PUT | `/construction-invoices/payments/{paymentId}/proof` | `ADMIN` — multipart `proof`: anexa ou substitui a prova de um pagamento já registado; `200` |
-| DELETE | `/construction-invoices/payments/{paymentId}/proof` | `ADMIN` — deixa o pagamento sem prova (idempotente); `200` |
+| POST | `/construction-invoices/{id}/payments` | `ADMIN`, `ACCOUNTANT` — marca **uma** fatura como paga (multipart: `payment` JSON + `proof` opcional); `201` |
+| POST | `/construction-invoices/payments` | `ADMIN`, `ACCOUNTANT` — pagamento **agregado** de N faturas (multipart: `payment` JSON com `invoiceIds[]` + `proof` opcional); `201` se bater, `200` (nada gravado) se o valor não bater |
+| DELETE | `/construction-invoices/payments/{paymentId}` | `ADMIN`, `ACCOUNTANT` — anula um pagamento, repõe as faturas; `204` |
+| PUT | `/construction-invoices/payments/{paymentId}/proof` | `ADMIN`, `ACCOUNTANT` — multipart `proof`: anexa ou substitui a prova de um pagamento já registado; `200` |
+| DELETE | `/construction-invoices/payments/{paymentId}/proof` | `ADMIN`, `ACCOUNTANT` — deixa o pagamento sem prova (idempotente); `200` |
 | GET | `/construction-invoices/{id}/credit-notes/split-preview?amount=` | `ADMIN` — proposta de repartição negativa de uma NC sobre esta fatura, na proporção das despesas dela; nada gravado |
 | POST | `/construction-invoices/{id}/credit-notes` | `ADMIN` — regista uma **nota de crédito** a partir desta fatura (JSON: valor, nº, data, NIF, `expenses[]` confirmadas); `201` |
 
@@ -1199,6 +1199,13 @@ Fornecedores por ordem alfabética, "por identificar" no fim; faturas pela ordem
 `400`/`INVOICE_054`, para não descarregar um ficheiro vazio. O PDF usa as fontes base (WinAnsi): um carácter
 fora dele sai como `?`. `PaymentListExportService`; botão "Exportar" em "A pagar" (com os filtros do ecrã) e no
 cartão "Aprovadas para pagamento" da página inicial (sem filtros).
+
+Ao lado, no mesmo cartão, **"Marcar como pagas"** (2026-11-25), com confirmação: liquida **todas** as
+aprovadas por liquidar, e não só as 5 que o cartão mostra. Não há rota em bloco: o Backoffice percorre o
+`/outstanding?approvedForPayment=true` em páginas de 100 e faz um `POST /{id}/payments` por fatura (hoje,
+`TRANSFERENCIA`, `amount: null` = o que falta). Fica um pagamento por fatura, como no "Marcar como paga" do
+menu de contexto, e anula-se fatura a fatura. Não é atómico: as que falham são nomeadas e as outras ficam
+pagas. As sem total ficam de fora, porque o backend as recusaria.
 
 ### Vencimento da fatura
 
