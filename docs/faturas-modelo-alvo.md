@@ -218,8 +218,27 @@ detalhe). **Nunca** se "apaga e relança": perde-se o documento, a ordem de segu
 ## 5. Recibos
 
 Um recibo (`RC`/`RG` no QR) **não é uma fatura**: não gera despesa nem entra em soma nenhuma. É prova de
-pagamento — vai para `payment.proof_*`. Se chegar um recibo sem a fatura estar na app, a app pede para
-registar a fatura primeiro (pode ser sem documento, §1).
+pagamento. Se chegar um recibo sem a fatura estar na app, a app pede para registar a fatura primeiro
+(pode ser sem documento, §1).
+
+**[decidido 2026-11-27]** O recibo passa a ser um **documento próprio**, `supplier_receipt`, ligado a N
+faturas pela junção `invoice_receipt` (com o valor por fatura). Deixa de ser `payment.proof_*`. Até agora
+ia para a prova, mas a prova só leva um ficheiro e só vale para um pagamento, o que falha em três casos
+reais do import do email: o recibo chega depois de as faturas terem sido pagas uma a uma (N
+pagamentos, um recibo), o pagamento já tem o extrato como prova, e o recibo tem identidade própria
+(nº, data, NIF do emissor) que serve para detetar duplicados.
+
+- **O recibo não entra no estado de pagamento.** O estado continua derivado só de `invoice_payment`
+  (§2.3). Isto evita duas fontes para "está paga?", e a coluna `Liquidada` do Excel não muda.
+- Um recibo é de **um só fornecedor** (bloqueia), mas pode atravessar obras.
+- Valor ≠ soma das faturas: **avisa, não bloqueia**.
+- Ao adicionar o recibo a faturas por liquidar, a UI **oferece** registar o pagamento agregado. Nunca o
+  cria sozinha.
+- `payment.proof_*` fica para o extrato e o comprovativo de transferência. Os recibos antigos que lá
+  estão não se migram.
+- Fica de fora da exportação para a pasta do Vilatro, como as provas (o Excel não arquiva recibos).
+
+Desenho, rotas e fases: `notes/roadmap/recibos.md`.
 
 ## 6. Notas de crédito
 
