@@ -8,7 +8,6 @@ import {
   batchAllocateInvoices,
   deallocateInvoice,
   deleteInvoice,
-  getOutstandingInvoicesSummary,
   getInvoiceTotalsSummary,
   listInvoices,
   getInvoice,
@@ -37,7 +36,6 @@ import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
 import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
 import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
 import { BudgetItemPickerModal } from "@/components/invoices/BudgetItemPickerModal";
-import { OutstandingTotalBadge } from "@/components/invoices/OutstandingTotalBadge";
 import { InvoiceTotalsBadge } from "@/components/invoices/InvoiceTotalsBadge";
 import { InvoiceFiltersModal } from "@/components/invoices/InvoiceFiltersModal";
 import { clearedInvoiceFilters, countActiveInvoiceFilters } from "@/components/invoices/invoiceFilters";
@@ -47,7 +45,6 @@ import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import type { BudgetLot } from "@/types/budget";
 import type {
   ConstructionInvoice,
-  OutstandingInvoicesSummary,
   InvoiceFilters,
   InvoiceTotalsSummary,
 } from "@/types/invoice";
@@ -64,15 +61,14 @@ const VIEWS = [
 
 type ViewKey = (typeof VIEWS)[number]["key"];
 
-/** O "Falta pagar X" faz sentido sempre que a lista é só de faturas por liquidar. */
-const wantsOutstandingTotal = (f: InvoiceFilters) =>
-  f.outstanding === true || f.paymentStatus === "UNPAID" || f.paymentStatus === "PARTIAL";
-
 /**
- * Total, pago e a pagar do fornecedor — só com um fornecedor filtrado. Substitui
- * o "Falta pagar", que seria o mesmo número que o "A pagar" deste resumo.
+ * Lista só de faturas por liquidar: o "Pago" do resumo seria 0 (ou só o das parciais) e sai.
+ * O resumo Total · Pago · A pagar aparece sempre, com ou sem filtros (pedido de 2026-11-27;
+ * até aí só com um fornecedor filtrado, e o "Por liquidar" tinha um "Falta pagar" à parte,
+ * que era o mesmo número que o "A pagar").
  */
-const wantsSupplierTotals = (f: InvoiceFilters) => !!f.supplierNif;
+const wantsOutstandingOnly = (f: InvoiceFilters) =>
+  f.outstanding === true || f.paymentStatus === "UNPAID" || f.paymentStatus === "PARTIAL";
 
 const initialFilters: InvoiceFilters = {
   ...EMPTY_INVOICE_FILTERS,
@@ -151,8 +147,6 @@ const EnterpriseInvoicesPage: FC = () => {
   const [allocatingEnterpriseId, setAllocatingEnterpriseId] = useState<string | null>(null);
   const [allocatingLotId, setAllocatingLotId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  /** O que falta pagar no filtro "Por liquidar" — só se pede quando o filtro está ligado. */
-  const [outstandingSummary, setOutstandingSummary] = useState<OutstandingInvoicesSummary | null>(null);
   const [totalsSummary, setTotalsSummary] = useState<InvoiceTotalsSummary | null>(null);
 
   const fetch = useCallback(
@@ -163,23 +157,17 @@ const EnterpriseInvoicesPage: FC = () => {
       if (!enterpriseId) return;
       setLoading(true);
       try {
-        // A soma é sobre a lista inteira, por isso vem à parte da página; sem
-        // o filtro ligado não se pede nem se mostra.
-        const supplierTotals = wantsSupplierTotals(next);
-        const [page, summary, totals] = await Promise.all([
+        // A soma é sobre a lista inteira (com os mesmos filtros), por isso vem à parte da página.
+        const [page, totals] = await Promise.all([
           listInvoices(
             enterpriseId,
             next,
             sort ? { field: sort.field, order: sort.order === "ascend" ? "asc" : "desc" } : undefined
           ),
-          !supplierTotals && wantsOutstandingTotal(next)
-            ? getOutstandingInvoicesSummary(enterpriseId, next)
-            : Promise.resolve(null),
-          supplierTotals ? getInvoiceTotalsSummary(enterpriseId, next) : Promise.resolve(null),
+          getInvoiceTotalsSummary(enterpriseId, next),
         ]);
         setInvoices(page.content);
         setTotalElements(page.totalElements);
-        setOutstandingSummary(summary);
         setTotalsSummary(totals);
       } catch (error) {
         ErrorHandler.handle(error);
@@ -288,8 +276,6 @@ const EnterpriseInvoicesPage: FC = () => {
   };
 
   const activeFilterCount = countActiveInvoiceFilters(filters);
-  const showSupplierTotals = wantsSupplierTotals(filters);
-  const showOutstandingTotal = !showSupplierTotals && wantsOutstandingTotal(filters);
 
   const reload = () => {
     setSelectedIds([]);
@@ -628,14 +614,11 @@ const EnterpriseInvoicesPage: FC = () => {
             Limpar filtros
           </Button>
         )}
-        {showOutstandingTotal && <OutstandingTotalBadge summary={outstandingSummary} />}
-        {showSupplierTotals && (
-          <InvoiceTotalsBadge
-            summary={totalsSummary}
-            hidePaid={wantsOutstandingTotal(filters)}
-            hideOutstanding={filters.paymentStatus === "PAID"}
-          />
-        )}
+        <InvoiceTotalsBadge
+          summary={totalsSummary}
+          hidePaid={wantsOutstandingOnly(filters)}
+          hideOutstanding={filters.paymentStatus === "PAID"}
+        />
 
         {allocatableSelected.length > 0 && (
           <Button type="primary" onClick={() => setAllocating(allocatableSelected)}>

@@ -322,25 +322,8 @@ export async function getPendingInvoicesSummary(
 }
 
 /**
- * O que ainda falta pagar nas faturas por liquidar desta obra, com os mesmos
- * filtros da lista — o número ao lado do filtro "Por liquidar". Sobre todas as
- * faturas do filtro, não só a página.
- */
-export async function getOutstandingInvoicesSummary(
-  enterpriseId: string,
-  filters: InvoiceFilters
-): Promise<OutstandingInvoicesSummary> {
-  const params = invoiceFilterParams(filters, false);
-
-  const response = await api.get(
-    `/construction-invoices/enterprise/${enterpriseId}/outstanding-summary?${params.toString()}`
-  );
-  return response.data;
-}
-
-/**
  * Total, pago e a pagar (número e soma) desta obra com exatamente os filtros
- * da lista — o resumo ao filtrar por fornecedor.
+ * da lista — o resumo por cima da lista da obra, sempre visível (desde 2026-11-27).
  */
 export async function getInvoiceTotalsSummary(
   enterpriseId: string,
