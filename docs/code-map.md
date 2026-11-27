@@ -47,6 +47,19 @@ várias faturas (`invoice_payment`) — o caso normal e o pagamento agregado sã
 | **Base de dados** | `worksite.payment` + `invoice_payment` — `V31` |
 | **Detalhe** | [[api.md]] → "Pagamentos" · [[faturas-modelo-alvo]] §2.3 |
 
+## Recibos de fornecedor
+
+O recibo (`RC`/`RG`) é um documento próprio ligado a N faturas. Não muda o estado de pagamento, mas
+pode criar os pagamentos das faturas por liquidar, um por obra (desde 2026-11-27).
+
+| Camada | Ficheiros |
+|---|---|
+| **Entrada** | "Adicionar recibo" no `InvoiceDetailDrawer` (uma fatura) e na barra de seleção de `EnterpriseInvoicesPage`, `ScopedInvoicesPage` e `OutstandingInvoicesPage`; "Editar"/"Apagar" na secção "Recibos" do detalhe |
+| **Frontend** | `components/invoices/ReceiptDrawer.tsx` + `receiptFormSchema.ts` · `InvoiceReceiptsSection.tsx` · `services/receiptService.ts` · `types/receipt.ts` · o campo `receipts` em `types/invoice.ts` · `RECEIPT_*` em `errors/errorMessages.ts` · `invoices.receipt.*` nos `locales` |
+| **Backend** | `enterprises/controller/SupplierReceiptController` (`/supplier-receipts`, `/preview`, `/{id}/file`) · `service/SupplierReceiptService` (regras, preview, `createPayment`) · `PaymentService.registerAllocated` + `netAmounts` · `service/DocumentNumbers` (nº normalizado, partilhado com as faturas) · `model/SupplierReceipt`, `InvoiceReceipt` (+Id), `SupplierReceiptPayment` (+Id) · `dto/receipt/` · `ConstructionInvoiceRepository.findReceiptCandidates` |
+| **Base de dados** | `worksite.supplier_receipt` + `invoice_receipt` + `supplier_receipt_payment` — `V56` |
+| **Detalhe** | [[api.md]] → "Recibos de fornecedor" · `notes/roadmap/recibos.md` · [[faturas-modelo-alvo]] §5 |
+
 ## Inconsistências & transferências
 
 Fase 5. Mudar uma fatura de obra ou de âmbito é uma **transferência com razão** (nunca edição do

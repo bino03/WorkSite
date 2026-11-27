@@ -108,6 +108,7 @@ end $$;
 
 -- begin;
 --   delete from worksite.construction_invoice;                                  -- bucket documents
+--   delete from worksite.supplier_receipt;                                      -- bucket documents (recibos, V56)
 --   delete from worksite.enterprises_media;                                      -- bucket media
 --   update worksite.profile set photo_key = null where photo_key is not null;    -- bucket private
 --

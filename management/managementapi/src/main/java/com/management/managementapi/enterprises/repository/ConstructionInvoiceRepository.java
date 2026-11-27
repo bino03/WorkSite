@@ -386,6 +386,23 @@ public interface ConstructionInvoiceRepository extends JpaRepository<Constructio
             """)
     List<String> findAllInvoiceNumbers();
 
+    /**
+     * Faturas (sem NC) de um fornecedor, em todas as obras e âmbitos, da mais
+     * recente para a mais antiga — os candidatos do preview do recibo. As obras
+     * de teste só entram com {@code includeTest}. O filtro por pago/data é do
+     * serviço (o estado de pagamento é derivado).
+     */
+    @Query("""
+            select i from ConstructionInvoice i
+            left join fetch i.enterprise e
+            where i.supplierNif = :supplierNif
+              and i.relatedInvoiceId is null
+              and (e is null or e.isTest = false or :includeTest = true)
+            order by i.invoiceDate desc nulls last
+            """)
+    List<ConstructionInvoice> findReceiptCandidates(@Param("supplierNif") String supplierNif,
+                                                    @Param("includeTest") boolean includeTest);
+
     /** As notas de crédito de uma página inteira de faturas, numa query. */
     @Query("select i from ConstructionInvoice i where i.relatedInvoiceId in :invoiceIds")
     List<ConstructionInvoice> findCreditNotesForAll(@Param("invoiceIds") Collection<UUID> invoiceIds);

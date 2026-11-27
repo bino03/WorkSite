@@ -147,6 +147,7 @@ public class ConstructionInvoiceService {
     private final AuthContext authContext;
     private final NotificationService notifications;
     private final PaymentService paymentService;
+    private final SupplierReceiptService supplierReceiptService;
     private final ActivityLogService activityLogService;
     private final ActivityLogRepository activityLogRepository;
     private final ObjectMapper objectMapper;
@@ -2396,6 +2397,9 @@ public class ConstructionInvoiceService {
                 // Histórico de transferências: só no detalhe (mesma condição do fileUrl).
                 includeFileUrl ? loadTransfers(invoice.getId()) : List.of(),
 
+                // Recibos: só no detalhe, como as transferências (assinam o URL do ficheiro).
+                includeFileUrl ? supplierReceiptService.receiptsForInvoice(invoice.getId()) : List.of(),
+
                 invoice.isSentToAccountant(),
                 invoice.getSentToAccountantBy(),
                 resolveProfileName(invoice.getSentToAccountantBy()),
@@ -2821,15 +2825,8 @@ public class ConstructionInvoiceService {
         return null;
     }
 
-    /**
-     * Normaliza um número de documento para comparar duplicados: maiúsculas e só
-     * letras/dígitos. Cada software de faturação escreve o mesmo número de
-     * forma diferente ("FT 2024/123", "FT2024-123", "ft.2024.123") — sem isto,
-     * a mesma fatura escrita à mão duas vezes de forma ligeiramente diferente
-     * escapava à verificação por (NIF, número). Não se aplica ao ATCUD nem ao
-     * checksum: nenhum dos dois é escrito à mão.
-     */
+    /** Ver {@link DocumentNumbers#normalize} — partilhado com os recibos. */
     private static String normalizeDocumentNumber(String value) {
-        return isBlank(value) ? "" : value.replaceAll("[^\\p{L}\\p{N}]", "").toUpperCase(Locale.ROOT);
+        return DocumentNumbers.normalize(value);
     }
 }

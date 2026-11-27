@@ -25,6 +25,7 @@ import { InvoiceRegisterDrawer } from "@/components/invoices/InvoiceRegisterDraw
 import { ExpensesImportModal } from "@/components/invoices/ExpensesImportModal";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
+import ReceiptDrawer from "@/components/invoices/ReceiptDrawer";
 import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
 import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
 import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
@@ -89,6 +90,7 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
   const [importOpen, setImportOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [payInvoices, setPayInvoices] = useState<ConstructionInvoice[] | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [noteInvoice, setNoteInvoice] = useState<ConstructionInvoice | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
@@ -231,6 +233,8 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
     (i) => i.documentType !== "CREDIT_NOTE" && i.netAmount != null && i.paidAmount < i.netAmount
   );
   const sendableSelected = selectedInvoices.filter((i) => !i.sentToAccountant);
+  /** O recibo aceita pagas, mas não notas de crédito (RECEIPT_005). */
+  const receiptSelected = selectedInvoices.filter((i) => i.documentType !== "CREDIT_NOTE");
 
   /** Marca todas as selecionadas de uma vez — só marca, nunca desmarca em bloco. */
   const handleBulkSendToAccountant = () => {
@@ -347,6 +351,9 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
               Registar pagamento de {payableSelected.length}
             </Button>
           )}
+          {receiptSelected.length > 0 && (
+            <Button onClick={() => setReceiptOpen(true)}>Adicionar recibo</Button>
+          )}
           {sendableSelected.length > 0 && (
             <Button onClick={handleBulkSendToAccountant}>
               Marcar {sendableSelected.length} como enviada{sendableSelected.length > 1 ? "s" : ""} à contabilidade
@@ -414,6 +421,13 @@ const ScopedInvoicesPage: FC<Props> = ({ scope, kicker, title, emptyHint }) => {
         open={payInvoices !== null}
         invoices={payInvoices ?? []}
         onClose={() => setPayInvoices(null)}
+        onDone={reload}
+      />
+
+      <ReceiptDrawer
+        open={receiptOpen}
+        initialInvoices={receiptSelected}
+        onClose={() => setReceiptOpen(false)}
         onDone={reload}
       />
 

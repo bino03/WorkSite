@@ -100,7 +100,7 @@ cascade. Por isso é que o `.sql` trata dos dois lados de uma vez:
 
 | Bucket | Quem aponta para lá | Se apagares só os ficheiros |
 |---|---|---|
-| `documents` | `worksite.construction_invoice_document` (`bucket` + `storage_key` + `thumbnail_key`, desde a `V24`) e `worksite.payment` (`proof_bucket` + `proof_key`, `V31`) | faturas e provas de pagamento a apontar para o vazio |
+| `documents` | `worksite.construction_invoice_document` (`bucket` + `storage_key` + `thumbnail_key`, desde a `V24`), `worksite.payment` (`proof_bucket` + `proof_key`, `V31`) e `worksite.supplier_receipt` (`file_bucket` + `file_key`, `V56`, chave `receipts/…`) | faturas, provas de pagamento e recibos a apontar para o vazio |
 | `media` | `worksite.enterprises_media` (uma linha por banner/foto/vídeo) | galeria e banner partidos |
 | `private` | ninguém, desde a `V35` (as fotos de perfil saíram) | nada |
 

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.management.managementapi.enterprises.dto.payment.InvoicePaymentSummaryDTO;
+import com.management.managementapi.enterprises.dto.receipt.InvoiceReceiptSummaryDTO;
 
 /**
  * Fatura devolvida ao cliente.
@@ -146,6 +147,13 @@ public record ConstructionInvoiceResponseDTO(
          * nas listas vem vazio.
          */
         List<InvoiceTransferSummaryDTO> transfers,
+
+        // ── recibos de fornecedor (V56) ──
+        /**
+         * Os recibos que cobrem esta fatura, com o "também cobre". Só no detalhe,
+         * como as transferências; nas listas vem vazio.
+         */
+        List<InvoiceReceiptSummaryDTO> receipts,
 
         // ── contabilidade ──
         boolean sentToAccountant,

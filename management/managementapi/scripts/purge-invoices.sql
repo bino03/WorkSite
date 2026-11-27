@@ -54,6 +54,8 @@ select e.id            as enterprise_id,
 -- TODAS as faturas de todos os projetos:
 -- begin;
 --   delete from worksite.construction_invoice;
+--   -- os recibos (V56) não caem com as faturas: ficam sem ligações e com o ficheiro no bucket
+--   delete from worksite.supplier_receipt;
 --   -- confere aqui antes de confirmar
 --   select count(*) as faturas_restantes from worksite.construction_invoice;
 -- commit;   -- ou: rollback;

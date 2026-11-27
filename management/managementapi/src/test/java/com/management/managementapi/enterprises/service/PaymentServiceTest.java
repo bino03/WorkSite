@@ -460,4 +460,66 @@ class PaymentServiceTest {
         verify(storageService, never()).delete(any(), any());
         assertThat(change.previousFilename()).isNull();
     }
+
+    // ── registerAllocated (o pagamento que o recibo cria) ─────────
+
+    @Test
+    @DisplayName("registerAllocated: o movimento é a soma das alocações, uma ligação por fatura, sem prova")
+    void registerAllocatedSomaAsAlocacoes() throws Exception {
+        PaymentService svc = service();
+        ConstructionInvoice a = invoice(UUID.randomUUID(), ENTERPRISE_A, new BigDecimal("100.00"));
+        ConstructionInvoice b = invoice(UUID.randomUUID(), ENTERPRISE_A, new BigDecimal("80.00"));
+        when(invoiceRepository.sumCreditNotesFor(any())).thenReturn(BigDecimal.ZERO);
+        when(invoicePaymentRepository.sumPaidByInvoices(any())).thenReturn(List.of());
+        java.util.LinkedHashMap<ConstructionInvoice, BigDecimal> allocations = new java.util.LinkedHashMap<>();
+        allocations.put(a, new BigDecimal("100.00"));
+        allocations.put(b, new BigDecimal("50.00"));
+
+        Payment payment = svc.registerAllocated(allocations, LocalDate.of(2026, 11, 20), "TRANSFERENCIA", "lote", "Pago pelo recibo X");
+
+        assertThat(payment.getAmount()).isEqualByComparingTo("150.00");
+        assertThat(payment.getProofKey()).isNull();
+        verify(invoicePaymentRepository, times(2)).save(any(InvoicePayment.class));
+        verify(storageService, never()).upload(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("registerAllocated: obras diferentes → INVOICE_022; valor acima do que falta → INVOICE_PAYMENT_EXCEEDS_NET")
+    void registerAllocatedRecusa() {
+        PaymentService svc = service();
+        when(invoiceRepository.sumCreditNotesFor(any())).thenReturn(BigDecimal.ZERO);
+        ConstructionInvoice a = invoice(UUID.randomUUID(), ENTERPRISE_A, new BigDecimal("100.00"));
+        ConstructionInvoice b = invoice(UUID.randomUUID(), ENTERPRISE_B, new BigDecimal("80.00"));
+        when(invoicePaymentRepository.sumPaidByInvoices(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> svc.registerAllocated(
+                java.util.Map.of(a, new BigDecimal("1"), b, new BigDecimal("1")), LocalDate.now(), "TRANSFERENCIA", null, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVOICE_PAYMENT_CROSS_ENTERPRISE);
+
+        assertThatThrownBy(() -> svc.registerAllocated(
+                java.util.Map.of(a, new BigDecimal("100.01")), LocalDate.now(), "TRANSFERENCIA", null, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVOICE_PAYMENT_EXCEEDS_NET);
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("netAmounts: total − Σ NC numa query, e uma fatura sem total fica de fora")
+    void netAmountsEmLote() {
+        PaymentService svc = service();
+        ConstructionInvoice a = invoice(UUID.randomUUID(), ENTERPRISE_A, new BigDecimal("100.00"));
+        ConstructionInvoice semTotal = invoice(UUID.randomUUID(), ENTERPRISE_A, null);
+        ConstructionInvoice nc = new ConstructionInvoice();
+        nc.setRelatedInvoiceId(a.getId());
+        nc.setTotalAmount(new BigDecimal("30.00"));
+        when(invoiceRepository.findCreditNotesForAll(any())).thenReturn(List.of(nc));
+
+        java.util.Map<UUID, BigDecimal> net = svc.netAmounts(List.of(a, semTotal));
+
+        assertThat(net).containsOnlyKeys(a.getId());
+        assertThat(net.get(a.getId())).isEqualByComparingTo("70.00");
+    }
 }

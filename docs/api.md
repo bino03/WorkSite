@@ -832,7 +832,7 @@ explicar a causa ao utilizador, que é o que o `InvoiceDocumentsDownloadModal` f
 Fase 2 da paridade com o Excel. "Dar como pago" e "método de pagamento" são **um só gesto**,
 e regista-se quem o fez. Um pagamento é uma entidade própria (`payment`) ligada às faturas
 por uma junção (`invoice_payment`) — é o que faz o caso normal (1 fatura, 1 movimento) e o
-caso raro (N faturas, 1 transferência) serem o **mesmo modelo**. Tudo `ADMIN`. Ver
+caso raro (N faturas, 1 transferência) serem o **mesmo modelo**. Tudo `ADMIN`, `ACCOUNTANT`. Ver
 [[database.md]] → `payment` e [[faturas-modelo-alvo.md]] §2.3.
 
 | Método | Rota | Notas |
@@ -867,6 +867,50 @@ recriar o pagamento — perdendo quem o registou e quando. O `PUT …/proof` ane
 ele cobre. O ficheiro antigo só sai do Storage **depois do commit** (apagá-lo antes deixava a linha a
 apontar para nada num rollback), e o nome dele fica no `activity_log` (`EDIT` com
 `{proof: attached|replaced|removed, previousFilename, filename}`).
+
+## Recibos de fornecedor (`SupplierReceiptController`, `/supplier-receipts`)
+
+Desde 2026-11-27 (`V56`). O recibo (`RC`/`RG` no QR) é um documento próprio ligado às N faturas
+que liquida, que podem estar em várias obras. **Não muda o estado de pagamento**, que continua a
+sair só dos `payments`. Tudo `ADMIN`, `ACCOUNTANT`, como os pagamentos. Desenho e porquês em
+`notes/roadmap/recibos.md`. Schema em [[database.md]] → `supplier_receipt`.
+
+| Método | Rota | Notas |
+|---|---|---|
+| POST | `/supplier-receipts/preview` | multipart `file` + `?linkedInvoiceIds=` opcional (as faturas já escolhidas). Lê o QR e **não grava nada**. `200` → `{qrRead, documentType, supplierNif, supplierName (do catálogo), receiptNumber, receiptDate, totalAmount, warnings[], candidateInvoices[]}`. `candidateInvoices` = faturas desse NIF (sem NC), em todas as obras: **por liquidar** (qualquer data, mais antigas primeiro) e depois as **pagas dos últimos 12 meses**, cada uma com `netAmount`, `paidAmount`, `remaining`, `paymentStatus`. Sem QR legível, o NIF vem das `linkedInvoiceIds`. Obras `is_test` só entram se uma das `linkedInvoiceIds` for de teste. Avisos: QR ilegível, tipo que não é `RC`/`RG` (um `FR` carrega-se como fatura), recibo já gravado com este nº, e os do próprio QR (anulado…) |
+| POST | `/supplier-receipts` | multipart `receipt` (JSON `SupplierReceiptCreateDTO`) + `file` (PDF/JPG/PNG, até 25 MB, **obrigatório**). `invoiceLinks: [{invoiceId, amount}]` (≥1), `receiptNumber?`, `receiptDate`, `totalAmount`, `supplierName?`/`supplierNif?` (vazios herdam-se da 1.ª fatura que os tenha), `notes?`, `createPayment?: {method, paidOn? (omissão = data do recibo), reference?}`. `201` → `SupplierReceiptResponseDTO` (com `paymentIds[]` e `warnings[]`) |
+| GET | `/supplier-receipts/{id}` | detalhe com URL assinada do ficheiro, `invoices[]` (nº, data, âmbito, obra, `amount`), `linkedSum`, `mismatch`, `paymentIds[]` |
+| PUT | `/supplier-receipts/{id}` | JSON `SupplierReceiptUpdateDTO` (os mesmos campos): **substitui** as ligações inteiras. Não mexe no ficheiro nem nos pagamentos |
+| PUT | `/supplier-receipts/{id}/file` | multipart `file`: substitui o ficheiro (o antigo sai do Storage depois do commit) |
+| DELETE | `/supplier-receipts/{id}` | apaga o recibo, as ligações e o ficheiro. Os pagamentos que originou **ficam**. `204` |
+
+Regras: ligações repetidas no pedido juntam-se (soma-se o valor); `mismatch = totalAmount −
+Σ ligações` nunca é erro (descontos, retenções). **Um só fornecedor, só conflito real**: dois NIFs
+diferentes bloqueiam; sem NIF de um dos lados compara-se o nome (trim, minúsculas, sem acentos);
+quem não tem NIF nem nome passa; o NIF da própria Vilatro (`518849651`, lido por engano nalgumas
+faturas importadas) não conta. Atravessar obras é aceite.
+
+**"Registar também o pagamento"** (`createPayment`): paga, na **mesma transação**, as faturas ligadas
+que ainda têm valor em falta, cada uma com `min(valor da ligação, em falta)`. **Um pagamento por obra**
+(ou por âmbito, fora de obra), porque o agregado não atravessa obras (`INVOICE_022`). Cada pagamento sai
+sem prova (o recibo é a prova) e com a nota `Pago pelo recibo <nº>`, e fica no `activity_log` como
+`PAYMENT`. Sem nada por liquidar, o recibo grava na mesma, não cria pagamento e devolve um aviso. Uma
+falha a pagar desfaz tudo, e o ficheiro sai do bucket. Por baixo está o `PaymentService.registerAllocated`
+(alocações explícitas, erro em vez de `created=false`).
+
+No **detalhe da fatura** (`GET /construction-invoices/{id}`) sai `receipts[]`: `{receiptId,
+receiptNumber, receiptDate, totalAmount, amountForThisInvoice, fileUrl, fileFilename, alsoCovers:
+[{invoiceId, invoiceNumber, enterpriseName}], mismatch}`. Nas listas vem vazio, como `transfers`.
+
+| Código | HTTP | Quando |
+|---|---|---|
+| `RECEIPT_001` | 404 | recibo não encontrado |
+| `RECEIPT_002` | 400 | faturas (ou o recibo) de fornecedores diferentes |
+| `RECEIPT_003` | 400 / 409 | mesmo NIF + nº normalizado. 400 pelo serviço; 409 se dois pedidos em paralelo chegarem ao índice `uq_supplier_receipt_nif_number` |
+| `RECEIPT_004` | 400 | sem faturas |
+| `RECEIPT_005` | 400 | uma das faturas é nota de crédito |
+| `INVOICE_001` | 404 | uma das faturas não existe |
+| `FILE_008` / `FILE_003` / `FILE_002` | 400 / 400 / 413 | sem ficheiro / tipo não permitido / acima de 25 MB |
 
 ## Notas de crédito
 

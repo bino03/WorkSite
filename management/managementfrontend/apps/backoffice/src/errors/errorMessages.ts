@@ -374,6 +374,13 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'SUPPLIER_003': 'IBAN inválido — confirme os dígitos.',
   'INVOICE_054': 'Não há faturas aprovadas por pagar com estes filtros.',
 
+  // ── Recibos de fornecedor ──
+  'RECEIPT_001': 'Recibo não encontrado.',
+  'RECEIPT_002': 'Um recibo só pode ter faturas do mesmo fornecedor.',
+  'RECEIPT_003': 'Já existe um recibo deste fornecedor com este número.',
+  'RECEIPT_004': 'Escolha pelo menos uma fatura para o recibo.',
+  'RECEIPT_005': 'Uma nota de crédito não se liga a um recibo.',
+
   // ── Tarefas ────────────────────────────────────────────────────────────────
   'TASK_001': 'Tarefa não encontrada. Pode ter sido removida.',
   'TASK_002': 'Um ou mais utilizadores atribuídos não foram encontrados.',

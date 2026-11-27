@@ -11,6 +11,7 @@ public enum EntityType {
     EMAIL_PROVIDER("email_provider"),
     TASK("task"),
     PAYMENT("payment"),
+    SUPPLIER_RECEIPT("supplier_receipt"),
     INVOICE_INCIDENT("invoice_incident"),
     ABSENCE("absence"),
     HOLIDAY("holiday"),

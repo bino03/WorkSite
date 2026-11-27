@@ -337,6 +337,14 @@ public enum ErrorCode {
     INVOICE_LOT_RUBRICS_MISSING("INVOICE_053", "Nem todas as rubricas da fatura existem no lote de destino — não dá para as manter"),
     INVOICE_PAYMENT_LIST_EMPTY("INVOICE_054", "Não há faturas aprovadas por pagar com estes filtros"),
     // ========================================================================
+    // RECIBOS DE FORNECEDOR (RECEIPT_xxx) — notes/roadmap/recibos.md
+    // ========================================================================
+    RECEIPT_NOT_FOUND("RECEIPT_001", "Recibo não encontrado"),
+    RECEIPT_MIXED_SUPPLIERS("RECEIPT_002", "Um recibo só pode ter faturas do mesmo fornecedor"),
+    RECEIPT_DUPLICATE("RECEIPT_003", "Já existe um recibo deste fornecedor com este número"),
+    RECEIPT_NO_INVOICES("RECEIPT_004", "Escolha pelo menos uma fatura para o recibo"),
+    RECEIPT_CREDIT_NOTE("RECEIPT_005", "Uma nota de crédito não se liga a um recibo"),
+    // ========================================================================
     // FORNECEDORES (SUPPLIER_xxx)
     // ========================================================================
     SUPPLIER_NOT_FOUND("SUPPLIER_001", "Fornecedor não encontrado"),

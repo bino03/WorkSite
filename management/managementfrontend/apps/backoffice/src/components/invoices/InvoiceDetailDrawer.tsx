@@ -13,6 +13,9 @@ import MarkPaidDrawer from "@/components/invoices/MarkPaidDrawer";
 import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import { SupplierNameInput } from "@/components/suppliers/SupplierNameInput";
 import { deletePayment } from "@/services/paymentService";
+import { deleteReceipt } from "@/services/receiptService";
+import InvoiceReceiptsSection from "@/components/invoices/InvoiceReceiptsSection";
+import ReceiptDrawer from "@/components/invoices/ReceiptDrawer";
 import {
   DEFAULT_INVOICE_TYPE,
   INVOICE_TYPES,
@@ -119,6 +122,10 @@ export const InvoiceDetailDrawer: FC<Props> = ({
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [receiptDrawer, setReceiptDrawer] = useState<{ open: boolean; receiptId: string | null }>({
+    open: false,
+    receiptId: null,
+  });
   /**
    * Fatura que a drawer está mesmo a mostrar, quando não é a que o pai pediu:
    * saltar de uma fatura para uma nota de crédito sua (e de volta) acontece
@@ -309,6 +316,24 @@ export const InvoiceDetailDrawer: FC<Props> = ({
         try {
           await deletePayment(paymentId);
           notificationService.success(t("invoices.payment.cancelSuccess"));
+          await fetchInvoice();
+          onChanged();
+        } catch (error) {
+          ErrorHandler.handle(error);
+        }
+      },
+    });
+  };
+
+  const handleDeleteReceipt = (receiptId: string) => {
+    confirm({
+      title: t("invoices.receipt.deleteConfirmTitle"),
+      message: t("invoices.receipt.deleteConfirmBody"),
+      actionLabel: t("invoices.receipt.deleteConfirmAction"),
+      onConfirm: async () => {
+        try {
+          await deleteReceipt(receiptId);
+          notificationService.success(t("invoices.receipt.deleted"));
           await fetchInvoice();
           onChanged();
         } catch (error) {
@@ -599,6 +624,13 @@ export const InvoiceDetailDrawer: FC<Props> = ({
                     </Button>
                   )}
 
+                  {/* Recibo de fornecedor — nunca numa NC (RECEIPT_005). */}
+                  {invoice.documentType === "INVOICE" && (
+                    <Button onClick={() => setReceiptDrawer({ open: true, receiptId: null })}>
+                      {t("invoices.receipt.add")}
+                    </Button>
+                  )}
+
                   {/* Transferir de obra/âmbito — nunca numa NC (segue a fatura). */}
                   {invoice.documentType === "INVOICE" && (
                     <Button onClick={() => setTransferOpen(true)}>
@@ -637,6 +669,15 @@ export const InvoiceDetailDrawer: FC<Props> = ({
               />
               )}
 
+              {/* Recibos — escondido quando não há nenhum. */}
+              <InvoiceReceiptsSection
+                receipts={invoice.receipts ?? []}
+                canManage={canManageWorks()}
+                onOpenInvoice={setViewingId}
+                onEdit={(receiptId) => setReceiptDrawer({ open: true, receiptId })}
+                onDelete={handleDeleteReceipt}
+              />
+
               {/* Histórico de transferências ---------------------------- */}
               {invoice.transfers.length > 0 && <InvoiceTransferSection invoice={invoice} />}
 
@@ -669,6 +710,17 @@ export const InvoiceDetailDrawer: FC<Props> = ({
         invoice={invoice}
         onClose={() => setCreditNoteOpen(false)}
         onCreated={() => {
+          void fetchInvoice();
+          onChanged();
+        }}
+      />
+
+      <ReceiptDrawer
+        open={receiptDrawer.open}
+        receiptId={receiptDrawer.receiptId}
+        initialInvoices={invoice ? [invoice] : []}
+        onClose={() => setReceiptDrawer({ open: false, receiptId: null })}
+        onDone={() => {
           void fetchInvoice();
           onChanged();
         }}

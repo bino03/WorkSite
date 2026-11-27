@@ -32,6 +32,7 @@ import TransferInvoiceDrawer from "@/components/invoices/TransferInvoiceDrawer";
 import IncidentDrawer from "@/components/invoices/IncidentDrawer";
 import { toIncidentInvoiceRef } from "@/components/invoices/toIncidentInvoiceRef";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
+import ReceiptDrawer from "@/components/invoices/ReceiptDrawer";
 import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
 import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
 import { canApproveForPayment, useInvoicePaymentApproval } from "@/hooks/useInvoicePaymentApproval";
@@ -129,6 +130,7 @@ const EnterpriseInvoicesPage: FC = () => {
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [aggregatePayOpen, setAggregatePayOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   const [payInvoice, setPayInvoice] = useState<ConstructionInvoice | null>(null);
   const [noteInvoice, setNoteInvoice] = useState<ConstructionInvoice | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -487,6 +489,8 @@ const EnterpriseInvoicesPage: FC = () => {
     (i) => i.documentType !== "CREDIT_NOTE" && i.netAmount != null && i.paidAmount < i.netAmount
   );
   const sendableSelected = selectedInvoices.filter((i) => !i.sentToAccountant);
+  /** O recibo aceita pagas, mas não notas de crédito (RECEIPT_005). */
+  const receiptSelected = selectedInvoices.filter((i) => i.documentType !== "CREDIT_NOTE");
   const approvableSelected = selectedInvoices.filter(canApproveForPayment);
 
   return (
@@ -639,6 +643,9 @@ const EnterpriseInvoicesPage: FC = () => {
           <Button onClick={() => setAggregatePayOpen(true)}>
             Registar pagamento de {payableSelected.length}
           </Button>
+        )}
+        {receiptSelected.length > 0 && canManageWorks() && (
+          <Button onClick={() => setReceiptOpen(true)}>Adicionar recibo</Button>
         )}
         {sendableSelected.length > 0 && canManageWorks() && (
           <Button onClick={handleBulkSendToAccountant}>
@@ -796,6 +803,13 @@ const EnterpriseInvoicesPage: FC = () => {
               setAggregatePayOpen(false);
               setPayInvoice(null);
             }}
+            onDone={reload}
+          />
+
+          <ReceiptDrawer
+            open={receiptOpen}
+            initialInvoices={receiptSelected}
+            onClose={() => setReceiptOpen(false)}
             onDone={reload}
           />
 

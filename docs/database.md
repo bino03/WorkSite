@@ -13,7 +13,8 @@ enterprises (projeto — nome de tabela/pacote mantido do Property-Management)
  ├── enterprises_location / enterprises_media (1:1 / 1:N)
  ├── construction_invoice (o registo da fatura — dados do QR da AT + scope, N:1 → enterprises, nullable)
  │    ├── construction_invoice_document (o ficheiro, 0..N por fatura — V24)
- │    └── invoice_payment (junção N:N → payment — V31; estado UNPAID/PARTIAL/PAID é derivado)
+ │    ├── invoice_payment (junção N:N → payment — V31; estado UNPAID/PARTIAL/PAID é derivado)
+ │    └── invoice_receipt (junção N:N → supplier_receipt — V56; não mexe no estado de pagamento)
  └── construction_budget (o lote/edifício — um orçamento cada, V39)
       └── construction_budget_item (rubrica do orçamento, N:1 → construction_budget; enterprise_id mantido)
            └── construction_budget_item (parent_id — árvore de profundidade livre, sempre no mesmo lote)
@@ -134,6 +135,21 @@ carrega-as todas sem decidir nada, e classifica depois. Uma fatura sem despesa a
   de crédito` a partir da fase 3): `PAID` quando pago ≥ líquido — **mesmo sem pagamento**, por isso uma fatura anulada por inteiro por NC (líquido 0) é `PAID` (desde 2026-11-16; antes dava `UNPAID` e contradizia o filtro "Pagas"); `UNPAID` sem nada pago; `PARTIAL` o resto. Sem total o líquido é `null` e nunca é `PAID`. As listas de faturas aceitam o filtro `outstanding` (por
   liquidar), aplicado por subquery no JPQL de `search`/`searchByScope`. Ver
   [[api.md]] → "Pagamentos".
+- **`supplier_receipt`** (`V56`) — o **recibo** do fornecedor (`RC`/`RG` no QR), documento
+  próprio: `supplier_name`/`supplier_nif` (texto, sem FK, como na fatura), `receipt_number` (como
+  vem escrito) + `receipt_number_normalized` (só letras/dígitos em maiúsculas —
+  `DocumentNumbers.normalize`, o mesmo das faturas), `receipt_date`, `total_amount`, `notes`,
+  `file_*` (**obrigatório**, bucket `documents`, chave `receipts/<obra|company|unidentified>/…`),
+  `registered_by`/`registered_at`. Índice único parcial `uq_supplier_receipt_nif_number`
+  (`supplier_nif`, `receipt_number_normalized`), só quando os dois existem. Trigger `updated_at`.
+- **`invoice_receipt`** (`V56`) — junção recibo ↔ fatura, PK `(receipt_id, invoice_id)`,
+  `amount` = quanto do recibo é para esta fatura. `ON DELETE CASCADE` dos dois lados: apagar a
+  fatura tira a ligação, o recibo fica. Ao contrário do `invoice_payment`, `Σ amount` pode não
+  bater com o total do recibo (a diferença é o `mismatch` da API, um aviso). **Não conta para o
+  estado de pagamento** — esse continua a sair só de `invoice_payment`.
+- **`supplier_receipt_payment`** (`V56`) — os pagamentos que um recibo **originou** (quando o
+  "Registar também o pagamento" cria um `payment` por obra). PK `(receipt_id, payment_id)`,
+  cascade dos dois lados: apagar o recibo não apaga o pagamento, só a ligação.
 
 A árvore substituiu (em `V15`) a hierarquia rígida de dois níveis
 `construction_stage` → `construction_sub_stage`, que não comportava os orçamentos reais:

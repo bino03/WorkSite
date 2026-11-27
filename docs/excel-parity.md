@@ -316,7 +316,7 @@ Excel que não exista na árvore da obra é erro de migração, listado, nunca c
 | `Por lançar\` = ainda não está no Excel | não existe: na app o upload **é** o lançamento |
 | `Não Reconhecido\` = a leitura falhou | fatura com QR ilegível e campos vazios, "por rever" — já existe |
 | Vários ficheiros por fatura (foto + PDF do Bizdocs; páginas separadas) | 0..N `construction_invoice_document` |
-| Recibo | não é fatura: `payment.proof_*` |
+| Recibo | não é fatura: documento próprio `supplier_receipt` ligado a N faturas (`V56`, desde 2026-11-27); os antigos continuam em `payment.proof_*`. Não vai para a `Lançadas` nem para o export |
 
 A exportação app → pasta produz **exatamente** a estrutura do Vilatro: `Empreendimentos\<slug>\Despesas - <slug>.xlsx`
 + `Faturas\Lançadas\<ficheiros renomeados>`, na raiz da pasta. É o que permite recomeçar no Excel

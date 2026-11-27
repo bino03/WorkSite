@@ -6,6 +6,8 @@
  * (`allocated: false`) é o que está por classificar — é essa a caixa de entrada.
  */
 
+import type { InvoiceReceiptSummary } from "@/types/receipt";
+
 /** Onde a fatura vive. `PROJECT` exige obra; os outros dois proíbem-na. */
 export type InvoiceScope = "PROJECT" | "COMPANY" | "UNIDENTIFIED";
 
@@ -266,6 +268,9 @@ export interface ConstructionInvoice {
 
   // ── transferências (fase 5) — só no detalhe, nas listas é `[]` ──
   transfers: InvoiceTransferSummary[];
+
+  // ── recibos de fornecedor — só no detalhe, nas listas é `[]` ──
+  receipts: InvoiceReceiptSummary[];
 
   /** Só vem no detalhe (`getInvoice`) — nas listas é sempre null. */
   fileUrl: string | null;

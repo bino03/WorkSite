@@ -18,6 +18,7 @@ import { DEFAULT_PAGE_SIZE } from "@/config/pagination";
 import { InvoicesList } from "@/components/invoices/InvoicesList";
 import { InvoiceDetailDrawer } from "@/components/invoices/InvoiceDetailDrawer";
 import AggregatePaymentDrawer from "@/components/invoices/AggregatePaymentDrawer";
+import ReceiptDrawer from "@/components/invoices/ReceiptDrawer";
 import { InvoiceNoteModal } from "@/components/invoices/InvoiceNoteModal";
 import InvoicePreviewModal from "@/components/construction/InvoicePreviewModal";
 import { useQuickMarkPaid } from "@/hooks/useQuickMarkPaid";
@@ -100,6 +101,7 @@ const OutstandingInvoicesPage: FC = () => {
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [payInvoices, setPayInvoices] = useState<ConstructionInvoice[] | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   const [noteInvoice, setNoteInvoice] = useState<ConstructionInvoice | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<ConstructionInvoice | null>(null);
 
@@ -225,6 +227,8 @@ const OutstandingInvoicesPage: FC = () => {
   // backend recusa a mistura com INVOICE_PAYMENT_CROSS_ENTERPRISE, e aqui é
   // onde ela é mais fácil de fazer sem querer.
   const sameOwner = new Set(payableSelected.map((invoice) => invoice.enterpriseId ?? "company")).size <= 1;
+  /** O recibo aceita pagas, mas não notas de crédito (RECEIPT_005); sem a restrição de obra do pagamento. */
+  const receiptSelected = selected.filter((i) => i.documentType !== "CREDIT_NOTE");
 
   return (
     <div>
@@ -338,6 +342,9 @@ const OutstandingInvoicesPage: FC = () => {
               Aprovar {approvableSelected.length} para pagamento
             </Button>
           )}
+          {receiptSelected.length > 0 && (
+            <Button onClick={() => setReceiptOpen(true)}>Adicionar recibo</Button>
+          )}
           {payableSelected.length > 0 && (
             <Tooltip
               title={
@@ -403,6 +410,13 @@ const OutstandingInvoicesPage: FC = () => {
         open={payInvoices !== null}
         invoices={payInvoices ?? []}
         onClose={() => setPayInvoices(null)}
+        onDone={reload}
+      />
+
+      <ReceiptDrawer
+        open={receiptOpen}
+        initialInvoices={receiptSelected}
+        onClose={() => setReceiptOpen(false)}
         onDone={reload}
       />
 

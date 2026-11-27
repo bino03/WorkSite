@@ -145,6 +145,7 @@ Se a lista inclui "só `ADMIN` vê X" ou "`EMPLOYEE` não pode Y", a prova é a 
 
 Se houve obra de teste, apagar **pela ordem certa** — a ordem errada deixa lixo com FK:
 
+0. **Recibos de fornecedor** ligados às faturas da obra (`V56`): `DELETE /supplier-receipts/{id}` por cada um (os ids vêm em `receipts[]` do `GET /construction-invoices/{id}`). Um recibo **não cai** com as faturas: ficava sem ligações e com o ficheiro no bucket. Os pagamentos que ele originou vão com as faturas.
 1. Faturas da obra: **notas de crédito primeiro** (têm origem), depois as outras — `DELETE /construction-invoices/{id}` por cada uma (`GET /construction-invoices/enterprise/{id}` dá a lista; os pagamentos e documentos vão com elas).
 2. A obra: `DELETE /enterprises/{id}` (soft delete).
 3. Confirmar: `GET /enterprises/{id}` → `200` com `status: "deleted"` (é soft delete, não 404) e a obra fora de `GET /enterprises`; a pasta `notes/tmp-browser/` apagada se existiu.
@@ -170,7 +171,7 @@ Não deixar a obra "para a próxima" — a última que ficou (`Vila Teste Claude
 - [ ] Nenhuma escrita na BD fora de uma obra `is_test`
 - [ ] Cada item provado por DOM **e** API, não por screenshot
 - [ ] Permissões provadas por `403` na API, não por botão escondido
-- [ ] Obra de teste apagada (faturas primeiro, NC antes das origens), `GET` → `status: "deleted"`; `notes/tmp-browser/` apagada
+- [ ] Obra de teste apagada (recibos primeiro, depois faturas, NC antes das origens), `GET` → `status: "deleted"`; `notes/tmp-browser/` apagada
 - [ ] [[verificacao-browser-pendente]] atualizado; 🔴 no `ToDo.md`; lição de ferramenta no [[learning]]
 - [ ] Corrido inline — nunca delegado a um subagente
 

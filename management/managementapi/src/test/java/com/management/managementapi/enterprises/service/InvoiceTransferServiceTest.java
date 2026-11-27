@@ -91,6 +91,7 @@ class InvoiceTransferServiceTest {
     @Mock private AuthContext authContext;
     @Mock private NotificationService notifications;
     @Mock private PaymentService paymentService;
+    @Mock private SupplierReceiptService supplierReceiptService;
     @Mock private ActivityLogService activityLogService;
     @Mock private ActivityLogRepository activityLogRepository;
     @Spy  private ObjectMapper objectMapper = new ObjectMapper();

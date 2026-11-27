@@ -237,6 +237,78 @@ public class PaymentService {
         return new AggregatePaymentResultDTO(true, toResponseDTO(payment), List.of(), selectedTotal, movement);
     }
 
+    /**
+     * Um movimento com o valor de cada fatura já decidido por quem chama — o
+     * recibo do fornecedor, que diz quanto foi para cada uma. As faturas são do
+     * mesmo grupo (obra ou âmbito), como no agregado; cada valor tem de ser
+     * positivo e caber no que falta pagar. Sem prova: o recibo já está ligado.
+     *
+     * Ao contrário do {@link #registerAggregate}, uma diferença é erro e nunca
+     * {@code created=false}: quem chama está numa transação maior, e um
+     * pagamento "meio gravado" não existe.
+     */
+    @CacheEvict(cacheNames = CacheConfig.BUDGET_TREE, allEntries = true)
+    public Payment registerAllocated(Map<ConstructionInvoice, BigDecimal> allocations, LocalDate paidOn,
+                                     String method, String reference, String notes) {
+        if (allocations.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVOICE_PAYMENT_NO_INVOICES);
+        }
+        List<ConstructionInvoice> invoices = new ArrayList<>(allocations.keySet());
+        invoices.forEach(PaymentService::rejectIfCreditNote);
+        if (!sameGroup(invoices)) {
+            throw new BusinessException(ErrorCode.INVOICE_PAYMENT_CROSS_ENTERPRISE);
+        }
+
+        Map<UUID, BigDecimal> paidByInvoice = paidSums(invoices.stream().map(ConstructionInvoice::getId).toList());
+        BigDecimal movement = BigDecimal.ZERO;
+        for (Map.Entry<ConstructionInvoice, BigDecimal> entry : allocations.entrySet()) {
+            ConstructionInvoice invoice = entry.getKey();
+            BigDecimal remaining = requireNet(invoice)
+                    .subtract(paidByInvoice.getOrDefault(invoice.getId(), BigDecimal.ZERO));
+            if (entry.getValue().signum() <= 0) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "O valor a pagar tem de ser positivo");
+            }
+            if (entry.getValue().compareTo(remaining) > 0) {
+                throw new BusinessException(ErrorCode.INVOICE_PAYMENT_EXCEEDS_NET,
+                        "O valor para a fatura " + describe(invoice) + " passa o que falta pagar (" + remaining + " €)");
+            }
+            movement = movement.add(entry.getValue());
+        }
+
+        Payment payment = paymentRepository.save(newPayment(paidOn, method, movement, reference, notes));
+        for (Map.Entry<ConstructionInvoice, BigDecimal> entry : allocations.entrySet()) {
+            invoicePaymentRepository.save(new InvoicePayment(payment, entry.getKey(), entry.getValue()));
+        }
+        return payment;
+    }
+
+    /**
+     * O líquido de várias faturas de uma vez ({@code total − Σ NC}), numa query
+     * pelas notas de crédito. Faturas sem total ficam de fora do mapa — como o
+     * {@code null} de {@link #netAmount}.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, BigDecimal> netAmounts(Collection<ConstructionInvoice> invoices) {
+        if (invoices.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, BigDecimal> credited = new HashMap<>();
+        for (ConstructionInvoice note : invoiceRepository.findCreditNotesForAll(
+                invoices.stream().map(ConstructionInvoice::getId).toList())) {
+            if (note.getTotalAmount() != null) {
+                credited.merge(note.getRelatedInvoiceId(), note.getTotalAmount(), BigDecimal::add);
+            }
+        }
+        Map<UUID, BigDecimal> out = new HashMap<>();
+        for (ConstructionInvoice invoice : invoices) {
+            if (invoice.getTotalAmount() != null) {
+                out.put(invoice.getId(), invoice.getTotalAmount()
+                        .subtract(credited.getOrDefault(invoice.getId(), BigDecimal.ZERO)));
+            }
+        }
+        return out;
+    }
+
     // ── anular ──────────────────────────────────────────────────
 
     /** Apaga o pagamento e repõe as faturas. Devolve o que foi apagado, para o log. */

@@ -169,6 +169,9 @@ public class GlobalExceptionHandler {
             code = ErrorCode.INVOICE_DUPLICATE_DOCUMENT;
         } else if (message.contains("uq_invoice_document_checksum")) {
             code = ErrorCode.INVOICE_DUPLICATE_FILE;
+        } else if (message.contains("uq_supplier_receipt_nif_number")) {
+            // V56 — o mesmo recibo gravado em paralelo; o SELECT do serviço dá 400
+            code = ErrorCode.RECEIPT_DUPLICATE;
         } else {
             code = ErrorCode.DATABASE_CONSTRAINT_VIOLATION;
         }
