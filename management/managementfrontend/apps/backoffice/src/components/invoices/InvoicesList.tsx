@@ -120,8 +120,6 @@ const SupplierName: FC<{
           textAlign: "left",
           cursor: "pointer",
           overflowWrap: "anywhere",
-          textDecoration: active ? "underline" : "underline dotted",
-          textUnderlineOffset: 3,
         }}
       >
         {label}
