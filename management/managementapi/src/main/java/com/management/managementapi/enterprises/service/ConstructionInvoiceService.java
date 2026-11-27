@@ -949,12 +949,12 @@ public class ConstructionInvoiceService {
      * curto, devolve zeros. Mesma conta que o {@link #totalsSummary} da obra.
      */
     @Transactional(readOnly = true)
-    public InvoiceTotalsSummaryDTO searchEverywhereTotals(GlobalInvoiceSearchFilter filter) {
+    public InvoiceTotalsSummaryDTO searchEverywhereTotals(GlobalInvoiceSearchFilter filter, LocalDate today) {
         String text = isBlank(filter.q()) ? "" : filter.q().trim();
         if (!filter.hasFilter() && text.length() < GLOBAL_SEARCH_MIN_LENGTH) {
-            return summarizeTotals(List.of());
+            return summarizeTotals(List.of(), today);
         }
-        return summarizeTotals(findEverywhere(filter, text, Pageable.unpaged()));
+        return summarizeTotals(findEverywhere(filter, text, Pageable.unpaged()), today);
     }
 
     /** O estado de pagamento como o {@link #toResponseDTO} o calcula: pago vs. total − notas de crédito. */
@@ -1610,18 +1610,25 @@ public class ConstructionInvoiceService {
      * quando líquido − pago ≤ 0 (inclui as anuladas por NC).
      */
     @Transactional(readOnly = true)
-    public InvoiceTotalsSummaryDTO totalsSummary(UUID enterpriseId, InvoiceSearchFilter filter) {
-        return summarizeTotals(runSearch(enterpriseId, filter, Pageable.unpaged()).getContent());
+    public InvoiceTotalsSummaryDTO totalsSummary(UUID enterpriseId, InvoiceSearchFilter filter, LocalDate today) {
+        return summarizeTotals(runSearch(enterpriseId, filter, Pageable.unpaged()).getContent(), today);
     }
 
-    /** A conta do {@link #totalsSummary}, partilhada com a pesquisa global. As NC saem (descontam na origem). */
-    private InvoiceTotalsSummaryDTO summarizeTotals(List<ConstructionInvoice> found) {
+    /**
+     * A conta do {@link #totalsSummary}, partilhada com a pesquisa global. As NC saem (descontam na origem).
+     * O "vencido" usa o mesmo {@link InvoiceDueDate} que o {@link #outstandingByUrgency}, mas só conta as
+     * que têm total: é a parte do "A pagar" que já passou o prazo.
+     */
+    private InvoiceTotalsSummaryDTO summarizeTotals(List<ConstructionInvoice> found, LocalDate today) {
         List<ConstructionInvoice> invoices = found.stream()
                 .filter(i -> i.getDocumentType() != ConstructionInvoice.DocumentType.CREDIT_NOTE)
                 .toList();
         if (invoices.isEmpty()) {
-            return new InvoiceTotalsSummaryDTO(0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0);
+            return new InvoiceTotalsSummaryDTO(0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0,
+                    0, BigDecimal.ZERO);
         }
+        Map<String, Supplier> suppliersByNif = supplierRepository.findAll().stream()
+                .collect(Collectors.toMap(Supplier::getNif, Function.identity(), (first, second) -> first));
         List<UUID> ids = invoices.stream().map(ConstructionInvoice::getId).toList();
         // Só a soma por fatura, numa query agrupada: o `paymentsForInvoices` monta o detalhe de cada
         // pagamento (carregando-os um a um) e com 281 faturas levava 12 s (verificado a 2026-11-17).
@@ -1634,6 +1641,8 @@ public class ConstructionInvoiceService {
         long paidCount = 0;
         long outstandingCount = 0;
         long withoutTotal = 0;
+        BigDecimal overdue = BigDecimal.ZERO;
+        long overdueCount = 0;
         for (ConstructionInvoice invoice : invoices) {
             BigDecimal paid = paidByInvoice.getOrDefault(invoice.getId(), BigDecimal.ZERO);
             paidTotal = paidTotal.add(paid);
@@ -1654,12 +1663,20 @@ public class ConstructionInvoiceService {
             if (remaining.signum() > 0) {
                 outstandingCount++;
                 outstanding = outstanding.add(remaining);
+                Supplier supplier = isBlank(invoice.getSupplierNif())
+                        ? null
+                        : suppliersByNif.get(invoice.getSupplierNif().trim());
+                LocalDate dueDate = InvoiceDueDate.of(invoice, supplier).dueDate();
+                if (dueDate != null && dueDate.isBefore(today)) {
+                    overdueCount++;
+                    overdue = overdue.add(remaining);
+                }
             } else {
                 paidCount++;
             }
         }
         return new InvoiceTotalsSummaryDTO(invoices.size(), total, paidCount, paidTotal,
-                outstandingCount, outstanding, withoutTotal);
+                outstandingCount, outstanding, withoutTotal, overdueCount, overdue);
     }
 
     /**

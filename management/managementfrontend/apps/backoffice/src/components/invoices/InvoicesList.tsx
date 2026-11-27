@@ -84,7 +84,51 @@ interface Props {
    * página "A pagar", a única que mistura obras.
    */
   enterpriseNames?: Record<string, string>;
+  /**
+   * Clicar no nome do fornecedor filtra por ele (sem abrir o detalhe). Opcional —
+   * sem isto o nome é texto. Só numa fatura com NIF: é por NIF que se filtra.
+   */
+  onSupplierClick?: (supplierNif: string) => void;
+  /** O NIF já filtrado — muda o tooltip para "tirar o filtro". */
+  activeSupplierNif?: string | null;
 }
+
+/** O nome do fornecedor; clicável quando a lista sabe filtrar e a fatura tem NIF. */
+const SupplierName: FC<{
+  row: ConstructionInvoice;
+  label: string;
+  onSupplierClick?: (supplierNif: string) => void;
+  activeSupplierNif?: string | null;
+}> = ({ row, label, onSupplierClick, activeSupplierNif }) => {
+  const nif = row.supplierNif;
+  if (!onSupplierClick || !nif) return <>{label}</>;
+  const active = activeSupplierNif === nif;
+  return (
+    <Tooltip title={active ? "Tirar o filtro deste fornecedor" : "Filtrar por este fornecedor"}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSupplierClick(nif);
+        }}
+        style={{
+          padding: 0,
+          border: "none",
+          background: "none",
+          font: "inherit",
+          color: "inherit",
+          textAlign: "left",
+          cursor: "pointer",
+          overflowWrap: "anywhere",
+          textDecoration: active ? "underline" : "underline dotted",
+          textUnderlineOffset: 3,
+        }}
+      >
+        {label}
+      </button>
+    </Tooltip>
+  );
+};
 
 /**
  * O cartão de uma fatura no telemóvel (`MobileCardList`): fornecedor, número, data,
@@ -94,7 +138,9 @@ const InvoiceCard: FC<{
   row: ConstructionInvoice;
   isProject: boolean;
   enterpriseNames?: Record<string, string>;
-}> = ({ row, isProject, enterpriseNames }) => {
+  onSupplierClick?: (supplierNif: string) => void;
+  activeSupplierNif?: string | null;
+}> = ({ row, isProject, enterpriseNames, onSupplierClick, activeSupplierNif }) => {
   const isCredit = row.documentType === "CREDIT_NOTE";
   const docStatus = DOCUMENT_STATUS[row.documentStatus];
   let rubric: { label: string; cls: string } | null = null;
@@ -108,7 +154,12 @@ const InvoiceCard: FC<{
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
         <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, minWidth: 0, overflowWrap: "anywhere" }}>
           {isCredit && <span className="ind-tag ind-tag-neutral" style={{ fontSize: 10, marginRight: 6 }}>NC</span>}
-          {row.supplierName ?? row.supplierNif ?? row.originalFilename ?? "—"}
+          <SupplierName
+            row={row}
+            label={row.supplierName ?? row.supplierNif ?? row.originalFilename ?? "—"}
+            onSupplierClick={onSupplierClick}
+            activeSupplierNif={activeSupplierNif}
+          />
         </span>
         <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, whiteSpace: "nowrap" }}>
           {row.totalAmount != null ? formatCurrency(row.totalAmount) : "—"}
@@ -172,6 +223,8 @@ export const InvoicesList: FC<Props> = ({
   onSortChange,
   scope = "PROJECT",
   enterpriseNames,
+  onSupplierClick,
+  activeSupplierNif,
 }) => {
   const { canManageWorks } = useAuth();
   const { t } = useTranslation();
@@ -252,7 +305,12 @@ export const InvoicesList: FC<Props> = ({
                 NC
               </span>
             )}
-            {name ?? row.supplierNif ?? row.originalFilename ?? "—"}
+            <SupplierName
+              row={row}
+              label={name ?? row.supplierNif ?? row.originalFilename ?? "—"}
+              onSupplierClick={onSupplierClick}
+              activeSupplierNif={activeSupplierNif}
+            />
           </span>
           <span style={{ display: "block", fontSize: 11, opacity: 0.55 }}>
             {[row.invoiceNumber, row.supplierNif ? `NIF ${row.supplierNif}` : null]
@@ -498,7 +556,15 @@ export const InvoicesList: FC<Props> = ({
             const rect = e.currentTarget.getBoundingClientRect();
             setMenu({ x: rect.right, y: rect.bottom, invoice: row });
           }}
-          renderCard={(row) => <InvoiceCard row={row} isProject={isProject} enterpriseNames={enterpriseNames} />}
+          renderCard={(row) => (
+            <InvoiceCard
+              row={row}
+              isProject={isProject}
+              enterpriseNames={enterpriseNames}
+              onSupplierClick={onSupplierClick}
+              activeSupplierNif={activeSupplierNif}
+            />
+          )}
         />
       ) : (
       <Table<ConstructionInvoice>

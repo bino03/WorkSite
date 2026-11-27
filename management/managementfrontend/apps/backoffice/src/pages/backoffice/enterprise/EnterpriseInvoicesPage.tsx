@@ -93,7 +93,9 @@ const EnterpriseInvoicesPage: FC = () => {
   // O lote de onde se veio (o botão "Faturas" da página do orçamento passa-o).
   // Lê-se **só à entrada**: mudar o dropdown não reescreve a URL, ao contrário da
   // página do orçamento, onde `?lote=` é o estado da aba aberta.
-  const [searchParams] = useSearchParams();
+  // O `?fornecedor=<NIF>` é diferente: lê-se e escreve-se (efeito mais abaixo), para
+  // recarregar, voltar a esta página e partilhar o link manterem o fornecedor filtrado.
+  const [searchParams, setSearchParams] = useSearchParams();
   const { canManageWorks } = useAuth();
   const confirm = useConfirm();
 
@@ -106,6 +108,7 @@ const EnterpriseInvoicesPage: FC = () => {
     ...initialFilters,
     // `?lote=` aceita um ou vários, separados por vírgula.
     budgetIds: (searchParams.get("lote") ?? "").split(",").filter(Boolean),
+    supplierNif: searchParams.get("fornecedor") || null,
   }));
   const [view, setView] = useState<ViewKey>("all");
   /** `null` = ordem por omissão do backend (data da fatura, mais recente primeiro; sem data no fim). */
@@ -208,6 +211,33 @@ const EnterpriseInvoicesPage: FC = () => {
     window.addEventListener(SUPPLIERS_CHANGED_EVENT, reload);
     return () => window.removeEventListener(SUPPLIERS_CHANGED_EVENT, reload);
   }, [fetch, filters, sort]);
+
+  // O fornecedor filtrado vive no URL, venha de onde vier a mudança (modal, "Limpar
+  // filtros", clique na linha). `replace`: o "voltar" sai da página, não desfaz filtros.
+  useEffect(() => {
+    const nif = filters.supplierNif ?? "";
+    if ((searchParams.get("fornecedor") ?? "") === nif) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nif) next.set("fornecedor", nif);
+        else next.delete("fornecedor");
+        return next;
+      },
+      { replace: true }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.supplierNif]);
+
+  /** Clicar no fornecedor de uma linha junta-o aos filtros; no já filtrado, tira-o. */
+  const handleSupplierClick = (nif: string) => {
+    if (filters.supplierNif === nif) {
+      applyFilters({ supplierNif: null, supplierName: null });
+      return;
+    }
+    const name = invoices.find((invoice) => invoice.supplierNif === nif)?.supplierName ?? null;
+    applyFilters({ supplierNif: nif, supplierName: name });
+  };
 
   /** Qualquer mudança de filtro volta à primeira página — senão fica-se num vazio. */
   const applyFilters = (changes: Partial<InvoiceFilters>) => {
@@ -600,7 +630,11 @@ const EnterpriseInvoicesPage: FC = () => {
         )}
         {showOutstandingTotal && <OutstandingTotalBadge summary={outstandingSummary} />}
         {showSupplierTotals && (
-          <InvoiceTotalsBadge summary={totalsSummary} hidePaid={wantsOutstandingTotal(filters)} />
+          <InvoiceTotalsBadge
+            summary={totalsSummary}
+            hidePaid={wantsOutstandingTotal(filters)}
+            hideOutstanding={filters.paymentStatus === "PAID"}
+          />
         )}
 
         {allocatableSelected.length > 0 && (
@@ -685,6 +719,8 @@ const EnterpriseInvoicesPage: FC = () => {
         sortField={sort?.field ?? null}
         sortOrder={sort?.order ?? null}
         onSortChange={handleSortChange}
+        onSupplierClick={handleSupplierClick}
+        activeSupplierNif={filters.supplierNif}
       />
 
       {enterpriseId && (

@@ -328,7 +328,7 @@ public class ConstructionInvoiceController {
             @RequestParam(required = false) String supplierNif,
             @RequestParam(required = false) String paymentStatus) {
         return service.searchEverywhereTotals(
-                new GlobalInvoiceSearchFilter(q, enterpriseId, scope, supplierNif, paymentStatus));
+                new GlobalInvoiceSearchFilter(q, enterpriseId, scope, supplierNif, paymentStatus), LocalDate.now());
     }
 
     @GetMapping("/enterprise/{enterpriseId}")
@@ -516,7 +516,7 @@ public class ConstructionInvoiceController {
         return ResponseEntity.ok(service.totalsSummary(enterpriseId, new InvoiceSearchFilter(
                 allocated, needsReview, outstanding, sentToAccountant, atChapter, from, to, q,
                 supplierNif, documentType, documentStatus, paymentStatus, allocationStatus,
-                minAmount, maxAmount, budgetItemId, budgetId)));
+                minAmount, maxAmount, budgetItemId, budgetId), LocalDate.now()));
     }
 
     /**

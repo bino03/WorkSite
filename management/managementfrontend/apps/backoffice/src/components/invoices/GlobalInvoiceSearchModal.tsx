@@ -212,8 +212,14 @@ export const GlobalInvoiceSearchModal: FC<Props> = ({ open, onClose }) => {
         {!idle && totals && totals.count > 0 && (
           <InvoiceTotalsBadge
             summary={totals}
-            // Lista só de por liquidar: o "Pago" seria 0 (ou só o das parciais) — como na obra.
-            hidePaid={filters.paymentStatus === "OUTSTANDING" || filters.paymentStatus === "UNPAID"}
+            // Lista só de por liquidar: o "Pago" seria 0 (ou só o das parciais) — como na obra;
+            // só de pagas: o "A pagar" seria 0.
+            hidePaid={
+              filters.paymentStatus === "OUTSTANDING" ||
+              filters.paymentStatus === "UNPAID" ||
+              filters.paymentStatus === "PARTIAL"
+            }
+            hideOutstanding={filters.paymentStatus === "PAID"}
           />
         )}
 

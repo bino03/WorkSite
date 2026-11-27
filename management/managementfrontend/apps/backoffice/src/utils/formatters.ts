@@ -4,11 +4,10 @@ import dayjs from "dayjs";
  * Format number as currency (EUR)
  */
 export function formatCurrency(value: number | undefined): string {
-  if (!value) return "€ 0,00";
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
     currency: "EUR"
-  }).format(value);
+  }).format(value == null || Number.isNaN(value) ? 0 : value);
 }
 
 /**

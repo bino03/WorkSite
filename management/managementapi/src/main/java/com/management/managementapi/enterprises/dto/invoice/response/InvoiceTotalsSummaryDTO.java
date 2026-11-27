@@ -18,6 +18,10 @@ import java.math.BigDecimal;
  * @param outstanding       Σ (líquido − pago) das por liquidar que têm total
  * @param withoutTotalCount quantas não têm total — contam em {@code outstandingCount}
  *                          mas valem 0 nas somas
+ * @param overdueCount      das por liquidar com total, quantas já passaram o vencimento
+ *                          (o mesmo {@code InvoiceDueDate} da página "A pagar": sem NIF,
+ *                          sem ficha, sem prazo ou sem data não vencem; vencer hoje ainda não é vencida)
+ * @param overdue           Σ (líquido − pago) dessas — uma parte de {@code outstanding}
  */
 public record InvoiceTotalsSummaryDTO(
         long count,
@@ -26,5 +30,7 @@ public record InvoiceTotalsSummaryDTO(
         BigDecimal paid,
         long outstandingCount,
         BigDecimal outstanding,
-        long withoutTotalCount
+        long withoutTotalCount,
+        long overdueCount,
+        BigDecimal overdue
 ) {}

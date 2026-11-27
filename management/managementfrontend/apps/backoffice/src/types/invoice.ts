@@ -807,6 +807,10 @@ export interface InvoiceTotalsSummary {
   outstandingCount: number;
   outstanding: number;
   withoutTotalCount: number;
+  /** Das por liquidar com total, as que já passaram o vencimento (mesma regra da página "A pagar"). */
+  overdueCount: number;
+  /** O que falta pagar dessas — parte do `outstanding`. */
+  overdue: number;
 }
 
 /**

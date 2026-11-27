@@ -11,12 +11,15 @@ const plural = (n: number) => `${n} fatura${n === 1 ? "" : "s"}`;
  * 2026-11-16) — número e soma sobre a lista inteira do filtro, não só a página.
  * O "Pago" inclui o já pago das parciais, para as três somas baterem
  * (total = pago + a pagar); a contagem do "Pago" é das pagas por inteiro.
+ * O "A pagar" diz quanto dele já está vencido (2026-11-27).
  */
 export const InvoiceTotalsBadge: FC<{
   summary: InvoiceTotalsSummary | null;
   /** Lista só de por liquidar: o "Pago" seria sempre 0 (ou só o das parciais) e sai (pedido de 2026-11-16). */
   hidePaid?: boolean;
-}> = ({ summary, hidePaid = false }) => {
+  /** Lista só de pagas: o "A pagar" e o "sem total" seriam sempre 0 e saem — a simetria do `hidePaid`. */
+  hideOutstanding?: boolean;
+}> = ({ summary, hidePaid = false, hideOutstanding = false }) => {
   if (!summary) return null;
 
   const item = (label: string, amount: number, count: number, color?: string) => (
@@ -35,8 +38,23 @@ export const InvoiceTotalsBadge: FC<{
           <span style={{ cursor: "help" }}>{item("Pago", summary.paid, summary.paidCount)}</span>
         </Tooltip>
       )}
-      {item("A pagar", summary.outstanding, summary.outstandingCount, "var(--ind-accent-700)")}
-      {summary.withoutTotalCount > 0 && (
+      {!hideOutstanding && (
+        <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "baseline", gap: 6 }}>
+          {item("A pagar", summary.outstanding, summary.outstandingCount, "var(--ind-accent-700)")}
+          {summary.overdueCount > 0 && (
+            <Tooltip title="O que falta pagar das faturas que já passaram o vencimento (data da fatura + prazo do fornecedor, ou o vencimento escrito à mão). Sem NIF, sem ficha ou sem prazo não vencem.">
+              <span style={{ cursor: "help" }}>
+                <span style={{ opacity: 0.6 }}>dos quais </span>
+                <span style={{ fontFamily: "var(--ind-font-heading)", fontWeight: 600, color: "var(--ind-color-accent)" }}>
+                  {formatCurrency(summary.overdue)}
+                </span>
+                <span style={{ opacity: 0.6 }}> vencidos ({plural(summary.overdueCount)})</span>
+              </span>
+            </Tooltip>
+          )}
+        </span>
+      )}
+      {!hideOutstanding && summary.withoutTotalCount > 0 && (
         <Tooltip title="Faturas que ainda não têm total — contam como a pagar mas não entram nas somas até serem corrigidas.">
           <span className="ind-tag ind-tag-outline" style={{ fontSize: 10, cursor: "help" }}>
             +{summary.withoutTotalCount} sem total
